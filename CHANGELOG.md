@@ -3,6 +3,11 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+
+### 2.22.1 (2025-01-27)
+
+- Fix submit keybind. [#153](https://github.com/TuxedoTako/4chan-xt/issues/153)
+
 ### 2.22.0 (2025-01-26)
 
 - Convert a few more things into icons. [#150](https://github.com/TuxedoTako/4chan-xt/issues/150)

@@ -413,6 +413,7 @@ var QR = {
     return QR.notifications = [];
   },
 
+  /* Returns true if the QR is disabled. */
   status() {
     let disabled, value;
     if (!QR.nodes) { return; }

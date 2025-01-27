@@ -144,7 +144,7 @@ var Keybinds = {
       QR.addPost();
       hasAction = true;
     }
-    if (key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && QR.status()) {
+    if (key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && !QR.status()) {
       QR.submit();
       hasAction = true;
     }

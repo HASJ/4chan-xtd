@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XT
-// @version      2.22.0
+// @version      2.22.1
 // @minGMVer     1.14
 // @minFFVer     74
 // @namespace    4chan-XT
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.22.0",
-    "date": "2025-01-26T18:15:00Z"
+    "version": "2.22.1",
+    "date": "2025-01-27T10:15:00Z"
   };
 
   var meta = {
@@ -16297,7 +16297,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QR.addPost();
         hasAction = true;
       }
-      if (key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && QR.status()) {
+      if (key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && !QR.status()) {
         QR.submit();
         hasAction = true;
       }
@@ -17293,6 +17293,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       return QR.notifications = [];
     },
+    /* Returns true if the QR is disabled. */
     status() {
       let disabled, value;
       if (!QR.nodes) {
