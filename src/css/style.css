@@ -13,11 +13,13 @@
 }
 .field {
   background-color: #FFF;
+  padding: 2px 4px 3px;
   border: 1px solid #CCC;
   box-sizing: border-box;
   color: #333;
   font: 13px sans-serif;
   outline: none;
+  margin: 0px;
   transition: color .25s, border-color .25s;
 }
 .field::placeholder {
@@ -1482,19 +1484,16 @@ $site$thread[hidden] + hr {
 }
 #qr > form {
   max-height: calc(100vh - 75px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden auto;
 }
 .qr-link-container {
   text-align: center;
   margin: 16px 0;
 }
 .qr-link-container-bottom {
-  width: 200px;
   position: absolute;
-  left: -100px;
   margin-left: 50%;
-  text-align: center;
+  transform: translateX(-50%);
 }
 .qr-link {
   border-radius: 3px;
@@ -1519,8 +1518,7 @@ $site$thread[hidden] + hr {
   flex: 1;
   width: 0;
 }
-#qr.forced-anon input[data-name="name"]:not(.force-show),
-#qr.forced-anon input[data-name="sub"]:not(.force-show),
+#qr.forced-anon :is(input[data-name="name"]:not(.force-show), input[data-name="sub"]:not(.force-show)),
 #qr.reply-to-thread input[data-name="sub"]:not(.force-show),
 body:not(.board_f) #qr select[name="filetag"],
 #qr.reply-to-thread select[name="filetag"],
@@ -1529,17 +1527,6 @@ body:not(.board_f) #qr select[name="filetag"],
 #qr.tex-preview .textarea > :not(#tex-preview),
 #qr:not(.tex-preview) #tex-preview {
   display: none;
-}
-.persona button {
-  flex: 0 0 23px;
-  align-self: stretch;
-  border: 1px solid #BBB;
-  padding: 0;
-  background: linear-gradient(to bottom, #F8F8F8, #DCDCDC) no-repeat;
-  color: #000;
-}
-#qr.sjis-preview #sjis-toggle, #qr.tex-preview #tex-preview-button {
-  background: #DCDCDC;
 }
 #sjis-toggle, #qr.sjis-preview textarea.field {
   font-family: "IPAMonaPGothic","Mona","MS PGothic",monospace;
@@ -1552,26 +1539,36 @@ body:not(.board_f) #qr select[name="filetag"],
 #tex-preview {
   white-space: pre-line;
 }
+.textarea {
+  position: relative;
+  display: flex;
+}
 #qr textarea.field {
   height: 14.8em;
   min-height: 9em;
+  min-width: 300px;
+  resize: both;
 }
 #qr.has-captcha textarea.field {
   height: 9em;
+}
+#char-count {
+  color: #000;
+  background: hsla(0, 0%, 100%, .5);
+  font-size: 8pt;
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  pointer-events: none;
+}
+#char-count.warning {
+  color: red;
 }
 input.field.tripped:not(:hover):not(:focus) {
   color: transparent !important;
   text-shadow: none !important;
 }
-#qr textarea {
-  min-width: 300px;
-  resize: both;
-}
-.field {
-  box-sizing: border-box;
-  margin: 0px;
-  padding: 2px 4px 3px;
-}
+
 #qr > .move {
   display: flex;
   justify-content: space-between;
@@ -1644,7 +1641,7 @@ input.field.tripped:not(:hover):not(:focus) {
   overflow: auto;
   align-items: center;
 }
-#overlay.media-preview video, #overlay.media-preview img {
+#overlay.media-preview :is(img, video) {
   margin: auto;
 }
 #overlay.media-preview video {
@@ -1652,18 +1649,11 @@ input.field.tripped:not(:hover):not(:focus) {
   max-width: 100%;
 }
 
-
 /* File Input, Submit Button, Oekaki */
 #file-n-submit, #qr .oekaki {
   display: flex;
   align-items: stretch;
   margin-top: 1px;
-}
-#file-n-submit > input, #qr-draw-button {
-  background: linear-gradient(to bottom, #F8F8F8, #DCDCDC) no-repeat;
-  border: 1px solid #BBB;
-  border-radius: 2px;
-  height: 100%;
 }
 #qr-file-button, #qr-draw-button {
   width: 15%;
@@ -1703,9 +1693,6 @@ input#qr-filename {
   color: #AAA;
 }
 #qr .oekaki.has-file {
-  height: 25px;
-}
-#qr .oekaki.has-file {
   display: none;
 }
 #qr .oekaki > label {
@@ -1713,7 +1700,6 @@ input#qr-filename {
   width: 0;
   display: flex;
   align-items: center;
-  height: 100%;
 }
 #qr .oekaki > label > span {
   margin: 0 3px;
@@ -1721,12 +1707,10 @@ input#qr-filename {
 #qr .oekaki > label > input {
   flex: 1 1 auto;
   width: 0;
-  height: 100%;
 }
 #qr .oekaki-bg {
   position: relative;
   display: inline-block;
-  height: 100%;
   width: 10%;
   margin-left: 3px;
 }
@@ -1760,13 +1744,10 @@ input#qr-filename {
   margin-right: 3px;
 }
 #qr:not(.has-spoiler) #qr-spoiler-label,
-#file-n-submit:not(.has-file) #qr-spoiler-label,
-#file-n-submit:not(.has-file) #qr-randomize,
+#file-n-submit:not(.has-file) :is(#qr-spoiler-label, #qr-randomize, #qr-restore-name),
 #file-n-submit:not(.has-image) #qr-jpg,
 #file-n-submit:not(.has-image):not(.has-video) #qr-view,
-#file-n-submit:not(.has-file) #qr-restore-name,
-.has-file #paste-area,
-.has-file #url-button,
+#file-n-submit.has-file :is(#paste-area, #url-button),
 #file-n-submit:not(.custom-cooldown) #custom-cooldown-button {
   display: none;
 }
@@ -1826,8 +1807,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   margin-top: 1px;
 }
 #dump-list {
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: auto;
   white-space: nowrap;
   width: 248px;
   max-height: 248px;
@@ -1836,9 +1816,6 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   min-width: 100%;
   display: flex;
   flex-wrap: wrap;
-}
-#dump-list:hover {
-  overflow-x: auto;
 }
 .qr-preview {
   box-sizing: border-box;
@@ -1890,7 +1867,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   color: #e00;
   padding: 1px;
 }
-a:only-of-type > .remove {
+.qr-preview:only-of-type > .remove {
   display: none;
 }
 .remove:hover::after {
@@ -1920,22 +1897,6 @@ a:only-of-type > .remove {
   right: 10px;
   transform: translateY(calc(-50% - .75em));
 }
-.textarea {
-  position: relative;
-  display: flex;
-}
-#char-count {
-  color: #000;
-  background: hsla(0, 0%, 100%, .5);
-  font-size: 8pt;
-  position: absolute;
-  bottom: 1px;
-  right: 1px;
-  pointer-events: none;
-}
-#char-count.warning {
-  color: red;
-}
 #file-n-submit {
   display: flex;
   flex-direction: column;
@@ -1947,10 +1908,14 @@ a:only-of-type > .remove {
 #file-n-submit .row.space {
   justify-content: space-between;
 }
-#file-n-submit > .row.space > .row {
+#qr-actions {
   align-items: center;
   gap: 6px;
   padding: 0 3px;
+}
+#qr-actions .qr-action-button {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Menu */
@@ -2046,21 +2011,16 @@ a:only-of-type > .remove {
   display: none;
 }
 #embedding {
-  padding: 1px 4px 1px 4px;
+  padding: 1px 4px;
   position: fixed;
 }
 #embedding.empty {
   display: none;
 }
-#embedding > div:first-child {
+#embedding > .move {
   display: flex;
-}
-#embedding .move {
-  flex: 1;
-}
-#embedding .jump {
-  margin: -1px 4px;
-  text-decoration: none;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 /* Gallery */
