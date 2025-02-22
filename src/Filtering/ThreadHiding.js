@@ -308,7 +308,7 @@ var ThreadHiding = {
     const threadRoot = thread.nodes.root;
     threadRoot.hidden = (thread.isHidden = false);
     Index.updateHideLabel();
-    if (thread.catalogView) {
+    if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
       const { root } = thread.catalogView.nodes;
 
       if (Index.showHiddenThreads) {

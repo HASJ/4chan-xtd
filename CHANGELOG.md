@@ -3,6 +3,16 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.23.0 (2025-02-22)
+
+- Slight tweaks to positioning of floating embedding icons. [#154](https://github.com/TuxedoTako/4chan-xt/issues/154),
+  [67](https://github.com/TuxedoTako/4chan-xt/issues/67)
+- Updated archive list.
+- Fixed bug where adding an image on the quick reply would apply the image on the post selected when downloading the
+  images finishes, instead of the post where the download was started.
+  [#156](https://github.com/TuxedoTako/4chan-xt/issues/156)
+- Fixed ghost threads created when going from the catalog view to the index view and then unhiding a thread.
+  [#142](https://github.com/TuxedoTako/4chan-xt/issues/142)
 
 ### 2.22.1 (2025-01-27)
 

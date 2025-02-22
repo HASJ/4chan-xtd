@@ -676,14 +676,16 @@ var QR = {
 
   handleUrl(urlDefault) {
     QR.open();
-    QR.selected.preventAutoPost();
+    const { selected } = QR;
+    selected.preventAutoPost();
     CrossOrigin.permission(function() {
       const url = prompt('Enter a URL:', urlDefault);
       if (!url) return;
       QR.nodes.fileButton.focus();
       CrossOrigin.file(url, function(blob) {
         if (blob && !/^text\//.test(blob.type)) {
-          QR.handleFiles([blob]);
+          selected.setFile(blob);
+          $.addClass(QR.nodes.el, 'dump');
         } else {
           QR.error("Can't load file.");
         }

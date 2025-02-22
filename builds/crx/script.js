@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.22.1",
-    "date": "2025-01-27T10:15:00Z"
+    "version": "2.23.0",
+    "date": "2025-02-22T17:45:00Z"
   };
 
   var meta = {
@@ -111,7 +111,7 @@
    "recaptchaKey": "6Ldp2bsSAAAAAAJ5uyx_lx34lJeEpTLVkP5k04qc",
    "min": {
     "chrome": "90",
-    "firefox": "74",
+    "firefox": "78",
     "greasemonkey": "1.14"
    }
   };
@@ -3136,18 +3136,16 @@ current-archive-text:"Archive"]
   color-scheme: dark;
 }
 
-:root.tomorrow #file-n-submit>input,
-:root.tomorrow #qr-draw-buton,
-:root.spooky #file-n-submit>input,
-:root.spooky #qr-draw-buton {
-  background-image: none;
-}
-
 :root.tomorrow .field,
-:root.spooly .field {
+:root.spooky .field {
   background-color: unset;
   color: unset;
   border-color: unset;
+}
+
+:root.tomorrow input[type="button"],
+:root.spooky input[type="button"] {
+  filter: brightness(80%);
 }`;
 
   var photon = `:root.photon {
@@ -3246,25 +3244,7 @@ current-archive-text:"Archive"]
   border-color: rgb(254, 150, 0) !important;
   background-color: rgb(30,32,36);
 }
-:root.spooky .persona button {
-  background: linear-gradient(to bottom, #2E3035, #222427) no-repeat;
-  color: rgb(197,200,198);
-  border-color: rgb(40, 41, 42);
-  outline: none;
-}
-:root.spooky .persona button::-moz-focus-inner {
-  border: none;
-}
-:root.spooky .persona button:focus {
-  border-color: rgb(254, 150, 0);
-}
-:root.spooky #qr.sjis-preview #sjis-toggle,
-:root.spooky #qr.tex-preview #tex-preview-button {
-  background: rgb(26, 27, 29);
-}
-:root.spooky #qr select,
-:root.spooky #file-n-submit > input,
-:root.spooky #qr-draw-button {
+:root.spooky #qr select {
   border-color: rgb(40, 41, 42);
   background: unset;
 }
@@ -3293,11 +3273,13 @@ current-archive-text:"Archive"]
 }
 .field {
   background-color: #FFF;
+  padding: 2px 4px 3px;
   border: 1px solid #CCC;
   box-sizing: border-box;
   color: #333;
   font: 13px sans-serif;
   outline: none;
+  margin: 0px;
   transition: color .25s, border-color .25s;
 }
 .field::placeholder {
@@ -4762,19 +4744,16 @@ $site$thread[hidden] + hr {
 }
 #qr > form {
   max-height: calc(100vh - 75px);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden auto;
 }
 .qr-link-container {
   text-align: center;
   margin: 16px 0;
 }
 .qr-link-container-bottom {
-  width: 200px;
   position: absolute;
-  left: -100px;
   margin-left: 50%;
-  text-align: center;
+  transform: translateX(-50%);
 }
 .qr-link {
   border-radius: 3px;
@@ -4799,8 +4778,7 @@ $site$thread[hidden] + hr {
   flex: 1;
   width: 0;
 }
-#qr.forced-anon input[data-name="name"]:not(.force-show),
-#qr.forced-anon input[data-name="sub"]:not(.force-show),
+#qr.forced-anon :is(input[data-name="name"]:not(.force-show), input[data-name="sub"]:not(.force-show)),
 #qr.reply-to-thread input[data-name="sub"]:not(.force-show),
 body:not(.board_f) #qr select[name="filetag"],
 #qr.reply-to-thread select[name="filetag"],
@@ -4809,17 +4787,6 @@ body:not(.board_f) #qr select[name="filetag"],
 #qr.tex-preview .textarea > :not(#tex-preview),
 #qr:not(.tex-preview) #tex-preview {
   display: none;
-}
-.persona button {
-  flex: 0 0 23px;
-  align-self: stretch;
-  border: 1px solid #BBB;
-  padding: 0;
-  background: linear-gradient(to bottom, #F8F8F8, #DCDCDC) no-repeat;
-  color: #000;
-}
-#qr.sjis-preview #sjis-toggle, #qr.tex-preview #tex-preview-button {
-  background: #DCDCDC;
 }
 #sjis-toggle, #qr.sjis-preview textarea.field {
   font-family: "IPAMonaPGothic","Mona","MS PGothic",monospace;
@@ -4832,26 +4799,36 @@ body:not(.board_f) #qr select[name="filetag"],
 #tex-preview {
   white-space: pre-line;
 }
+.textarea {
+  position: relative;
+  display: flex;
+}
 #qr textarea.field {
   height: 14.8em;
   min-height: 9em;
+  min-width: 300px;
+  resize: both;
 }
 #qr.has-captcha textarea.field {
   height: 9em;
+}
+#char-count {
+  color: #000;
+  background: hsla(0, 0%, 100%, .5);
+  font-size: 8pt;
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  pointer-events: none;
+}
+#char-count.warning {
+  color: red;
 }
 input.field.tripped:not(:hover):not(:focus) {
   color: transparent !important;
   text-shadow: none !important;
 }
-#qr textarea {
-  min-width: 300px;
-  resize: both;
-}
-.field {
-  box-sizing: border-box;
-  margin: 0px;
-  padding: 2px 4px 3px;
-}
+
 #qr > .move {
   display: flex;
   justify-content: space-between;
@@ -4924,7 +4901,7 @@ input.field.tripped:not(:hover):not(:focus) {
   overflow: auto;
   align-items: center;
 }
-#overlay.media-preview video, #overlay.media-preview img {
+#overlay.media-preview :is(img, video) {
   margin: auto;
 }
 #overlay.media-preview video {
@@ -4932,18 +4909,11 @@ input.field.tripped:not(:hover):not(:focus) {
   max-width: 100%;
 }
 
-
 /* File Input, Submit Button, Oekaki */
 #file-n-submit, #qr .oekaki {
   display: flex;
   align-items: stretch;
   margin-top: 1px;
-}
-#file-n-submit > input, #qr-draw-button {
-  background: linear-gradient(to bottom, #F8F8F8, #DCDCDC) no-repeat;
-  border: 1px solid #BBB;
-  border-radius: 2px;
-  height: 100%;
 }
 #qr-file-button, #qr-draw-button {
   width: 15%;
@@ -4983,9 +4953,6 @@ input#qr-filename {
   color: #AAA;
 }
 #qr .oekaki.has-file {
-  height: 25px;
-}
-#qr .oekaki.has-file {
   display: none;
 }
 #qr .oekaki > label {
@@ -4993,7 +4960,6 @@ input#qr-filename {
   width: 0;
   display: flex;
   align-items: center;
-  height: 100%;
 }
 #qr .oekaki > label > span {
   margin: 0 3px;
@@ -5001,12 +4967,10 @@ input#qr-filename {
 #qr .oekaki > label > input {
   flex: 1 1 auto;
   width: 0;
-  height: 100%;
 }
 #qr .oekaki-bg {
   position: relative;
   display: inline-block;
-  height: 100%;
   width: 10%;
   margin-left: 3px;
 }
@@ -5040,13 +5004,10 @@ input#qr-filename {
   margin-right: 3px;
 }
 #qr:not(.has-spoiler) #qr-spoiler-label,
-#file-n-submit:not(.has-file) #qr-spoiler-label,
-#file-n-submit:not(.has-file) #qr-randomize,
+#file-n-submit:not(.has-file) :is(#qr-spoiler-label, #qr-randomize, #qr-restore-name),
 #file-n-submit:not(.has-image) #qr-jpg,
 #file-n-submit:not(.has-image):not(.has-video) #qr-view,
-#file-n-submit:not(.has-file) #qr-restore-name,
-.has-file #paste-area,
-.has-file #url-button,
+#file-n-submit.has-file :is(#paste-area, #url-button),
 #file-n-submit:not(.custom-cooldown) #custom-cooldown-button {
   display: none;
 }
@@ -5106,8 +5067,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   margin-top: 1px;
 }
 #dump-list {
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: auto;
   white-space: nowrap;
   width: 248px;
   max-height: 248px;
@@ -5116,9 +5076,6 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   min-width: 100%;
   display: flex;
   flex-wrap: wrap;
-}
-#dump-list:hover {
-  overflow-x: auto;
 }
 .qr-preview {
   box-sizing: border-box;
@@ -5170,7 +5127,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   color: #e00;
   padding: 1px;
 }
-a:only-of-type > .remove {
+.qr-preview:only-of-type > .remove {
   display: none;
 }
 .remove:hover::after {
@@ -5200,22 +5157,6 @@ a:only-of-type > .remove {
   right: 10px;
   transform: translateY(calc(-50% - .75em));
 }
-.textarea {
-  position: relative;
-  display: flex;
-}
-#char-count {
-  color: #000;
-  background: hsla(0, 0%, 100%, .5);
-  font-size: 8pt;
-  position: absolute;
-  bottom: 1px;
-  right: 1px;
-  pointer-events: none;
-}
-#char-count.warning {
-  color: red;
-}
 #file-n-submit {
   display: flex;
   flex-direction: column;
@@ -5227,10 +5168,14 @@ a:only-of-type > .remove {
 #file-n-submit .row.space {
   justify-content: space-between;
 }
-#file-n-submit > .row.space > .row {
+#qr-actions {
   align-items: center;
   gap: 6px;
   padding: 0 3px;
+}
+#qr-actions .qr-action-button {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Menu */
@@ -5326,21 +5271,16 @@ a:only-of-type > .remove {
   display: none;
 }
 #embedding {
-  padding: 1px 4px 1px 4px;
+  padding: 1px 4px;
   position: fixed;
 }
 #embedding.empty {
   display: none;
 }
-#embedding > div:first-child {
+#embedding > .move {
   display: flex;
-}
-#embedding .move {
-  flex: 1;
-}
-#embedding .jump {
-  margin: -1px 4px;
-  text-decoration: none;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 /* Gallery */
@@ -5610,25 +5550,7 @@ div.post {
   border-color: var(--xt-border-field-focus) !important;
   background-color: rgb(30,32,36);
 }
-:root.tomorrow .persona button {
-  background: linear-gradient(to bottom, #2E3035, #222427) no-repeat;
-  color: rgb(197,200,198);
-  border-color: rgb(40, 41, 42);
-  outline: none;
-}
-:root.tomorrow .persona button::-moz-focus-inner {
-  border: none;
-}
-:root.tomorrow .persona button:focus {
-  border-color: rgb(129, 162, 190);
-}
-:root.tomorrow #qr.sjis-preview #sjis-toggle,
-:root.tomorrow #qr.tex-preview #tex-preview-button {
-  background: rgb(26, 27, 29);
-}
-:root.tomorrow #qr select,
-:root.tomorrow #file-n-submit > input,
-:root.tomorrow #qr-draw-button {
+:root.tomorrow #qr select {
   border-color: rgb(40, 41, 42);
   background: unset;
 }
@@ -6201,8 +6123,8 @@ svg.icon {
 </div>
 <form>
   <div class="persona">
-    <button type="button" id="sjis-toggle" title="Toggle Mona font">∀</button>
-    <button type="button" id="tex-preview-button" title="Preview TeX">T<sub>E</sub>X</button>
+    <button type="button" id="sjis-toggle" class="qr-button" title="Toggle Mona font">∀</button>
+    <button type="button" id="tex-preview-button" class="qr-button" title="Preview TeX">T<sub>E</sub>X</button>
     <input name="name" data-name="name" list="list-name" placeholder="Name" class="field" size="1">
     <input name="email" data-name="email" list="list-email" placeholder="Options" class="field" size="1">
     <input name="sub" data-name="sub" list="list-sub" placeholder="Subject" class="field" size="1" maxlength="100">
@@ -6217,14 +6139,14 @@ svg.icon {
     <a id="add-post" href="javascript:;" title="Add a post">+</a>
   </div>
   <div class="oekaki" hidden>
-    <input type="button" id="qr-draw-button" value="Draw">
+    <input type="button" id="qr-draw-button" class="qr-button" value="Draw">
     <label><span>Width:</span><input name="oekaki-width" value="400" type="number" class="field" size="1"></label>
     <label><span>Height:</span><input name="oekaki-height" value="400" type="number" class="field" size="1"></label>
     <span class="oekaki-bg" title="Background Color"><input name="oekaki-bg" type="checkbox" checked><input name="oekaki-bgcolor" type="color" value="#ffffff"></span>
   </div>
   <div id="file-n-submit">
-    <span class="row">
-      <input type="button" id="qr-file-button" value="Files">
+    <span id="qr-file" class="row">
+      <input type="button" id="qr-file-button" class="qr-button" value="Files">
       <span id="qr-filename-container" class="field">
         <span id="qr-no-file">No selected file</span>
         <input id="qr-filename" data-name="filename" spellcheck="false">
@@ -6234,21 +6156,21 @@ svg.icon {
         </label>
       </span>
     </span>
-    <span class="row space">
-      <span class="row">
-        <a href="javascript:;" id="qr-oekaki-button" title="Edit in Tegaki">✎︎</a>
-        <a href="javascript:;" id="qr-jpg" title="Compress to jpg">C</a>
-        <a href="javascript:;" id="qr-view" title="Preview">V</a>
-        <a href="javascript:;" id="qr-randomize" title="Randomize filename">R</a>
-        <a href="javascript:;" id="qr-restore-name" title="Reset filename">U</a>
-        <a href="javascript:;" id="qr-filerm" title="Remove file">✕</a>
-        <a href="javascript:;" id="url-button" title="Post from URL">🔗︎</a>
-        <a href="javascript:;" hidden id="paste-area" title="Select to paste images" tabindex="-1" contentEditable="true">📋︎</a>
-        <a href="javascript:;" id="custom-cooldown-button" title="Toggle custom cooldown" class="disabled">🕒︎</a>
-        <a href="javascript:;" id="split-post" title="Split into multiple posts" hidden>✂️</a>
-        <a href="javascript:;" id="dump-button" title="Dump list">➕︎</a>
+    <span id="qr-actions-container" class="row space">
+      <span id="qr-actions" class="row">
+        <a href="javascript:;" id="qr-oekaki-button" class="qr-action-button" title="Edit in Tegaki">✎︎</a>
+        <a href="javascript:;" id="qr-jpg" class="qr-action-button" title="Compress to jpg">C</a>
+        <a href="javascript:;" id="qr-view" class="qr-action-button" title="Preview">V</a>
+        <a href="javascript:;" id="qr-randomize" class="qr-action-button" title="Randomize filename">R</a>
+        <a href="javascript:;" id="qr-restore-name" class="qr-action-button" title="Reset filename">U</a>
+        <a href="javascript:;" id="qr-filerm" class="qr-action-button" title="Remove file">✕</a>
+        <a href="javascript:;" id="url-button" class="qr-action-button" title="Post from URL">🔗︎</a>
+        <a href="javascript:;" hidden id="paste-area" class="qr-action-button" title="Select to paste images" tabindex="-1" contentEditable="true">📋︎</a>
+        <a href="javascript:;" id="custom-cooldown-button" class="qr-action-button" title="Toggle custom cooldown" class="disabled">🕒︎</a>
+        <a href="javascript:;" id="split-post" class="qr-action-button" title="Split into multiple posts" hidden>✂️</a>
+        <a href="javascript:;" id="dump-button" class="qr-action-button" title="Dump list">➕︎</a>
       </span>
-      <input type="submit">
+      <input class="qr-button" type="submit">
     </span>
   </div>
   <select data-default="4" name="filetag">
@@ -13644,7 +13566,7 @@ svg.icon {
       const threadRoot = thread.nodes.root;
       threadRoot.hidden = (thread.isHidden = false);
       Index.updateHideLabel();
-      if (thread.catalogView) {
+      if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
         const { root } = thread.catalogView.nodes;
 
         if (Index.showHiddenThreads) {
@@ -14451,8 +14373,7 @@ svg.icon {
     }
   };
 
-  var EmbeddingPage = `<div>
-  <div class="move"></div>
+  var EmbeddingPage = `<div class="move">
   <a href="javascript:;" class="jump" title="Jump to post">→</a>
   <a href="javascript:;" class="close" title="Close">×</a>
 </div>
@@ -17405,7 +17326,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     },
     handleUrl(urlDefault) {
       QR.open();
-      QR.selected.preventAutoPost();
+      const { selected } = QR;
+      selected.preventAutoPost();
       CrossOrigin.permission(function () {
         const url = prompt('Enter a URL:', urlDefault);
         if (!url)
@@ -17413,7 +17335,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QR.nodes.fileButton.focus();
         CrossOrigin.file(url, function (blob) {
           if (blob && !/^text\//.test(blob.type)) {
-            QR.handleFiles([blob]);
+            selected.setFile(blob);
+            $.addClass(QR.nodes.el, 'dump');
           } else {
             QR.error("Can't load file.");
           }
@@ -19062,9 +18985,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           // In JS Blocker (Safari) content type comes back as 'text/plain; charset=x-user-defined'; guess from filename instead.
           mime = $.getOwn(QR.typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
         }
-        const blob = new Blob([data], { type: mime });
-        blob.name = name;
-        return cb(blob);
+        cb(new File([data], name, { type: mime }));
       });
     },
     Request: (function () {
@@ -22882,8 +22803,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     "search": ["cm", "co", "ic", "sci", "y"]
   }, {
     "uid": 25,
-    "name": "arch.b4k.co",
-    "domain": "arch.b4k.co",
+    "name": "not arch.b4k.co",
+    "domain": "arch.b4k.dev",
     "http": true,
     "https": true,
     "software": "foolfuuka",
@@ -23125,7 +23046,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return '';
         }
       }
-      if (archive.name === 'arch.b4k.co') {
+      if (archive.name.endsWith('arch.b4k.co')) {
         const [timeStamp, ext] = filename.split('.');
         if (timeStamp.length > 13) {
           // remove last 3 digits

@@ -84,7 +84,7 @@
     ],
     "min": {
       "chrome": "90",
-      "firefox": "74",
+      "firefox": "78",
       "greasemonkey": "1.14"
     }
   },
