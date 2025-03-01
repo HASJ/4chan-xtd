@@ -3,6 +3,13 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.23.1 (2025-03-01)
+
+- Do not run on cloudflare pages.
+  [#158 \(comment\)](https://github.com/TuxedoTako/4chan-xt/issues/158#issuecomment-2691769200)
+- Added the "Avoid OffscreenCanvas" setting, which enables a workaround for
+  [#132](https://github.com/TuxedoTako/4chan-xt/issues/132).
+
 ### 2.23.0 (2025-02-22)
 
 - Slight tweaks to positioning of floating embedding icons. [#154](https://github.com/TuxedoTako/4chan-xt/issues/154),

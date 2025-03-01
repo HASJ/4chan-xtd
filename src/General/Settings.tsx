@@ -103,6 +103,7 @@ var Settings = {
     $.on(dialog.firstElementChild, 'click', e => e.stopPropagation());
 
     $.add(d.body, dialog);
+    links[0].focus();
 
     $.event('OpenSettings', null, dialog);
   },

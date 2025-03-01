@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.23.0",
-    "date": "2025-02-22T17:45:00Z"
+    "version": "2.23.1",
+    "date": "2025-03-01T17:50:00Z"
   };
 
   var meta = {
@@ -766,6 +766,12 @@ div.boardTitle {
         'Post on Captcha Completion': [
           false,
           'Submit the post immediately when the captcha is completed.',
+          1
+        ],
+        'Avoid OffscreenCanvas': [
+          false,
+          'Do not use OffscreenCanvas when converting images, workaround for ' +
+            '<a href="https://github.com/TuxedoTako/4chan-xt/issues/132">this LibreWolf bug</a>',
           1
         ],
         'Force Noscript Captcha': [
@@ -2478,11 +2484,11 @@ current-archive-text:"Archive"]
       h("div", { class: "sections-list" }),
       h("p", { class: "imp-exp-result warning" }),
       h("div", { class: "credits" },
-        h("a", { class: "export" }, "Export"),
+        h("a", { href: "javascript:;", class: "export" }, "Export"),
         separator,
-        h("a", { class: "import" }, "Import"),
+        h("a", { href: "javascript:;", class: "import" }, "Import"),
         separator,
-        h("a", { class: "reset" }, "Reset Settings"),
+        h("a", { href: "javascript:;", class: "reset" }, "Reset Settings"),
         separator,
         h("input", { type: "file", hidden: true, accept: ".json,application/json" }),
         h("a", { href: meta.page, target: "_blank" }, meta.name),
@@ -17908,9 +17914,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       const mime = 'image/' + type;
       // Fallback to HTMLCanvasElement is for old firefox versions. Once the minimum firefox >= 105, this can be
       // simplified to just the OffscreenCanvas implementation.
+      // Conf['Avoid OffscreenCanvas'] is for https://codeberg.org/librewolf/issues/issues/2174
       let canvas;
       let toBlob;
-      if (window.OffscreenCanvas) {
+      if (window.OffscreenCanvas && !Conf['Avoid OffscreenCanvas']) {
         canvas = new OffscreenCanvas(width, height);
         toBlob = (mime, quality) => canvas.convertToBlob({ type: mime, quality });
       } else {
@@ -18383,7 +18390,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         href: 'javascript:;'
       });
       $.extend(el, {
-        innerHTML: `<a class="remove" title="Remove">${Icon.get('xmark')}</a>` +
+        innerHTML: `<a href="javascript:;" class="remove" title="Remove">${Icon.get('xmark')}</a>` +
           '<label class="qr-preview-spoiler"><input type="checkbox"> Spoiler</label>' +
           '<span id="qr-preview-comment"></span><br /><span id="qr-preview-name"></span>'
       });
@@ -20620,6 +20627,7 @@ $\
       });
       $.on(dialog.firstElementChild, 'click', e => e.stopPropagation());
       $.add(d.body, dialog);
+      links[0].focus();
       $.event('OpenSettings', null, dialog);
     },
     close() {
@@ -25259,11 +25267,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
   var Main = {
     init() {
-      // Return if the url is exactly https://www.4chan.org, this is only the home page which has a cloudflare checking system which breaks this script
-      if (window.location.hostname == 'www.4chan.org') { return; }
+      // Return if the url is exactly https://www.4chan.org, this is only the home page which has a cloudflare checking
+      // system which breaks this script. Keep it in the includes so it can be found on greasy fork.
+      // __cf is also a cloudflare check page
+      if (location.hostname === 'www.4chan.org' || location.search.includes("__cf")) return;
       // XXX dwb userscripts extension reloads scripts run at document-start when replaceState/pushState is called.
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
-      let key;
       try {
         let w = window;
          w = (w.wrappedJSObject || w);
@@ -25319,8 +25328,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           Conf[parent] = dict.clone(obj[0]);
         } else if (typeof obj === 'object') {
           for (var key in obj) {
-            var val = obj[key];
-            flatten(key, val);
+            flatten(key, obj[key]);
           }
         } else { // string or number
           Conf[parent] = obj;
@@ -25375,7 +25383,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
       // Get saved values as items
       const items = dict();
-      for (key in Conf) { items[key] = undefined; }
+      for (const key in Conf) items[key] = undefined;
       items['previousversion'] = undefined;
       ($.getSync || $.get)(items, function(items) {
         $.asap(docSet, function() {
@@ -25394,9 +25402,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           }
 
           // Combine default values with saved values
-          for (key in Conf) {
-            var val = Conf[key];
-            Conf[key] = items[key] ?? val;
+          for (const key in Conf) {
+            Conf[key] = items[key] ?? Conf[key];
           }
 
           Site.init(Main.initFeatures);

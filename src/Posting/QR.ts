@@ -1290,9 +1290,10 @@ var QR = {
 
     // Fallback to HTMLCanvasElement is for old firefox versions. Once the minimum firefox >= 105, this can be
     // simplified to just the OffscreenCanvas implementation.
+    // Conf['Avoid OffscreenCanvas'] is for https://codeberg.org/librewolf/issues/issues/2174
     let canvas: HTMLCanvasElement | OffscreenCanvas;
     let toBlob: (mime: string, quality: number) => Promise<Blob>;
-    if (window.OffscreenCanvas) {
+    if (window.OffscreenCanvas && !Conf['Avoid OffscreenCanvas']) {
       canvas = new OffscreenCanvas(width, height);
       toBlob = (mime, quality) => (canvas as OffscreenCanvas).convertToBlob({ type: mime, quality });
     } else {
@@ -1818,7 +1819,7 @@ class post {
       href: 'javascript:;'
     }) as HTMLAnchorElement;
     $.extend(el, {
-      innerHTML: `<a class="remove" title="Remove">${Icon.get('xmark')}</a>` +
+      innerHTML: `<a href="javascript:;" class="remove" title="Remove">${Icon.get('xmark')}</a>` +
       '<label class="qr-preview-spoiler"><input type="checkbox"> Spoiler</label>' +
       '<span id="qr-preview-comment"></span><br /><span id="qr-preview-name"></span>'
     });

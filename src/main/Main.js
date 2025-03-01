@@ -104,11 +104,12 @@ import Test from "../General/Test";
  */
 var Main = {
   init() {
-    // Return if the url is exactly https://www.4chan.org, this is only the home page which has a cloudflare checking system which breaks this script
-    if (window.location.hostname == 'www.4chan.org') { return; }
+    // Return if the url is exactly https://www.4chan.org, this is only the home page which has a cloudflare checking
+    // system which breaks this script. Keep it in the includes so it can be found on greasy fork.
+    // __cf is also a cloudflare check page
+    if (location.hostname === 'www.4chan.org' || location.search.includes("__cf")) return;
     // XXX dwb userscripts extension reloads scripts run at document-start when replaceState/pushState is called.
     // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
-    let key;
     try {
       let w = window;
       if (platform === 'crx') { w = (w.wrappedJSObject || w); }
@@ -164,8 +165,7 @@ var Main = {
         Conf[parent] = dict.clone(obj[0]);
       } else if (typeof obj === 'object') {
         for (var key in obj) {
-          var val = obj[key];
-          flatten(key, val);
+          flatten(key, obj[key]);
         }
       } else { // string or number
         Conf[parent] = obj;
@@ -220,7 +220,7 @@ var Main = {
 
     // Get saved values as items
     const items = dict();
-    for (key in Conf) { items[key] = undefined; }
+    for (const key in Conf) items[key] = undefined;
     items['previousversion'] = undefined;
     ($.getSync || $.get)(items, function(items) {
       $.asap(docSet, function() {
@@ -243,9 +243,8 @@ var Main = {
         }
 
         // Combine default values with saved values
-        for (key in Conf) {
-          var val = Conf[key];
-          Conf[key] = items[key] ?? val;
+        for (const key in Conf) {
+          Conf[key] = items[key] ?? Conf[key];
         }
 
         Site.init(Main.initFeatures);

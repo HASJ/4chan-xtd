@@ -551,6 +551,12 @@ const Config = {
         'Submit the post immediately when the captcha is completed.',
         1
       ],
+      'Avoid OffscreenCanvas': [
+        false,
+        'Do not use OffscreenCanvas when converting images, workaround for ' +
+          '<a href="https://github.com/TuxedoTako/4chan-xt/issues/132">this LibreWolf bug</a>',
+        1
+      ],
       'Force Noscript Captcha': [
         false,
         'Use the non-Javascript fallback captcha even if Javascript is enabled.'
