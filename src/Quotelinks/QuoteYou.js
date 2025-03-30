@@ -8,6 +8,7 @@ import Menu from "../Menu/Menu";
 import ExpandComment from "../Miscellaneous/ExpandComment";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
+import { debounce } from "../platform/helpers";
 import PostRedirect from "../Posting/PostRedirect";
 
 /*
@@ -55,7 +56,18 @@ var QuoteYou = {
       cb:   this.node
     });
 
-    return QuoteYou.menu.init();
+    QuoteYou.menu.init();
+
+    QuoteYou.scrollMarkerContainer = $.el('div', { classList: 'scroll-marker-container' });
+    doc.insertAdjacentElement('afterbegin', QuoteYou.scrollMarkerContainer);
+    $.on( QuoteYou.scrollMarkerContainer, 'click', (e) => {
+      const { postId } = /** @type {HTMLElement} */ (e.target).dataset;
+      if (postId) Header.scrollTo(g.posts[postId].nodes.root);
+    })
+    // $.on(d, 'PostsInserted', QuoteYou.markScroll);
+    // $.on(d, 'PostsRemoved', QuoteYou.markScroll);
+    $.on(window, 'resize', QuoteYou.markScroll);
+    new ResizeObserver(QuoteYou.markScroll).observe(doc)
   },
 
   isYou(post) {
@@ -71,6 +83,7 @@ var QuoteYou = {
 
     if (QuoteYou.isYou(this)) {
       $.addClass(this.nodes.root, 'yourPost');
+      QuoteYou.markScroll();
     }
 
     // Stop there if there's no quotes in that post.
@@ -93,7 +106,7 @@ var QuoteYou = {
         {innerHTML: '<input type="checkbox"> You'});
       const input = $('input', label);
       $.on(input, 'change', QuoteYou.menu.toggle);
-      return Menu.menu?.addEntry({
+      Menu.menu?.addEntry({
         el: label,
         order: 80,
         open(post) {
@@ -127,8 +140,38 @@ var QuoteYou = {
           quoter.classList.toggle('quotesYou', !!$('.quotelink.you', quoter));
         }
       }
+      QuoteYou.markScroll();
     }
   },
+
+  markScroll: debounce(100, () => {
+    // Remove previous
+    QuoteYou.scrollMarkerContainer.innerText = '';
+
+    g.posts?.forEach((post) => {
+      const postEl = post.nodes.root;
+      let isReply = false;
+      if ($.hasClass(postEl, 'quotesYou')) {
+        isReply = true;
+      } else if (!$.hasClass(postEl, 'yourPost')) {
+        return;
+      }
+
+      const postPosition = postEl.getBoundingClientRect();
+      const top = (((postPosition.top + window.scrollY) / doc.scrollHeight) * 100).toFixed(1);
+      const height = Math.max(1, (postPosition.height / doc.scrollHeight) * 100).toFixed(1);
+
+      const marker = $.el('div', {
+        classList: `post-scroll-marker ${isReply ? 'reply' : 'you'}-scroll-marker`,
+        ariaHidden: true,
+      });
+      marker.style.top = `${top}vh`;
+      marker.style.height = `${height}vh`;
+      marker.dataset.postId = `${post.boardID}.${post.ID}`;
+
+      $.add(QuoteYou.scrollMarkerContainer, marker);
+    })
+  }, false),
 
   cb: {
     seek(type) {

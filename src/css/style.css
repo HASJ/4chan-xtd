@@ -2238,3 +2238,21 @@ div.post {
   overflow: auto;
   scroll-margin-top: 30px;
 }
+
+/* (you) markers on the scrollbar */
+.post-scroll-marker {
+  position: fixed;
+  right: -5px;
+  background-color: var(--xt-border-highlight);
+  border-radius: 3px;
+  width: 10px;
+  min-height: 5px;
+}
+
+.post-scroll-marker.you-scroll-marker {
+  opacity: 50%;
+}
+
+.scroll-marker-container {
+  display: contents;
+}

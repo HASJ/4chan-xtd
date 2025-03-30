@@ -3,6 +3,10 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### Not released yet
+
+- Mark your posts and replies on the scrollbar. [#162](https://github.com/TuxedoTako/4chan-xt/issues/162)
+
 ### 2.23.1 (2025-03-01)
 
 - Do not run on cloudflare pages.
