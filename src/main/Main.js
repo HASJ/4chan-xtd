@@ -17,7 +17,6 @@ import Index from "../General/Index";
 import Settings from "../General/Settings";
 import FappeTyme from "../Images/FappeTyme";
 import Gallery from "../Images/Gallery";
-import ImageCommon from "../Images/ImageCommon";
 import ImageExpand from "../Images/ImageExpand";
 import ImageHost from "../Images/ImageHost";
 import ImageHover from "../Images/ImageHover";
@@ -90,6 +89,7 @@ import CaptchaReplace from "../Posting/Captcha.replace";
 import Get from "../General/Get";
 import { dict, platform } from "../platform/helpers";
 import RestoreDeletedFromArchive from "../Archive/RestoreDeletedFromArchive";
+import ScrollMarkers from "../Miscellaneous/ScrollMarkers";
 // #region tests_enabled
 import Test from "../General/Test";
 // #endregion
@@ -943,6 +943,7 @@ User agent: ${navigator.userAgent}\
     ['Reply Pruning',             ReplyPruning],
     ['Mod Contact Links',         ModContact],
     ['Restore deleted posts from archive', RestoreDeletedFromArchive],
+    ['Mark posts on scroll bar',  ScrollMarkers],
   ]
 };
 export default Main;

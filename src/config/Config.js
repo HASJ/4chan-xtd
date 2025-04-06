@@ -140,6 +140,11 @@ const Config = {
         true,
         'Ask if history should be exported when settings are exported.'
       ],
+      'Scroll Markers': [
+        true,
+        'Mark your posts and replies to them on the scroll bar. Relies on the "Highlight Posts Quoting You" and ' +
+          '"Highlight Own Posts" settings'
+      ],
     },
 
     'Linkification': {

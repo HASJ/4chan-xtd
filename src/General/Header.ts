@@ -552,7 +552,7 @@ var Header = {
     return $('[name=boardnav]', settings).focus();
   },
 
-  scrollTo(root, down, needed) {
+  scrollTo(root: HTMLElement, down = false, needed = false) {
     let height, x;
     if (!root.offsetParent) { return; } // hidden or fixed
     if (down) {

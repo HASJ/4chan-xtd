@@ -21,6 +21,7 @@ New features since the fork include:
 - A manifest v3 version for chromium browsers dropping support for v2
 - A button to un-randomize a filename in the quick reply
 - Showing the reason a post was filtered in the stub
+- Marking replies to your post on the scroll bar
 
 4chan X was previously developed by [ccd0](https://github.com/ccd0/4chan-x),
 [aeosynth](https://github.com/aeosynth/4chan-x), [Mayhem](https://github.com/MayhemYDG/4chan-x),

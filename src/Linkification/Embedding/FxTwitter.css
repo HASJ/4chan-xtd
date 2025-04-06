@@ -4,6 +4,7 @@
 }
 
 .fxt-card {
+  color: var(--xt-fxt-fg, #000);
   background-color: var(--xt-fxt-bg, #D6DAF0);
   padding: 16px;
   border: 1px solid var(--xt-fxt-border, #B7C5D9);

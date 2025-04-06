@@ -2,9 +2,9 @@
 // dependencies, so try to keep this file without dependencies, so these functions don't have to wait for something else
 
 /**
- * @param wait Time to wait in milisecons.
+ * @param wait Time to wait in milliseconds.
  * @param fn The function to execute
- * @param leading Wether to run immidiatly, otherwise it waits for timeout even if there is no older call.
+ * @param leading Wether to run immediately, otherwise it waits for timeout even if there is no older call.
  */
 export const debounce = (wait: number, fn: Function, leading = true) => {
   let lastCall = 0;

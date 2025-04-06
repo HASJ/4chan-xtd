@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.23.1",
-    "date": "2025-03-01T17:50:00Z"
+    "version": "2.24.0",
+    "date": "2025-04-06T17:30:00Z"
   };
 
   var meta = {
@@ -356,6 +356,11 @@ div.boardTitle {
         'Ask to Export History': [
           true,
           'Ask if history should be exported when settings are exported.'
+        ],
+        'Scroll Markers': [
+          true,
+          'Mark your posts and replies to them on the scroll bar. Relies on the "Highlight Posts Quoting You" and ' +
+            '"Highlight Own Posts" settings'
         ],
       },
 
@@ -1442,7 +1447,12 @@ current-archive-text:"Archive"]
 
   // This file was created because these functions on $ were sometimes not initialized yet because of circular
   // dependencies, so try to keep this file without dependencies, so these functions don't have to wait for something else
-  const debounce = (wait, fn) => {
+  /**
+   * @param wait Time to wait in milliseconds.
+   * @param fn The function to execute
+   * @param leading Wether to run immediately, otherwise it waits for timeout even if there is no older call.
+   */
+  const debounce = (wait, fn, leading = true) => {
     let lastCall = 0;
     let timeout = null;
     let that = null;
@@ -1454,13 +1464,15 @@ current-archive-text:"Archive"]
     return function () {
       args = arguments;
       that = this;
-      if (lastCall < (Date.now() - wait)) {
-        return exec();
+      if (leading && lastCall < (Date.now() - wait)) {
+        exec();
+        return;
       }
       // stop current reset
-      clearTimeout(timeout);
+      if (timeout !== null)
+        clearTimeout(timeout);
       // after wait, let next invocation execute immediately
-      return timeout = setTimeout(exec, wait);
+      timeout = setTimeout(exec, wait);
     };
   };
   const dict = () => Object.create(null);
@@ -1963,12 +1975,10 @@ current-archive-text:"Archive"]
   $.replace = (root, el) => root.parentNode.replaceChild($.nodes(el), root);
   $.el = function (tag, properties, properties2) {
     const el = d.createElement(tag);
-    if (properties) {
+    if (properties)
       $.extend(el, properties);
-    }
-    if (properties2) {
+    if (properties2)
       $.extend(el, properties2);
-    }
     return el;
   };
   $.on = function (el, events, handler) {
@@ -2906,7 +2916,7 @@ current-archive-text:"Archive"]
   --xt-background: #D6DAF0;
   --xt-border: #B7C5D9;
   --xt-border-field-focus: #98E;
-  --xt-border-highlight: 3px dashed rgba(221, 0, 0, .8);
+  --xt-border-highlight: rgba(221, 0, 0, .8);
   --xt-header-dialog-bg: rgba(214, 218, 240, 0.98);
   --xt-notification-size: 11pt;
   --xt-header-dialog-fg: #89A;
@@ -2930,7 +2940,7 @@ current-archive-text:"Archive"]
   --xt-background: #F0E0D6;
   --xt-border: #D9BFB7;
   --xt-border-field-focus: #EA8;
-  --xt-border-highlight: rgba(240, 224, 214, 0.98);
+  --xt-border-highlight: rgba(221, 0, 0, .8);
   --xt-notification-size: 11pt;
   --xt-header-dialog-fg: #B86;
   --xt-dead-link: #00E;
@@ -5503,6 +5513,28 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
 div.post {
   overflow: auto;
   scroll-margin-top: 30px;
+}
+
+/* (you) markers on the scrollbar */
+.post-scroll-marker {
+  border: none;
+  padding: 0;
+  position: fixed;
+  right: -5px;
+  background-color: var(--xt-scroll-maker-you, var(--xt-border-highlight));
+  border-radius: 3px;
+  width: 10px;
+  min-height: 5px;
+  top: calc(var(--top) * 1vh);
+  height: calc(var(--height) * 1vh);
+}
+
+.post-scroll-marker.you-scroll-marker {
+  opacity: 50%;
+}
+
+.scroll-marker-container {
+  display: contents;
 }`;
 
   var tomorrow = `:root.tomorrow {
@@ -5652,6 +5684,7 @@ svg.icon {
 }
 
 .fxt-card {
+  color: var(--xt-fxt-fg, #000);
   background-color: var(--xt-fxt-bg, #D6DAF0);
   padding: 16px;
   border: 1px solid var(--xt-fxt-border, #B7C5D9);
@@ -9376,6 +9409,74 @@ svg.icon {
     }
   };
 
+  const ScrollMarkers = {
+    init() {
+      ScrollMarkers.container = $.el('div', { classList: 'scroll-marker-container' });
+      doc.insertAdjacentElement('afterbegin', ScrollMarkers.container);
+      $.on(ScrollMarkers.container, 'click', (e) => {
+        const { postId } = e.target.dataset;
+        if (postId)
+          Header.scrollTo(g.posts[postId].nodes.root);
+      });
+      new ResizeObserver(ScrollMarkers.markScroll).observe(doc);
+    },
+    container: undefined,
+    // Keep instead of redoing so renewing doesn't lose keyboard focus
+    markers: undefined,
+    markScroll: debounce(100, () => {
+      if (!Conf['Scroll Markers']) {
+        ScrollMarkers.container.innerText = '';
+        ScrollMarkers.markers = undefined;
+        return;
+      }
+      const newMarkers = new Map();
+      g.posts?.forEach((post) => {
+        const postEl = post.nodes.root;
+        let isReply = false;
+        if ($.hasClass(postEl, 'quotesYou')) {
+          isReply = true;
+        } else if (!$.hasClass(postEl, 'yourPost')) {
+          return;
+        }
+        const postPosition = postEl.getBoundingClientRect();
+        newMarkers.set(`${post.boardID}.${post.ID}`, {
+          classList: `post-scroll-marker ${isReply ? 'reply' : 'you'}-scroll-marker`,
+          ariaLabel: `Jump to ${isReply ? 'reply to ' : ''} my post`,
+          top: (((postPosition.top + window.scrollY) / doc.scrollHeight) * 100).toFixed(1),
+          height: Math.max(1, (postPosition.height / doc.scrollHeight) * 100).toFixed(1),
+        });
+      });
+      let previousEl;
+      for (const [key, marker] of newMarkers) {
+        const existing = ScrollMarkers.markers?.get(key);
+        let el = existing?.el;
+        if (!el) {
+          el = $.el('button', { type: 'button' });
+          if (previousEl) {
+            previousEl.insertAdjacentElement('afterend', el);
+          } else {
+            $.add(ScrollMarkers.container, el);
+          }
+        }
+        el.classList = marker.classList;
+        el.style.setProperty('--top', marker.top);
+        el.style.setProperty('--height', marker.height);
+        el.dataset.postId = key;
+        marker.el = el;
+        previousEl = el;
+        document.createElement('button');
+      }
+      // Remove those that don't exist anymore
+      if (ScrollMarkers.markers) {
+        for (const [key, { el }] of ScrollMarkers.markers) {
+          if (!newMarkers.has(key))
+            el.remove();
+        }
+      }
+      ScrollMarkers.markers = newMarkers;
+    }, false),
+  };
+
   var QuoteYou = {
     init() {
       if (!Conf['Remember Your Posts']) { return; }
@@ -9416,7 +9517,7 @@ svg.icon {
         cb:   this.node
       });
 
-      return QuoteYou.menu.init();
+      QuoteYou.menu.init();
     },
 
     isYou(post) {
@@ -9432,6 +9533,7 @@ svg.icon {
 
       if (QuoteYou.isYou(this)) {
         $.addClass(this.nodes.root, 'yourPost');
+        ScrollMarkers.markScroll();
       }
 
       // Stop there if there's no quotes in that post.
@@ -9454,7 +9556,7 @@ svg.icon {
           {innerHTML: '<input type="checkbox"> You'});
         const input = $('input', label);
         $.on(input, 'change', QuoteYou.menu.toggle);
-        return Menu.menu?.addEntry({
+        Menu.menu?.addEntry({
           el: label,
           order: 80,
           open(post) {
@@ -9488,6 +9590,7 @@ svg.icon {
             quoter.classList.toggle('quotesYou', !!$('.quotelink.you', quoter));
           }
         }
+        ScrollMarkers.markScroll();
       }
     },
 
@@ -22580,7 +22683,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       const settings = $.id('fourchanx-settings');
       return $('[name=boardnav]', settings).focus();
     },
-    scrollTo(root, down, needed) {
+    scrollTo(root, down = false, needed = false) {
       let height, x;
       if (!root.offsetParent) {
         return;
@@ -26100,6 +26203,7 @@ User agent: ${navigator.userAgent}\
       ['Reply Pruning',             ReplyPruning],
       ['Mod Contact Links',         ModContact],
       ['Restore deleted posts from archive', RestoreDeletedFromArchive],
+      ['Mark posts on scroll bar',  ScrollMarkers],
     ]
   };
   $.ready(() => Main.init());

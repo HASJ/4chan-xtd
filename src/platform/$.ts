@@ -272,10 +272,14 @@ $.before = (root, el) => root.parentNode.insertBefore($.nodes(el), root);
 
 $.replace = (root, el) => root.parentNode.replaceChild($.nodes(el), root);
 
-$.el = function (tag: string, properties?: Record<string, any>, properties2?: Record<string, any>) {
+$.el = function <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  properties?: Record<string, any>,
+  properties2?: Record<string, any>
+): HTMLElementTagNameMap[K] {
   const el = d.createElement(tag);
-  if (properties) { $.extend(el, properties); }
-  if (properties2) { $.extend(el, properties2); }
+  if (properties) $.extend(el, properties);
+  if (properties2) $.extend(el, properties2);
   return el;
 };
 

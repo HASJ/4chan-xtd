@@ -3,9 +3,14 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
-### Not released yet
+### 2.24.0 (2025-04-06)
 
 - Mark your posts and replies on the scrollbar. [#162](https://github.com/TuxedoTako/4chan-xt/issues/162)
+  - This can be turned off with the "Scroll Markers" setting.
+  - This wasn't tested on a platform with auto-hiding scroll bars.
+- Fixed reply highlight in the Burichan style.
+- Changed reply highlight in the Futaba style to a visible color.
+- Restored --xt-fxt-bg.
 
 ### 2.23.1 (2025-03-01)
 

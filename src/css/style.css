@@ -2241,12 +2241,16 @@ div.post {
 
 /* (you) markers on the scrollbar */
 .post-scroll-marker {
+  border: none;
+  padding: 0;
   position: fixed;
   right: -5px;
-  background-color: var(--xt-border-highlight);
+  background-color: var(--xt-scroll-maker-you, var(--xt-border-highlight));
   border-radius: 3px;
   width: 10px;
   min-height: 5px;
+  top: calc(var(--top) * 1vh);
+  height: calc(var(--height) * 1vh);
 }
 
 .post-scroll-marker.you-scroll-marker {
