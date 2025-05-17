@@ -3,6 +3,11 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.24.1 (2025-05-17)
+
+- Update pastebin embedding [#183](https://github.com/TuxedoTako/4chan-xt/pull/183)
+- Added a fallback color for the (you) markers on the scrollbar for alt chans.
+
 ### 2.24.0 (2025-04-06)
 
 - Mark your posts and replies on the scrollbar. [#162](https://github.com/TuxedoTako/4chan-xt/issues/162)

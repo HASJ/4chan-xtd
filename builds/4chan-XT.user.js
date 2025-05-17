@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XT
-// @version      2.24.0
+// @version      2.24.1
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XT
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.24.0",
-    "date": "2025-04-06T17:30:00Z"
+    "version": "2.24.1",
+    "date": "2025-05-17T18:20:00Z"
   };
 
   var meta = {
@@ -5671,7 +5671,10 @@ div.post {
   padding: 0;
   position: fixed;
   right: -5px;
-  background-color: var(--xt-scroll-maker-you, var(--xt-border-highlight));
+  background-color: var(
+    --xt-scroll-maker-you, 
+    var(--xt-border-highlight, currentColor)
+  );
   border-radius: 3px;
   width: 10px;
   min-height: 5px;
@@ -15624,7 +15627,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         key: 'Pastebin',
         regExp: /^\w+:\/\/(?:\w+\.)?pastebin\.com\/(?!u\/)(?:[\w.]+(?:\/|\?i\=))?(\w+)/,
         el(a) {
-          return $.el('iframe', { src: `//pastebin.com/embed_iframe.php?i=${a.dataset.uid}` });
+          return $.el('iframe', { src: `//pastebin.com/embed_iframe/${a.dataset.uid}` });
         }
       },
       {
