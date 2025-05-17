@@ -530,7 +530,7 @@ var Embedding = {
       el(a) {
         let div;
         return div = $.el('iframe',
-          {src: `//pastebin.com/embed_iframe.php?i=${a.dataset.uid}`});
+          {src: `//pastebin.com/embed_iframe/${a.dataset.uid}`});
       }
     }
     , {
