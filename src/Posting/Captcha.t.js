@@ -63,7 +63,7 @@ const CaptchaT = {
         response[key] = $(`[name='${key}']`, this.nodes.container).value;
       }
     }
-    if (!response['t-response'] && !((el = $('#t-msg')) && /Verification not required/i.test(el.textContent))) {
+    if (!response['t-response'] && !((el = $('#t-msg, #t-task')) && /Verification not required/i.test(el.textContent))) {
       response = null;
     }
     return response;
