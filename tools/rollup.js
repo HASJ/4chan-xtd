@@ -40,6 +40,7 @@ const tsPlugin = typescript({
   const metaFileName = `${packageJson.meta.path}${minify ? '.min' : ''}.meta.js`;
 
   const metadata = await generateMetadata(packageJson, fileName, metaFileName);
+  const metaNoDownload = metadata.replace(/downloadURL( +)[^\n]+\n/, 'downloadURL$1none\n');
 
   const license = await readFile(resolve(__dirname, '../LICENSE'), 'utf8');
 
@@ -167,7 +168,7 @@ const tsPlugin = typescript({
   if (platform !== 'crx') {
     await bundle.write({
       ...sharedBundleOpts,
-      banner: (metadata + license).replace(/\r\n/g, '\n'),
+      banner: (metaNoDownload + license).replace(/\r\n/g, '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
       plugins: minify ? [terser({

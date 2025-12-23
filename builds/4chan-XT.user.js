@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XT
-// @version      2.24.1
+// @version      2.24.2
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XT
@@ -77,8 +77,8 @@
 // @grant        GM.openInTab
 // @grant        GM.xmlHttpRequest
 // @run-at       document-start
-// @updateURL    https://github.com/TuxedoTako/4chan-xt/releases/latest/download/4chan-XT.meta.js
-// @downloadURL  https://github.com/TuxedoTako/4chan-xt/releases/latest/download/4chan-XT.user.js
+// @updateURL    none
+// @downloadURL  none
 // @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAACVBMVEUAAGcAAABmzDNZt9VtAAAAAXRSTlMAQObYZgAAAF5JREFUeNrtkTESABAQxPD/R6tsE2dUGYUtFJvLDKf93KevHJAjpBorAQWSBIKqFASC4G0pCAkm4GfaEvgYXl0T6HBaE97f0vmnfYHbZOMLZCx9ISdKWwjOWZSC8GYm4SUGwfYgqI4AAAAASUVORK5CYII=
 // @license      MIT
 // ==/UserScript==
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.24.1",
-    "date": "2025-05-17T18:20:00Z"
+    "version": "2.24.2",
+    "date": "2025-12-23T20:20:20Z"
   };
 
   var meta = {
@@ -6670,7 +6670,7 @@ svg.icon {
           response[key] = $(`[name='${key}']`, this.nodes.container).value;
         }
       }
-      if (!response['t-response'] && !((el = $('#t-msg')) && /Verification not required/i.test(el.textContent))) {
+      if (!response['t-response'] && !((el = $('#t-msg, #t-task')) && /Verification not required/i.test(el.textContent))) {
         response = null;
       }
       return response;
@@ -23391,7 +23391,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return '';
         }
       }
-      if (archive.name.endsWith('arch.b4k.co')) {
+      if (archive.name.endsWith('arch.b4k.co') || archive.name.endsWith('palanq.win')) {
         const [timeStamp, ext] = filename.split('.');
         if (timeStamp.length > 13) {
           // remove last 3 digits

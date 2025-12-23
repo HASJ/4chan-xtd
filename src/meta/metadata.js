@@ -61,9 +61,10 @@ export default async function generateMetadata(packageJson, fileName, metaFileNa
     return '// @grant        ' + grant;
   }).join('\n');
 
+  // @updateURL    ${meta.downloads}/latest/download/${metaFileName}
   output += `
 // @run-at       document-start
-// @updateURL    ${meta.downloads}/latest/download/${metaFileName}
+// @updateURL    none
 // @downloadURL  ${meta.downloads}/latest/download/${fileName}
 // @icon         data:image/png;base64,${icon.toString('base64')}
 // @license      MIT

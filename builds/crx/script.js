@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.24.1",
-    "date": "2025-05-17T18:20:00Z"
+    "version": "2.24.2",
+    "date": "2025-12-23T20:20:20Z"
   };
 
   var meta = {
@@ -23160,7 +23160,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return '';
         }
       }
-      if (archive.name.endsWith('arch.b4k.co')) {
+      if (archive.name.endsWith('arch.b4k.co') || archive.name.endsWith('palanq.win')) {
         const [timeStamp, ext] = filename.split('.');
         if (timeStamp.length > 13) {
           // remove last 3 digits

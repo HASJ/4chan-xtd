@@ -1,4 +1,10 @@
-# 4chan XT
+# 4chan XT is dead
+
+I stopped using 4chan since the hack. I now browse alt chans that actually care about their users, and don't need an 
+userscript fighting their shitty design.
+
+<details>
+<summary>Old readme</summary>
 
 4chan XT is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has
 no affiliation with it.
@@ -123,4 +129,5 @@ If the bug seems to be caused by a script update, you can install a old version 
 - @violentmonkey/types was chosen over @types/greasemonkey because @types/greasemonkey only declares the GM object,
   and not GM\_ functions
 
+</details>
 </details>

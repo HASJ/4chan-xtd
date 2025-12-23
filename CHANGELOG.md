@@ -3,6 +3,14 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.24.2 (2025-12-23 🎅🏻)
+
+I'm officially stopping XT since I don't use 4chan anymore. This update removes the update URL, and merges the last two
+bug fix pull requests that were open.
+
+- Fix file redirect for palanq.win [#205](https://github.com/TuxedoTako/4chan-xt/pull/205)
+- Fix new 4chan captcha submission when "Verification not required" [#209](https://github.com/TuxedoTako/4chan-xt/pull/209)
+
 ### 2.24.1 (2025-05-17)
 
 - Update pastebin embedding [#183](https://github.com/TuxedoTako/4chan-xt/pull/183)
