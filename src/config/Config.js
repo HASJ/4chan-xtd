@@ -250,6 +250,10 @@ const Config = {
         true,
         'Show full image / video on mouseover.'
       ],
+      'Download All Media': [
+        true,
+        'Add a button to the header to download all media in a thread.'
+      ],
       'Image Hover in Catalog': [
         true,
         `Show full image / video on mouseover in ${meta.name} catalog.`

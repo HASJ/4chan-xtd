@@ -15,6 +15,7 @@ import Recursive from "../Filtering/Recursive";
 import ThreadHiding from "../Filtering/ThreadHiding";
 import Index from "../General/Index";
 import Settings from "../General/Settings";
+import DownloadAll from "../Images/DownloadAll";
 import FappeTyme from "../Images/FappeTyme";
 import Gallery from "../Images/Gallery";
 import ImageExpand from "../Images/ImageExpand";
@@ -909,6 +910,7 @@ User agent: ${navigator.userAgent}\
     ['Time Formatting',           Time],
     ['Relative Post Dates',       RelativeDates],
     ['File Info Formatting',      FileInfo],
+    ['Download All Media',        DownloadAll],
     ['Fappe Tyme',                FappeTyme],
     ['Gallery',                   Gallery],
     ['Gallery (menu)',            Gallery.menu],

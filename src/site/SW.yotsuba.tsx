@@ -82,7 +82,7 @@ const SWYotsuba = {
       isArchived: '.archivedIcon'
     },
     file: {
-      text:  '.file > :first-child',
+      text:  '.fileText, .fileInfo',
       link:  '.fileText > a',
       thumb: 'a.fileThumb > [data-md5]'
     },
