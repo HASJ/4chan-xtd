@@ -240,35 +240,31 @@
     return doc;
   };
 
-  // @ts-nocheck
-
   class Callbacks {
-    static initClass() {
-      this.Post          = new Callbacks('Post');
-      this.Thread        = new Callbacks('Thread');
-      this.CatalogThread = new Callbacks('Catalog Thread');
-      this.CatalogThreadNative = new Callbacks('Catalog Thread');
-    }
-
     constructor(type) {
       this.type = type;
       this.keys = [];
     }
-
-    push({name, cb}) {
-      if (!this[name]) { this.keys.push(name); }
-      return this[name] = cb;
+    push({ name, cb }) {
+      if (!this[name]) {
+        this.keys.push(name);
+      }
+      this[name] = cb;
+      return cb;
     }
-
-    execute(node, keys=this.keys, force=false) {
+    execute(node, keys = this.keys, force = false) {
       let errors;
-      if (node.callbacksExecuted && !force) { return; }
+      if (node.callbacksExecuted && !force) {
+        return;
+      }
       node.callbacksExecuted = true;
-      for (var name of keys) {
+      for (const name of keys) {
         try {
           this[name]?.call(node);
         } catch (err) {
-          if (!errors) { errors = []; }
+          if (!errors) {
+            errors = [];
+          }
           errors.push({
             message: ['"', name, '" crashed on node ', this.type, ' No.', node.ID, ' (', node.board, ').'].join(''),
             error: err,
@@ -276,12 +272,16 @@
           });
         }
       }
-
-      if (errors) { return Callbacks.errorHandler?.(errors); }
+      if (errors) {
+        Callbacks.errorHandler?.(errors);
+      }
     }
   }
   Callbacks.errorHandler = null;
-  Callbacks.initClass();
+  Callbacks.Post = new Callbacks('Post');
+  Callbacks.Thread = new Callbacks('Thread');
+  Callbacks.CatalogThread = new Callbacks('Catalog Thread');
+  Callbacks.CatalogThreadNative = new Callbacks('Catalog Thread');
 
   var userCss = `/* Board title rice */
 div.boardTitle {
@@ -7278,24 +7278,23 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
-
   class CatalogThread {
-    toString() { return this.ID; }
-
+    toString() {
+      return this.ID;
+    }
     constructor(root, thread) {
       this.thread = thread;
-      this.ID    = this.thread.ID;
+      this.ID = this.thread.ID;
       this.board = this.thread.board;
-      const {post} = this.thread.OP.nodes;
+      const { post } = this.thread.OP.nodes;
       this.nodes = {
         root,
-        thumb:     $('.catalog-thumb', post),
-        icons:     $('.catalog-icons', post),
-        postCount: $('.post-count',    post),
-        fileCount: $('.file-count',    post),
-        pageCount: $('.page-count',    post),
-        replies:   null
+        thumb: $('.catalog-thumb', post),
+        icons: $('.catalog-icons', post),
+        postCount: $('.post-count', post),
+        fileCount: $('.file-count', post),
+        pageCount: $('.page-count', post),
+        replies: null
       };
       this.thread.catalogView = this;
     }
@@ -9981,19 +9980,27 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
   class RandomAccessList {
     constructor(items) {
+      this.first = null;
+      this.last = null;
       this.length = 0;
-      if (items) { for (var item of items) { this.push(item); } }
+      if (items) {
+        for (const item of items) {
+          this.push(item);
+        }
+      }
     }
-
     push(data) {
       let item;
-      let {ID} = data;
-      if (!ID) { ID = data.id; }
-      if (this[ID]) { return; }
-      const {last} = this;
+      let ID = data.ID;
+      if (!ID) {
+        ID = data.id;
+      }
+      if (this[ID]) {
+        return;
+      }
+      const last = this.last;
       this[ID] = (item = {
         prev: last,
         next: null,
@@ -10001,50 +10008,46 @@ svg.icon {
         ID
       });
       item.prev = last;
-      this.last = last ?
-        (last.next = item)
-      :
-        (this.first = item);
+      this.last = last ? (last.next = item) : (this.first = item);
       return this.length++;
     }
-
     before(root, item) {
-      if ((item.next === root) || (item === root)) { return; }
-
+      if ((item.next === root) || (item === root)) {
+        return;
+      }
       this.rmi(item);
-
-      const {prev} = root;
+      const prev = root.prev;
       root.prev = item;
       item.next = root;
       item.prev = prev;
       if (prev) {
-        return prev.next = item;
+        prev.next = item;
       } else {
-        return this.first = item;
+        this.first = item;
       }
     }
-
     after(root, item) {
-      if ((item.prev === root) || (item === root)) { return; }
-
+      if ((item.prev === root) || (item === root)) {
+        return;
+      }
       this.rmi(item);
-
-      const {next} = root;
+      const next = root.next;
       root.next = item;
       item.prev = root;
       item.next = next;
       if (next) {
-        return next.prev = item;
+        next.prev = item;
       } else {
-        return this.last = item;
+        this.last = item;
       }
     }
-
     prepend(item) {
-      const {first} = this;
-      if ((item === first) || !this[item.ID]) { return; }
+      const first = this.first;
+      if ((item === first) || !this[item.ID]) {
+        return;
+      }
       this.rmi(item);
-      item.next  = first;
+      item.next = first;
       if (first) {
         first.prev = item;
       } else {
@@ -10053,39 +10056,44 @@ svg.icon {
       this.first = item;
       return delete item.prev;
     }
-
     shift() {
-      return this.rm(this.first.ID);
+      if (this.first) {
+        return this.rm(this.first.ID);
+      }
     }
-
     order() {
-      let item;
-      const order = [(item = this.first)];
-      while ((item = item.next)) { order.push(item); }
+      let item = this.first;
+      if (!item)
+        return [];
+      const order = [item];
+      while (item && item.next) {
+        item = item.next;
+        order.push(item);
+      }
       return order;
     }
-
     rm(ID) {
       const item = this[ID];
-      if (!item) { return; }
+      if (!item) {
+        return;
+      }
       delete this[ID];
       this.length--;
       this.rmi(item);
       delete item.next;
       return delete item.prev;
     }
-
     rmi(item) {
-      const {prev, next} = item;
+      const { prev, next } = item;
       if (prev) {
         prev.next = next;
       } else {
-        this.first = next;
+        this.first = next || null;
       }
       if (next) {
-        return next.prev = prev;
+        next.prev = prev;
       } else {
-        return this.last = prev;
+        this.last = prev || null;
       }
     }
   }
@@ -23581,8 +23589,6 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   class Notice {
     constructor(type, content, timeout, onclose) {
       this.add = this.add.bind(this);
@@ -23592,23 +23598,26 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       this.el = $.el('div', {
         innerHTML: `<a href="javascript:;" class="close" title="Close">${Icon.get('xmark')}</a><div class="message"></div>`
       });
-      this.el.style.opacity = 0;
+      this.el.style.opacity = '0';
       this.setType(type);
       $.on(this.el.firstElementChild, 'click', this.close);
+      let contentNode;
       if (typeof content === 'string') {
-        content = $.tn(content);
+        contentNode = $.tn(content);
+      } else if (content instanceof Array) {
+        contentNode = $.nodes(content);
+      } else {
+        contentNode = content;
       }
-      $.add(this.el.lastElementChild, content);
-
+      $.add(this.el.lastElementChild, contentNode);
       $.ready(this.add);
     }
-
     setType(type) {
       this.el.className = `notification ${type}`;
     }
-
     add() {
-      if (this.closed) return;
+      if (this.closed)
+        return;
       if (d.hidden) {
         $.on(d, 'visibilitychange', this.add);
         return;
@@ -23616,18 +23625,19 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       $.off(d, 'visibilitychange', this.add);
       $.add(Header.noticesRoot, this.el);
       this.el.clientHeight; // force reflow
-      this.el.style.opacity = 1;
-      if (this.timeout) { this.timeoutId = setTimeout(this.close, this.timeout * SECOND); }
+      this.el.style.opacity = '1';
+      if (this.timeout) {
+        this.timeoutId = setTimeout(this.close, this.timeout * SECOND);
+      }
     }
-
     close() {
-      if (this.timeoutId) clearTimeout(this.timeoutId);
+      if (this.timeoutId)
+        clearTimeout(this.timeoutId);
       this.closed = true;
       $.off(d, 'visibilitychange', this.add);
       $.rm(this.el);
       this.onclose?.();
     }
-
     resetTimer() {
       if (this.timeout) {
         clearTimeout(this.timeoutId);
@@ -23987,22 +23997,22 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-  // @ts-nocheck
-
   class CatalogThreadNative {
-    toString() { return this.ID; }
-
+    toString() {
+      return this.ID;
+    }
     constructor(root) {
+      const thumb = $(g.SITE.selectors.catalog.thumb, root);
       this.nodes = {
         root,
-        thumb: $(g.SITE.selectors.catalog.thumb, root)
+        thumb
       };
-      this.siteID  = g.SITE.ID;
-      this.boardID = this.nodes.thumb.parentNode.pathname.split(/\/+/)[1];
+      this.siteID = g.SITE.ID;
+      const parentNode = this.nodes.thumb.parentNode;
+      this.boardID = parentNode.pathname.split(/\/+/)[1];
       this.board = g.boards[this.boardID] || new Board(this.boardID);
-      this.ID = (this.threadID = +(root.dataset.id || root.id).match(/\d*$/)[0]);
-      this.thread = this.board.threads.get(this.ID) || new Thread(this.ID, this.board);
+      this.ID = this.threadID = +(root.dataset.id || root.id).match(/\d*$/)[0];
+      this.thread = this.board.threads.get(String(this.ID)) || new Thread(String(this.ID), this.board);
     }
   }
 
