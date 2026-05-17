@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Fetcher from "../classes/Fetcher";
 import Get from "../General/Get";
@@ -8,19 +7,22 @@ import { Conf, d, doc, g } from "../globals/globals";
 import ExpandComment from "../Miscellaneous/ExpandComment";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var QuotePreview = {
+interface QuotePreviewType {
+  init(): void;
+  node(this: any): void;
+  mouseover(this: HTMLElement, e: MouseEvent): void;
+  mouseout(this: { el: HTMLElement }): void;
+}
+
+const QuotePreview: QuotePreviewType = {
   init() {
     if (!Conf['Quote Previewing']) { return; }
 
     if (g.VIEW === 'archive') {
-      $.on(d, 'mouseover', function(e) {
-        if ((e.target.nodeName === 'A') && $.hasClass(e.target, 'quotelink')) {
-          return QuotePreview.mouseover.call(e.target, e);
+      $.on(d, 'mouseover', function(e: MouseEvent) {
+        const target = e.target as HTMLElement;
+        if ((target.nodeName === 'A') && $.hasClass(target, 'quotelink')) {
+          QuotePreview.mouseover.call(target, e);
         }
       });
     }
@@ -31,32 +33,31 @@ var QuotePreview = {
       ExpandComment.callbacks.push(this.node);
     }
 
-    return Callbacks.Post.push({
+    Callbacks.Post.push({
       name: 'Quote Previewing',
       cb:   this.node
     });
   },
 
-  node() {
-    for (var link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
+  node(this: any) {
+    for (const link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
       $.on(link, 'mouseover', QuotePreview.mouseover);
     }
   },
 
-  mouseover(e) {
-    let origin;
+  mouseover(this: HTMLElement, e: MouseEvent) {
+    let origin: any;
     if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d.contains(this)) { return; }
 
-    const {boardID, threadID, postID} = Get.postDataFromLink(this);
+    const { boardID, threadID, postID } = Get.postDataFromLink(this);
 
     const qp = $.el('div', {
       id: 'qp',
       className: 'dialog'
-    }
-    );
+    });
 
     $.add(Header.hover, qp);
-    new Fetcher(boardID, threadID, postID, qp, Get.postFromNode(this));
+    new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
 
     UI.hover({
       root: this,
@@ -64,27 +65,27 @@ var QuotePreview = {
       latestEvent: e,
       endEvents: 'mouseout click',
       cb: QuotePreview.mouseout
-    });
+    } as any);
 
     if (Conf['Quote Highlighting'] && (origin = g.posts.get(`${boardID}.${postID}`))) {
       const posts = [origin].concat(origin.clones);
       // Remove the clone that's in the qp from the array.
       posts.pop();
-      for (var post of posts) {
+      for (const post of posts) {
         $.addClass(post.nodes.post, 'qphl');
       }
     }
   },
 
-  mouseout() {
+  mouseout(this: { el: HTMLElement }) {
     // Stop if it only contains text.
-    let root;
-    if (!(root = this.el.firstElementChild)) { return; }
+    let root: HTMLElement | null;
+    if (!(root = this.el.firstElementChild as HTMLElement)) { return; }
 
     $.event('PostsRemoved', null, Header.hover);
 
     const clone = Get.postFromRoot(root);
-    let post  = clone.origin;
+    let post = clone.origin;
     post.rmClone(root.dataset.clone);
 
     if (!Conf['Quote Highlighting']) { return; }
@@ -93,5 +94,5 @@ var QuotePreview = {
     }
   }
 };
-export default QuotePreview;
 
+export default QuotePreview;
