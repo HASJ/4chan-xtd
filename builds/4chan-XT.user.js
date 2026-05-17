@@ -3163,19 +3163,19 @@ current-archive-text:"Archive"]
 
   const $$ = (selector, root = d.body) => Array.from(root.querySelectorAll(selector));
 
-  // @ts-nocheck
-
-  var ImageHost = {
+  const ImageHost = {
+    useFaster: undefined,
+    suggestions: ['i.4cdn.org', 'is2.4chan.org'],
+    regex: /^is\d*\.4chan(?:nel)?\.org$/,
     init() {
-      if ((!(this.useFaster = /\S/.test(Conf['fourchanImageHost']))) || (g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) { return; }
-      return Callbacks.Post.push({
+      if ((!(this.useFaster = /\S/.test(Conf['fourchanImageHost']))) || (g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'Image Host Rewriting',
-        cb:   this.node
+        cb: this.node
       });
     },
-
-    suggestions: ['i.4cdn.org', 'is2.4chan.org'],
-
     host() {
       return Conf['fourchanImageHost'].trim() || 'i.4cdn.org';
     },
@@ -3188,25 +3188,27 @@ current-archive-text:"Archive"]
     test(hostname) {
       return (hostname === 'i.4cdn.org') || ImageHost.regex.test(hostname);
     },
-
-    regex: /^is\d*\.4chan(?:nel)?\.org$/,
-
     node() {
-      if (this.isClone) { return; }
+      if (this.isClone) {
+        return;
+      }
       const host = ImageHost.host();
       if (this.file && ImageHost.test(this.file.url.split('/')[2]) && !/\.swf$/.test(this.file.url)) {
         this.file.link.hostname = host;
-        if (this.file.thumbLink) { this.file.thumbLink.hostname = host; }
+        if (this.file.thumbLink) {
+          this.file.thumbLink.hostname = host;
+        }
         this.file.url = this.file.link.href;
       }
-      return ImageHost.fixLinks($$('a', this.nodes.comment));
+      ImageHost.fixLinks($$('a', this.nodes.comment));
     },
-
     fixLinks(links) {
-      for (var link of links) {
+      for (const link of links) {
         if (ImageHost.test(link.hostname) && !/\.swf$/.test(link.pathname)) {
-          var host = ImageHost.host();
-          if (link.hostname !== host) { link.hostname = host; }
+          const host = ImageHost.host();
+          if (link.hostname !== host) {
+            link.hostname = host;
+          }
         }
       }
     }
@@ -7899,73 +7901,66 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
-  var Volume = {
+  const Volume = {
+    inputs: undefined,
     init() {
       if (!['index', 'thread'].includes(g.VIEW) ||
-        (!Conf['Image Expansion'] && !Conf['Image Hover'] && !Conf['Image Hover in Catalog'] && !Conf['Gallery'])) { return; }
-
-      $.sync('Allow Sound', function(x) {
+        (!Conf['Image Expansion'] && !Conf['Image Hover'] && !Conf['Image Hover in Catalog'] && !Conf['Gallery'])) {
+        return;
+      }
+      $.sync('Allow Sound', (x) => {
         Conf['Allow Sound'] = x;
-        if (Volume.inputs) Volume.inputs.unmute.checked = x;
+        if (Volume.inputs)
+          Volume.inputs.unmute.checked = x;
       });
-
-      $.sync('Default Volume', function(x) {
+      $.sync('Default Volume', (x) => {
         Conf['Default Volume'] = x;
-        if (Volume.inputs) Volume.inputs.volume.value = x;
+        if (Volume.inputs)
+          Volume.inputs.volume.value = String(x);
       });
-
       if (Conf['Mouse Wheel Volume']) {
         Callbacks.Post.push({
           name: 'Mouse Wheel Volume',
-          cb:   this.node
+          cb: this.node
         });
       }
-
-      if (g.SITE.noAudio?.(g.BOARD)) { return; }
-
+      if (g.SITE.noAudio?.(g.BOARD)) {
+        return;
+      }
       if (Conf['Mouse Wheel Volume']) {
         Callbacks.CatalogThread.push({
           name: 'Mouse Wheel Volume',
-          cb:   this.catalogNode
+          cb: this.catalogNode
         });
       }
-
       const unmuteEntry = UI.checkbox('Allow Sound', 'Allow Sound');
       unmuteEntry.title = Config.main['Images and Videos']['Allow Sound'][1];
-
-      const volumeEntry = $.el('label',
-        {title: 'Default volume for videos.'});
-      $.extend(volumeEntry,
-        {innerHTML: "<input name=\"Default Volume\" type=\"range\" min=\"0\" max=\"1\" step=\"0.01\" value=\"" + E(Conf["Default Volume"]) + "\"> Volume"});
-
+      const volumeEntry = $.el('label', { title: 'Default volume for videos.' });
+      $.extend(volumeEntry, {
+        innerHTML: `<input name="Default Volume" type="range" min="0" max="1" step="0.01" value="${E(Conf["Default Volume"])}"> Volume`
+      });
       this.inputs = {
         unmute: unmuteEntry.firstElementChild,
         volume: volumeEntry.firstElementChild
       };
-
       $.on(this.inputs.unmute, 'change', $.cb.checked);
       $.on(this.inputs.volume, 'change', $.cb.value);
-
-      Header.menu.addEntry({el: unmuteEntry, order: 200});
-      return Header.menu.addEntry({el: volumeEntry, order: 201});
+      Header.menu.addEntry({ el: unmuteEntry, order: 200 });
+      Header.menu.addEntry({ el: volumeEntry, order: 201 });
     },
-
     setup(video) {
-      video.muted  = !Conf['Allow Sound'];
+      video.muted = !Conf['Allow Sound'];
       video.volume = Conf['Default Volume'];
-      return $.on(video, 'volumechange', Volume.change);
+      $.on(video, 'volumechange', Volume.change);
     },
-
     change() {
-      const {muted, volume} = this;
+      const { muted, volume } = this;
       const items = {
         'Allow Sound': !muted,
         'Default Volume': volume
       };
-      for (var key in items) {
-        var val = items[key];
+      for (const key in items) {
+        const val = items[key];
         if (Conf[key] === val) {
           delete items[key];
         }
@@ -7974,36 +7969,49 @@ svg.icon {
       $.extend(Conf, items);
       if (Volume.inputs) {
         Volume.inputs.unmute.checked = !muted;
-        return Volume.inputs.volume.value = volume;
+        Volume.inputs.volume.value = String(volume);
       }
     },
-
     node() {
-      if (g.SITE.noAudio?.(this.board)) { return; }
-      for (var file of this.files) {
+      if (g.SITE.noAudio?.(this.board)) {
+        return;
+      }
+      for (const file of this.files) {
         if (file.isVideo) {
-          if (file.thumb) { $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover)); }
+          if (file.thumb) {
+            $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+          }
           $.on(($('.file-info', file.text) || file.link), 'wheel', Volume.wheel.bind(file.thumbLink));
         }
       }
     },
-
     catalogNode() {
       const file = this.thread.OP.files[0];
-      if (!file?.isVideo) { return; }
-      return $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+      if (!file?.isVideo) {
+        return;
+      }
+      $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
     },
-
     wheel(e) {
       let el;
-      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) { return; }
-      if (!(el = $('video:not([data-md5])', this))) { return; }
-      if (el.muted || !$.hasAudio(el)) { return; }
+      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
+        return;
+      }
+      if (!(el = $('video:not([data-md5])', this))) {
+        return;
+      }
+      if (el.muted || !$.hasAudio(el)) {
+        return;
+      }
       let volume = el.volume + 0.1;
-      if (e.deltaY < 0) { volume *= 1.1; }
-      if (e.deltaY > 0) { volume /= 1.1; }
+      if (e.deltaY < 0) {
+        volume *= 1.1;
+      }
+      if (e.deltaY > 0) {
+        volume /= 1.1;
+      }
       el.volume = $.minmax(volume - 0.1, 0, 1);
-      return e.preventDefault();
+      e.preventDefault();
     }
   };
 
@@ -9814,85 +9822,82 @@ svg.icon {
     }, false),
   };
 
-  // @ts-nocheck
-
-  var QuoteYou = {
+  const QuoteYou = {
+    db: null,
+    mark: null,
+    lastRead: undefined,
     init() {
-      if (!Conf['Remember Your Posts']) { return; }
-
+      if (!Conf['Remember Your Posts']) {
+        return;
+      }
       this.db = new DataBoard('yourPosts');
-      $.sync('Remember Your Posts', enabled => Conf['Remember Your Posts'] = enabled);
-      $.on(d, 'QRPostSuccessful', function(e) {
+      $.sync('Remember Your Posts', (enabled) => Conf['Remember Your Posts'] = enabled);
+      $.on(d, 'QRPostSuccessful', (e) => {
         const cb = PostRedirect.delay();
-        return $.get('Remember Your Posts', Conf['Remember Your Posts'], function(items) {
-          if (!items['Remember Your Posts']) { return; }
-          const {boardID, threadID, postID} = e.detail;
-          return QuoteYou.db.set({boardID, threadID, postID, val: true}, cb);
+        $.get('Remember Your Posts', Conf['Remember Your Posts'], (items) => {
+          if (!items['Remember Your Posts']) {
+            return;
+          }
+          const { boardID, threadID, postID } = e.detail;
+          QuoteYou.db.set({ boardID, threadID, postID, val: true }, cb);
         });
       });
-
-      if (!['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
-
+      if (!['index', 'thread', 'archive'].includes(g.VIEW)) {
+        return;
+      }
       if (Conf['Highlight Own Posts']) {
         $.addClass(doc, 'highlight-own');
       }
-
       if (Conf['Highlight Posts Quoting You']) {
         $.addClass(doc, 'highlight-you');
       }
-
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
       // \u00A0 is nbsp
       this.mark = $.el('span', {
         textContent: '\u00A0(You)',
-        className:   'qmark-you'
-      }
-      );
+        className: 'qmark-you'
+      });
       Callbacks.Post.push({
         name: 'Mark Quotes of You',
-        cb:   this.node
+        cb: this.node
       });
-
       QuoteYou.menu.init();
     },
-
     isYou(post) {
       return !!QuoteYou.db?.get({
-        boardID:  post.boardID,
+        boardID: post.boardID,
         threadID: post.threadID,
-        postID:   post.ID
+        postID: post.ID
       });
     },
-
     node() {
-      if (this.isClone) { return; }
-
+      if (this.isClone) {
+        return;
+      }
       if (QuoteYou.isYou(this)) {
         $.addClass(this.nodes.root, 'yourPost');
         ScrollMarkers.markScroll();
       }
-
       // Stop there if there's no quotes in that post.
-      if (!this.quotes.length) { return; }
-
-      for (var quotelink of this.nodes.quotelinks) {
+      if (!this.quotes.length) {
+        return;
+      }
+      for (const quotelink of this.nodes.quotelinks) {
         if (QuoteYou.db.get(Get.postDataFromLink(quotelink))) {
-          if (Conf['Mark Quotes of You']) { $.add(quotelink, QuoteYou.mark.cloneNode(true)); }
+          if (Conf['Mark Quotes of You']) {
+            $.add(quotelink, QuoteYou.mark.cloneNode(true));
+          }
           $.addClass(quotelink, 'you');
           $.addClass(this.nodes.root, 'quotesYou');
         }
       }
     },
-
     menu: {
+      post: undefined,
       init() {
-        const label = $.el('label',
-          {className: 'toggle-you'}
-        ,
-          {innerHTML: '<input type="checkbox"> You'});
+        const label = $.el('label', { className: 'toggle-you' }, { innerHTML: '<input type="checkbox"> You' });
         const input = $('input', label);
         $.on(input, 'change', QuoteYou.menu.toggle);
         Menu.menu?.addEntry({
@@ -9905,61 +9910,62 @@ svg.icon {
           }
         });
       },
-
       toggle() {
-        const {post} = QuoteYou.menu;
-        const data = {boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID, val: true};
+        const post = QuoteYou.menu.post;
+        const data = { boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID, val: true };
         if (this.checked) {
           QuoteYou.db.set(data);
         } else {
           QuoteYou.db.delete(data);
         }
-        for (var clone of [post].concat(post.clones)) {
+        for (const clone of [post].concat(post.clones)) {
           clone.nodes.root.classList.toggle('yourPost', this.checked);
         }
-        for (var quotelink of Get.allQuotelinksLinkingTo(post)) {
+        for (const quotelink of Get.allQuotelinksLinkingTo(post)) {
           if (this.checked) {
-            if (Conf['Mark Quotes of You']) { $.add(quotelink, QuoteYou.mark.cloneNode(true)); }
+            if (Conf['Mark Quotes of You']) {
+              $.add(quotelink, QuoteYou.mark.cloneNode(true));
+            }
           } else {
             $.rm($('.qmark-you', quotelink));
           }
           quotelink.classList.toggle('you', this.checked);
           if ($.hasClass(quotelink, 'quotelink')) {
-            var quoter = Get.postFromNode(quotelink).nodes.root;
+            const quoter = Get.postFromNode(quotelink).nodes.root;
             quoter.classList.toggle('quotesYou', !!$('.quotelink.you', quoter));
           }
         }
         ScrollMarkers.markScroll();
       }
     },
-
     cb: {
       seek(type) {
         let highlighted, post;
         let result;
-        const {highlight} = g.SITE.classes;
-        if (highlighted = $(`.${highlight}`)) { $.rmClass(highlighted, highlight); }
-
+        const highlight = g.SITE.classes.highlight;
+        if ((highlighted = $(`.${highlight}`))) {
+          $.rmClass(highlighted, highlight);
+        }
         if (!QuoteYou.lastRead || !doc.contains(QuoteYou.lastRead) || !$.hasClass(QuoteYou.lastRead, 'quotesYou')) {
           if (!(post = (QuoteYou.lastRead = $('.quotesYou')))) {
             new Notice('warning', 'No posts are currently quoting you, loser.', 20);
             return;
           }
-          if (QuoteYou.cb.scroll(post)) { return; }
+          if (QuoteYou.cb.scroll(post)) {
+            return;
+          }
         } else {
           post = QuoteYou.lastRead;
         }
-
         const str = `${type}::div[contains(@class,'quotesYou')]`;
-
-        while (post = (result = $.X(str, post)).snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0)) {
-          if (QuoteYou.cb.scroll(post)) { return; }
+        while ((post = (result = $.X(str, post)).snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0))) {
+          if (QuoteYou.cb.scroll(post)) {
+            return;
+          }
         }
-
         const posts = $$('.quotesYou');
-        return QuoteYou.cb.scroll(posts[type === 'following' ? 0 : posts.length - 1]);
+        QuoteYou.cb.scroll(posts[type === 'following' ? 0 : posts.length - 1]);
       },
-
       scroll(root) {
         const post = Get.postFromRoot(root);
         if (!post.nodes.post.getBoundingClientRect().height) {
@@ -9971,7 +9977,9 @@ svg.icon {
           if (post.isReply) {
             const sel = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
             let node = post.nodes.root;
-            if (!node.matches(sel)) { node = $(sel, node); }
+            if (!node.matches(sel)) {
+              node = $(sel, node);
+            }
             $.addClass(node, g.SITE.classes.highlight);
           }
           return true;
@@ -12408,53 +12416,47 @@ svg.icon {
     '[/blue]': { innerHTML: "</span>" }
   };
 
-  // @ts-nocheck
-
-  var QuotePreview = {
+  const QuotePreview = {
     init() {
-      if (!Conf['Quote Previewing']) { return; }
-
+      if (!Conf['Quote Previewing']) {
+        return;
+      }
       if (g.VIEW === 'archive') {
-        $.on(d, 'mouseover', function(e) {
-          if ((e.target.nodeName === 'A') && $.hasClass(e.target, 'quotelink')) {
-            return QuotePreview.mouseover.call(e.target, e);
+        $.on(d, 'mouseover', function (e) {
+          const target = e.target;
+          if ((target.nodeName === 'A') && $.hasClass(target, 'quotelink')) {
+            QuotePreview.mouseover.call(target, e);
           }
         });
       }
-
-      if (!['index', 'thread'].includes(g.VIEW)) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Quote Previewing',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
-      for (var link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
+      for (const link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
         $.on(link, 'mouseover', QuotePreview.mouseover);
       }
     },
-
     mouseover(e) {
       let origin;
-      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d.contains(this)) { return; }
-
-      const {boardID, threadID, postID} = Get.postDataFromLink(this);
-
+      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d.contains(this)) {
+        return;
+      }
+      const { boardID, threadID, postID } = Get.postDataFromLink(this);
       const qp = $.el('div', {
         id: 'qp',
         className: 'dialog'
-      }
-      );
-
+      });
       $.add(Header.hover, qp);
-      new Fetcher(boardID, threadID, postID, qp, Get.postFromNode(this));
-
+      new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
       UI.hover({
         root: this,
         el: qp,
@@ -12462,29 +12464,28 @@ svg.icon {
         endEvents: 'mouseout click',
         cb: QuotePreview.mouseout
       });
-
       if (Conf['Quote Highlighting'] && (origin = g.posts.get(`${boardID}.${postID}`))) {
         const posts = [origin].concat(origin.clones);
         // Remove the clone that's in the qp from the array.
         posts.pop();
-        for (var post of posts) {
+        for (const post of posts) {
           $.addClass(post.nodes.post, 'qphl');
         }
       }
     },
-
     mouseout() {
       // Stop if it only contains text.
       let root;
-      if (!(root = this.el.firstElementChild)) { return; }
-
+      if (!(root = this.el.firstElementChild)) {
+        return;
+      }
       $.event('PostsRemoved', null, Header.hover);
-
       const clone = Get.postFromRoot(root);
-      let post  = clone.origin;
+      let post = clone.origin;
       post.rmClone(root.dataset.clone);
-
-      if (!Conf['Quote Highlighting']) { return; }
+      if (!Conf['Quote Highlighting']) {
+        return;
+      }
       for (post of [post].concat(post.clones)) {
         $.rmClass(post.nodes.post, 'qphl');
       }
@@ -14069,86 +14070,81 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
-  var FappeTyme = {
+  const FappeTyme = {
+    nodes: {},
+    enabled: {},
     init() {
-      if ((!Conf['Fappe Tyme'] && !Conf['Werk Tyme']) || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
-
+      if ((!Conf['Fappe Tyme'] && !Conf['Werk Tyme']) || !['index', 'thread', 'archive'].includes(g.VIEW)) {
+        return;
+      }
       this.nodes = {};
       this.enabled = {
         fappe: false,
-        werk:  Conf['werk']
+        werk: Conf['werk']
       };
-
-      for (var type of ["Fappe", "Werk"]) {
+      for (const type of ["Fappe", "Werk"]) {
         if (Conf[`${type} Tyme`]) {
-          var lc = type.toLowerCase();
-          var el = UI.checkbox(lc, `${type} Tyme`, false);
+          const lc = type.toLowerCase();
+          const el = UI.checkbox(lc, `${type} Tyme`, false);
           el.title = `${type} Tyme`;
-
           this.nodes[lc] = el.firstElementChild;
-          if (Conf[lc]) { this.set(lc, true); }
+          if (Conf[lc]) {
+            this.set(lc, true);
+          }
           $.on(this.nodes[lc], 'change', this.toggle.bind(this, lc));
-
           Header.menu.addEntry({
             el,
             order: 97
           });
-
-          var indicator = $.el('span', {
+          const indicator = $.el('span', {
             className: 'indicator',
             textContent: type[0],
             title: `${type} Tyme active`
-          }
-          );
-          $.on(indicator, 'click', function() {
+          });
+          $.on(indicator, 'click', function () {
             const check = $.getOwn(FappeTyme.nodes, this.parentNode.id.replace('shortcut-', ''));
             check.checked = !check.checked;
-            return $.event('change', null, check);
+            $.event('change', null, check);
           });
           Header.addShortcut(lc, indicator, 410);
         }
       }
-
       if (Conf['Werk Tyme']) {
         $.sync('werk', this.set.bind(this, 'werk'));
       }
-
       Callbacks.Post.push({
         name: 'Fappe Tyme',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Callbacks.CatalogThread.push({
+      Callbacks.CatalogThread.push({
         name: 'Werk Tyme',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
     },
-
     node() {
-      return this.nodes.root.classList.toggle('noFile', !this.files.length);
+      this.nodes.root.classList.toggle('noFile', !this.files.length);
     },
-
     catalogNode() {
       const file = this.thread.OP.files[0];
-      if (!file) { return; }
+      if (!file) {
+        return;
+      }
       const filename = $.el('div', {
         textContent: file.name,
-        className:   'werkTyme-filename'
-      }
-      );
-      return $.add(this.nodes.thumb.parentNode, filename);
+        className: 'werkTyme-filename'
+      });
+      $.add(this.nodes.thumb.parentNode, filename);
     },
-
     set(type, enabled) {
       this.enabled[type] = (this.nodes[type].checked = enabled);
-      return $[`${enabled ? 'add' : 'rm'}Class`](doc, `${type}Tyme`);
+      const action = enabled ? 'addClass' : 'rmClass';
+      $[action](doc, `${type}Tyme`);
     },
-
     toggle(type) {
       this.set(type, !this.enabled[type]);
-      if (type === 'werk') { return $.cb.checked.call(this.nodes[type]); }
+      if (type === 'werk') {
+        $.cb.checked.call(this.nodes[type]);
+      }
     }
   };
 
@@ -14174,56 +14170,61 @@ svg.icon {
 </div>
 <div class="gal-thumbnails"></div>`;
 
-  // @ts-nocheck
-
-  var Sauce = {
+  const Sauce = {
+    links: [],
+    link: null,
     init() {
-      let link;
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Sauce']) { return; }
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Sauce']) {
+        return;
+      }
       $.addClass(doc, 'show-sauce');
-
       const links = [];
-      for (link of Conf['sauces'].split('\n')) {
-        var linkData;
+      for (const link of Conf['sauces'].split('\n')) {
+        let linkData;
         if ((link[0] !== '#') && (linkData = this.parseLink(link))) {
           links.push(linkData);
         }
       }
-      if (!links.length) { return; }
-
-      this.links = links;
-      this.link  = $.el('a', {
-        target:    '_blank',
-        className: 'sauce'
+      if (!links.length) {
+        return;
       }
-      );
-      return Callbacks.Post.push({
+      this.links = links;
+      this.link = $.el('a', {
+        target: '_blank',
+        className: 'sauce'
+      });
+      Callbacks.Post.push({
         name: 'Sauce',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     parseLink(link) {
-      if (!(link = link.trim())) { return null; }
+      if (!(link = link.trim())) {
+        return null;
+      }
       const parts = dict();
       const iterable = link.split(/;(?=(?:text|boards|types|regexp|sandbox):?)/);
       for (let i = 0; i < iterable.length; i++) {
-        var part = iterable[i];
+        const part = iterable[i];
         if (i === 0) {
           parts['url'] = part;
         } else {
-          var m = part.match(/^(\w*):?(.*)$/);
-          parts[m[1]] = m[2];
+          const m = part.match(/^(\w*):?(.*)$/);
+          if (m) {
+            parts[m[1]] = m[2];
+          }
         }
       }
-      if (!parts['text']) { parts['text'] = parts['url'].match(/(\w+)\.\w+\//)?.[1] || '?'; }
+      if (!parts['text']) {
+        parts['text'] = parts['url'].match(/(\w+)\.\w+\//)?.[1] || '?';
+      }
       if ('boards' in parts) {
         parts['boards'] = Filter.parseBoards(parts['boards']);
       }
       if ('regexp' in parts) {
         try {
           let regexp;
-          if (regexp = parts['regexp'].match(/^\/(.*)\/(\w*)$/)) {
+          if ((regexp = parts['regexp'].match(/^\/(.*)\/(\w*)$/))) {
             parts['regexp'] = RegExp(regexp[1], regexp[2]);
           } else {
             parts['regexp'] = RegExp(parts['regexp']);
@@ -14241,100 +14242,113 @@ svg.icon {
       }
       return parts;
     },
-
     createSauceLink(link, post, file) {
-      let a, matches, needle;
-      const ext = file.url.match(/[^.]*$/)[0];
+      let a, matches = null, needle;
+      const ext = (file.url.match(/[^.]*$/) || [])[0] || '';
       const parts = dict();
       $.extend(parts, link);
-
-      if (!!parts['boards'] && !parts['boards'][`${post.siteID}/${post.boardID}`] && !parts['boards'][`${post.siteID}/*`]) { return null; }
-      if (!!parts['types']  && (needle = ext, !parts['types'].split(',').includes(needle))) { return null; }
-      if (!!parts['regexp'] && (!(matches = file.name.match(parts['regexp'])))) { return null; }
-
+      if (parts['boards'] && !parts['boards'][`${post.siteID}/${post.boardID}`] && !parts['boards'][`${post.siteID}/*`]) {
+        return null;
+      }
+      if (parts['types'] && (needle = ext, !parts['types'].split(',').includes(needle))) {
+        return null;
+      }
+      if (parts['regexp'] && (!(matches = file.name.match(parts['regexp'])))) {
+        return null;
+      }
       const missing = [];
-      for (var key of ['url', 'text']) {
-        parts[key] = parts[key].replace(/%(T?URL|IMG|[sh]?MD5|board|name|%|semi|\$\d+)/g, function(orig, parameter) {
+      for (const key of ['url', 'text']) {
+        parts[key] = parts[key].replace(/%(T?URL|IMG|[sh]?MD5|board|name|%|semi|\$\d+)/g, (orig, parameter) => {
           let type;
           if (parameter[0] === '$') {
-            if (!matches) { return orig; }
-            type = matches[parameter.slice(1)] || '';
+            if (!matches) {
+              return orig;
+            }
+            type = matches[+parameter.slice(1)] || '';
           } else {
-            type = Sauce.formatters[parameter](post, file, ext);
-            if ((type == null)) {
+            const formatted = Sauce.formatters[parameter](post, file, ext);
+            if (formatted == null) {
               missing.push(parameter);
               return '';
             }
+            type = formatted;
           }
-
           if ((key === 'url') && !['%', 'semi'].includes(parameter)) {
-            if (/^javascript:/i.test(parts['url'])) { type = JSON.stringify(type); }
+            if (/^javascript:/i.test(parts['url'])) {
+              type = JSON.stringify(type);
+            }
             type = encodeURIComponent(type);
           }
           return type;
         });
       }
-
       if (g.SITE.areMD5sDeferred?.(post.board) && missing.length && !missing.filter(x => !/^.?MD5$/.test(x)).length) {
         a = Sauce.link.cloneNode(false);
         a.dataset.skip = '1';
         return a;
       }
-
-      if (missing.length) { return null; }
-
+      if (missing.length) {
+        return null;
+      }
       a = Sauce.link.cloneNode(false);
       a.href = parts['url'];
       a.textContent = parts['text'];
-      if (/^javascript:/i.test(parts['url'])) { a.removeAttribute('target'); }
+      if (/^javascript:/i.test(parts['url'])) {
+        a.removeAttribute('target');
+      }
       return a;
     },
-
     node() {
-      if (this.isClone) { return; }
-      for (var file of this.files) {
+      if (this.isClone) {
+        return;
+      }
+      for (const file of this.files) {
         Sauce.file(this, file);
       }
     },
-
     file(post, file) {
       let link, node;
       const nodes = [];
       const skipped = [];
       for (link of Sauce.links) {
-        if (node = Sauce.createSauceLink(link, post, file)) {
+        if ((node = Sauce.createSauceLink(link, post, file))) {
           nodes.push($.tn(' '), node);
-          if (node.dataset.skip) { skipped.push([link, node]); }
+          if (node.dataset.skip) {
+            skipped.push([link, node]);
+          }
         }
       }
       $.add(file.text, nodes);
-
       if (skipped.length) {
-        var observer = new MutationObserver(function() {
+        const observer = new MutationObserver(() => {
           if (file.text.dataset.md5) {
-            for ([link, node] of skipped) {
-              var node2;
-              if (node2 = Sauce.createSauceLink(link, post, file)) {
-                $.replace(node, node2);
+            for (const [lnk, nd] of skipped) {
+              const node2 = Sauce.createSauceLink(lnk, post, file);
+              if (node2) {
+                $.replace(nd, node2);
               }
             }
-            return observer.disconnect();
+            observer.disconnect();
           }
         });
-        return observer.observe(file.text, {attributes: true});
+        observer.observe(file.text, { attributes: true });
       }
     },
-
     formatters: {
       TURL(post, file) { return file.thumbURL; },
       URL(post, file) { return file.url; },
-      IMG(post, file, ext) { if (['gif', 'jpg', 'jpeg', 'png'].includes(ext)) { return file.url; } else { return file.thumbURL; } },
+      IMG(post, file, ext) { if (['gif', 'jpg', 'jpeg', 'png'].includes(ext)) {
+        return file.url;
+      } else {
+        return file.thumbURL;
+      } },
       MD5(post, file) { return file.MD5; },
-      sMD5(post, file) { return file.MD5?.replace(/[+/=]/g, c => ({'+': '-', '/': '_', '=': ''})[c]); },
+      sMD5(post, file) { return file.MD5?.replace(/[+/=]/g, (c) => ({ '+': '-', '/': '_', '=': '' })[c]); },
       hMD5(post, file) {
         if (file.MD5) {
-          return Array.from(atob(file.MD5), c => c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+          return Array.from(atob(file.MD5), c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
         }
+        return undefined;
       },
       board(post) { return post.board.ID; },
       name(post, file) { return file.name; },
@@ -14343,133 +14357,121 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
-  var Gallery = {
+  const Gallery = {
+    enabled: undefined,
+    delay: 0,
+    images: [],
+    nodes: null,
+    fileIDs: {},
+    slideshow: false,
+    timeoutID: undefined,
+    cache: undefined,
     init() {
-      if (!(this.enabled = Conf['Gallery'] && ['index', 'thread'].includes(g.VIEW))) { return; }
-
+      if (!(this.enabled = Conf['Gallery'] && ['index', 'thread'].includes(g.VIEW))) {
+        return;
+      }
       this.delay = Conf['Slide Delay'];
-
       const el = $.el('a', {
         href: 'javascript:;',
         title: 'Gallery',
       });
       Icon.set(el, 'image', 'Gallery');
-
       $.on(el, 'click', this.cb.toggle);
-
       Header.addShortcut('gallery', el, 530);
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Gallery',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
-      return (() => {
-        const result = [];
-        for (var file of this.files) {
-          if (file.thumb) {
-            if (Gallery.nodes) {
-              Gallery.generateThumb(this, file);
-              Gallery.nodes.total.textContent = Gallery.images.length;
-            }
-
-            if (!Conf['Image Expansion'] && ((g.SITE.software !== 'tinyboard') || !$.hasClass(doc, 'js-enabled'))) {
-              result.push($.on(file.thumbLink, 'click', Gallery.cb.image));
-            } else {
-              result.push(undefined);
-            }
+      for (const file of this.files) {
+        if (file.thumb) {
+          if (Gallery.nodes) {
+            Gallery.generateThumb(this, file);
+            Gallery.nodes.total.textContent = Gallery.images.length;
+          }
+          if (!Conf['Image Expansion'] && ((g.SITE.software !== 'tinyboard') || !$.hasClass(doc, 'js-enabled'))) {
+            $.on(file.thumbLink, 'click', Gallery.cb.image);
           }
         }
-        return result;
-      })();
+      }
     },
-
     build(image) {
-      let dialog, thumb;
-      const {cb} = Gallery;
-
+      let dialog, thumb = null;
+      const cb = Gallery.cb;
       if (Conf['Fullscreen Gallery']) {
         $.one(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
         doc.mozRequestFullScreen?.();
         doc.webkitRequestFullScreen?.(Element.ALLOW_KEYBOARD_INPUT);
       }
-
-      Gallery.images  = [];
+      Gallery.images = [];
       const nodes = (Gallery.nodes = {});
       Gallery.fileIDs = dict();
       Gallery.slideshow = false;
-
-      nodes.el = (dialog = $.el('div',
-        {id: 'a-gallery'}));
-      $.extend(dialog, {innerHTML: galleryPage });
-
+      nodes.el = (dialog = $.el('div', { id: 'a-gallery' }));
+      $.extend(dialog, { innerHTML: galleryPage });
       const object = {
         buttons: '.gal-buttons',
-        frame:   '.gal-image',
-        name:    '.gal-name',
-        count:   '.count',
-        total:   '.total',
-        sauce:   '.gal-sauce',
-        thumbs:  '.gal-thumbnails',
-        next:    '.gal-image a',
+        frame: '.gal-image',
+        name: '.gal-name',
+        count: '.count',
+        total: '.total',
+        sauce: '.gal-sauce',
+        thumbs: '.gal-thumbnails',
+        next: '.gal-image a',
         current: '.gal-image img'
       };
-      for (var key in object) { var value = object[key]; nodes[key] = $(value, dialog); }
-
+      for (const key in object) {
+        const value = object[key];
+        nodes[key] = $(value, dialog);
+      }
       const menuButton = $('.menu-button', dialog);
       nodes.menu = new UI.Menu('gallery');
-
       $.on(nodes.frame, 'click', cb.blank);
-      if (Conf['Mouse Wheel Volume']) { $.on(nodes.frame, 'wheel', Volume.wheel); }
-      $.on(nodes.next,  'click', cb.click);
-      $.on(nodes.name,  'click', ImageCommon.download);
-
-      const prev =  $('.gal-prev',  dialog);
-      const next =  $('.gal-next',  dialog);
+      if (Conf['Mouse Wheel Volume']) {
+        $.on(nodes.frame, 'wheel', Volume.wheel);
+      }
+      $.on(nodes.next, 'click', cb.click);
+      $.on(nodes.name, 'click', ImageCommon.download);
+      const prev = $('.gal-prev', dialog);
+      const next = $('.gal-next', dialog);
       const start = $('.gal-start', dialog);
-      const stop =  $('.gal-stop',  dialog);
+      const stop = $('.gal-stop', dialog);
       const close = $('.gal-close', dialog);
-
-      $.on(prev,  'click', cb.prev);
-      $.on(next,  'click', cb.next);
+      $.on(prev, 'click', cb.prev);
+      $.on(next, 'click', cb.next);
       $.on(start, 'click', cb.start);
-      $.on(stop,  'click', cb.stop);
+      $.on(stop, 'click', cb.stop);
       $.on(close, 'click', cb.close);
-
-      $.on(menuButton, 'click', function(e) {
-        return nodes.menu.toggle(e, this, g);
+      $.on(menuButton, 'click', function (e) {
+        nodes.menu.toggle(e, this, g);
       });
-
       Icon.set(menuButton, 'caretDown');
       Icon.set(start, 'play');
       Icon.set(stop, 'stop');
       Icon.set(close, 'xmark');
       Icon.set(prev, 'caretLeft');
       Icon.set(next, 'caretRight');
-
-      for (var entry of Gallery.menu.createSubEntries()) {
+      for (const entry of Gallery.menu.createSubEntries()) {
         entry.order = 0;
         nodes.menu.addEntry(entry);
       }
-
       $.on(d, 'keydown', cb.keybinds);
-      if (Conf['Keybinds']) { $.off(d, 'keydown', Keybinds.keydown); }
-
+      if (Conf['Keybinds']) {
+        $.off(d, 'keydown', Keybinds.keydown);
+      }
       $.on(window, 'resize', Gallery.cb.setHeight);
-
-      for (var postThumb of $$(g.SITE.selectors.file.thumb)) {
-        var post;
-        if (!(post = Get.postFromNode(postThumb))) { continue; }
-        for (var file of post.files) {
+      for (const postThumb of $$(g.SITE.selectors.file.thumb)) {
+        let post;
+        if (!(post = Get.postFromNode(postThumb))) {
+          continue;
+        }
+        for (const file of post.files) {
           if (file.thumb) {
             Gallery.generateThumb(post, file);
             // If no image to open is given, pick image we have scrolled to.
             if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
-              var candidate = file.thumbLink;
+              const candidate = file.thumbLink;
               if ((Header.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
                 image = candidate;
               }
@@ -14478,284 +14480,297 @@ svg.icon {
         }
       }
       $.addClass(doc, 'gallery-open');
-
       $.add(d.body, dialog);
-
       nodes.thumbs.scrollTop = 0;
       nodes.current.parentElement.scrollTop = 0;
-
-      if (image) { thumb = $(`[href='${image.href}']`, nodes.thumbs); }
-      if (!thumb) { thumb = Gallery.images[Gallery.images.length-1]; }
-      if (thumb) { Gallery.open(thumb); }
-
+      if (image) {
+        thumb = $(`[href='${image.href}']`, nodes.thumbs);
+      }
+      if (!thumb) {
+        thumb = Gallery.images[Gallery.images.length - 1];
+      }
+      if (thumb) {
+        Gallery.open(thumb);
+      }
       doc.style.overflow = 'hidden';
-      return nodes.total.textContent = Gallery.images.length;
+      nodes.total.textContent = Gallery.images.length;
     },
-
     generateThumb(post, file) {
-      if (post.isClone || post.isHidden) { return; }
-      if (!file || !file.thumb || (!file.isImage && !file.isVideo && !Conf['PDF in Gallery'])) { return; }
-      if (Gallery.fileIDs[`${post.fullID}.${file.index}`]) { return; }
-
+      if (post.isClone || post.isHidden) {
+        return;
+      }
+      if (!file || !file.thumb || (!file.isImage && !file.isVideo && !Conf['PDF in Gallery'])) {
+        return;
+      }
+      if (Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
+        return;
+      }
       Gallery.fileIDs[`${post.fullID}.${file.index}`] = true;
-
       const thumb = $.el('a', {
         className: 'gal-thumb',
-        href:      file.url,
-        target:    '_blank',
-        title:     file.name
-      }
-      );
-
-      thumb.dataset.id   = Gallery.images.length;
+        href: file.url,
+        target: '_blank',
+        title: file.name
+      });
+      thumb.dataset.id = String(Gallery.images.length);
       thumb.dataset.post = post.fullID;
       thumb.dataset.file = file.index;
-
       const thumbImg = file.thumb.cloneNode(false);
       thumbImg.style.cssText = '';
       $.add(thumb, thumbImg);
-
       $.on(thumb, 'click', Gallery.cb.open);
-
       Gallery.images.push(thumb);
-      return $.add(Gallery.nodes.thumbs, thumb);
+      $.add(Gallery.nodes.thumbs, thumb);
     },
-
     load(thumb, errorCB) {
-      const ext = thumb.href.match(/\w*$/);
-      const elType = $.getOwn({'webm': 'video', 'mp4': 'video', 'ogv': 'video', 'pdf': 'iframe'}, ext) || 'img';
+      const ext = (thumb.href.match(/\w*$/) || [])[0];
+      const elType = $.getOwn({ 'webm': 'video', 'mp4': 'video', 'ogv': 'video', 'pdf': 'iframe' }, ext) || 'img';
       const file = $.el(elType);
       $.extend(file.dataset, thumb.dataset);
       $.on(file, 'error', errorCB);
       file.src = thumb.href;
       return file;
     },
-
     open(thumb) {
       let el, file, post;
-      const {nodes} = Gallery;
+      const { nodes } = Gallery;
       const oldID = +nodes.current.dataset.id;
       const newID = +thumb.dataset.id;
-
       // Highlight, center selected thumbnail
-      if (el = Gallery.images[oldID]) { $.rmClass(el,    'gal-highlight'); }
+      if ((el = Gallery.images[oldID])) {
+        $.rmClass(el, 'gal-highlight');
+      }
       $.addClass(thumb, 'gal-highlight');
-      nodes.thumbs.scrollTop = (thumb.offsetTop + (thumb.offsetHeight/2)) - (nodes.thumbs.clientHeight/2);
-
+      nodes.thumbs.scrollTop = (thumb.offsetTop + (thumb.offsetHeight / 2)) - (nodes.thumbs.clientHeight / 2);
       // Load image or use preloaded image
-      if (Gallery.cache?.dataset.id === (''+newID)) {
+      if (Gallery.cache?.dataset.id === String(newID)) {
         file = Gallery.cache;
         $.off(file, 'error', Gallery.cacheError);
         $.on(file, 'error', Gallery.error);
       } else {
         file = Gallery.load(thumb, Gallery.error);
       }
-
       // Replace old image with new one
       $.off(nodes.current, 'error', Gallery.error);
       ImageCommon.pause(nodes.current);
       $.replace(nodes.current, file);
       nodes.current = file;
-
       if (file.nodeName === 'VIDEO') {
         file.loop = true;
         Volume.setup(file);
-        if (Conf['Autoplay']) { file.play(); }
-        if (Conf['Show Controls']) file.controls = true;
+        if (Conf['Autoplay']) {
+          file.play();
+        }
+        if (Conf['Show Controls'])
+          file.controls = true;
       }
-
       doc.classList.toggle('gal-pdf', file.nodeName === 'IFRAME');
       Gallery.cb.setHeight();
-      nodes.count.textContent = +thumb.dataset.id + 1;
-      nodes.name.download     = (nodes.name.textContent = thumb.title);
-      nodes.name.href         = thumb.href;
-      nodes.frame.scrollTop   = 0;
+      nodes.count.textContent = String(newID + 1);
+      nodes.name.download = (nodes.name.textContent = thumb.title);
+      nodes.name.href = thumb.href;
+      nodes.frame.scrollTop = 0;
       nodes.next.focus();
-
       // Set sauce links
       $.rmAll(nodes.sauce);
       if (Conf['Sauce'] && Sauce.links && (post = g.posts.get(file.dataset.post))) {
         const sauces = [];
-        for (var link of Sauce.links) {
-          var node;
-          if (node = Sauce.createSauceLink(link, post, post.files[+file.dataset.file])) {
-            sauces.push($.tn(' '), node);
+        for (const link of Sauce.links) {
+          let sauceNode;
+          if ((sauceNode = Sauce.createSauceLink(link, post, post.files[+file.dataset.file]))) {
+            sauces.push($.tn(' '), sauceNode);
           }
         }
         $.add(nodes.sauce, sauces);
       }
-
       // Continue slideshow if moving forward, stop otherwise
-      if (Gallery.slideshow && ((newID > oldID) || ((oldID === (Gallery.images.length-1)) && (newID === 0)))) {
+      if (Gallery.slideshow && ((newID > oldID) || ((oldID === (Gallery.images.length - 1)) && (newID === 0)))) {
         Gallery.setupTimer();
       } else {
         Gallery.cb.stop();
       }
-
       // Scroll to post
       if (Conf['Scroll to Post'] && (post = g.posts.get(file.dataset.post))) {
         Header.scrollTo(post.nodes.root);
       }
-
       // Preload next image
       if (isNaN(oldID) || (newID === ((oldID + 1) % Gallery.images.length))) {
-        return Gallery.cache = Gallery.load(Gallery.images[(newID + 1) % Gallery.images.length], Gallery.cacheError);
+        Gallery.cache = Gallery.load(Gallery.images[(newID + 1) % Gallery.images.length], Gallery.cacheError);
       }
     },
-
     error() {
       if (this.error?.code === MediaError.MEDIA_ERR_DECODE) {
-        return new Notice('error', 'Corrupt or unplayable video', 30);
+        new Notice('error', 'Corrupt or unplayable video', 30);
+        return;
       }
-      if (ImageCommon.isFromArchive(this)) { return; }
+      if (ImageCommon.isFromArchive(this)) {
+        return;
+      }
       const post = g.posts.get(this.dataset.post);
       const file = post.files[+this.dataset.file];
-      return ImageCommon.error(this, post, file, null, url => {
-        if (!url) { return; }
+      ImageCommon.error(this, post, file, null, (url) => {
+        if (!url) {
+          return;
+        }
         Gallery.images[+this.dataset.id].href = url;
-        if (Gallery.nodes.current === this) { return this.src = url; }
+        if (Gallery.nodes.current === this) {
+          this.src = url;
+        }
       });
     },
-
     cacheError() {
-      return delete Gallery.cache;
+      delete Gallery.cache;
     },
-
     cleanupTimer() {
       clearTimeout(Gallery.timeoutID);
-      const {current} = Gallery.nodes;
+      const { current } = Gallery.nodes;
       $.off(current, 'canplaythrough load', Gallery.startTimer);
-      return $.off(current, 'ended', Gallery.cb.next);
+      $.off(current, 'ended', Gallery.cb.next);
     },
-
     startTimer() {
       return Gallery.timeoutID = setTimeout(Gallery.checkTimer, Gallery.delay * SECOND);
     },
-
     setupTimer() {
       Gallery.cleanupTimer();
-      const {current} = Gallery.nodes;
+      const { current } = Gallery.nodes;
       const isVideo = current.nodeName === 'VIDEO';
-      if (isVideo) { current.play(); }
+      if (isVideo) {
+        current.play();
+      }
       if ((isVideo ? current.readyState >= 4 : current.complete) || (current.nodeName === 'IFRAME')) {
-        return Gallery.startTimer();
+        Gallery.startTimer();
       } else {
-        return $.on(current, (isVideo ? 'canplaythrough' : 'load'), Gallery.startTimer);
+        $.on(current, (isVideo ? 'canplaythrough' : 'load'), Gallery.startTimer);
       }
     },
-
     checkTimer() {
-      const {current} = Gallery.nodes;
+      const { current } = Gallery.nodes;
       if ((current.nodeName === 'VIDEO') && !current.paused) {
         $.on(current, 'ended', Gallery.cb.next);
-        return current.loop = false;
+        current.loop = false;
       } else {
-        return Gallery.cb.next();
+        Gallery.cb.next();
       }
     },
-
     cb: {
       keybinds(e) {
         let key;
-        if (!(key = Keybinds.keyCode(e))) { return; }
-
-        const cb = (() => { switch (key) {
-          case Conf['Close']: case Conf['Open Gallery']:
-            return Gallery.cb.close;
-          case Conf['Next Gallery Image']:
-            return Gallery.cb.next;
-          case Conf['Advance Gallery']:
-            return Gallery.cb.advance;
-          case Conf['Previous Gallery Image']:
-            return Gallery.cb.prev;
-          case Conf['Pause']:
-            return Gallery.cb.pause;
-          case Conf['Slideshow']:
-            return Gallery.cb.toggleSlideshow;
-          case Conf['Rotate image anticlockwise']:
-            return Gallery.cb.rotateLeft;
-          case Conf['Rotate image clockwise']:
-            return Gallery.cb.rotateRight;
-          case Conf['Download Gallery Image']:
-            return Gallery.cb.download;
-        } })();
-
-        if (!cb) { return; }
+        if (!(key = Keybinds.keyCode(e))) {
+          return;
+        }
+        const cb = (() => {
+          switch (key) {
+            case Conf['Close']:
+            case Conf['Open Gallery']:
+              return Gallery.cb.close;
+            case Conf['Next Gallery Image']:
+              return Gallery.cb.next;
+            case Conf['Advance Gallery']:
+              return Gallery.cb.advance;
+            case Conf['Previous Gallery Image']:
+              return Gallery.cb.prev;
+            case Conf['Pause']:
+              return Gallery.cb.pause;
+            case Conf['Slideshow']:
+              return Gallery.cb.toggleSlideshow;
+            case Conf['Rotate image anticlockwise']:
+              return Gallery.cb.rotateLeft;
+            case Conf['Rotate image clockwise']:
+              return Gallery.cb.rotateRight;
+            case Conf['Download Gallery Image']:
+              return Gallery.cb.download;
+          }
+        })();
+        if (!cb) {
+          return;
+        }
         e.stopPropagation();
         e.preventDefault();
-        return cb();
+        cb();
       },
-
       open(e) {
-        if (e) { e.preventDefault(); }
-        if (this) { return Gallery.open(this); }
+        if (e) {
+          e.preventDefault();
+        }
+        if (this) {
+          Gallery.open(this);
+        }
       },
-
       image(e) {
         e.preventDefault();
         e.stopPropagation();
-        return Gallery.build(this);
+        Gallery.build(this);
       },
-
       prev() {
-        return Gallery.cb.open.call(
-          Gallery.images[+Gallery.nodes.current.dataset.id - 1] || Gallery.images[Gallery.images.length - 1]
-        );
+        Gallery.cb.open.call(Gallery.images[+Gallery.nodes.current.dataset.id - 1] || Gallery.images[Gallery.images.length - 1]);
       },
       next() {
-        return Gallery.cb.open.call(
-          Gallery.images[+Gallery.nodes.current.dataset.id + 1] || Gallery.images[0]
-        );
+        Gallery.cb.open.call(Gallery.images[+Gallery.nodes.current.dataset.id + 1] || Gallery.images[0]);
       },
-
       click(e) {
-        if (ImageCommon.onControls(e)) { return; }
+        if (ImageCommon.onControls(e)) {
+          return;
+        }
         e.preventDefault();
-        return Gallery.cb.advance();
+        Gallery.cb.advance();
       },
-
-      advance() { if (!Conf['Autoplay'] && Gallery.nodes.current.paused) { return Gallery.nodes.current.play(); } else { return Gallery.cb.next(); } },
-      toggle() { return (Gallery.nodes ? Gallery.cb.close : Gallery.build)(); },
-      blank(e) { if (e.target === this) { return Gallery.cb.close(); } },
-      toggleSlideshow() {  return Gallery.cb[Gallery.slideshow ? 'stop' : 'start'](); },
-
+      advance() {
+        if (!Conf['Autoplay'] && Gallery.nodes.current.paused) {
+          Gallery.nodes.current.play();
+        } else {
+          Gallery.cb.next();
+        }
+      },
+      toggle() {
+        (Gallery.nodes ? Gallery.cb.close : Gallery.build)();
+      },
+      blank(e) {
+        if (e.target === this) {
+          Gallery.cb.close();
+        }
+      },
+      toggleSlideshow() {
+        Gallery.cb[Gallery.slideshow ? 'stop' : 'start']();
+      },
       download() {
         const name = $('.gal-name');
-        return name.click();
+        name.click();
       },
-
       pause() {
         Gallery.cb.stop();
-        const {current} = Gallery.nodes;
-        if (current.nodeName === 'VIDEO') { return current[current.paused ? 'play' : 'pause'](); }
+        const { current } = Gallery.nodes;
+        if (current.nodeName === 'VIDEO') {
+          current[current.paused ? 'play' : 'pause']();
+        }
       },
-
       start() {
         $.addClass(Gallery.nodes.buttons, 'gal-playing');
         Gallery.slideshow = true;
-        return Gallery.setupTimer();
+        Gallery.setupTimer();
       },
-
       stop() {
-        if (!Gallery.slideshow) { return; }
+        if (!Gallery.slideshow) {
+          return;
+        }
         Gallery.cleanupTimer();
-        const {current} = Gallery.nodes;
-        if (current.nodeName === 'VIDEO') { current.loop = true; }
+        const { current } = Gallery.nodes;
+        if (current.nodeName === 'VIDEO') {
+          current.loop = true;
+        }
         $.rmClass(Gallery.nodes.buttons, 'gal-playing');
-        return Gallery.slideshow = false;
+        Gallery.slideshow = false;
       },
-
-      rotateLeft() { return Gallery.cb.rotate(270); },
-      rotateRight() { return Gallery.cb.rotate(90); },
-
-      rotate: debounce(100, function(delta) {
-        const {current} = Gallery.nodes;
-        if (current.nodeName === 'IFRAME') { return; }
+      rotateLeft() { Gallery.cb.rotate(270); },
+      rotateRight() { Gallery.cb.rotate(90); },
+      rotate: debounce(100, function (delta) {
+        const { current } = Gallery.nodes;
+        if (current.nodeName === 'IFRAME') {
+          return;
+        }
         current.dataRotate = ((current.dataRotate || 0) + delta) % 360;
         current.style.transform = `rotate(${current.dataRotate}deg)`;
-        return Gallery.cb.setHeight();
+        Gallery.cb.setHeight();
       }),
-
       close() {
         $.off(Gallery.nodes.current, 'error', Gallery.error);
         ImageCommon.pause(Gallery.nodes.current);
@@ -14769,24 +14784,25 @@ svg.icon {
         delete Gallery.nodes;
         delete Gallery.fileIDs;
         doc.style.overflow = '';
-
         $.off(d, 'keydown', Gallery.cb.keybinds);
-        if (Conf['Keybinds']) { $.on(d, 'keydown', Keybinds.keydown); }
+        if (Conf['Keybinds']) {
+          $.on(d, 'keydown', Keybinds.keydown);
+        }
         $.off(window, 'resize', Gallery.cb.setHeight);
-        return clearTimeout(Gallery.timeoutID);
+        clearTimeout(Gallery.timeoutID);
       },
-
       setFitness() {
-        return (this.checked ? $.addClass : $.rmClass)(doc, `gal-${this.name.toLowerCase().replace(/\s+/g, '-')}`);
+        (this.checked ? $.addClass : $.rmClass)(doc, `gal-${this.name.toLowerCase().replace(/\s+/g, '-')}`);
       },
-
       setHeight: debounce(100, function () {
         let dim, margin, minHeight;
-        const {current, frame} = Gallery.nodes;
-        const {style} = current;
-
-        if (Conf['Stretch to Fit'] && (dim = g.posts.get(current.dataset.post)?.files[+current.dataset.file].dimensions)) {
-          const [width, height] = dim.split('x');
+        const { current, frame } = Gallery.nodes;
+        const { style } = current;
+        const post = g.posts.get(current.dataset.post);
+        if (Conf['Stretch to Fit'] && post && (dim = post.files[+current.dataset.file].dimensions)) {
+          const dims = dim.split('x').map((x) => +x);
+          const width = dims[0];
+          const height = dims[1];
           let containerWidth = frame.clientWidth;
           let containerHeight = doc.clientHeight - 25;
           if (((current.dataRotate || 0) % 180) === 90) {
@@ -14798,57 +14814,53 @@ svg.icon {
         } else {
           style.minHeight = (style.minWidth = '');
         }
-
         if (((current.dataRotate || 0) % 180) === 90) {
-          style.maxWidth  = Conf['Fit Height'] ? `${doc.clientHeight - 25}px` : 'none';
-          style.maxHeight = Conf['Fit Width']  ? `${frame.clientWidth}px`     : 'none';
-          margin = (current.clientWidth - current.clientHeight)/2;
-          return style.margin = `${margin}px ${-margin}px`;
+          style.maxWidth = Conf['Fit Height'] ? `${doc.clientHeight - 25}px` : 'none';
+          style.maxHeight = Conf['Fit Width'] ? `${frame.clientWidth}px` : 'none';
+          margin = (current.clientWidth - current.clientHeight) / 2;
+          style.margin = `${margin}px ${-margin}px`;
         } else {
-          return style.maxWidth = (style.maxHeight = (style.margin = ''));
+          style.maxWidth = (style.maxHeight = (style.margin = ''));
         }
       }),
-
-      setDelay() { return Gallery.delay = +this.value; }
+      setDelay() { Gallery.delay = +this.value; }
     },
-
     menu: {
       init() {
-        if (!Gallery.enabled) { return; }
-
+        if (!Gallery.enabled) {
+          return;
+        }
         const el = $.el('span', {
           textContent: 'Gallery',
           className: 'gallery-link'
-        }
-        );
-
-        return Header.menu.addEntry({
+        });
+        Header.menu.addEntry({
           el,
           order: 105,
           subEntries: Gallery.menu.createSubEntries()
         });
       },
-
       createSubEntry(name) {
         const label = UI.checkbox(name, name);
         const input = label.firstElementChild;
-        if (['Hide Thumbnails', 'Fit Width', 'Fit Height'].includes(name)) { $.on(input, 'change', Gallery.cb.setFitness); }
+        if (['Hide Thumbnails', 'Fit Width', 'Fit Height'].includes(name)) {
+          $.on(input, 'change', Gallery.cb.setFitness);
+        }
         $.event('change', null, input);
         $.on(input, 'change', $.cb.checked);
-        if (['Hide Thumbnails', 'Fit Width', 'Fit Height', 'Stretch to Fit'].includes(name)) { $.on(input, 'change', Gallery.cb.setHeight); }
-        return {el: label};
+        if (['Hide Thumbnails', 'Fit Width', 'Fit Height', 'Stretch to Fit'].includes(name)) {
+          $.on(input, 'change', Gallery.cb.setHeight);
+        }
+        return { el: label };
       },
-
       createSubEntries() {
-        const subEntries = (['Hide Thumbnails', 'Fit Width', 'Fit Height', 'Stretch to Fit', 'Scroll to Post'].map((item) => Gallery.menu.createSubEntry(item)));
-
-        const delayLabel = $.el('label', {innerHTML: 'Slide Delay: <input type="number" name="Slide Delay" min="0" step="any" class="field">'});
+        const subEntries = ['Hide Thumbnails', 'Fit Width', 'Fit Height', 'Stretch to Fit', 'Scroll to Post'].map((item) => Gallery.menu.createSubEntry(item));
+        const delayLabel = $.el('label', { innerHTML: 'Slide Delay: <input type="number" name="Slide Delay" min="0" step="any" class="field">' });
         const delayInput = delayLabel.firstElementChild;
-        delayInput.value = Gallery.delay;
+        delayInput.value = String(Gallery.delay);
         $.on(delayInput, 'change', Gallery.cb.setDelay);
         $.on(delayInput, 'change', $.cb.value);
-        subEntries.push({el: delayLabel});
-
+        subEntries.push({ el: delayLabel });
         return subEntries;
       }
     }
@@ -19893,96 +19905,113 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     },
   };
 
-  // @ts-nocheck
-
-  var ImageCommon = {
+  const ImageCommon = {
+    cache: undefined,
     // Pause and mute video in preparation for removing the element from the document.
     pause(video) {
-      if (video.nodeName !== 'VIDEO') { return; }
-      video.pause();
-      $.off(video, 'volumechange', Volume.change);
-      return video.muted = true;
+      if (video.nodeName !== 'VIDEO') {
+        return;
+      }
+      const v = video;
+      v.pause();
+      $.off(v, 'volumechange', Volume.change);
+      v.muted = true;
     },
-
     rewind(el) {
       if (el.nodeName === 'VIDEO') {
-        if (el.readyState >= el.HAVE_METADATA) { return el.currentTime = 0; }
+        const v = el;
+        if (v.readyState >= v.HAVE_METADATA) {
+          return v.currentTime = 0;
+        }
       } else if (/\.gif$/.test(el.src)) {
-        return $.queueTask(() => el.src = el.src);
+        const img = el;
+        return $.queueTask(() => img.src = img.src);
       }
     },
-
     pushCache(el) {
       ImageCommon.cache = el;
-      return $.on(el, 'error', ImageCommon.cacheError);
+      $.on(el, 'error', ImageCommon.cacheError);
     },
-
     popCache() {
       const el = ImageCommon.cache;
       $.off(el, 'error', ImageCommon.cacheError);
       delete ImageCommon.cache;
       return el;
     },
-
     cacheError() {
-      if (ImageCommon.cache === this) { return delete ImageCommon.cache; }
+      if (ImageCommon.cache === this) {
+        delete ImageCommon.cache;
+      }
     },
-
     decodeError(file, fileObj) {
       let message;
-      if (file.error?.code !== MediaError.MEDIA_ERR_DECODE) { return false; }
+      if (file.error?.code !== MediaError.MEDIA_ERR_DECODE) {
+        return false;
+      }
       if (!(message = $('.warning', fileObj.thumb.parentNode))) {
-        message = $.el('div', {className:   'warning'});
+        message = $.el('div', { className: 'warning' });
         $.after(fileObj.thumb, message);
       }
       message.textContent = 'Error: Corrupt or unplayable video';
       return true;
     },
-
     isFromArchive(file) {
       return (g.SITE.software === 'yotsuba') && !ImageHost.test(file.src.split('/')[2]);
     },
-
     error(file, post, fileObj, delay, cb) {
       let timeoutID;
       const src = fileObj.url.split('/');
       let url = null;
       if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect']) {
         url = Redirect.to('file', {
-          boardID:  post.board.ID,
+          boardID: post.board.ID,
           filename: src[src.length - 1]
         });
       }
-      if (!url || !Redirect.securityCheck(url)) { url = null; }
-
-      if ((post.isDead || fileObj.isDead) && !ImageCommon.isFromArchive(file)) { return cb(url); }
-
-      if (delay != null) { timeoutID = setTimeout((() => cb(url)), delay); }
-      if (post.isDead || fileObj.isDead) { return; }
-      const redirect = function() {
+      if (!url || !Redirect.securityCheck(url)) {
+        url = null;
+      }
+      if ((post.isDead || fileObj.isDead) && !ImageCommon.isFromArchive(file)) {
+        return cb(url);
+      }
+      if (delay != null) {
+        timeoutID = setTimeout((() => cb(url)), delay);
+      }
+      if (post.isDead || fileObj.isDead) {
+        return;
+      }
+      const redirect = function () {
         if (!ImageCommon.isFromArchive(file)) {
-          if (delay != null) { clearTimeout(timeoutID); }
+          if (delay != null) {
+            clearTimeout(timeoutID);
+          }
           return cb(url);
         }
       };
-
       const threadJSON = g.SITE.urls.threadJSON?.(post);
-      if (!threadJSON) { return; }
-      var parseJSON = function(isArchiveURL) {
+      if (!threadJSON) {
+        return;
+      }
+      const parseJSON = function (isArchiveURL) {
         let needle, postObj;
         if (this.status === 404) {
           let archivedThreadJSON;
           if (!isArchiveURL && (archivedThreadJSON = g.SITE.urls.archivedThreadJSON?.(post))) {
-            $.ajax(archivedThreadJSON, {onloadend() { return parseJSON.call(this, true); }});
+            $.ajax(archivedThreadJSON, { onloadend() { return parseJSON.call(this, true); } });
           } else {
             post.kill(!post.isClone, fileObj.index);
           }
         }
-        if (this.status !== 200) { return redirect(); }
-        for (postObj of this.response.posts) {
-          if (postObj.no === post.ID) { break; }
+        if (this.status !== 200) {
+          return redirect();
         }
-        if (postObj.no !== post.ID) {
+        for (const p of this.response.posts) {
+          if (p.no === post.ID) {
+            postObj = p;
+            break;
+          }
+        }
+        if (!postObj || postObj.no !== post.ID) {
           post.kill();
           return redirect();
         } else if ((needle = fileObj.docIndex, g.SITE.Build.parseJSON(postObj, post.board).filesDeleted.includes(needle))) {
@@ -19992,27 +20021,26 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return url = fileObj.url;
         }
       };
-      return $.ajax(threadJSON, {onloadend() { return parseJSON.call(this); }});
+      return $.ajax(threadJSON, { onloadend() { return parseJSON.call(this); } });
     },
-
     // XXX Estimate whether clicks are on the video controls and should be ignored.
     onControls(e) {
       return (Conf['Show Controls'] && Conf['Click Passthrough'] && (e.target.nodeName === 'VIDEO')) ||
         (e.target.controls && ((e.target.getBoundingClientRect().bottom - e.clientY) < 35));
     },
-
     download(e) {
-      if (this.protocol === 'blob:') { return true; }
+      if (this.protocol === 'blob:') {
+        return true;
+      }
       e.preventDefault();
-      const {href, download} = this;
-      return CrossOrigin.file(href, function(blob) {
+      const { href, download } = this;
+      return CrossOrigin.file(href, function (blob) {
         if (blob) {
           const a = $.el('a', {
             href: URL.createObjectURL(blob),
             download,
             hidden: true
-          }
-          );
+          });
           $.add(d.body, a);
           a.click();
           return $.rm(a);
@@ -24159,214 +24187,238 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var ImageHover = {
+  const ImageHover = {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW)) { return; }
+      if (!['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
       if (Conf['Image Hover']) {
         Callbacks.Post.push({
           name: 'Image Hover',
-          cb:   this.node
+          cb: this.node
         });
       }
       if (Conf['Image Hover in Catalog']) {
-        return Callbacks.CatalogThread.push({
+        Callbacks.CatalogThread.push({
           name: 'Image Hover',
-          cb:   this.catalogNode
+          cb: this.catalogNode
         });
       }
     },
-
     node() {
-      return this.files.filter((file) => (file.isImage || file.isVideo) && file.thumb).map((file) =>
-        $.on(file.thumb, 'mouseover', ImageHover.mouseover(this, file)));
+      this.files.filter((file) => (file.isImage || file.isVideo) && file.thumb).map((file) => $.on(file.thumb, 'mouseover', ImageHover.mouseover(this, file)));
     },
-
     catalogNode() {
       const file = this.thread.OP.files[0];
-      if (!file || (!file.isImage && !file.isVideo)) { return; }
-      return $.on(this.nodes.thumb, 'mouseover', ImageHover.mouseover(this.thread.OP, file));
+      if (!file || (!file.isImage && !file.isVideo)) {
+        return;
+      }
+      $.on(this.nodes.thumb, 'mouseover', ImageHover.mouseover(this.thread.OP, file));
     },
-
-    mouseover(post, file) { return function(e) {
-      let el, height, width;
-      if (!doc.contains(this)) { return; }
-      const {isVideo} = file;
-      if (file.isExpanding || file.isExpanded || g.SITE.isThumbExpanded?.(file)) { return; }
-      const error = ImageHover.error(post, file);
-      if (ImageCommon.cache?.dataset.fileID === `${post.fullID}.${file.index}`) {
-        el = ImageCommon.popCache();
-        $.on(el, 'error', error);
-      } else {
-        el = $.el((isVideo ? 'video' : 'img'));
-        el.dataset.fileID = `${post.fullID}.${file.index}`;
-        $.on(el, 'error', error);
-        el.src = file.url;
-      }
-
-      if (Conf['Restart when Opened']) {
-        ImageCommon.rewind(el);
-        ImageCommon.rewind(this);
-      }
-      el.id = 'ihover';
-      $.add(Header.hover, el);
-      if (isVideo) {
-        el.loop     = true;
-        el.controls = false;
-        Volume.setup(el);
-        if (Conf['Autoplay']) {
-          el.play();
-          if (this.nodeName === 'VIDEO') { this.currentTime = el.currentTime; }
+    mouseover(post, file) {
+      return function (e) {
+        let el, height, width;
+        if (!doc.contains(this)) {
+          return;
         }
-      }
-      if (file.dimensions) {
-        [width, height] = file.dimensions.split('x').map((x) => +x);
-        const maxWidth = doc.clientWidth;
-        const maxHeight = doc.clientHeight - UI.hover.padding;
-        const scale = Math.min(1, maxWidth / width, maxHeight / height);
-        width *= scale;
-        height *= scale;
-        el.style.maxWidth  = `${width}px`;
-        el.style.maxHeight = `${height}px`;
-      }
-      return UI.hover({
-        root: this,
-        el,
-        latestEvent: e,
-        endEvents: 'mouseout click',
-        height,
-        width,
-        noRemove: true,
-        cb() {
-          $.off(el, 'error', error);
-          ImageCommon.pushCache(el);
-          ImageCommon.pause(el);
-          $.rm(el);
-          return el.removeAttribute('style');
+        const { isVideo } = file;
+        if (file.isExpanding || file.isExpanded || g.SITE.isThumbExpanded?.(file)) {
+          return;
         }
-      });
-    }; },
-
-    error(post, file) { return function() {
-      if (ImageCommon.decodeError(this, file)) { return; }
-      return ImageCommon.error(this, post, file, 3 * SECOND, URL => {
-        if (URL) {
-          return this.src = URL + (this.src === URL ? '?' + Date.now() : '');
+        const error = ImageHover.error(post, file);
+        if (ImageCommon.cache?.dataset.fileID === `${post.fullID}.${file.index}`) {
+          el = ImageCommon.popCache();
+          $.on(el, 'error', error);
         } else {
-          return $.rm(this);
+          el = $.el((isVideo ? 'video' : 'img'));
+          el.dataset.fileID = `${post.fullID}.${file.index}`;
+          $.on(el, 'error', error);
+          el.src = file.url;
         }
-      });
-    }; }
+        if (Conf['Restart when Opened']) {
+          ImageCommon.rewind(el);
+          ImageCommon.rewind(this);
+        }
+        el.id = 'ihover';
+        $.add(Header.hover, el);
+        if (isVideo) {
+          const video = el;
+          video.loop = true;
+          video.controls = false;
+          Volume.setup(video);
+          if (Conf['Autoplay']) {
+            video.play();
+            if (this.nodeName === 'VIDEO') {
+              this.currentTime = video.currentTime;
+            }
+          }
+        }
+        if (file.dimensions) {
+          const dims = file.dimensions.split('x').map((x) => +x);
+          width = dims[0];
+          height = dims[1];
+          const maxWidth = doc.clientWidth;
+          const maxHeight = doc.clientHeight - UI.hover.padding;
+          const scale = Math.min(1, maxWidth / width, maxHeight / height);
+          width *= scale;
+          height *= scale;
+          el.style.maxWidth = `${width}px`;
+          el.style.maxHeight = `${height}px`;
+        }
+        UI.hover({
+          root: this,
+          el,
+          latestEvent: e,
+          endEvents: 'mouseout click',
+          height,
+          width,
+          noRemove: true,
+          cb() {
+            $.off(el, 'error', error);
+            ImageCommon.pushCache(el);
+            ImageCommon.pause(el);
+            $.rm(el);
+            el.removeAttribute('style');
+          }
+        });
+      };
+    },
+    error(post, file) {
+      return function () {
+        if (ImageCommon.decodeError(this, file)) {
+          return;
+        }
+        ImageCommon.error(this, post, file, 3 * SECOND, (URL) => {
+          if (URL) {
+            this.src = URL + (this.src === URL ? '?' + Date.now() : '');
+          } else {
+            $.rm(this);
+          }
+        });
+      };
+    }
   };
 
-  // @ts-nocheck
-
-  var ImageLoader = {
+  const ImageLoader = {
+    prefetchEnabled: undefined,
     init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+      if (!['index', 'thread', 'archive'].includes(g.VIEW)) {
+        return;
+      }
       const replace = Conf['Replace JPG'] || Conf['Replace PNG'] || Conf['Replace GIF'] || Conf['Replace WEBM'];
-      if (!Conf['Image Prefetching'] && !replace) { return; }
-
+      if (!Conf['Image Prefetching'] && !replace) {
+        return;
+      }
       Callbacks.Post.push({
         name: 'Image Replace',
-        cb:   this.node
+        cb: this.node
       });
-
-      $.on(d, 'PostsInserted', function() {
+      $.on(d, 'PostsInserted', () => {
         if (ImageLoader.prefetchEnabled || replace) {
-          return g.posts.forEach(ImageLoader.prefetchAll);
+          g.posts.forEach(ImageLoader.prefetchAll);
         }
       });
-
       if (Conf['Replace WEBM']) {
         $.on(d, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
       }
-
-      if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(g.VIEW)) { return; }
-
+      if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
       const el = $.el('a', {
         href: 'javascript:;',
         title: 'Prefetch Images',
         className: 'disabled',
       });
       Icon.set(el, 'bolt', 'Prefetch');
-
       $.on(el, 'click', this.toggle);
-
-      return Header.addShortcut('prefetch', el, 525);
+      Header.addShortcut('prefetch', el, 525);
     },
-
     node() {
-      if (this.isClone) { return; }
-      for (var file of this.files) {
-        if (Conf['Replace WEBM'] && file.isVideo) { ImageLoader.replaceVideo(this, file); }
+      if (this.isClone) {
+        return;
+      }
+      for (const file of this.files) {
+        if (Conf['Replace WEBM'] && file.isVideo) {
+          ImageLoader.replaceVideo(this, file);
+        }
         ImageLoader.prefetch(this, file);
       }
     },
-
     replaceVideo(post, file) {
-      const {thumb} = file;
+      const { thumb } = file;
       const video = $.el('video', {
-        preload:     'none',
-        loop:        true,
-        muted:       true,
-        poster:      thumb.src || thumb.dataset.src,
+        preload: 'none',
+        loop: true,
+        muted: true,
+        poster: thumb.src || thumb.dataset.src,
         textContent: thumb.alt,
-        className:   thumb.className
-      }
-      );
+        className: thumb.className
+      });
       video.setAttribute('muted', 'muted');
       video.dataset.md5 = thumb.dataset.md5;
-      for (var attr of ['height', 'width', 'maxHeight', 'maxWidth']) { video.style[attr] = thumb.style[attr]; }
-      video.src         = file.url;
+      for (const attr of ['height', 'width', 'maxHeight', 'maxWidth']) {
+        video.style[attr] = thumb.style[attr];
+      }
+      video.src = file.url;
       $.replace(thumb, video);
-      file.thumb      = video;
-      return file.videoThumb = true;
+      file.thumb = video;
+      file.videoThumb = true;
     },
-
     prefetch(post, file) {
       let clone, type;
-      const {isImage, isVideo, thumb, url} = file;
-      if (file.isPrefetched || !(isImage || isVideo) || post.isHidden || post.thread.isHidden) { return; }
+      const { isImage, isVideo, thumb, url } = file;
+      if (file.isPrefetched || !(isImage || isVideo) || post.isHidden || post.thread.isHidden) {
+        return;
+      }
       if (isVideo) {
         type = 'WEBM';
       } else {
-        type = url.match(/\.([^.]+)$/)?.[1].toUpperCase();
-        if (type === 'JPEG') { type = 'JPG'; }
+        type = (url.match(/\.([^.]+)$/) || [])[1]?.toUpperCase() || '';
+        if (type === 'JPEG') {
+          type = 'JPG';
+        }
       }
       const replace = Conf[`Replace ${type}`] && !/spoiler/.test(thumb.src || thumb.dataset.src);
-      if (!replace && !ImageLoader.prefetchEnabled) { return; }
-      if ($.hasClass(doc, 'catalog-mode')) { return; }
-      if (![post, ...post.clones].some(clone => doc.contains(clone.nodes.root))) { return; }
+      if (!replace && !ImageLoader.prefetchEnabled) {
+        return;
+      }
+      if ($.hasClass(doc, 'catalog-mode')) {
+        return;
+      }
+      if (![post, ...post.clones].some((clone) => doc.contains(clone.nodes.root))) {
+        return;
+      }
       file.isPrefetched = true;
       if (file.videoThumb) {
-        for (clone of post.clones) { clone.file.thumb.preload = 'auto'; }
+        for (clone of post.clones) {
+          clone.file.thumb.preload = 'auto';
+        }
         thumb.preload = 'auto';
         // XXX Cloned video elements with poster in Firefox cause momentary display of image loading icon.
         if ($.engine === 'gecko') {
-          $.on(thumb, 'loadeddata', function() { return this.removeAttribute('poster'); });
+          $.on(thumb, 'loadeddata', function () { this.removeAttribute('poster'); });
         }
         return;
       }
-
       const el = $.el(isImage ? 'img' : 'video');
-      if (isVideo) { el.preload = 'auto'; }
+      if (isVideo) {
+        el.preload = 'auto';
+      }
       if (replace && isImage) {
-        $.on(el, 'load', function() {
-          for (clone of post.clones) { clone.file.thumb.src = url; }
-          return thumb.src = url;
+        $.on(el, 'load', () => {
+          for (clone of post.clones) {
+            clone.file.thumb.src = url;
+          }
+          thumb.src = url;
         });
       }
-      return el.src = url;
+      el.src = url;
     },
-
     prefetchAll(post) {
-      for (var file of post.files) {
+      for (const file of post.files) {
         ImageLoader.prefetch(post, file);
       }
     },
-
     toggle() {
       ImageLoader.prefetchEnabled = !ImageLoader.prefetchEnabled;
       this.classList.toggle('disabled', !ImageLoader.prefetchEnabled);
@@ -24374,16 +24426,19 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         g.posts.forEach(ImageLoader.prefetchAll);
       }
     },
-
     playVideos() {
       // Special case: Quote previews are off screen when inserted into document, but quickly moved on screen.
       const qpClone = $.id('qp')?.firstElementChild;
-      return g.posts.forEach(function(post) {
-        for (post of [post, ...post.clones]) {
-          for (var file of post.files) {
+      g.posts.forEach((post) => {
+        for (const p of [post, ...post.clones]) {
+          for (const file of p.files) {
             if (file.videoThumb) {
-              var {thumb} = file;
-              if (Header.isNodeVisible(thumb) || (post.nodes.root === qpClone)) { thumb.play(); } else { thumb.pause(); }
+              const { thumb } = file;
+              if (Header.isNodeVisible(thumb) || (p.nodes.root === qpClone)) {
+                thumb.play();
+              } else {
+                thumb.pause();
+              }
             }
           }
         }
@@ -24391,80 +24446,79 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var Metadata = {
+  const Metadata = {
     init() {
-      if (!Conf['WEBM Metadata'] || !['index', 'thread'].includes(g.VIEW)) { return; }
-
-      return Callbacks.Post.push({
+      if (!Conf['WEBM Metadata'] || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'WEBM Metadata',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       for (let i = 0; i < this.files.length; i++) {
-        var file = this.files[i];
-        if (/webm$/i.test(file.url)) {var el;
-
+        const file = this.files[i];
+        if (/webm$/i.test(file.url)) {
+          let el;
           if (this.isClone) {
             el = $('.webm-title', file.text);
           } else {
-            el = $.el('span',
-              {className: 'webm-title'});
-            el.dataset.index = i;
-            $.extend(el,
-              {innerHTML: "<a href=\"javascript:;\"></a>"});
+            el = $.el('span', { className: 'webm-title' });
+            el.dataset.index = String(i);
+            $.extend(el, { innerHTML: '<a href="javascript:;"></a>' });
             $.add(file.text, [$.tn(' '), el]);
           }
-          if (el.children.length === 1) { $.one(el.lastElementChild, 'mouseover focus', Metadata.load); }
+          if (el && el.children.length === 1) {
+            $.one(el.lastElementChild, 'mouseover focus', Metadata.load);
+          }
         }
       }
     },
-
     load() {
-      $.rmClass(this.parentNode, 'error');
-      $.addClass(this.parentNode, 'loading');
-      const {index} = this.parentNode.dataset;
-      return CrossOrigin.binary(Get.postFromNode(this).files[+index].url, data => {
-        $.rmClass(this.parentNode, 'loading');
+      const parent = this.parentNode;
+      $.rmClass(parent, 'error');
+      $.addClass(parent, 'loading');
+      const { index } = parent.dataset;
+      CrossOrigin.binary(Get.postFromNode(this).files[+(index || 0)].url, (data) => {
+        $.rmClass(parent, 'loading');
         if (data != null) {
-          const title = Metadata.parse(data);
-          const output = $.el('span',
-            {textContent: title || ''});
-          if (title == null) { $.addClass(this.parentNode, 'not-found'); }
+          const title = Metadata.parse(new Uint8Array(data));
+          const output = $.el('span', { textContent: title || '' });
+          if (title == null) {
+            $.addClass(parent, 'not-found');
+          }
           $.before(this, output);
-          this.parentNode.tabIndex = 0;
-          if (d.activeElement === this) { this.parentNode.focus(); }
-          return this.tabIndex = -1;
+          parent.tabIndex = 0;
+          if (d.activeElement === this) {
+            parent.focus();
+          }
+          this.tabIndex = -1;
         } else {
-          $.addClass(this.parentNode, 'error');
-          return $.one(this, 'click', Metadata.load);
+          $.addClass(parent, 'error');
+          $.one(this, 'click', Metadata.load);
         }
-      }
-      ,
-        {Range: 'bytes=0-9999'});
+      }, { Range: 'bytes=0-9999' });
     },
-
     parse(data) {
-      const readInt = function() {
+      let i = 0;
+      const readInt = function () {
         let n = data[i++];
         let len = 0;
-        while (n < (0x80 >> len)) { len++; }
+        while (n < (0x80 >> len)) {
+          len++;
+        }
         n ^= (0x80 >> len);
         while (len-- && (i < data.length)) {
           n = (n << 8) ^ data[i++];
         }
         return n;
       };
-
-      var i = 0;
       while (i < data.length) {
-        var element = readInt();
-        var size    = readInt();
+        const element = readInt();
+        let size = readInt();
         if (element === 0x3BA9) { // Title
-          var title = '';
+          let title = '';
           while (size-- && (i < data.length)) {
             title += String.fromCharCode(data[i++]);
           }
@@ -24477,23 +24531,23 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const RevealSpoilers = {
     init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Reveal Spoiler Thumbnails']) { return; }
-
-      return Callbacks.Post.push({
+      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Reveal Spoiler Thumbnails']) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'Reveal Spoiler Thumbnails',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
-      if (this.isClone) { return; }
-      for (var file of this.files) {
+      if (this.isClone) {
+        return;
+      }
+      for (const file of this.files) {
         if (file.thumb && file.isSpoiler) {
-          var {thumb} = file;
+          const { thumb } = file;
           // Remove old width and height.
           thumb.removeAttribute('style');
           // Enforce thumbnail size if thumbnail is replaced.
@@ -25859,67 +25913,69 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var QuoteInline = {
+  const QuoteInline = {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Inlining']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Inlining']) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Quote Inlining',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
-      const {process} = QuoteInline;
-      const {isClone} = this;
-      for (var link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
+      const { process } = QuoteInline;
+      const { isClone } = this;
+      for (const link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
         process(link, isClone);
       }
     },
-
     process(link, clone) {
       if (Conf['Quote Hash Navigation']) {
-        if (!clone) { $.after(link, QuoteInline.qiQuote(link, $.hasClass(link, 'filtered'))); }
+        if (!clone) {
+          $.after(link, QuoteInline.qiQuote(link, $.hasClass(link, 'filtered')));
+        }
       }
-      return $.on(link, 'click', QuoteInline.toggle);
+      $.on(link, 'click', QuoteInline.toggle);
     },
-
     qiQuote(link, hidden) {
       let name = "hashlink";
-      if (hidden) { name += " filtered"; }
+      if (hidden) {
+        name += " filtered";
+      }
       return $.el('a', {
         className: name,
         textContent: '#',
         href: link.href
-      }
-      );
+      });
     },
-
     toggle(e) {
-      if ($.modifiedClick(e)) { return; }
-
-      const {boardID, threadID, postID} = Get.postDataFromLink(this);
-      if (Conf['Inline Cross-thread Quotes Only'] && (g.VIEW === 'thread') && g.posts.get(`${boardID}.${postID}`)?.nodes.root.offsetParent) { return; } // exists and not hidden
-      if ($.hasClass(doc, 'catalog-mode')) { return; }
-
+      if ($.modifiedClick(e)) {
+        return;
+      }
+      const { boardID, threadID, postID } = Get.postDataFromLink(this);
+      if (Conf['Inline Cross-thread Quotes Only'] && (g.VIEW === 'thread') && g.posts.get(`${boardID}.${postID}`)?.nodes.root.offsetParent) {
+        return;
+      } // exists and not hidden
+      if ($.hasClass(doc, 'catalog-mode')) {
+        return;
+      }
       e.preventDefault();
       const quoter = Get.postFromNode(this);
-      const {context} = quoter;
+      const { context } = quoter;
       if ($.hasClass(this, 'inlined')) {
         QuoteInline.rm(this, boardID, threadID, postID, context);
       } else {
-        if ($.x(`ancestor::div[@data-full-i-d='${boardID}.${postID}']`, this)) { return; }
+        if ($.x(`ancestor::div[@data-full-i-d='${boardID}.${postID}']`, this)) {
+          return;
+        }
         QuoteInline.add(this, boardID, threadID, postID, context, quoter);
       }
-      return this.classList.toggle('inlined');
+      this.classList.toggle('inlined');
     },
-
     findRoot(quotelink, isBacklink) {
       if (isBacklink) {
         return $.x('ancestor::*[parent::*[contains(@class,"post")]][1]', quotelink);
@@ -25927,39 +25983,33 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return $.x('ancestor-or-self::*[parent::blockquote][1]', quotelink);
       }
     },
-
     add(quotelink, boardID, threadID, postID, context, quoter) {
       let post;
       const isBacklink = $.hasClass(quotelink, 'backlink');
-      const inline = $.el('div',
-        {className: 'inline'});
+      const inline = $.el('div', { className: 'inline' });
       inline.dataset.fullID = `${boardID}.${postID}`;
       const root = QuoteInline.findRoot(quotelink, isBacklink);
       $.after(root, inline);
-
       const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root);
-
       $.addClass(qroot, 'hasInline');
-      new Fetcher(boardID, threadID, postID, inline, quoter);
-
-      if (!(
-        (post = g.posts.get(`${boardID}.${postID}`)) &&
-        (context.thread === post.thread)
-      )) { return; }
-
+      new Fetcher(boardID, +threadID, String(postID), inline, quoter);
+      if (!((post = g.posts.get(`${boardID}.${postID}`)) &&
+        (context.thread === post.thread))) {
+        return;
+      }
       // Hide forward post if it's a backlink of a post in this thread.
       // Will only unhide if there's no inlined backlinks of it anymore.
       if (isBacklink && Conf['Forward Hiding']) {
         $.addClass(post.nodes.root, 'forwarded');
         post.forwarded++ || (post.forwarded = 1);
       }
-
       // Decrease the unread count if this post
       // is in the array of unread posts.
-      if (!Unread.posts) { return; }
-      return Unread.readSinglePost(post);
+      if (!Unread.posts) {
+        return;
+      }
+      Unread.readSinglePost(post);
     },
-
     rm(quotelink, boardID, threadID, postID, context) {
       let el;
       let inlined;
@@ -25968,102 +26018,90 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       let root = QuoteInline.findRoot(quotelink, isBacklink);
       root = $.x(`following-sibling::div[@data-full-i-d='${boardID}.${postID}'][1]`, root);
       const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root);
-      const {parentNode} = root;
+      const parentNode = root.parentNode;
       $.rm(root);
       $.event('PostsRemoved', null, parentNode);
-
       if (!$('.inline', qroot)) {
         $.rmClass(qroot, 'hasInline');
       }
-
       // Stop if it only contains text.
-      if (!(el = root.firstElementChild)) { return; }
-
+      if (!(el = root.firstElementChild)) {
+        return;
+      }
       // Dereference clone.
       const post = g.posts.get(`${boardID}.${postID}`);
       post.rmClone(el.dataset.clone);
-
       // Decrease forward count and unhide.
       if (Conf['Forward Hiding'] &&
         isBacklink &&
         (context.thread === g.threads.get(`${boardID}.${threadID}`)) &&
         !--post.forwarded) {
-          delete post.forwarded;
-          $.rmClass(post.nodes.root, 'forwarded');
-        }
-
+        delete post.forwarded;
+        $.rmClass(post.nodes.root, 'forwarded');
+      }
       // Repeat.
       while ((inlined = $('.inlined', el))) {
-        ({boardID, threadID, postID} = Get.postDataFromLink(inlined));
+        ({ boardID, threadID, postID } = Get.postDataFromLink(inlined));
         QuoteInline.rm(inlined, boardID, threadID, postID, context);
         $.rmClass(inlined, 'inlined');
       }
     }
   };
 
-  // @ts-nocheck
-
-  var QuoteBacklink = {
-    // Backlinks appending need to work for:
-    //  - previous, same, and following posts.
-    //  - existing and yet-to-exist posts.
-    //  - newly fetched posts.
-    //  - in copies.
-    // XXX what about order for fetched posts?
-    //
-    // First callback creates backlinks and add them to relevant containers.
-    // Second callback adds relevant containers into posts.
-    // This is is so that fetched posts can get their backlinks,
-    // and that as much backlinks are appended in the background as possible.
+  const QuoteBacklink = {
     containers: dict(),
+    bottomBacklinks: undefined,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Backlinks']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Backlinks']) {
+        return;
+      }
       // Add a class to differentiate when backlinks are at
       // the top (default) or bottom of a post
-      if (this.bottomBacklinks = Conf['Bottom Backlinks']) {
+      if ((this.bottomBacklinks = Conf['Bottom Backlinks'])) {
         $.addClass(doc, 'bottom-backlinks');
       }
-
       Callbacks.Post.push({
         name: 'Quote Backlinking Part 1',
-        cb:   this.firstNode
+        cb: this.firstNode
       });
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Quote Backlinking Part 2',
-        cb:   this.secondNode
+        cb: this.secondNode
       });
     },
     firstNode() {
-      if (this.isClone || !this.quotes.length || this.isRebuilt) { return; }
+      if (this.isClone || !this.quotes.length || this.isRebuilt) {
+        return;
+      }
       const markYours = Conf['Mark Quotes of You'] && QuoteYou.isYou(this);
       const a = $.el('a', {
         href: g.SITE.Build.postURL(this.board.ID, this.thread.ID, this.ID),
         className: this.isHidden ? 'filtered backlink' : 'backlink',
-        textContent: Conf['backlink'].replace(/%(?:id|%)/g, x => ({'%id': this.ID, '%%': '%'})[x])
+        textContent: Conf['backlink'].replace(/%(?:id|%)/g, (x) => ({ '%id': this.ID, '%%': '%' }[x]))
+      });
+      if (markYours) {
+        $.add(a, QuoteYou.mark.cloneNode(true));
       }
-      );
-      if (markYours) { $.add(a, QuoteYou.mark.cloneNode(true)); }
-      for (var quote of this.quotes) {
-        var post;
-        var containers = [QuoteBacklink.getContainer(quote)];
+      for (const quote of this.quotes) {
+        let post;
+        const containers = [QuoteBacklink.getContainer(quote)];
         if ((post = g.posts.get(quote)) && post.nodes.backlinkContainer) {
           // Don't add OP clones when OP Backlinks is disabled,
           // as the clones won't have the backlink containers.
-          for (var clone of post.clones) {
+          for (const clone of post.clones) {
             containers.push(clone.nodes.backlinkContainer);
           }
         }
-        for (var container of containers) {
-          var link = a.cloneNode(true);
-          var nodes = container.firstChild ? [$.tn(' '), link] : [link];
+        for (const container of containers) {
+          const link = a.cloneNode(true);
+          const nodes = container.firstChild ? [$.tn(' '), link] : [link];
           if (Conf['Quote Previewing']) {
             $.on(link, 'mouseover', QuotePreview.mouseover);
           }
           if (Conf['Quote Inlining']) {
             $.on(link, 'click', QuoteInline.toggle);
             if (Conf['Quote Hash Navigation']) {
-              var hash = QuoteInline.qiQuote(link, $.hasClass(link, 'filtered'));
+              const hash = QuoteInline.qiQuote(link, $.hasClass(link, 'filtered'));
               nodes.push(hash);
             }
           }
@@ -26077,50 +26115,53 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       // Don't backlink the OP.
-      if (!this.isReply && !Conf['OP Backlinks']) { return; }
+      if (!this.isReply && !Conf['OP Backlinks']) {
+        return;
+      }
       const container = QuoteBacklink.getContainer(this.fullID);
       this.nodes.backlinkContainer = container;
       if (QuoteBacklink.bottomBacklinks) {
-        return $.add(this.nodes.post, container);
+        $.add(this.nodes.post, container);
       } else {
-        return $.add(this.nodes.info, container);
+        $.add(this.nodes.info, container);
       }
     },
     getContainer(id) {
       return this.containers[id] ||
-        (this.containers[id] = $.el('span', {className: 'container'}));
+        (this.containers[id] = $.el('span', { className: 'container' }));
     }
   };
 
-  // @ts-nocheck
-
-  var QuoteCT = {
+  const QuoteCT = {
+    mark: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark Cross-thread Quotes']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark Cross-thread Quotes']) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
       // \u00A0 is nbsp
       this.mark = $.el('span', {
         textContent: '\u00A0(Cross-thread)',
-        className:   'qmark-ct'
-      }
-      );
-      return Callbacks.Post.push({
+        className: 'qmark-ct'
+      });
+      Callbacks.Post.push({
         name: 'Mark Cross-thread Quotes',
-        cb:   this.node
+        cb: this.node
       });
     },
     node() {
       // Stop there if it's a clone of a post in the same thread.
-      if (this.isClone && (this.thread === this.context.thread)) { return; }
-
-      const {board, thread} = this.context;
-      for (var quotelink of this.nodes.quotelinks) {
-        var {boardID, threadID} = Get.postDataFromLink(quotelink);
-        if (!threadID) { continue; } // deadlink
+      if (this.isClone && (this.thread === this.context.thread)) {
+        return;
+      }
+      const { board, thread } = this.context;
+      for (const quotelink of this.nodes.quotelinks) {
+        const { boardID, threadID } = Get.postDataFromLink(quotelink);
+        if (!threadID) {
+          continue;
+        } // deadlink
         if (this.isClone) {
           $.rm($('.qmark-ct', quotelink));
         }
@@ -26131,36 +26172,36 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var QuoteOP = {
+  const QuoteOP = {
+    mark: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark OP Quotes']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark OP Quotes']) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
       // \u00A0 is nbsp
       this.mark = $.el('span', {
         textContent: '\u00A0(OP)',
-        className:   'qmark-op'
-      }
-      );
-      return Callbacks.Post.push({
+        className: 'qmark-op'
+      });
+      Callbacks.Post.push({
         name: 'Mark OP Quotes',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       // Stop there if it's a clone of a post in the same thread.
       let i, quotelink, quotes;
-      if (this.isClone && (this.thread === this.context.thread)) { return; }
+      if (this.isClone && (this.thread === this.context.thread)) {
+        return;
+      }
       // Stop there if there's no quotes in that post.
-      if (!(quotes = this.quotes).length) { return; }
-      const {quotelinks} = this.nodes;
-
+      if (!(quotes = this.quotes).length) {
+        return;
+      }
+      const { quotelinks } = this.nodes;
       // rm (OP) from cross-thread quotes.
       if (this.isClone && quotes.includes(this.thread.fullID)) {
         i = 0;
@@ -26168,14 +26209,14 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           $.rm($('.qmark-op', quotelink));
         }
       }
-
-      const {fullID} = this.context.thread;
+      const { fullID } = this.context.thread;
       // add (OP) to quotes quoting this context's OP.
-
-      if (!quotes.includes(fullID)) { return; }
+      if (!quotes.includes(fullID)) {
+        return;
+      }
       i = 0;
       while ((quotelink = quotelinks[i++])) {
-        var {boardID, postID} = Get.postDataFromLink(quotelink);
+        const { boardID, postID } = Get.postDataFromLink(quotelink);
         if (`${boardID}.${postID}` === fullID) {
           $.add(quotelink, QuoteOP.mark.cloneNode(true));
         }
@@ -26183,23 +26224,23 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const QuoteStrikeThrough = {
     init() {
       if (!['index', 'thread'].includes(g.VIEW) ||
-        (!Conf['Reply Hiding Buttons'] && (!Conf['Menu'] || !Conf['Reply Hiding Link']) && !Conf['Filter'])) { return; }
-
-      return Callbacks.Post.push({
+        (!Conf['Reply Hiding Buttons'] && (!Conf['Menu'] || !Conf['Reply Hiding Link']) && !Conf['Filter'])) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'Strike-through Quotes',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
-      if (this.isClone) { return; }
-      for (var quotelink of this.nodes.quotelinks) {
-        var {boardID, postID} = Get.postDataFromLink(quotelink);
+      if (this.isClone) {
+        return;
+      }
+      for (const quotelink of this.nodes.quotelinks) {
+        const { boardID, postID } = Get.postDataFromLink(quotelink);
         if (g.posts.get(`${boardID}.${postID}`)?.isHidden) {
           $.addClass(quotelink, 'filtered');
         }
@@ -26207,140 +26248,123 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var Quotify = {
+  const Quotify = {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Resurrect Quotes']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Resurrect Quotes']) {
+        return;
+      }
       $.addClass(doc, 'resurrect-quotes');
-
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Resurrect Quotes',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       if (this.isClone) {
         this.nodes.archivelinks = $$('a.linkify.quotelink', this.nodes.comment);
         return;
       }
-      for (var link of $$('a.linkify', this.nodes.comment)) {
+      for (const link of $$('a.linkify', this.nodes.comment)) {
         Quotify.parseArchivelink.call(this, link);
       }
-      for (var deadlink of $$('.deadlink', this.nodes.comment)) {
+      for (const deadlink of $$('.deadlink', this.nodes.comment)) {
         Quotify.parseDeadlink.call(this, deadlink);
       }
     },
-
     parseArchivelink(link) {
       let m;
-      if (!(m = link.pathname.match(/^\/([^/]+)\/thread\/S?(\d+)\/?$/))) { return; }
-      if (['boards.4chan.org', 'boards.4channel.org'].includes(link.hostname)) { return; }
-      const boardID  = m[1];
+      if (!(m = link.pathname.match(/^\/([^/]+)\/thread\/S?(\d+)\/?$/))) {
+        return;
+      }
+      if (['boards.4chan.org', 'boards.4channel.org'].includes(link.hostname)) {
+        return;
+      }
+      const boardID = m[1];
       const threadID = m[2];
-      const postID   = link.hash.match(/^#[pq]?(\d+)$|$/)[1] || threadID;
-      if (Redirect.to('post', {boardID, postID})) {
+      const postID = (link.hash.match(/^#[pq]?(\d+)$|$/) || [])[1] || threadID;
+      if (Redirect.to('post', { boardID, postID })) {
         $.addClass(link, 'quotelink');
-        $.extend(link.dataset, {boardID, threadID, postID});
-        return this.nodes.archivelinks.push(link);
+        $.extend(link.dataset, { boardID, threadID, postID });
+        this.nodes.archivelinks.push(link);
       }
     },
-
     parseDeadlink(deadlink) {
       let a, m, post, postID;
       if ($.hasClass(deadlink.parentNode, 'prettyprint')) {
-        // Don't quotify deadlinks inside code tags,
-        // un-`span` them.
-        // This won't be necessary once 4chan
-        // stops quotifying inside code tags:
-        // https://github.com/4chan/4chan-JS/issues/77
+        // Don't quotify deadlinks inside code tags, un-span them.
         Quotify.fixDeadlink(deadlink);
         return;
       }
-
-      const quote = deadlink.textContent;
-      if (!(postID = quote.match(/\d+$/)?.[0])) { return; }
+      const quote = deadlink.textContent || '';
+      if (!(postID = (quote.match(/\d+$/) || [])[0])) {
+        return;
+      }
       if (postID[0] === '0') {
-        // Fix quotelinks that start with a `0`.
+        // Fix quotelinks that start with a 0.
         Quotify.fixDeadlink(deadlink);
         return;
       }
-      const boardID = (m = quote.match(/^>>>\/([a-z\d]+)/)) ?
-        m[1]
-      :
-        this.board.ID;
+      const boardID = (m = quote.match(/^>>>\/([a-z\d]+)/)) ? m[1] : this.board.ID;
       const quoteID = `${boardID}.${postID}`;
-
-      if (post = g.posts.get(quoteID)) {
+      if ((post = g.posts.get(quoteID))) {
         if (!post.isDead) {
-          // Don't (Dead) when quotifying in an archived post,
-          // and we know the post still exists.
+          // Don't (Dead) when quotifying in an archived post, and we know the post still exists.
           a = $.el('a', {
-            href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
-            className:   'quotelink',
+            href: g.SITE.Build.postURL(boardID, post.thread.ID, postID),
+            className: 'quotelink',
             textContent: quote
-          }
-          );
+          });
         } else {
           // Replace the .deadlink span if we can redirect.
           a = $.el('a', {
-            href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
-            className:   'quotelink deadlink',
+            href: g.SITE.Build.postURL(boardID, post.thread.ID, postID),
+            className: 'quotelink deadlink',
             textContent: quote
-          }
-          );
+          });
           $.add(a, Post.deadMark.cloneNode(true));
-          $.extend(a.dataset, {boardID, threadID: post.thread.ID, postID});
+          $.extend(a.dataset, { boardID, threadID: post.thread.ID, postID });
         }
-
       } else {
-        const redirect = Redirect.to('thread', {boardID, threadID: 0, postID});
-        const fetchable = Redirect.to('post', {boardID, postID});
+        const redirect = Redirect.to('thread', { boardID, threadID: 0, postID });
+        const fetchable = Redirect.to('post', { boardID, postID });
         if (redirect || fetchable) {
           // Replace the .deadlink span if we can redirect or fetch the post.
           a = $.el('a', {
-            href:        redirect || 'javascript:;',
-            className:   'deadlink',
+            href: redirect || 'javascript:;',
+            className: 'deadlink',
             textContent: quote
-          }
-          );
+          });
           $.add(a, Post.deadMark.cloneNode(true));
           if (fetchable) {
             // Make it function as a normal quote if we can fetch the post.
             $.addClass(a, 'quotelink');
-            $.extend(a.dataset, {boardID, postID});
+            $.extend(a.dataset, { boardID, postID });
           }
         }
       }
-
-      if (!this.quotes.includes(quoteID)) { this.quotes.push(quoteID); }
-
+      if (!this.quotes.includes(quoteID)) {
+        this.quotes.push(quoteID);
+      }
       if (!a) {
         $.add(deadlink, Post.deadMark.cloneNode(true));
         return;
       }
-
       $.replace(deadlink, a);
       if ($.hasClass(a, 'quotelink')) {
-        return this.nodes.quotelinks.push(a);
+        this.nodes.quotelinks.push(a);
       }
     },
-
     fixDeadlink(deadlink) {
       let el;
       if (!(el = deadlink.previousSibling) || (el.nodeName === 'BR')) {
-        const green = $.el('span',
-          {className: 'quote'});
+        const green = $.el('span', { className: 'quote' });
         $.before(deadlink, green);
         $.add(green, deadlink);
       }
-      return $.replace(deadlink, [...deadlink.childNodes]);
+      $.replace(deadlink, [...deadlink.childNodes]);
     }
   };
 

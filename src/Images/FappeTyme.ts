@@ -1,16 +1,23 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Header from "../General/Header";
 import UI from "../General/UI";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var FappeTyme = {
+interface FappeTymeType {
+  nodes: Record<string, HTMLInputElement>;
+  enabled: Record<string, boolean>;
+  init(): void;
+  node(this: any): void;
+  catalogNode(this: any): void;
+  set(type: string, enabled: boolean): void;
+  toggle(type: string): void;
+}
+
+const FappeTyme: FappeTymeType = {
+  nodes: {},
+  enabled: {},
+
   init() {
     if ((!Conf['Fappe Tyme'] && !Conf['Werk Tyme']) || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
 
@@ -20,13 +27,13 @@ var FappeTyme = {
       werk:  Conf['werk']
     };
 
-    for (var type of ["Fappe", "Werk"]) {
+    for (const type of ["Fappe", "Werk"]) {
       if (Conf[`${type} Tyme`]) {
-        var lc = type.toLowerCase();
-        var el = UI.checkbox(lc, `${type} Tyme`, false);
+        const lc = type.toLowerCase();
+        const el = UI.checkbox(lc, `${type} Tyme`, false) as HTMLElement;
         el.title = `${type} Tyme`;
 
-        this.nodes[lc] = el.firstElementChild;
+        this.nodes[lc] = el.firstElementChild as HTMLInputElement;
         if (Conf[lc]) { this.set(lc, true); }
         $.on(this.nodes[lc], 'change', this.toggle.bind(this, lc));
 
@@ -35,16 +42,15 @@ var FappeTyme = {
           order: 97
         });
 
-        var indicator = $.el('span', {
+        const indicator = $.el('span', {
           className: 'indicator',
           textContent: type[0],
           title: `${type} Tyme active`
-        }
-        );
-        $.on(indicator, 'click', function() {
-          const check = $.getOwn(FappeTyme.nodes, this.parentNode.id.replace('shortcut-', ''));
+        });
+        $.on(indicator, 'click', function(this: HTMLElement) {
+          const check = $.getOwn(FappeTyme.nodes, (this.parentNode as HTMLElement).id.replace('shortcut-', '')) as HTMLInputElement;
           check.checked = !check.checked;
-          return $.event('change', null, check);
+          $.event('change', null, check);
         });
         Header.addShortcut(lc, indicator, 410);
       }
@@ -59,36 +65,38 @@ var FappeTyme = {
       cb:   this.node
     });
 
-    return Callbacks.CatalogThread.push({
+    Callbacks.CatalogThread.push({
       name: 'Werk Tyme',
       cb:   this.catalogNode
     });
   },
 
-  node() {
-    return this.nodes.root.classList.toggle('noFile', !this.files.length);
+  node(this: any) {
+    this.nodes.root.classList.toggle('noFile', !this.files.length);
   },
 
-  catalogNode() {
+  catalogNode(this: any) {
     const file = this.thread.OP.files[0];
     if (!file) { return; }
     const filename = $.el('div', {
       textContent: file.name,
       className:   'werkTyme-filename'
-    }
-    );
-    return $.add(this.nodes.thumb.parentNode, filename);
+    });
+    $.add(this.nodes.thumb.parentNode, filename);
   },
 
-  set(type, enabled) {
+  set(type: string, enabled: boolean) {
     this.enabled[type] = (this.nodes[type].checked = enabled);
-    return $[`${enabled ? 'add' : 'rm'}Class`](doc, `${type}Tyme`);
+    const action = enabled ? 'addClass' : 'rmClass';
+    $[action](doc, `${type}Tyme`);
   },
 
-  toggle(type) {
+  toggle(type: string) {
     this.set(type, !this.enabled[type]);
-    if (type === 'werk') { return $.cb.checked.call(this.nodes[type]); }
+    if (type === 'werk') {
+      ($.cb as any).checked.call(this.nodes[type]);
+    }
   }
 };
-export default FappeTyme;
 
+export default FappeTyme;
