@@ -1231,4 +1231,6 @@ current-archive-text:"Archive"]
   beepSource: '',
   beepVolume: 1,
 };
+
+export type ConfigType = typeof Config;
 export default Config;

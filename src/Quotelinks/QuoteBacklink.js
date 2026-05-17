@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
@@ -100,3 +101,4 @@ var QuoteBacklink = {
   }
 };
 export default QuoteBacklink;
+

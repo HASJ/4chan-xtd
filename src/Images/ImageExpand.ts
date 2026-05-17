@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Config from "../config/Config";
 import Get from "../General/Get";

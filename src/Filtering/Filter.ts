@@ -440,7 +440,7 @@ var Filter = {
     subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
     comment(post) {
       if (post.info.comment == null) {
-        post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.(post.info.commentHTML.innerHTML);
+        post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.((post.info.commentHTML as any).innerHTML);
       }
       return [post.info.comment];
     },
@@ -510,7 +510,7 @@ var Filter = {
     if (!files.length) { return; }
     const filter = files.map(f => `/${f.MD5}/`).join('\n');
     Filter.addFilter('MD5', filter);
-    const origin = post.origin || post;
+    const origin = (post as any).origin || post;
     if (origin.isReply) {
       PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f.MD5}`).join(' & '));
     } else if (g.VIEW === 'index') {

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf } from "../globals/globals";
 
@@ -34,3 +35,4 @@ var ThreadLinks = {
   }
 };
 export default ThreadLinks;
+

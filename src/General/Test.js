@@ -1,3 +1,4 @@
+// @ts-nocheck
 /*
  * decaffeinate suggestions:
  * DS102: Remove unnecessary code created because of implicit returns

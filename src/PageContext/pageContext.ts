@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 /**
  * Because of increased security in manifest v3, scripts can no longer just inject a script tag into the main page.
  * Functions to be called in the main context must be predefined. Those functions should be in this file, and they will

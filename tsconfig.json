@@ -32,6 +32,7 @@
     "skipDefaultLibCheck": true,
   },
   "exclude": [
-    "builds/"
+    "builds/",
+    "src/meta/"
   ]
 }

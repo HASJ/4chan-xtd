@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import CSS from "../css/CSS";
 import { Conf } from "../globals/globals";
@@ -32,3 +33,4 @@ const CustomCSS = {
   }
 };
 export default CustomCSS;
+

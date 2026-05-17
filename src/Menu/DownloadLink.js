@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { g, Conf } from "../globals/globals";
 import ImageCommon from "../Images/ImageCommon";
 import $ from "../platform/$";
@@ -34,3 +35,4 @@ const DownloadLink = {
   }
 };
 export default DownloadLink;
+

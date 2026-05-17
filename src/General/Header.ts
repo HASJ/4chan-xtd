@@ -1,7 +1,6 @@
 import Redirect from "../Archive/Redirect";
 import Notice from "../classes/Notice";
 import { Conf, d, doc, E, g } from "../globals/globals";
-import Main from "../main/Main";
 import CatalogLinks from "../Miscellaneous/CatalogLinks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
@@ -18,10 +17,10 @@ import Icon from "../Icons/icon";
  * DS104: Avoid inline assignments
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
-var Header = {
+var Header: any = {
   init() {
     $.onExists(doc, 'body', () => {
-      if (!Main.isThisPageLegit()) { return; }
+      if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
       $.add(this.bar, [this.noticesRoot, this.toggle]);
       $.prepend(d.body, this.bar);
       $.add(d.body, Header.hover);
@@ -118,7 +117,9 @@ var Header = {
 
     $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
 
-    Main.ready(function() {
+    $.ready(function() {
+      const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
+      if (!isPageLegit) { return; }
       let footer;
       if ((g.SITE.software === 'yotsuba') && !(footer = $.id('boardNavDesktopFoot'))) {
         let absbot;
@@ -157,6 +158,9 @@ var Header = {
 
   bar: $.el('div',
     {id: 'header-bar'}),
+
+  bottomBoardList: undefined as HTMLElement | undefined,
+  boardList: undefined as HTMLElement | undefined,
 
   noticesRoot: $.el('div',
     {id: 'notifications'}),
@@ -243,7 +247,7 @@ var Header = {
       return '';
     });
 
-    let indexOptions = [];
+    let indexOptions: any = [];
     t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function(m0, m1) {
       indexOptions.push(m1.toLowerCase().replace(/\ /g, '-'));
       return '';
@@ -395,7 +399,7 @@ var Header = {
   },
 
   toggleLinkJustify() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const centered = this.nodeName === 'INPUT' ?
       this.checked : undefined;
     Header.setLinkJustify(centered);
@@ -414,7 +418,7 @@ var Header = {
   },
 
   toggleBarFixed() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
 
     Header.setBarFixed(this.checked);
 
@@ -432,7 +436,7 @@ var Header = {
   },
 
   toggleShortcutIcons() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
 
     Header.setShortcutIcons(this.checked);
 
@@ -442,7 +446,7 @@ var Header = {
 
   setBarVisibility(hide) {
     Header.headerToggler.checked = hide;
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
     return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
   },
@@ -492,7 +496,7 @@ var Header = {
 
   setBarPosition(bottom) {
     if (Header.barPositionToggler) Header.barPositionToggler.checked = bottom;
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const args = bottom ? [
       'bottom-header',
       'top-header',
@@ -519,7 +523,7 @@ var Header = {
   },
 
   toggleFooterVisibility() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const hide = this.nodeName === 'INPUT' ?
       this.checked
     :

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Get from "../General/Get";
 import Header from "../General/Header";
 import { g, Conf, d, doc } from "../globals/globals";
@@ -26,13 +27,13 @@ var Nav = {
     const span = $.el('span',
       {id: 'navlinks'});
     const prev = $.el('a', {
-      textContent: '▲',
+      textContent: 'â–²',
       className: 'navlinks-navlink navlink-prev',
       href: 'javascript:;'
     }
     );
     const next = $.el('a', {
-      textContent: '▼',
+      textContent: 'â–¼',
       className: 'navlinks-navlink navlink-next',
       href: 'javascript:;'
     }
@@ -120,3 +121,4 @@ var Nav = {
   }
 };
 export default Nav;
+

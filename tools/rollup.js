@@ -30,7 +30,10 @@ const buildForTest = process.argv.includes('-test');
 
 // https://github.com/rollup/plugins/discussions/1777
 const tsPlugin = typescript({
-  compilerOptions: { outDir: buildDir, },
+  compilerOptions: {
+    outDir: buildDir,
+    noEmit: false,
+  },
 });
 
 (async () => {
@@ -57,13 +60,14 @@ const tsPlugin = typescript({
   });
 
   const bundle = await rollup({
-    input: resolve(__dirname, '../src/main/Main.js'),
+    input: resolve(__dirname, '../src/main/Main.ts'),
+    treeshake: false,
     plugins: [
       platform ? platformSpecific({
         platform,
         include: [
           // Only files that actually have platform specific code.
-          "**/src/main/Main.js",
+          "**/src/main/Main.ts",
           "**/src/platform/$.ts",
           "**/src/platform/CrossOrigin.ts",
         ],
@@ -72,7 +76,7 @@ const tsPlugin = typescript({
       buildForTest ? undefined : removeTestCode({
         include: [
           // Only files that actually have test code.
-          "**/src/main/Main.js",
+          "**/src/main/Main.ts",
           "**/src/classes/Post.ts",
           "**/src/Linkification/Linkify.js",
         ],
@@ -161,7 +165,7 @@ const tsPlugin = typescript({
       constBindings: false,
     },
     // Can't be none as long as the root file defined exports
-    // exports: 'none',
+    exports: 'none',
   };
 
   // user script

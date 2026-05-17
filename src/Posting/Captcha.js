@@ -1,8 +1,8 @@
+// @ts-nocheck
 import $ from "../platform/$";
 import CaptchaReplace from "./Captcha.replace";
 import CaptchaT from "./Captcha.t";
 import meta from '../../package.json';
-import Main from "../main/Main";
 import Keybinds from "../Miscellaneous/Keybinds";
 import $$ from "../platform/$$";
 import QR from "./QR";
@@ -149,7 +149,7 @@ const Captcha = {
       if (isPassEnabled()) { return; }
       if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) { return; }
 
-      if (this.noscript = Conf['Force Noscript Captcha'] || !Main.jsEnabled) {
+      if (this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled')) {
         $.addClass(QR.nodes.el, 'noscript-captcha');
       }
 
@@ -370,3 +370,4 @@ const Captcha = {
   }
 };
 export default Captcha;
+

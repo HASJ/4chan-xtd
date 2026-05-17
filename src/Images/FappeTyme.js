@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Header from "../General/Header";
 import UI from "../General/UI";
@@ -90,3 +91,4 @@ var FappeTyme = {
   }
 };
 export default FappeTyme;
+

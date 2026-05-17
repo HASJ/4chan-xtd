@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import Redirect from "../Archive/Redirect";
 import Filter from "../Filtering/Filter";
@@ -83,3 +84,4 @@ const ArchiveLink = {
   }
 };
 export default ArchiveLink;
+

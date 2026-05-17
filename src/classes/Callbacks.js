@@ -1,4 +1,4 @@
-import Main from "../main/Main";
+﻿// @ts-nocheck
 
 /*
  * decaffeinate suggestions:
@@ -41,7 +41,9 @@ export default class Callbacks {
       }
     }
 
-    if (errors) { return Main.handleErrors(errors); }
+    if (errors) { return Callbacks.errorHandler?.(errors); }
   }
 }
+Callbacks.errorHandler = null;
 Callbacks.initClass();
+

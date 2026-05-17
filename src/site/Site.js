@@ -1,5 +1,5 @@
+// @ts-nocheck
 import { Conf, doc, g } from "../globals/globals";
-import Main from "../main/Main";
 import $ from "../platform/$";
 import { dict } from "../platform/helpers";
 import SW from "./SW";
@@ -65,9 +65,35 @@ var Site = {
     return hostname;
   },
 
-  parseURL(url) {
+  parseURL(url=location) {
     const siteID = Site.resolve(url);
-    return Main.parseURL(g.sites[siteID], url);
+    const site = g.sites[siteID];
+    const r = {};
+
+    if (!site) { return r; }
+    r.siteID = site.ID;
+
+    if (site.isBoardlessPage?.(url)) { return r; }
+    const pathname = url.pathname.split(/\/+/);
+    r.boardID = pathname[1];
+
+    if (site.isFileURL(url)) {
+      r.VIEW = 'file';
+    } else if (site.isAuxiliaryPage?.(url)) {
+      // pass
+    } else if (['thread', 'res'].includes(pathname[2])) {
+      r.VIEW = 'thread';
+      r.threadID = (r.THREADID = +pathname[3].replace(/\.\w+$/, ''));
+    } else if ((pathname[2] === 'archive') && (pathname[3] === 'res')) {
+      r.VIEW = 'thread';
+      r.threadID = (r.THREADID = +pathname[4].replace(/\.\w+$/, ''));
+      r.threadArchived = true;
+    } else if (/^(?:catalog|archive)(?:\.\w+)?$/.test(pathname[2])) {
+      r.VIEW = pathname[2].replace(/\.\w+$/, '');
+    } else if (/^(?:index|\d*)(?:\.\w+)?$/.test(pathname[2])) {
+      r.VIEW = 'index';
+    }
+    return r;
   },
 
   set(hostname) {
@@ -86,3 +112,4 @@ var Site = {
   }
 };
 export default Site;
+

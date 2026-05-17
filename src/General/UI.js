@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { Conf, d, doc } from "../globals/globals";
-import Main from "../main/Main";
+import Callbacks from "../classes/Callbacks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Header from "./Header";
@@ -138,7 +139,7 @@ var Menu = (function() {
         try {
           if (!entry.open(data)) { return; }
         } catch (err) {
-          Main.handleErrors({
+          Callbacks.errorHandler?.({
             message: `Error in building the ${this.type} menu.`,
             error: err
           });

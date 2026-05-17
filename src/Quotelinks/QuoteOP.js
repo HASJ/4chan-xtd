@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Get from "../General/Get";
 import { g, Conf } from "../globals/globals";
@@ -59,3 +60,4 @@ var QuoteOP = {
   }
 };
 export default QuoteOP;
+

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import PageContextFunctions from "../PageContext/pageContext";
 
 // This requestId workaround isn't needed in manifest V3, since returning true in the event listener works.
@@ -59,3 +60,4 @@ var handlers = {
     return results[0].result
   }
 };
+

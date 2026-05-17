@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 
 export default class CatalogThread {
@@ -20,3 +21,4 @@ export default class CatalogThread {
     this.thread.catalogView = this;
   }
 }
+

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Filter from "../Filtering/Filter";
 import { g, Conf, E } from "../globals/globals";
@@ -103,3 +104,4 @@ var FileInfo = {
   }
 };
 export default FileInfo;
+

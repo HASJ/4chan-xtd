@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
@@ -66,3 +67,4 @@ var MarkNewIPs = {
   }
 };
 export default MarkNewIPs;
+

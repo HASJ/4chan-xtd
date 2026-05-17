@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 /*
  * decaffeinate suggestions:
  * DS102: Remove unnecessary code created because of implicit returns
@@ -502,8 +503,8 @@ $.oneItemSugar = fn => (function(key, val, cb) {
     return fn(key, val);
   }
 }) as (
-  ((key: string, value: any, callback?: (() => void)) => void) &
-  ((values: Record<string, any>, callback?: (() => void)) => void)
+  ((key: string, value: any, callback?: ((items: any) => void)) => void) &
+  ((values: Record<string, any>, callback?: ((items: any) => void)) => void)
 );
 
 $.syncing = dict();
@@ -889,3 +890,4 @@ if (platform === 'crx') {
 }
 
 export default $;
+

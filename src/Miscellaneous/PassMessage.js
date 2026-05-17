@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 import PassMessagePage from './PassMessage/PassMessageHtml';
@@ -31,3 +32,4 @@ const PassMessage = {
   }
 };
 export default PassMessage;
+

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 export default function generateManifestJson(p, xtVersion, manifestVersion) {
   const manifest = {
     "name": p.meta.name,
@@ -45,3 +46,4 @@ export default function generateManifestJson(p, xtVersion, manifestVersion) {
 
   return JSON.stringify(manifest, undefined, 2);
 }
+

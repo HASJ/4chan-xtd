@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import Callbacks from "../classes/Callbacks";
 import ExpandComment from "../Miscellaneous/ExpandComment";
@@ -46,3 +47,4 @@ var QuoteCT = {
   }
 };
 export default QuoteCT;
+

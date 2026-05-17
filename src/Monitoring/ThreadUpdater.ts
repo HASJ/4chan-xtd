@@ -1,9 +1,9 @@
+// @ts-nocheck
 import Beep from './ThreadUpdater/beep.wav';
 import $ from "../platform/$";
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
 import Post from '../classes/Post';
-import Main from '../main/Main';
 import Config from '../config/Config';
 import Settings from '../General/Settings';
 import QuoteThreading from '../Quotelinks/QuoteThreading';
@@ -61,7 +61,7 @@ var ThreadUpdater = {
     const updateLink = $.el('span',
       {className: 'brackets-wrap updatelink'});
     $.extend(updateLink, {innerHTML: '<a href="javascript:;">Update</a>'});
-    Main.ready(function() {
+    $.on(d, '4chanXInitFinished', function() {
       let navLinksBot;
       if (navLinksBot = $('.navLinksBot')) { return $.add(navLinksBot, [$.tn(' '), updateLink]); }
     });
@@ -416,7 +416,7 @@ var ThreadUpdater = {
       const unreadCount   = Unread.posts?.size;
       const unreadQYCount = Unread.postsQuotingYou?.size;
 
-      Main.callbackNodes('Post', posts);
+      for (const post of posts) { Callbacks.Post.execute(post); }
 
       if (d.hidden || !d.hasFocus()) {
         if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
@@ -469,3 +469,4 @@ var ThreadUpdater = {
   }
 };
 export default ThreadUpdater;
+

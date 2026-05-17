@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import type Post from "../classes/Post";
 import RandomAccessList from "../classes/RandomAccessList";
@@ -209,3 +210,4 @@ var QuoteThreading = {
   },
 };
 export default QuoteThreading;
+

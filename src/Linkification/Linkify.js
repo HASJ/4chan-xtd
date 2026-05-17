@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 // #region tests_enabled
 import Test from "../General/Test";
@@ -210,3 +211,4 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
   }
 };
 export default Linkify;
+

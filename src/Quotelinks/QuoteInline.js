@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Fetcher from "../classes/Fetcher";
 import Get from "../General/Get";
@@ -151,3 +152,4 @@ var QuoteInline = {
   }
 };
 export default QuoteInline;
+

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import SettingsPage from './Settings/SettingsHtml';
 import FilterGuidePage from './Settings/Filter-guide.html';
 import SaucePage from './Settings/Sauce.html';

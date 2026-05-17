@@ -9,14 +9,15 @@ import { dict, HOUR } from "../platform/helpers";
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
  */
 
+interface SiteData {
+  boards: Record<string, any>;
+  lastChecked?: number;
+}
+
 type DataBoardData = {
-  [site: string]: {
-    boards: {
-      [threadId: string]: number;
-    };
-    lastChecked?: number;
-  };
-} & { version?: number };
+  version?: number;
+  [site: string]: any;
+};
 
 interface PostInfo {
   /** Defaults to g.SITE.ID */
@@ -108,7 +109,7 @@ export default class DataBoard {
     });
   }
 
-  delete({siteID, boardID, threadID, postID}, cb) {
+  delete({siteID, boardID, threadID, postID}: any, cb?: any) {
     if (!siteID) { siteID = g.SITE.ID; }
     if (!this.data[siteID]) { return; }
     this.save(() => {
@@ -226,12 +227,12 @@ export default class DataBoard {
     const siteID = g.SITE.ID;
     const threadsList = g.SITE.urls.threadsListJSON?.({siteID, boardID});
     if (!threadsList) { return; }
-    $.cache(threadsList, function() {
+    ($ as any).cache(threadsList, function() {
       if (this.status !== 200) { return; }
       const archiveList = g.SITE.urls.archiveListJSON?.({siteID, boardID});
       if (!archiveList) return that.ajaxCleanParse(boardID, this.response);
       const response1 = this.response;
-      $.cache(archiveList, function() {
+      ($ as any).cache(archiveList, function() {
         if ((this.status !== 200) && (!!g.SITE.archivedBoardsKnown || (this.status !== 404))) { return; }
         that.ajaxCleanParse(boardID, response1, this.response);
       });

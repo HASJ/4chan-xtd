@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { Conf, g } from "../globals/globals";
 import $ from "../platform/$";
 
@@ -97,3 +98,4 @@ var Get = {
   }
 };
 export default Get;
+

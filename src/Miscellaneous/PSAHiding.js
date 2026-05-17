@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Header from "../General/Header";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
@@ -43,7 +44,7 @@ var PSAHiding = {
       title:       'Mark announcement as read and hide.',
       className:   'hide-announcement-button',
       href:        'javascript:;',
-      textContent: '➖︎',
+      textContent: 'âž–ï¸Ž',
     }
     ));
     Icon.set(btn, 'squareMinus');
@@ -90,3 +91,4 @@ var PSAHiding = {
   }
 };
 export default PSAHiding;
+

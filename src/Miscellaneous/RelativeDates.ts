@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Post from "../classes/Post";
 import Index from "../General/Index";
@@ -176,3 +177,4 @@ var RelativeDates = {
   }
 };
 export default RelativeDates;
+

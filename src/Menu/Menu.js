@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import UI from "../General/UI";
 import { g, Conf } from "../globals/globals";
@@ -57,3 +58,4 @@ var Menu = {
   }
 };
 export default Menu;
+

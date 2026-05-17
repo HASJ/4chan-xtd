@@ -1,3 +1,4 @@
+// @ts-nocheck
 /*
  * decaffeinate suggestions:
  * DS102: Remove unnecessary code created because of implicit returns
@@ -8,7 +9,6 @@ import galleryPage from './Gallery/Gallery.html';
 import $ from '../platform/$';
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
-import Main from '../main/Main';
 import Keybinds from '../Miscellaneous/Keybinds';
 import $$ from '../platform/$$';
 import ImageCommon from './ImageCommon';
@@ -53,7 +53,7 @@ var Gallery = {
             Gallery.nodes.total.textContent = Gallery.images.length;
           }
 
-          if (!Conf['Image Expansion'] && ((g.SITE.software !== 'tinyboard') || !Main.jsEnabled)) {
+          if (!Conf['Image Expansion'] && ((g.SITE.software !== 'tinyboard') || !$.hasClass(doc, 'js-enabled'))) {
             result.push($.on(file.thumbLink, 'click', Gallery.cb.image));
           } else {
             result.push(undefined);

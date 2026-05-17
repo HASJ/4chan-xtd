@@ -61,9 +61,9 @@ const RestoreDeletedFromArchive = {
     });
     $.on(menuEntry, 'click', () => {
       RestoreDeletedFromArchive.restore();
-      Header.menu.close();
+      (Header as any).menu.close();
     });
-    Header.menu.addEntry({
+    (Header as any).menu.addEntry({
       el: menuEntry,
       order: 10,
     });
@@ -82,7 +82,7 @@ const RestoreDeletedFromArchive = {
 
     let inserted = false;
 
-    const post = parseArchivePost(raw);
+    const post = parseArchivePost(raw, "");
     post.resurrect();
     post.markAsFromArchive();
 

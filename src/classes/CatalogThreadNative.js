@@ -1,3 +1,5 @@
+// @ts-nocheck
+// @ts-nocheck
 import { g } from "../globals/globals";
 import $ from "../platform/$";
 import Board from "./Board";

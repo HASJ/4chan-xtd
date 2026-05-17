@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Get from "../General/Get";
@@ -156,3 +157,4 @@ var UnreadIndex = {
   }
 };
 export default UnreadIndex;
+

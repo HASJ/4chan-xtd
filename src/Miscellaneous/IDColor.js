@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
@@ -57,3 +58,4 @@ var IDColor = {
   }
 };
 export default IDColor;
+

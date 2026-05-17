@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Header from "../General/Header";
 import { g, Conf, d, doc } from "../globals/globals";
@@ -138,3 +139,4 @@ var ImageLoader = {
   }
 };
 export default ImageLoader;
+

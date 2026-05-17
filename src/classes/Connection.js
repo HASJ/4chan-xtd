@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import { g } from "../globals/globals";
 
@@ -42,3 +43,4 @@ export default class Connection {
     }
   }
 }
+

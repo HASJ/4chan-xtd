@@ -28,8 +28,10 @@ export default class Thread {
   declare ipCount: number;
   declare json: any;
   declare OP: any;
-  declare catalogView: any
-  declare nodes: any
+  declare catalogView: any;
+  declare catalogViewNative?: any;
+  declare stub?: any;
+  declare nodes: any;
 
   toString() { return this.ID; }
 

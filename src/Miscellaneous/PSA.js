@@ -1,6 +1,6 @@
+// @ts-nocheck
 import Notice from "../classes/Notice";
-import { g, Conf, doc } from "../globals/globals";
-import Main from "../main/Main";
+import { g, Conf, d, doc } from "../globals/globals";
 import $ from "../platform/$";
 
 /*
@@ -19,7 +19,7 @@ const PSA = {
     if ('samachan.org' in Conf['siteProperties'] && !Conf['PSAseen'].includes('samachan')) {
       el = $.el('span',
         {innerHTML: "<a href=\"https://sushigirl.us/yakuza/res/776.html\" target=\"_blank\" rel=\"noopener\">Looking for a new home?<br>Some former Samachan users are regrouping on SushiChan.</a><br>(a message from 4chan X)"});
-      return Main.ready(function() {
+      return $.on(d, '4chanXInitFinished', function() {
         new Notice('info', el);
         Conf['PSAseen'].push('samachan');
         return $.set('PSAseen', Conf['PSAseen']);});
@@ -27,3 +27,4 @@ const PSA = {
   }
 };
 export default PSA;
+

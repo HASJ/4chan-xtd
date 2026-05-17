@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
@@ -30,3 +31,4 @@ const PostSuccessful = {
   }
 };
 export default PostSuccessful;
+

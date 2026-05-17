@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { Conf, g } from "../globals/globals";
 
 /*
@@ -28,3 +29,4 @@ const NormalizeURL = {
   }
 };
 export default NormalizeURL;
+

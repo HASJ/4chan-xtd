@@ -1,5 +1,5 @@
-import { g, Conf } from "../globals/globals";
-import Main from "../main/Main";
+// @ts-nocheck
+import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 /*
  * decaffeinate suggestions:
@@ -9,7 +9,7 @@ import $ from "../platform/$";
 const PassLink = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) { return; }
-    return Main.ready(this.ready);
+    return $.on(d, '4chanXInitFinished', this.ready);
   },
 
   ready() {
@@ -26,3 +26,4 @@ const PassLink = {
   }
 };
 export default PassLink;
+

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Filter from "../Filtering/Filter";
 import $ from "../platform/$";
@@ -174,3 +175,4 @@ var CatalogLinks = {
   }
 };
 export default CatalogLinks;
+

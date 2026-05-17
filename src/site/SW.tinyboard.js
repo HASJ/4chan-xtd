@@ -1,5 +1,5 @@
+// @ts-nocheck
 import { Conf, d } from "../globals/globals";
-import Main from "../main/Main";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
@@ -64,7 +64,7 @@ const SWTinyboard = {
       const s = (this.selectors = Object.create(this.selectors));
       s.boardFor = {index: '.page-container'};
       s.thread = 'div[id^="thread_"]';
-      return Main.mounted(cb);
+      return $.on(d, '4chanXMounted', cb);
     } else {
       return cb();
     }
@@ -304,3 +304,4 @@ $\
   }
 };
 export default SWTinyboard;
+

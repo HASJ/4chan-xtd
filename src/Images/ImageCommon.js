@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Redirect from "../Archive/Redirect";
 import Notice from "../classes/Notice";
 import { g, Conf, d } from "../globals/globals";

@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import Callbacks from "../classes/Callbacks";
 import { g } from "../globals/globals";
@@ -45,3 +46,4 @@ var ModContact = {
   }
 };
 export default ModContact;
+

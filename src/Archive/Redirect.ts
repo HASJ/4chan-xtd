@@ -139,7 +139,7 @@ var Redirect = {
   ): string {
     const archive = (['search', 'board'].includes(dest) ? Redirect.data.thread : Redirect.data[dest]).get(data.boardID);
     if (!archive) { return ''; }
-    return Redirect[dest](archive, data);
+    return (Redirect as any)[dest](archive, data);
   },
 
   protocol(archive) {

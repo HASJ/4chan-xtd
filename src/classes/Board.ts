@@ -28,7 +28,7 @@ export default class Board {
     this.posts   = new SimpleDict();
     this.config  = BoardConfig.boards?.[this.ID] || {};
 
-    g.boards[this] = this;
+    g.boards[this.ID] = this;
   }
 
   cooldowns() {

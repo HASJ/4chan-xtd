@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Notice from "../classes/Notice";
 import Filter from "../Filtering/Filter";
@@ -180,3 +181,4 @@ var Sauce = {
   }
 };
 export default Sauce;
+

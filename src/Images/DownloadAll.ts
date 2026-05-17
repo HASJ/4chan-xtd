@@ -6,7 +6,6 @@ import CrossOrigin from "../platform/CrossOrigin";
 import Notice from "../classes/Notice";
 import Callbacks from "../classes/Callbacks";
 import Menu from "../Menu/Menu";
-import Main from "../main/Main";
 
 declare var GM_download: any;
 declare var GM: any;

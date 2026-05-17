@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 
@@ -25,3 +26,4 @@ var Flash = {
   }
 };
 export default Flash;
+

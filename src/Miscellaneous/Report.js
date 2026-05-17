@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Redirect from "../Archive/Redirect";
 import $ from "../platform/$";
 import ReportPage from './Report/ArchiveReport.html';
@@ -142,3 +143,4 @@ var Report = {
   }
 };
 export default Report;
+

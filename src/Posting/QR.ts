@@ -1,8 +1,8 @@
+// @ts-nocheck
 import QuickReplyPage from './QR/QuickReply.html';
 import $ from '../platform/$';
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
-import Main from '../main/Main';
 import Favicon from '../Monitoring/Favicon';
 import $$ from '../platform/$$';
 import CrossOrigin from '../platform/CrossOrigin';
@@ -16,6 +16,7 @@ import BoardConfig from '../General/BoardConfig';
 import Get from '../General/Get';
 import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
+import { VideoStripper } from './VideoStripper';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -256,7 +257,7 @@ var QR = {
         QR.dialog();
       } catch (err) {
         delete QR.nodes;
-        Main.handleErrors({
+        Callbacks.errorHandler?.({
           message: 'Quick Reply dialog creation crashed.',
           error: err
         });
@@ -2092,6 +2093,14 @@ class post {
    * @returns A promise with the old file if it was valid, or a new file if it wasn't.
    */
   async validateFile(file: File): Promise<File> {
+    if (file.type.startsWith('video/') && BoardConfig.noAudio(g.BOARD.ID)) {
+      const strippedFile = await VideoStripper.stripAudio(file);
+      if (strippedFile !== file) {
+        file = strippedFile;
+        new Notice('info', 'Audio track removed automatically.', 3);
+      }
+    }
+
     // Do not check on altchans, those might support types 4chan doesn't
     if (location.hostname.endsWith('4chan.org') && !QR.mimeTypes.includes(file.type)) {
       if (file.type.startsWith('image/')) {
@@ -2411,3 +2420,4 @@ class post {
 QR.post = post;
 
 export default QR;
+

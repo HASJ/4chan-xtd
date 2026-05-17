@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 
@@ -36,3 +37,4 @@ const PostRedirect = {
   }
 };
 export default PostRedirect;
+

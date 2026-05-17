@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import { Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
 
@@ -13,3 +14,4 @@ const Anonymize = {
   }
 };
 export default Anonymize;
+

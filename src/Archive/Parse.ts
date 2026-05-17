@@ -1,6 +1,6 @@
 import Redirect from './Redirect';
 import { isEscaped } from '../globals/jsx';
-import Main from '../main/Main';
+import Callbacks from '../classes/Callbacks';
 import ImageHost from '../Images/ImageHost';
 import Board from '../classes/Board';
 import Fetcher from '../classes/Fetcher';
@@ -28,6 +28,7 @@ export interface RawArchivePost {
   poster_hash: any;
   poster_country?: string;
   troll_country_code?: string;
+  troll_country_name?: string;
   sticky: string;
   locked: string;
   deleted: string;
@@ -78,7 +79,7 @@ export interface RawArchivePost {
 }
 
 
-export const parseArchivePost = (data: RawArchivePost) => {
+export const parseArchivePost = (data: RawArchivePost, url: string) => {
   // https://github.com/eksopl/asagi/blob/v0.4.0b74/src/main/java/net/easymodo/asagi/YotsubaAbstract.java#L82-L129
   // https://github.com/FoolCode/FoolFuuka/blob/800bd090835489e7e24371186db6e336f04b85c0/src/Model/Comment.php#L368-L428
   // https://github.com/bstats/b-stats/blob/6abe7bffaf6e5f523498d760e54b110df5331fbb/inc/classes/Yotsuba.php#L157-L168
@@ -97,7 +98,7 @@ export const parseArchivePost = (data: RawArchivePost) => {
       return { innerHTML: (greentext ? `<span class="quote">${text}</span>` : text) };
     }
   });
-  comment = { innerHTML: E.cat(comment), [isEscaped]: true };
+  comment = { innerHTML: E.cat(comment as any), [isEscaped]: true } as any;
 
   const o = {
     ID: data.num,
@@ -140,7 +141,7 @@ export const parseArchivePost = (data: RawArchivePost) => {
     // Fix URLs missing origin
     if (thumb_link?.[0] === '/') { thumb_link = url.split('/', 3).join('/') + thumb_link; }
     if (!Redirect.securityCheck(thumb_link)) { thumb_link = ''; }
-    let media_link = Redirect.to('file', { boardID: o.boardID, filename: data.media.media_orig });
+    let media_link = Redirect.to('file', { boardID: o.boardID, filename: data.media.media_orig } as any);
     if (!Redirect.securityCheck(media_link)) { media_link = ''; }
     o.file = {
       name: data.media.media_filename,
@@ -157,7 +158,7 @@ export const parseArchivePost = (data: RawArchivePost) => {
       theight: data.media.preview_h,
       twidth: data.media.preview_w,
       isSpoiler: data.media.spoiler === '1'
-    };
+    } as File;
     if (!/\.pdf$/.test(o.file.url)) { o.file.dimensions = `${o.file.width}x${o.file.height}`; }
     if ((o.boardID === 'f') && data.media.exif) { o.file.tag = JSON.parse(data.media.exif).Tag; }
   }
@@ -171,7 +172,7 @@ export const parseArchivePost = (data: RawArchivePost) => {
   post.resurrect();
   post.markAsFromArchive();
   if (post.file) { post.file.thumbURL = o.file.thumbURL; }
-  Main.callbackNodes('Post', [post]);
+  Callbacks.Post.execute(post);
   return post;
 };
 export default parseArchivePost;

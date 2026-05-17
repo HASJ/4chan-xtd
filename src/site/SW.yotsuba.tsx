@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Redirect from "../Archive/Redirect";
 import PassMessage from "../Miscellaneous/PassMessage";
 import Report from "../Miscellaneous/Report";
@@ -726,3 +727,4 @@ $\
   }
 };
 export default SWYotsuba;
+

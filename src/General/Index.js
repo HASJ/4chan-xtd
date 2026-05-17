@@ -1,3 +1,4 @@
+// @ts-nocheck
 /*
  * decaffeinate suggestions:
  * DS102: Remove unnecessary code created because of implicit returns
@@ -14,7 +15,6 @@ import Config from '../config/Config';
 import Filter from '../Filtering/Filter';
 import PostHiding from '../Filtering/PostHiding';
 import ThreadHiding from '../Filtering/ThreadHiding';
-import Main from '../main/Main';
 import CatalogLinks from '../Miscellaneous/CatalogLinks';
 import RelativeDates from '../Miscellaneous/RelativeDates';
 import ThreadWatcher from '../Monitoring/ThreadWatcher';
@@ -229,7 +229,7 @@ var Index = {
       if (timeEl.dataset.utc) { return RelativeDates.update(timeEl); }
     });
 
-    return Main.ready(function() {
+    return $.on(d, '4chanXInitFinished', function() {
       let pagelist;
       if (pagelist = $('.pagelist')) {
         $.replace(pagelist, Index.pagelist);
@@ -941,14 +941,14 @@ var Index = {
         });
       }
     }
-    if (errors) { Main.handleErrors(errors); }
+    if (errors) { Callbacks.errorHandler?.(errors); }
 
     if (withReplies) {
       newPosts = newPosts.concat(Index.buildReplies(threads));
     }
 
-    Main.callbackNodes('Thread', newThreads);
-    Main.callbackNodes('Post',   newPosts);
+    for (const thread of newThreads) { Callbacks.Thread.execute(thread); }
+    for (const post of newPosts) { Callbacks.Post.execute(post); }
     Index.updateHideLabel();
     $.event('IndexRefreshInternal', {threadIDs: (threads.map((t) => t.fullID)), isCatalog});
 
@@ -984,7 +984,7 @@ var Index = {
       $.add(thread.nodes.root, nodes);
     }
 
-    if (errors) { Main.handleErrors(errors); }
+    if (errors) { Callbacks.errorHandler?.(errors); }
     return posts;
   },
 
@@ -998,7 +998,7 @@ var Index = {
         catalogThreads.push(new CatalogThread(root, thread));
       }
     }
-    Main.callbackNodes('CatalogThread', catalogThreads);
+    for (const catalogThread of catalogThreads) { Callbacks.CatalogThread.execute(catalogThread); }
   },
 
   sizeCatalogViews(threads) {

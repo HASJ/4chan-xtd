@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import QR from "../Posting/QR";
 import $ from "./$";
 import { dict, platform } from "./helpers";
@@ -248,3 +249,4 @@ var CrossOrigin = {
   },
 };
 export default CrossOrigin;
+

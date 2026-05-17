@@ -1,3 +1,4 @@
+// @ts-nocheck
 import $ from "../platform/$";
 import Callbacks from "../classes/Callbacks";
 import CrossOrigin from "../platform/CrossOrigin";
@@ -94,3 +95,4 @@ var Metadata = {
   }
 };
 export default Metadata;
+

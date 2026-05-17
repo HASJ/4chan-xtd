@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { Conf, g } from "../globals/globals";
 import $$ from "../platform/$$";
@@ -54,3 +55,4 @@ var ImageHost = {
   }
 };
 export default ImageHost;
+
