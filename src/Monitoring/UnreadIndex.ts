@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Get from "../General/Get";
@@ -11,16 +10,26 @@ import { dict } from "../platform/helpers";
 import QuoteYou from "../Quotelinks/QuoteYou";
 import ThreadWatcher from "./ThreadWatcher";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var UnreadIndex = {
+interface UnreadIndexType {
+  lastReadPost: Record<string, number>;
+  hr: Record<string, HTMLHRElement>;
+  markReadLink: Record<string, HTMLAnchorElement>;
+  enabled?: boolean;
+  db?: DataBoard;
+  init(): void;
+  node(this: any): void;
+  onIndexRefresh(e: Event): void;
+  onPostsInserted(e: Event): void;
+  sync(): void;
+  update(thread: any): void;
+  markRead(this: HTMLElement): void;
+}
+
+const UnreadIndex: UnreadIndexType = {
   lastReadPost: dict(),
   hr:           dict(),
   markReadLink: dict(),
+  enabled: undefined,
 
   init() {
     if ((g.VIEW !== 'index') || !Conf['Remember Last Read Post'] || !Conf['Unread Line in Index']) { return; }
@@ -34,70 +43,69 @@ var UnreadIndex = {
     });
 
     $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
-    return $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
+    $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
   },
 
-  node() {
-    UnreadIndex.lastReadPost[this.fullID] = UnreadIndex.db.get({
+  node(this: any) {
+    UnreadIndex.lastReadPost[this.fullID] = UnreadIndex.db!.get({
       boardID: this.board.ID,
       threadID: this.ID
     }) || 0;
     if (!Index.enabled) { // let onIndexRefresh handle JSON Index
-      return UnreadIndex.update(this);
+      UnreadIndex.update(this);
     }
   },
 
-  onIndexRefresh(e) {
-    if (e.detail.isCatalog) { return; }
-    return (() => {
-      const result = [];
-      for (var threadID of e.detail.threadIDs) {
-        var thread = g.threads.get(threadID);
-        result.push(UnreadIndex.update(thread));
+  onIndexRefresh(e: Event) {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.isCatalog) { return; }
+    for (const threadID of detail?.threadIDs || []) {
+      const thread = g.threads.get(threadID);
+      if (thread) {
+        UnreadIndex.update(thread);
       }
-      return result;
-    })();
+    }
   },
 
-  onPostsInserted(e) {
+  onPostsInserted(e: Event) {
     if (e.target === Index.root) { return; } // onIndexRefresh handles this case
-    const thread = Get.threadFromNode(e.target);
+    const thread = Get.threadFromNode(e.target as Node);
     if (!thread || (thread.nodes.root !== e.target)) { return; }
     const wasVisible = !!UnreadIndex.hr[thread.fullID]?.parentNode;
     UnreadIndex.update(thread);
     if (Conf['Scroll to Last Read Post'] && (e.type === 'PostsInserted') && !wasVisible && !!UnreadIndex.hr[thread.fullID]?.parentNode) {
-      return Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
+      Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
     }
   },
 
   sync() {
-    return g.threads.forEach(function(thread) {
-      const lastReadPost = UnreadIndex.db.get({
+    g.threads.forEach((thread: any) => {
+      const lastReadPost = UnreadIndex.db!.get({
         boardID: thread.board.ID,
         threadID: thread.ID
       }) || 0;
       if (lastReadPost !== UnreadIndex.lastReadPost[thread.fullID]) {
         UnreadIndex.lastReadPost[thread.fullID] = lastReadPost;
         if (thread.nodes.root?.parentNode) {
-          return UnreadIndex.update(thread);
+          UnreadIndex.update(thread);
         }
       }
     });
   },
 
-  update(thread) {
-    let divider;
+  update(thread: any) {
+    let divider: HTMLElement | null;
     const lastReadPost = UnreadIndex.lastReadPost[thread.fullID];
     let repliesShown = 0;
     let repliesRead = 0;
-    let firstUnread = null;
-    thread.posts.forEach(function(post) {
+    let firstUnread: any = null;
+    thread.posts.forEach((post: any) => {
       if (post.isReply && thread.nodes.root.contains(post.nodes.root)) {
         repliesShown++;
         if (post.ID <= lastReadPost) {
-          return repliesRead++;
+          repliesRead++;
         } else if ((!firstUnread || (post.ID < firstUnread.ID)) && !post.isHidden && !QuoteYou.isYou(post)) {
-          return firstUnread = post;
+          firstUnread = post;
         }
       }
     });
@@ -105,8 +113,7 @@ var UnreadIndex = {
     let hr = UnreadIndex.hr[thread.fullID];
     if (firstUnread && (repliesRead || ((lastReadPost === thread.OP.ID) && (!$(g.SITE.selectors.summary, thread.nodes.root) || thread.ID in ExpandThread.statuses)))) {
       if (!hr) {
-        hr = (UnreadIndex.hr[thread.fullID] = $.el('hr',
-          {className: 'unread-line'}));
+        hr = (UnreadIndex.hr[thread.fullID] = $.el('hr', { className: 'unread-line' }) as HTMLHRElement);
       }
       $.before(firstUnread.nodes.root, hr);
     } else {
@@ -114,12 +121,12 @@ var UnreadIndex = {
     }
 
     const hasUnread = repliesShown ?
-      firstUnread || !repliesRead
+      (firstUnread || !repliesRead)
     : Index.enabled ?
-      thread.lastPost > lastReadPost
+      (thread.lastPost > lastReadPost)
     :
-      thread.OP.ID > lastReadPost;
-    thread.nodes.root.classList.toggle('unread-thread', hasUnread);
+      (thread.OP.ID > lastReadPost);
+    thread.nodes.root.classList.toggle('unread-thread', !!hasUnread);
 
     let link = UnreadIndex.markReadLink[thread.fullID];
     if (!link) {
@@ -127,34 +134,33 @@ var UnreadIndex = {
         className: 'unread-mark-read brackets-wrap',
         href: 'javascript:;',
         textContent: 'Mark Read'
-      }
-      ));
+      }) as HTMLAnchorElement);
       $.on(link, 'click', UnreadIndex.markRead);
     }
-    if (divider = $(g.SITE.selectors.threadDivider, thread.nodes.root)) { // divider inside thread as in Tinyboard
-      return $.before(divider, link);
+    if ((divider = $(g.SITE.selectors.threadDivider, thread.nodes.root) as HTMLElement | null)) { // divider inside thread as in Tinyboard
+      $.before(divider, link);
     } else {
-      return $.add(thread.nodes.root, link);
+      $.add(thread.nodes.root, link);
     }
   },
 
-  markRead() {
-    const thread = Get.threadFromNode(this);
+  markRead(this: HTMLElement) {
+    const thread = Get.threadFromNode(this) as any;
+    if (!thread) { return; }
     UnreadIndex.lastReadPost[thread.fullID] = thread.lastPost;
-    UnreadIndex.db.set({
+    UnreadIndex.db!.set({
       boardID:  thread.board.ID,
       threadID: thread.ID,
       val:      thread.lastPost
     });
     $.rm(UnreadIndex.hr[thread.fullID]);
     thread.nodes.root.classList.remove('unread-thread');
-    return ThreadWatcher.update(g.SITE.ID, thread.board.ID, thread.ID, {
+    ThreadWatcher.update(g.SITE.ID, thread.board.ID, thread.ID, {
       last: thread.lastPost,
       unread: 0,
       quotingYou: 0
-    }
-    );
+    });
   }
 };
-export default UnreadIndex;
 
+export default UnreadIndex;

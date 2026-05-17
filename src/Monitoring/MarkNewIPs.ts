@@ -1,52 +1,62 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var MarkNewIPs = {
+interface MarkNewIPsType {
+  ipCount: number;
+  postCount: number;
+  init(): void;
+  node(this: any): void;
+  onUpdate(e: Event): void;
+  markNew(post: any, ipCount: number): void;
+  markOld(post: any): void;
+}
+
+const MarkNewIPs: MarkNewIPsType = {
+  ipCount: 0,
+  postCount: 0,
+
   init() {
     if ((g.SITE.software !== 'yotsuba') || (g.VIEW !== 'thread') || !Conf['Mark New IPs']) { return; }
-    return Callbacks.Thread.push({
+    Callbacks.Thread.push({
       name: 'Mark New IPs',
       cb:   this.node
     });
   },
 
-  node() {
+  node(this: any) {
     MarkNewIPs.ipCount = this.ipCount;
     MarkNewIPs.postCount = this.posts.keys.length;
-    return $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
+    $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
   },
 
-  onUpdate(e) {
-    let fullID;
-    const {ipCount, postCount, newPosts, deletedPosts} = e.detail;
+  onUpdate(e: Event) {
+    let fullID: string;
+    const detail = (e as CustomEvent).detail;
+    if (!detail) { return; }
+    const { ipCount, postCount, newPosts, deletedPosts } = detail;
     if (ipCount == null) { return; }
 
     switch (ipCount - MarkNewIPs.ipCount) {
-      case (postCount - MarkNewIPs.postCount) + deletedPosts.length:
-        var i = MarkNewIPs.ipCount;
+      case (postCount - MarkNewIPs.postCount) + deletedPosts.length: {
+        let i = MarkNewIPs.ipCount;
         for (fullID of newPosts) {
           MarkNewIPs.markNew(g.posts.get(fullID), ++i);
         }
         break;
-      case -deletedPosts.length:
+      }
+      case -deletedPosts.length: {
         for (fullID of newPosts) {
           MarkNewIPs.markOld(g.posts.get(fullID));
         }
         break;
+      }
     }
     MarkNewIPs.ipCount = ipCount;
-    return MarkNewIPs.postCount = postCount;
+    MarkNewIPs.postCount = postCount;
   },
 
-  markNew(post, ipCount) {
+  markNew(post: any, ipCount: number) {
     const suffix = ((Math.floor(ipCount / 10)) % 10) === 1 ?
       'th'
     :
@@ -54,17 +64,16 @@ var MarkNewIPs = {
     const counter = $.el('span', {
       className: 'ip-counter',
       textContent: `(${ipCount})`
-    }
-    );
+    });
     post.nodes.nameBlock.title = `This is the ${ipCount}${suffix} IP in the thread.`;
     $.add(post.nodes.nameBlock, [$.tn(' '), counter]);
-    return $.addClass(post.nodes.root, 'new-ip');
+    $.addClass(post.nodes.root, 'new-ip');
   },
 
-  markOld(post) {
+  markOld(post: any) {
     post.nodes.nameBlock.title = 'Not the first post from this IP.';
-    return $.addClass(post.nodes.root, 'old-ip');
+    $.addClass(post.nodes.root, 'old-ip');
   }
 };
-export default MarkNewIPs;
 
+export default MarkNewIPs;
