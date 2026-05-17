@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Fetcher from "../classes/Fetcher";
 import Get from "../General/Get";
@@ -7,12 +6,18 @@ import ExpandComment from "../Miscellaneous/ExpandComment";
 import Unread from "../Monitoring/Unread";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var QuoteInline = {
+interface QuoteInlineType {
+  init(): void;
+  node(this: any): void;
+  process(link: HTMLAnchorElement, clone: boolean): void;
+  qiQuote(link: HTMLAnchorElement, hidden: boolean): HTMLElement;
+  toggle(this: HTMLElement, e: MouseEvent): void;
+  findRoot(quotelink: HTMLElement, isBacklink: boolean): Node;
+  add(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any, quoter: any): void;
+  rm(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any): void;
+}
+
+const QuoteInline: QuoteInlineType = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Inlining']) { return; }
 
@@ -20,58 +25,57 @@ var QuoteInline = {
       ExpandComment.callbacks.push(this.node);
     }
 
-    return Callbacks.Post.push({
+    Callbacks.Post.push({
       name: 'Quote Inlining',
       cb:   this.node
     });
   },
 
-  node() {
-    const {process} = QuoteInline;
-    const {isClone} = this;
-    for (var link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
+  node(this: any) {
+    const { process } = QuoteInline;
+    const { isClone } = this;
+    for (const link of this.nodes.quotelinks.concat([...this.nodes.backlinks], this.nodes.archivelinks)) {
       process(link, isClone);
     }
   },
 
-  process(link, clone) {
+  process(link: HTMLAnchorElement, clone: boolean) {
     if (Conf['Quote Hash Navigation']) {
       if (!clone) { $.after(link, QuoteInline.qiQuote(link, $.hasClass(link, 'filtered'))); }
     }
-    return $.on(link, 'click', QuoteInline.toggle);
+    $.on(link, 'click', QuoteInline.toggle);
   },
 
-  qiQuote(link, hidden) {
+  qiQuote(link: HTMLAnchorElement, hidden: boolean): HTMLElement {
     let name = "hashlink";
     if (hidden) { name += " filtered"; }
     return $.el('a', {
       className: name,
       textContent: '#',
       href: link.href
-    }
-    );
+    });
   },
 
-  toggle(e) {
+  toggle(this: HTMLElement, e: MouseEvent) {
     if ($.modifiedClick(e)) { return; }
 
-    const {boardID, threadID, postID} = Get.postDataFromLink(this);
+    const { boardID, threadID, postID } = Get.postDataFromLink(this);
     if (Conf['Inline Cross-thread Quotes Only'] && (g.VIEW === 'thread') && g.posts.get(`${boardID}.${postID}`)?.nodes.root.offsetParent) { return; } // exists and not hidden
     if ($.hasClass(doc, 'catalog-mode')) { return; }
 
     e.preventDefault();
     const quoter = Get.postFromNode(this);
-    const {context} = quoter;
+    const { context } = quoter;
     if ($.hasClass(this, 'inlined')) {
       QuoteInline.rm(this, boardID, threadID, postID, context);
     } else {
       if ($.x(`ancestor::div[@data-full-i-d='${boardID}.${postID}']`, this)) { return; }
       QuoteInline.add(this, boardID, threadID, postID, context, quoter);
     }
-    return this.classList.toggle('inlined');
+    this.classList.toggle('inlined');
   },
 
-  findRoot(quotelink, isBacklink) {
+  findRoot(quotelink: HTMLElement, isBacklink: boolean): Node {
     if (isBacklink) {
       return $.x('ancestor::*[parent::*[contains(@class,"post")]][1]', quotelink);
     } else {
@@ -79,19 +83,18 @@ var QuoteInline = {
     }
   },
 
-  add(quotelink, boardID, threadID, postID, context, quoter) {
-    let post;
+  add(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any, quoter: any) {
+    let post: any;
     const isBacklink = $.hasClass(quotelink, 'backlink');
-    const inline = $.el('div',
-      {className: 'inline'});
+    const inline = $.el('div', { className: 'inline' });
     inline.dataset.fullID = `${boardID}.${postID}`;
-    const root = QuoteInline.findRoot(quotelink, isBacklink);
+    const root = QuoteInline.findRoot(quotelink, isBacklink) as HTMLElement;
     $.after(root, inline);
 
-    const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root);
+    const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root) as HTMLElement;
 
     $.addClass(qroot, 'hasInline');
-    new Fetcher(boardID, threadID, postID, inline, quoter);
+    new Fetcher(boardID, +threadID, String(postID), inline, quoter);
 
     if (!(
       (post = g.posts.get(`${boardID}.${postID}`)) &&
@@ -108,18 +111,18 @@ var QuoteInline = {
     // Decrease the unread count if this post
     // is in the array of unread posts.
     if (!Unread.posts) { return; }
-    return Unread.readSinglePost(post);
+    Unread.readSinglePost(post);
   },
 
-  rm(quotelink, boardID, threadID, postID, context) {
-    let el;
-    let inlined;
+  rm(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any) {
+    let el: HTMLElement | null;
+    let inlined: HTMLElement | null;
     const isBacklink = $.hasClass(quotelink, 'backlink');
     // Select the corresponding inlined quote, and remove it.
-    let root = QuoteInline.findRoot(quotelink, isBacklink);
-    root = $.x(`following-sibling::div[@data-full-i-d='${boardID}.${postID}'][1]`, root);
-    const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root);
-    const {parentNode} = root;
+    let root = QuoteInline.findRoot(quotelink, isBacklink) as HTMLElement;
+    root = $.x(`following-sibling::div[@data-full-i-d='${boardID}.${postID}'][1]`, root) as HTMLElement;
+    const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root) as HTMLElement;
+    const parentNode = root.parentNode!;
     $.rm(root);
     $.event('PostsRemoved', null, parentNode);
 
@@ -128,10 +131,10 @@ var QuoteInline = {
     }
 
     // Stop if it only contains text.
-    if (!(el = root.firstElementChild)) { return; }
+    if (!(el = root.firstElementChild as HTMLElement)) { return; }
 
     // Dereference clone.
-    const post = g.posts.get(`${boardID}.${postID}`);
+    const post = g.posts.get(`${boardID}.${postID}`) as any;
     post.rmClone(el.dataset.clone);
 
     // Decrease forward count and unhide.
@@ -144,12 +147,12 @@ var QuoteInline = {
       }
 
     // Repeat.
-    while ((inlined = $('.inlined', el))) {
-      ({boardID, threadID, postID} = Get.postDataFromLink(inlined));
+    while ((inlined = $('.inlined', el) as HTMLElement)) {
+      ({ boardID, threadID, postID } = Get.postDataFromLink(inlined));
       QuoteInline.rm(inlined, boardID, threadID, postID, context);
       $.rmClass(inlined, 'inlined');
     }
   }
 };
-export default QuoteInline;
 
+export default QuoteInline;

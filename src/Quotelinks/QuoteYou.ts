@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Notice from "../classes/Notice";
@@ -12,23 +11,40 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import PostRedirect from "../Posting/PostRedirect";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var QuoteYou = {
+interface QuoteYouType {
+  db: DataBoard;
+  mark: HTMLElement;
+  lastRead?: HTMLElement;
+  init(): void;
+  isYou(post: any): boolean;
+  node(this: any): void;
+  menu: {
+    post?: any;
+    init(): void;
+    toggle(this: HTMLInputElement): void;
+  };
+  cb: {
+    seek(type: 'preceding' | 'following'): void;
+    scroll(root: HTMLElement): boolean;
+  };
+}
+
+const QuoteYou: QuoteYouType = {
+  db: null as any,
+  mark: null as any,
+  lastRead: undefined,
+
   init() {
     if (!Conf['Remember Your Posts']) { return; }
 
     this.db = new DataBoard('yourPosts');
-    $.sync('Remember Your Posts', enabled => Conf['Remember Your Posts'] = enabled);
-    $.on(d, 'QRPostSuccessful', function(e) {
+    $.sync('Remember Your Posts', (enabled: boolean) => Conf['Remember Your Posts'] = enabled);
+    $.on(d, 'QRPostSuccessful', (e: CustomEvent) => {
       const cb = PostRedirect.delay();
-      return $.get('Remember Your Posts', Conf['Remember Your Posts'], function(items) {
+      $.get('Remember Your Posts', Conf['Remember Your Posts'], (items: any) => {
         if (!items['Remember Your Posts']) { return; }
-        const {boardID, threadID, postID} = e.detail;
-        return QuoteYou.db.set({boardID, threadID, postID, val: true}, cb);
+        const { boardID, threadID, postID } = e.detail;
+        QuoteYou.db.set({ boardID, threadID, postID, val: true }, cb);
       });
     });
 
@@ -50,8 +66,8 @@ var QuoteYou = {
     this.mark = $.el('span', {
       textContent: '\u00A0(You)',
       className:   'qmark-you'
-    }
-    );
+    });
+
     Callbacks.Post.push({
       name: 'Mark Quotes of You',
       cb:   this.node
@@ -60,7 +76,7 @@ var QuoteYou = {
     QuoteYou.menu.init();
   },
 
-  isYou(post) {
+  isYou(post: any): boolean {
     return !!QuoteYou.db?.get({
       boardID:  post.boardID,
       threadID: post.threadID,
@@ -68,7 +84,7 @@ var QuoteYou = {
     });
   },
 
-  node() {
+  node(this: any) {
     if (this.isClone) { return; }
 
     if (QuoteYou.isYou(this)) {
@@ -79,7 +95,7 @@ var QuoteYou = {
     // Stop there if there's no quotes in that post.
     if (!this.quotes.length) { return; }
 
-    for (var quotelink of this.nodes.quotelinks) {
+    for (const quotelink of this.nodes.quotelinks) {
       if (QuoteYou.db.get(Get.postDataFromLink(quotelink))) {
         if (Conf['Mark Quotes of You']) { $.add(quotelink, QuoteYou.mark.cloneNode(true)); }
         $.addClass(quotelink, 'you');
@@ -89,12 +105,11 @@ var QuoteYou = {
   },
 
   menu: {
+    post: undefined,
+
     init() {
-      const label = $.el('label',
-        {className: 'toggle-you'}
-      ,
-        {innerHTML: '<input type="checkbox"> You'});
-      const input = $('input', label);
+      const label = $.el('label', { className: 'toggle-you' }, { innerHTML: '<input type="checkbox"> You' });
+      const input = $('input', label) as HTMLInputElement;
       $.on(input, 'change', QuoteYou.menu.toggle);
       Menu.menu?.addEntry({
         el: label,
@@ -107,18 +122,18 @@ var QuoteYou = {
       });
     },
 
-    toggle() {
-      const {post} = QuoteYou.menu;
-      const data = {boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID, val: true};
+    toggle(this: HTMLInputElement) {
+      const post = QuoteYou.menu.post;
+      const data = { boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID, val: true };
       if (this.checked) {
         QuoteYou.db.set(data);
       } else {
         QuoteYou.db.delete(data);
       }
-      for (var clone of [post].concat(post.clones)) {
+      for (const clone of [post].concat(post.clones)) {
         clone.nodes.root.classList.toggle('yourPost', this.checked);
       }
-      for (var quotelink of Get.allQuotelinksLinkingTo(post)) {
+      for (const quotelink of Get.allQuotelinksLinkingTo(post)) {
         if (this.checked) {
           if (Conf['Mark Quotes of You']) { $.add(quotelink, QuoteYou.mark.cloneNode(true)); }
         } else {
@@ -126,7 +141,7 @@ var QuoteYou = {
         }
         quotelink.classList.toggle('you', this.checked);
         if ($.hasClass(quotelink, 'quotelink')) {
-          var quoter = Get.postFromNode(quotelink).nodes.root;
+          const quoter = Get.postFromNode(quotelink).nodes.root;
           quoter.classList.toggle('quotesYou', !!$('.quotelink.you', quoter));
         }
       }
@@ -135,14 +150,14 @@ var QuoteYou = {
   },
 
   cb: {
-    seek(type) {
-      let highlighted, post;
-      let result;
-      const {highlight} = g.SITE.classes;
-      if (highlighted = $(`.${highlight}`)) { $.rmClass(highlighted, highlight); }
+    seek(type: 'preceding' | 'following') {
+      let highlighted: HTMLElement | null, post: HTMLElement | null;
+      let result: XPathResult;
+      const highlight = g.SITE.classes.highlight;
+      if ((highlighted = $(`.${highlight}`))) { $.rmClass(highlighted, highlight); }
 
       if (!QuoteYou.lastRead || !doc.contains(QuoteYou.lastRead) || !$.hasClass(QuoteYou.lastRead, 'quotesYou')) {
-        if (!(post = (QuoteYou.lastRead = $('.quotesYou')))) {
+        if (!(post = (QuoteYou.lastRead = $('.quotesYou') as HTMLElement))) {
           new Notice('warning', 'No posts are currently quoting you, loser.', 20);
           return;
         }
@@ -153,15 +168,15 @@ var QuoteYou = {
 
       const str = `${type}::div[contains(@class,'quotesYou')]`;
 
-      while (post = (result = $.X(str, post)).snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0)) {
+      while ((post = (result = $.X(str, post)).snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0) as HTMLElement)) {
         if (QuoteYou.cb.scroll(post)) { return; }
       }
 
-      const posts = $$('.quotesYou');
-      return QuoteYou.cb.scroll(posts[type === 'following' ? 0 : posts.length - 1]);
+      const posts = $$('.quotesYou') as HTMLElement[];
+      QuoteYou.cb.scroll(posts[type === 'following' ? 0 : posts.length - 1]);
     },
 
-    scroll(root) {
+    scroll(root: HTMLElement): boolean {
       const post = Get.postFromRoot(root);
       if (!post.nodes.post.getBoundingClientRect().height) {
         return false;
@@ -180,5 +195,5 @@ var QuoteYou = {
     }
   }
 };
-export default QuoteYou;
 
+export default QuoteYou;
