@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Header from "../General/Header";
 import UI from "../General/UI";
@@ -6,22 +5,60 @@ import { g, Conf, E, doc, d } from "../globals/globals";
 import $ from "../platform/$";
 import { MINUTE, SECOND } from "../platform/helpers";
 
-var ThreadStats = {
+interface ThreadStatsType {
+  postCount: number;
+  fileCount: number;
+  postIndex: number;
+  showPurgePos?: boolean;
+  showPage?: boolean;
+  dialog: HTMLElement;
+  postCountEl: HTMLElement;
+  fileCountEl: HTMLElement;
+  ipCountEl: HTMLElement | null;
+  pageCountEl: HTMLElement | null;
+  thread: any;
+  timeout?: any;
+  lastPageUpdate?: Date;
+  init(): void;
+  node(this: any): void;
+  count(): void;
+  onUpdate(e: Event): void;
+  onPostsInserted(): void;
+  update(): void;
+  fetchPage(): void;
+  onThreadsLoad(this: any): void;
+  retry(): void;
+  [key: string]: any;
+}
+
+const ThreadStats: ThreadStatsType = {
   postCount: 0,
   fileCount: 0,
   postIndex: 0,
+  showPurgePos: undefined,
+  showPage: undefined,
+  dialog: null as any,
+  postCountEl: null as any,
+  fileCountEl: null as any,
+  ipCountEl: null,
+  pageCountEl: null,
+  thread: null,
+  timeout: undefined,
+  lastPageUpdate: undefined,
 
   init() {
-    let sc;
+    let sc: HTMLElement;
     if ((g.VIEW !== 'thread') || !Conf['Thread Stats']) { return; }
 
     if (Conf['Page Count in Stats']) {
-      this[g.SITE.isPrunedByAge?.(g.BOARD) ? 'showPurgePos' : 'showPage'] = true;
+      this[(g.SITE as any).isPrunedByAge?.(g.BOARD) ? 'showPurgePos' : 'showPage'] = true;
     }
 
-    const statsHTML = {innerHTML: "<span id=\"post-count\">?</span> / <span id=\"file-count\">?</span>" + ((Conf["IP Count in Stats"] && g.SITE.hasIPCount) ? " / <span id=\"ip-count\">?</span>" : "") + ((Conf["Page Count in Stats"]) ? " / <span id=\"page-count\">?</span>" : "")};
+    const statsHTML = {
+      innerHTML: `<span id="post-count">?</span> / <span id="file-count">?</span>${(Conf["IP Count in Stats"] && (g.SITE as any).hasIPCount) ? " / <span id=\"ip-count\">?</span>" : ""}${(Conf["Page Count in Stats"]) ? " / <span id=\"page-count\">?</span>" : ""}`
+    };
     let statsTitle = 'Posts / Files';
-    if (Conf['IP Count in Stats'] && g.SITE.hasIPCount) { statsTitle += ' / IPs'; }
+    if (Conf['IP Count in Stats'] && (g.SITE as any).hasIPCount) { statsTitle += ' / IPs'; }
     if (Conf['Page Count in Stats']) {
       if (this.showPurgePos) {
         statsTitle += ' / Purge Position';
@@ -35,46 +72,45 @@ var ThreadStats = {
       this.dialog = (sc = $.el('span', {
         id:    'thread-stats',
         title: statsTitle
-      }
-      ));
+      }));
       $.extend(sc, statsHTML);
       Header.addShortcut('stats', sc, 200);
-
     } else {
-      this.dialog = (sc = UI.dialog('thread-stats',
-        {innerHTML: "<div class=\"move\" title=\"" + E(statsTitle) + "\">" + (statsHTML).innerHTML + "</div>"}));
+      this.dialog = (sc = UI.dialog('thread-stats', {
+        innerHTML: `<div class="move" title="${E(statsTitle) as string}">${statsHTML.innerHTML}</div>`
+      }));
       $.addClass(doc, 'float');
       $.ready(() => $.add(d.body, sc));
     }
 
-    this.postCountEl = $('#post-count', sc);
-    this.fileCountEl = $('#file-count', sc);
-    this.ipCountEl   = $('#ip-count',   sc);
-    this.pageCountEl = $('#page-count', sc);
+    this.postCountEl = $('#post-count', sc) as HTMLElement;
+    this.fileCountEl = $('#file-count', sc) as HTMLElement;
+    this.ipCountEl   = $('#ip-count',   sc) as HTMLElement | null;
+    this.pageCountEl = $('#page-count', sc) as HTMLElement | null;
 
     if (this.pageCountEl) { $.on(this.pageCountEl, 'click', ThreadStats.fetchPage); }
 
-    return Callbacks.Thread.push({
+    Callbacks.Thread.push({
       name: 'Thread Stats',
       cb:   this.node
     });
   },
 
-  node() {
+  node(this: any) {
     ThreadStats.thread = this;
     ThreadStats.count();
     ThreadStats.update();
     ThreadStats.fetchPage();
     $.on(d, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
-    return $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
+    $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
   },
 
   count() {
-    const {posts} = ThreadStats.thread;
+    const { posts } = ThreadStats.thread;
     const n = posts.keys.length;
     for (let i = ThreadStats.postIndex, end = n; i < end; i++) {
-      var post = posts.get(posts.keys[i]);
-      if (!post.isFetchedQuote) {
+      const post = posts.get(posts.keys[i]);
+      if (post && !post.isFetchedQuote) {
         ThreadStats.postCount++;
         ThreadStats.fileCount += post.files.length;
       }
@@ -82,14 +118,15 @@ var ThreadStats = {
     ThreadStats.postIndex = n;
   },
 
-  onUpdate(e) {
-    if (e.detail[404]) { return; }
-    const {postCount, fileCount} = e.detail;
-    $.extend(ThreadStats, {postCount, fileCount});
+  onUpdate(e: Event) {
+    const detail = (e as CustomEvent).detail;
+    if (detail?.[404]) { return; }
+    const { postCount, fileCount } = detail;
+    $.extend(ThreadStats, { postCount, fileCount });
     ThreadStats.postIndex = ThreadStats.thread.posts.keys.length;
     ThreadStats.update();
-    if (ThreadStats.showPage && (ThreadStats.pageCountEl.textContent !== '1')) {
-      return ThreadStats.fetchPage();
+    if (ThreadStats.showPage && ThreadStats.pageCountEl && (ThreadStats.pageCountEl.textContent !== '1')) {
+      ThreadStats.fetchPage();
     }
   },
 
@@ -97,30 +134,32 @@ var ThreadStats = {
     if (ThreadStats.thread.posts.keys.length <= ThreadStats.postIndex) { return; }
     ThreadStats.count();
     ThreadStats.update();
-    if (ThreadStats.showPage && (ThreadStats.pageCountEl.textContent !== '1')) {
-      return ThreadStats.fetchPage();
+    if (ThreadStats.showPage && ThreadStats.pageCountEl && (ThreadStats.pageCountEl.textContent !== '1')) {
+      ThreadStats.fetchPage();
     }
   },
 
   update() {
-    const {thread, postCountEl, fileCountEl, ipCountEl} = ThreadStats;
-    postCountEl.textContent = ThreadStats.postCount;
-    fileCountEl.textContent = ThreadStats.fileCount;
+    const { thread, postCountEl, fileCountEl, ipCountEl } = ThreadStats;
+    postCountEl.textContent = String(ThreadStats.postCount);
+    fileCountEl.textContent = String(ThreadStats.fileCount);
     if (ipCountEl) {
       if (thread.ipCount) {
-        ipCountEl.textContent = thread.ipCount;
-      } else if (g.BOARD?.config.user_ids) {
+        ipCountEl.textContent = String(thread.ipCount);
+      } else if (g.BOARD?.config?.user_ids) {
         const IDs = new Set();
-        g.posts.forEach(post => {
-          IDs.add(post.info.uniqueID);
+        g.posts.forEach((post: any) => {
+          if (post.info?.uniqueID) {
+            IDs.add(post.info.uniqueID);
+          }
         });
-        ipCountEl.textContent = IDs.size;
+        ipCountEl.textContent = String(IDs.size);
       } else {
         ipCountEl.textContent = '?';
       }
     }
-    postCountEl.classList.toggle('warning', (thread.postLimit && !thread.isSticky));
-    fileCountEl.classList.toggle('warning', (thread.fileLimit && !thread.isSticky));
+    postCountEl.classList.toggle('warning', !!(thread.postLimit && !thread.isSticky));
+    fileCountEl.classList.toggle('warning', !!(thread.fileLimit && !thread.isSticky));
   },
 
   fetchPage() {
@@ -143,10 +182,10 @@ var ThreadStats = {
     );
   },
 
-  onThreadsLoad() {
+  onThreadsLoad(this: any) {
     if (this.status === 200) {
-      let page, thread;
-      if (ThreadStats.showPurgePos) {
+      let page: any, thread: any;
+      if (ThreadStats.showPurgePos && ThreadStats.pageCountEl) {
         let purgePos = 1;
         for (page of this.response) {
           for (thread of page.threads) {
@@ -155,11 +194,11 @@ var ThreadStats = {
             }
           }
         }
-        ThreadStats.pageCountEl.textContent = purgePos;
+        ThreadStats.pageCountEl.textContent = String(purgePos);
         ThreadStats.pageCountEl.classList.toggle('warning', (purgePos === 1));
-      } else {
-        let nThreads;
-        let i = (nThreads = 0);
+      } else if (ThreadStats.pageCountEl) {
+        let nThreads = 0;
+        let i = 0;
         for (page of this.response) {
           nThreads += page.threads.length;
         }
@@ -167,7 +206,7 @@ var ThreadStats = {
           page = this.response[pageNum];
           for (thread of page.threads) {
             if (thread.no === ThreadStats.thread.ID) {
-              ThreadStats.pageCountEl.textContent = pageNum + 1;
+              ThreadStats.pageCountEl.textContent = String(pageNum + 1);
               const hasWarning = (i >= (nThreads - this.response[0].threads.length));
               ThreadStats.pageCountEl.classList.toggle('warning', hasWarning);
               if (hasWarning && Conf['Purge Position']) {
@@ -188,16 +227,17 @@ var ThreadStats = {
 
   retry() {
     // If thread data is stale (modification date given < time of last post), try again.
-    // Skip this on vichan sites due to sage posts not updating modification time in threads.json.
+    // Skip this on vichan sites due to sage posts not updating modification time in signatures.
     if (
       !ThreadStats.showPage ||
+      !ThreadStats.pageCountEl ||
       (ThreadStats.pageCountEl.textContent === '1') ||
-      !!g.SITE.threadModTimeIgnoresSage ||
-      (ThreadStats.thread.posts.get(ThreadStats.thread.lastPost).info.date <= ThreadStats.lastPageUpdate)
+      !!(g.SITE as any).threadModTimeIgnoresSage ||
+      (ThreadStats.thread.posts.get(ThreadStats.thread.lastPost).info.date <= ThreadStats.lastPageUpdate!)
     ) { return; }
     clearTimeout(ThreadStats.timeout);
     ThreadStats.timeout = setTimeout(ThreadStats.fetchPage, 5 * SECOND);
   }
 };
-export default ThreadStats;
 
+export default ThreadStats;
