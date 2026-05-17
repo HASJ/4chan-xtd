@@ -20918,13 +20918,10 @@ $\
     }
   };
 
-  // @ts-nocheck
-
   const SWTinyboard = {
     isOPContainerThread: true,
     mayLackJSON: true,
     threadModTimeIgnoresSage: true,
-
     disabledFeatures: [
       'Resurrect Quotes',
       'Quick Reply Personas',
@@ -20948,153 +20945,159 @@ $\
       'Flash Features',
       'Reply Pruning'
     ],
-
     detect() {
-      for (var script of $$('script:not([src])', d.head)) {
-        var m;
+      for (const script of $$('script:not([src])', d.head)) {
+        let m;
         if (m = script.textContent.match(/\bvar configRoot=(".*?")/)) {
-          var properties = dict();
+          const properties = dict();
           try {
-            var root = JSON.parse(m[1]);
+            const root = JSON.parse(m[1]);
             if (root[0] === '/') {
               properties.root = location.origin + root;
             } else if (/^https?:/.test(root)) {
               properties.root = root;
             }
-          } catch (error) {}
+          } catch (error) { }
           return properties;
         }
       }
       return false;
     },
-
     awaitBoard(cb) {
       let reactUI;
       if (reactUI = $.id('react-ui')) {
         const s = (this.selectors = Object.create(this.selectors));
-        s.boardFor = {index: '.page-container'};
+        s.boardFor = { index: '.page-container' };
         s.thread = 'div[id^="thread_"]';
         return $.on(d, '4chanXMounted', cb);
       } else {
         return cb();
       }
     },
-
     urls: {
-      thread({siteID, boardID, threadID}, isArchived) {
+      thread({ siteID, boardID, threadID }, isArchived) {
         return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.html`;
       },
-      post({postID})                   { return `#${postID}`; },
-      index({siteID, boardID})          { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/`; },
-      catalog({siteID, boardID})          { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/catalog.html`; },
-      threadJSON({siteID, boardID, threadID}, isArchived) {
+      post({ postID }) { return `#${postID}`; },
+      index({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/`; },
+      catalog({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/catalog.html`; },
+      threadJSON({ siteID, boardID, threadID }, isArchived) {
         const root = Conf['siteProperties'][siteID]?.root;
-        if (root) { return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.json`; } else { return ''; }
+        if (root) {
+          return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.json`;
+        } else {
+          return '';
+        }
       },
       archivedThreadJSON(thread) {
         return SWTinyboard.urls.threadJSON(thread, true);
       },
-      threadsListJSON({siteID, boardID}) {
+      threadsListJSON({ siteID, boardID }) {
         const root = Conf['siteProperties'][siteID]?.root;
-        if (root) { return `${root}${boardID}/threads.json`; } else { return ''; }
+        if (root) {
+          return `${root}${boardID}/threads.json`;
+        } else {
+          return '';
+        }
       },
-      archiveListJSON({siteID, boardID}) {
+      archiveListJSON({ siteID, boardID }) {
         const root = Conf['siteProperties'][siteID]?.root;
-        if (root) { return `${root}${boardID}/archive/archive.json`; } else { return ''; }
+        if (root) {
+          return `${root}${boardID}/archive/archive.json`;
+        } else {
+          return '';
+        }
       },
-      catalogJSON({siteID, boardID}) {
+      catalogJSON({ siteID, boardID }) {
         const root = Conf['siteProperties'][siteID]?.root;
-        if (root) { return `${root}${boardID}/catalog.json`; } else { return ''; }
+        if (root) {
+          return `${root}${boardID}/catalog.json`;
+        } else {
+          return '';
+        }
       },
-      file({siteID, boardID}, filename) {
+      file({ siteID, boardID }, filename) {
         return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${filename}`;
       },
       thumb(board, filename) {
         return SWTinyboard.urls.file(board, filename);
       }
     },
-
     selectors: {
-      board:         'form[name="postcontrols"]',
-      thread:        'input[name="board"] ~ div[id^="thread_"]',
+      board: 'form[name="postcontrols"]',
+      thread: 'input[name="board"] ~ div[id^="thread_"]',
       threadDivider: 'div[id^="thread_"] > hr:last-child',
-      summary:       '.omitted',
-      postContainer: 'div[id^="reply_"]:not(.hidden)', // postContainer is thread for OP
-      opBottom:      '.op',
+      summary: '.omitted',
+      postContainer: 'div[id^="reply_"]:not(.hidden)',
+      opBottom: '.op',
       replyOriginal: 'div[id^="reply_"]:not(.hidden)',
-      infoRoot:      '.intro',
+      infoRoot: '.intro',
       info: {
-        subject:   '.subject',
-        name:      '.name',
-        email:     '.email',
-        tripcode:  '.trip',
-        uniqueID:  '.poster_id',
-        capcode:   '.capcode',
-        flag:      '.flag',
-        date:      'time',
+        subject: '.subject',
+        name: '.name',
+        email: '.email',
+        tripcode: '.trip',
+        uniqueID: '.poster_id',
+        capcode: '.capcode',
+        flag: '.flag',
+        date: 'time',
         nameBlock: 'label',
-        quote:     'a[href*="#q"]',
-        reply:     'a[href*="/res/"]:not([href*="#"])'
+        quote: 'a[href*="#q"]',
+        reply: 'a[href*="/res/"]:not([href*="#"])'
       },
       icons: {
-        isSticky:   '.fa-thumb-tack',
-        isClosed:   '.fa-lock'
+        isSticky: '.fa-thumb-tack',
+        isClosed: '.fa-lock'
       },
       file: {
-        text:  '.fileinfo',
-        link:  '.fileinfo > a',
+        text: '.fileinfo',
+        link: '.fileinfo > a',
         thumb: 'a > .post-image'
       },
       thumbLink: '.file > a',
       multifile: '.files > .file',
       highlightable: {
-        op:      ' > .op',
-        reply:   '.reply',
+        op: ' > .op',
+        reply: '.reply',
         catalog: ' > .thread'
       },
-      comment:   '.body',
-      spoiler:   '.spoiler',
+      comment: '.body',
+      spoiler: '.spoiler',
       quotelink: 'a[onclick*="highlightReply("]',
       catalog: {
-        board:  '#Grid',
+        board: '#Grid',
         thread: '.mix',
-        thumb:  '.thread-image'
+        thumb: '.thread-image'
       },
       boardList: '.boardlist',
       boardListBottom: '.boardlist.bottom',
       styleSheet: '#stylesheet',
-      psa:       '.blotter',
+      psa: '.blotter',
       nav: {
         prev: '.pages > form > [value=Previous]',
         next: '.pages > form > [value=Next]'
       }
     },
-
     classes: {
       highlight: 'highlighted'
     },
-
     xpath: {
-      thread:         'div[starts-with(@id,"thread_")]',
-      postContainer:  'div[starts-with(@id,"reply_") or starts-with(@id,"thread_")]',
+      thread: 'div[starts-with(@id,"thread_")]',
+      postContainer: 'div[starts-with(@id,"reply_") or starts-with(@id,"thread_")]',
       replyContainer: 'div[starts-with(@id,"reply_")]'
     },
-
     regexp: {
-      quotelink:
-        new RegExp(`\
-/\
-([^/]+)\
-/res/\
-(\\d+)\
-(?:\\.\\w+)?#\
-(\\d+)\
+      quotelink: new RegExp(`\
+/\\
+([^/]+)\\
+/res/\\
+(\\d+)\\
+(?:\\.\\w+)?#\\
+(\\d+)\\
 $\
 `),
-      quotelinkHTML:
-        /<a [^>]*\bhref="[^"]*\/([^\/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
+      quotelinkHTML: /<a [^>]*\bhref="[^"]*\/([^\/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
     },
-
     Build: {
       parseJSON(data, board) {
         const o = SWYotsuba.Build.parseJSON(data, board);
@@ -21109,7 +21112,7 @@ $\
         if (data.extra_files) {
           let file;
           for (let i = 0; i < data.extra_files.length; i++) {
-            var extra_file = data.extra_files[i];
+            const extra_file = data.extra_files[i];
             if (extra_file.ext === 'deleted') {
               o.filesDeleted.push(i);
             } else {
@@ -21123,7 +21126,6 @@ $\
         }
         return o;
       },
-
       parseComment(html) {
         html = html
           .replace(/<br\b[^<]*>/gi, '\n')
@@ -21131,92 +21133,96 @@ $\
         return $.unescape(html);
       }
     },
-
     bgColoredEl() {
-      return $.el('div', {className: 'post reply'});
+      return $.el('div', { className: 'post reply' });
     },
-
     isFileURL(url) {
       return /\/src\/[^\/]+/.test(url.pathname);
     },
-
     preParsingFixes(board) {
-      // fixes effects of unclosed link in announcement
       let broken;
       if (broken = $('a > input[name="board"]', board)) {
-        return $.before(broken.parentNode, broken);
+        $.before(broken.parentNode, broken);
       }
     },
-
     parseNodes(post, nodes) {
-      // Add vichan's span.poster_id around the ID if not already present.
-      let m;
-      if (nodes.uniqueID) { return; }
+      if (nodes.uniqueID) {
+        return;
+      }
       let text = '';
       let node = nodes.nameBlock.nextSibling;
       while (node && (node.nodeType === 3)) {
         text += node.textContent;
         node = node.nextSibling;
       }
+      let m;
       if (m = text.match(/(\s*ID:\s*)(\S+)/)) {
         let uniqueID;
         nodes.info.normalize();
-        let {nextSibling} = nodes.nameBlock;
+        let nextSibling = nodes.nameBlock.nextSibling;
         nextSibling = nextSibling.splitText(m[1].length);
         nextSibling.splitText(m[2].length);
-        nodes.uniqueID = (uniqueID = $.el('span', {className: 'poster_id'}));
+        nodes.uniqueID = (uniqueID = $.el('span', { className: 'poster_id' }));
         $.replace(nextSibling, uniqueID);
-        return $.add(uniqueID, nextSibling);
+        $.add(uniqueID, nextSibling);
       }
     },
-
     parseDate(node) {
-      let date = Date.parse(node.getAttribute('datetime')?.trim());
-      if (!isNaN(date)) { return new Date(date); }
-      date = Date.parse(node.textContent.trim() + ' UTC'); // e.g. onesixtwo.club
-      if (!isNaN(date)) { return new Date(date); }
+      const datetime = node.getAttribute('datetime');
+      let date = Date.parse(datetime?.trim() || '');
+      if (!isNaN(date)) {
+        return new Date(date);
+      }
+      date = Date.parse(node.textContent.trim() + ' UTC');
+      if (!isNaN(date)) {
+        return new Date(date);
+      }
       return undefined;
     },
-
     parseFile(post, file) {
-      let info, infoNode;
-      const {text, link, thumb} = file;
-      if ($.x(`ancestor::${this.xpath.postContainer}[1]`, text) !== post.nodes.root) { return false; } // file belongs to a reply
-      if (!(infoNode = link.nextSibling?.textContent.includes('(') ? link.nextSibling : link.nextElementSibling)) { return false; }
-      if (!(info = infoNode.textContent.match(/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/))) { return false; }
+      const { text, link, thumb } = file;
+      if ($.x(`ancestor::${this.xpath.postContainer}[1]`, text) !== post.nodes.root) {
+        return false;
+      }
+      const nextSibling = link.nextSibling;
+      const hasParen = nextSibling && nextSibling.textContent && nextSibling.textContent.includes('(');
+      const infoNode = hasParen ? nextSibling : link.nextElementSibling;
+      if (!infoNode) {
+        return false;
+      }
+      const info = infoNode.textContent.match(/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/);
+      if (!info) {
+        return false;
+      }
       const nameNode = $('.postfilename', text);
       $.extend(file, {
-        name:       nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0],
-        size:       info[2],
+        name: nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0],
+        size: info[2],
         dimensions: info[0].match(/\d+x\d+/)?.[0]
       });
       if (thumb) {
         $.extend(file, {
-          thumbURL:  /\/static\//.test(thumb.src) && $.isImage(link.href) ? link.href : thumb.src,
+          thumbURL: /\/static\//.test(thumb.src) && $.isImage(link.href) ? link.href : thumb.src,
           isSpoiler: /^Spoiler/i.test(info[1] || '') || (link.textContent === 'Spoiler Image')
-        }
-        );
+        });
       }
       return true;
     },
-
     isThumbExpanded(file) {
-      // Detect old Tinyboard image expansion that changes src attribute on thumbnail.
       return $.hasClass(file.thumb.parentNode, 'expanded') || (file.thumb.parentNode.dataset.expanded === 'true');
     },
-
     isLinkified(link) {
       return /\bnofollow\b/.test(link.rel);
     },
-
     catalogPin(threadRoot) {
       return threadRoot.dataset.sticky = 'true';
     }
   };
 
-  // @ts-nocheck
-
-  const SW = { tinyboard: SWTinyboard, yotsuba: SWYotsuba };
+  const SW = {
+    tinyboard: SWTinyboard,
+    yotsuba: SWYotsuba
+  };
 
   // @ts-nocheck
   var FileInfo = {
@@ -22638,18 +22644,15 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var Site = {
+  const Site = {
     defaultProperties: {
-      '4chan.org':    {software: 'yotsuba'},
-      '4channel.org': {canonical: '4chan.org'},
-      '4cdn.org':     {canonical: '4chan.org'},
-      'notso.smuglo.li': {canonical: 'smuglo.li'},
-      'smugloli.net':    {canonical: 'smuglo.li'},
-      'smug.nepu.moe':   {canonical: 'smuglo.li'}
+      '4chan.org': { software: 'yotsuba' },
+      '4channel.org': { canonical: '4chan.org' },
+      '4cdn.org': { canonical: '4chan.org' },
+      'notso.smuglo.li': { canonical: 'smuglo.li' },
+      'smugloli.net': { canonical: 'smuglo.li' },
+      'smug.nepu.moe': { canonical: 'smuglo.li' }
     },
-
     init(cb) {
       $.extend(Conf['siteProperties'], Site.defaultProperties);
       let hostname = Site.resolve();
@@ -22658,14 +22661,14 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         cb();
       }
       $.onExists(doc, 'body', () => {
-        for (var software in SW) {
-          var changes;
+        for (const software in SW) {
+          let changes;
           if (changes = SW[software].detect?.()) {
             changes.software = software;
             hostname = location.hostname.replace(/^www\./, '');
-            var properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
-            var changed = 0;
-            for (var key in changes) {
+            const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
+            let changed = 0;
+            for (const key in changes) {
               if (properties[key] !== changes[key]) {
                 properties[key] = changes[key];
                 changed++;
@@ -22683,31 +22686,32 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       });
     },
-
-    resolve(url=location) {
-      let {hostname} = url;
+    resolve(url = location) {
+      let { hostname } = url;
       while (hostname && !$.hasOwn(Conf['siteProperties'], hostname)) {
         hostname = hostname.replace(/^[^.]*\.?/, '');
       }
       if (hostname) {
         let canonical;
-        if (canonical = Conf['siteProperties'][hostname].canonical) { hostname = canonical; }
+        if (canonical = Conf['siteProperties'][hostname]?.canonical) {
+          hostname = canonical;
+        }
       }
       return hostname;
     },
-
-    parseURL(url=location) {
+    parseURL(url = location) {
       const siteID = Site.resolve(url);
       const site = g.sites[siteID];
       const r = {};
-
-      if (!site) { return r; }
+      if (!site) {
+        return r;
+      }
       r.siteID = site.ID;
-
-      if (site.isBoardlessPage?.(url)) { return r; }
+      if (site.isBoardlessPage?.(url)) {
+        return r;
+      }
       const pathname = url.pathname.split(/\/+/);
       r.boardID = pathname[1];
-
       if (site.isFileURL(url)) {
         r.VIEW = 'file';
       } else if (site.isAuxiliaryPage?.(url)) {
@@ -22726,18 +22730,19 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       }
       return r;
     },
-
     set(hostname) {
-      for (var ID in Conf['siteProperties']) {
-        var site;
-        var properties = Conf['siteProperties'][ID];
-        if (properties.canonical) { continue; }
-        var {
-          software
-        } = properties;
-        if (!software || !$.hasOwn(SW, software)) { continue; }
+      for (const ID in Conf['siteProperties']) {
+        let site;
+        const properties = Conf['siteProperties'][ID];
+        if (properties.canonical) {
+          continue;
+        }
+        const { software } = properties;
+        if (!software || !$.hasOwn(SW, software)) {
+          continue;
+        }
         g.sites[ID] = (site = Object.create(SW[software]));
-        $.extend(site, {ID, siteID: ID, properties, software});
+        $.extend(site, { ID, siteID: ID, properties, software });
       }
       return g.SITE = g.sites[hostname];
     }

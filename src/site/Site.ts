@@ -1,15 +1,15 @@
-// @ts-nocheck
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import { dict } from "../platform/helpers";
 import SW from "./SW";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Site = {
+interface SiteProperties {
+  software?: string;
+  canonical?: string;
+  [key: string]: any;
+}
+
+const Site = {
   defaultProperties: {
     '4chan.org':    {software: 'yotsuba'},
     '4channel.org': {canonical: '4chan.org'},
@@ -17,9 +17,9 @@ var Site = {
     'notso.smuglo.li': {canonical: 'smuglo.li'},
     'smugloli.net':    {canonical: 'smuglo.li'},
     'smug.nepu.moe':   {canonical: 'smuglo.li'}
-  },
+  } as { [key: string]: SiteProperties },
 
-  init(cb) {
+  init(cb: () => void): void {
     $.extend(Conf['siteProperties'], Site.defaultProperties);
     let hostname = Site.resolve();
     if (hostname && $.hasOwn(SW, Conf['siteProperties'][hostname].software)) {
@@ -27,14 +27,14 @@ var Site = {
       cb();
     }
     $.onExists(doc, 'body', () => {
-      for (var software in SW) {
-        var changes;
+      for (const software in SW) {
+        let changes: any;
         if (changes = SW[software].detect?.()) {
           changes.software = software;
           hostname = location.hostname.replace(/^www\./, '');
-          var properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
-          var changed = 0;
-          for (var key in changes) {
+          const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
+          let changed = 0;
+          for (const key in changes) {
             if (properties[key] !== changes[key]) {
               properties[key] = changes[key];
               changed++;
@@ -53,22 +53,24 @@ var Site = {
     });
   },
 
-  resolve(url=location) {
-    let {hostname} = url;
+  resolve(url: { hostname: string } | Location = location): string {
+    let { hostname } = url;
     while (hostname && !$.hasOwn(Conf['siteProperties'], hostname)) {
       hostname = hostname.replace(/^[^.]*\.?/, '');
     }
     if (hostname) {
-      let canonical;
-      if (canonical = Conf['siteProperties'][hostname].canonical) { hostname = canonical; }
+      let canonical: string | undefined;
+      if (canonical = Conf['siteProperties'][hostname]?.canonical) {
+        hostname = canonical;
+      }
     }
     return hostname;
   },
 
-  parseURL(url=location) {
-    const siteID = Site.resolve(url);
+  parseURL(url: { pathname: string } | Location = location): { [key: string]: any } {
+    const siteID = Site.resolve(url as Location);
     const site = g.sites[siteID];
-    const r = {};
+    const r: { [key: string]: any } = {};
 
     if (!site) { return r; }
     r.siteID = site.ID;
@@ -96,20 +98,18 @@ var Site = {
     return r;
   },
 
-  set(hostname) {
-    for (var ID in Conf['siteProperties']) {
-      var site;
-      var properties = Conf['siteProperties'][ID];
+  set(hostname: string): any {
+    for (const ID in Conf['siteProperties']) {
+      let site: any;
+      const properties = Conf['siteProperties'][ID];
       if (properties.canonical) { continue; }
-      var {
-        software
-      } = properties;
+      const { software } = properties;
       if (!software || !$.hasOwn(SW, software)) { continue; }
       g.sites[ID] = (site = Object.create(SW[software]));
-      $.extend(site, {ID, siteID: ID, properties, software});
+      $.extend(site, { ID, siteID: ID, properties, software });
     }
     return g.SITE = g.sites[hostname];
   }
 };
-export default Site;
 
+export default Site;
