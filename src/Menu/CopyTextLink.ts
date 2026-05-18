@@ -1,29 +1,30 @@
-﻿// @ts-nocheck
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 import Menu from "./Menu";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var CopyTextLink = {
+interface CopyTextLinkType {
+  text: string;
+  init(): void;
+  copy(this: HTMLAnchorElement): void;
+}
+
+const CopyTextLink: CopyTextLinkType = {
+  text: '',
+
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
+    if (!['index', 'thread'].includes(g.VIEW!) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
 
     const a = $.el('a', {
       className: 'copy-text-link',
       href: 'javascript:;',
       textContent: 'Copy Text'
-    }
-    );
-    $.on(a, 'click', CopyTextLink.copy);
+    }) as HTMLAnchorElement;
+    $.on(a, 'click', this.copy.bind(this));
 
-    return Menu.menu.addEntry({
+    Menu.menu.addEntry({
       el: a,
       order: 12,
-      open(post) {
+      open(post: any) {
         CopyTextLink.text = (post.origin || post).commentOrig();
         return true;
       }
@@ -33,16 +34,15 @@ var CopyTextLink = {
   copy() {
     const el = $.el('textarea', {
       className: 'copy-text-element',
-      value: CopyTextLink.text
-    }
-    );
+      value: this.text
+    }) as HTMLTextAreaElement;
     $.add(d.body, el);
     el.select();
     try {
       d.execCommand('copy');
     } catch (error) {}
-    return $.rm(el);
+    $.rm(el);
   }
 };
-export default CopyTextLink;
 
+export default CopyTextLink;

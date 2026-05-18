@@ -1,32 +1,30 @@
-﻿// @ts-nocheck
 import $ from "../platform/$";
 import Redirect from "../Archive/Redirect";
 import Filter from "../Filtering/Filter";
 import { g, Conf } from "../globals/globals";
 import Menu from "./Menu";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-const ArchiveLink = {
-  init() {
-    if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) { return; }
+interface ArchiveLinkSubEntry {
+  el: HTMLAnchorElement;
+  open(post: any): boolean;
+}
 
-    const div = $.el('div',
-      {textContent: 'Archive'});
+const ArchiveLink = {
+  init(): void {
+    if ((g.SITE!.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW!) || !Conf['Menu'] || !Conf['Archive Link']) { return; }
+
+    const div = $.el('div', { textContent: 'Archive' });
 
     const entry = {
       el: div,
       order: 60,
-      open({ID, thread, board}) {
+      open({ID, thread, board}: any) {
         return !!Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
       },
-      subEntries: []
+      subEntries: [] as ArchiveLinkSubEntry[]
     };
 
-    for (var type of [
+    const types = [
       ['Post',      'post'],
       ['Name',      'name'],
       ['Tripcode',  'tripcode'],
@@ -35,28 +33,29 @@ const ArchiveLink = {
       ['Flag',      'country'],
       ['Filename',  'filename'],
       ['Image MD5', 'MD5']
-    ]) {
+    ];
+
+    for (const [text, type] of types) {
       // Add a sub entry for each type.
-      entry.subEntries.push(this.createSubEntry(type[0], type[1]));
+      entry.subEntries.push(this.createSubEntry(text, type));
     }
 
-    return Menu.menu.addEntry(entry);
+    Menu.menu.addEntry(entry);
   },
 
-  createSubEntry(text, type) {
+  createSubEntry(text: string, type: string): ArchiveLinkSubEntry {
     const el = $.el('a', {
       textContent: text,
       target: '_blank'
-    }
-    );
+    }) as HTMLAnchorElement;
 
     const open = type === 'post' ?
-      function({ID, thread, board}) {
-        el.href = Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
+      function({ID, thread, board}: any) {
+        el.href = Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID}) || '';
         return true;
       }
     :
-      function(post) {
+      function(post: any) {
         const typeParam = (type === 'country') && post.info.flagCodeTroll ?
           'troll_country'
         :
@@ -72,8 +71,7 @@ const ArchiveLink = {
           type:     typeParam,
           value,
           isSearch: true
-        }
-        );
+        } as any) || '';
         return true;
       };
 
@@ -83,5 +81,5 @@ const ArchiveLink = {
     };
   }
 };
-export default ArchiveLink;
 
+export default ArchiveLink;

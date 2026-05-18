@@ -1,24 +1,29 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import UI from "../General/UI";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Menu = {
+interface MenuType {
+  button: HTMLAnchorElement;
+  menu: any;
+  init(): void;
+  node(this: any): void;
+  catalogNode(this: any): void;
+  makeButton(post: any, button?: HTMLAnchorElement): HTMLAnchorElement;
+}
+
+const Menu: MenuType = {
+  button: null as any,
+  menu: null,
+
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
+    if (!['index', 'thread'].includes(g.VIEW!) || !Conf['Menu']) { return; }
 
     this.button = $.el('a', {
       className: 'menu-button',
       href:      'javascript:;'
-    }
-    );
+    }) as HTMLAnchorElement;
 
     Icon.set(this.button, 'caretDown');
 
@@ -28,34 +33,36 @@ var Menu = {
       cb:   this.node
     });
 
-    return Callbacks.CatalogThread.push({
+    Callbacks.CatalogThread.push({
       name: 'Menu',
       cb:   this.catalogNode
     });
   },
 
-  node() {
+  node(this: any) {
     if (this.isClone) {
-      const button = $('.menu-button', this.nodes.info);
-      $.rmClass(button, 'active');
-      $.rm($('.dialog', this.nodes.info));
-      Menu.makeButton(this, button);
+      const button = $('.menu-button', this.nodes.info) as HTMLAnchorElement;
+      if (button) {
+        $.rmClass(button, 'active');
+        $.rm($('.dialog', this.nodes.info)!);
+        Menu.makeButton(this, button);
+      }
       return;
     }
-    return $.add(this.nodes.info, Menu.makeButton(this));
+    $.add(this.nodes.info, Menu.makeButton(this));
   },
 
-  catalogNode() {
-    return $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
+  catalogNode(this: any) {
+    $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
   },
 
   makeButton(post, button) {
-    if (!button) { button = Menu.button.cloneNode(true); }
+    if (!button) { button = Menu.button.cloneNode(true) as HTMLAnchorElement; }
     $.on(button, 'click', function(e) {
-      return Menu.menu.toggle(e, this, post);
+      Menu.menu.toggle(e, this, post);
     });
     return button;
   }
 };
-export default Menu;
 
+export default Menu;

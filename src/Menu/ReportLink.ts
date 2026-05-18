@@ -1,30 +1,33 @@
-﻿// @ts-nocheck
-import { g, Conf, d } from "../globals/globals";
+import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Menu from "./Menu";
 import { isPassEnabled } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var ReportLink = {
+interface ReportLinkType {
+  url: string;
+  dims: string;
+  init(): void;
+  report(): void;
+}
+
+const ReportLink: ReportLinkType = {
+  url: '',
+  dims: '',
+
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }
+    if (!['index', 'thread'].includes(g.VIEW!) || !Conf['Menu'] || !Conf['Report Link']) { return; }
 
     const a = $.el('a', {
       className: 'report-link',
       href: 'javascript:;',
       textContent: 'Report'
-    }
-    );
-    $.on(a, 'click', ReportLink.report);
+    }) as HTMLAnchorElement;
+    $.on(a, 'click', this.report);
 
-    return Menu.menu.addEntry({
+    Menu.menu.addEntry({
       el: a,
       order: 10,
-      open(post) {
+      open(post: any) {
         ReportLink.url = `//sys.${location.hostname.split('.')[1]}.org/${post.board}/imgboard.php?mode=report&no=${post}`;
         if (isPassEnabled()) {
           ReportLink.dims = 'width=350,height=275';
@@ -38,10 +41,10 @@ var ReportLink = {
 
   report() {
     const {url, dims} = ReportLink;
-    const id  = Date.now();
+    const id  = String(Date.now());
     const set = `toolbar=0,scrollbars=1,location=0,status=1,menubar=0,resizable=1,${dims}`;
-    return window.open(url, id, set);
+    window.open(url, id, set);
   }
 };
-export default ReportLink;
 
+export default ReportLink;
