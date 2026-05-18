@@ -1,3 +1,5 @@
+**I do not intend to maintain this. It is only for my own personal use. Do not ask me for shit.**
+
 # 4chan XT is dead
 
 I stopped using 4chan since the hack. I now browse alt chans that actually care about their users, and don't need an 
