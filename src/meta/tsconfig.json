@@ -1,6 +1,3 @@
 {
-  "compilerOptions": {
-    "moduleResolution": "node16"
-  },
-  "extends": "../../package.json"
+  "extends": "../../tsconfig.json"
 }
