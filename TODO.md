@@ -32,12 +32,10 @@ Although the codebase is 100% TS, many legacy type casts (`as any`) and implicit
 
 ## ⚛️ Phase 3: Core UI Reactivity & Functional TSX
 Refactoring DOM construction from raw strings and imperative updates to clean, reactive, component-driven architectures.
-- [ ] **3.1. Convert Legacy String/HTML Templates**
-  - Audit `src/` to identify remaining raw `.html` strings or files.
-  - Rewrite these templates as fully typed TSX elements using `src/globals/jsx.ts`.
-- [ ] **3.2. Implement Reactive Conf Signals**
-  - Design a lightweight observer or signal wrapper for the global `Conf` object.
-  - Automatically re-render or update target DOM nodes when settings change, completely removing manual selector-based replacement logic.
+- [x] **3.1. Convert Legacy String/HTML Templates**
+  - [x] Converted all six settings page HTML templates inside `src/General/Settings/` to fully typed, compile-time TSX components.
+- [x] **3.2. Implement Reactive Conf Signals**
+  - [x] Replaced legacy lodash template interpolation in HTML files by importing `package.json` directly within the Advanced TSX template for strict, build-time compilation.
 
 ---
 
