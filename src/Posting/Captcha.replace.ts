@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { g, Conf, doc, d } from "../globals/globals";
+import { g, Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { isPassEnabled } from "../platform/helpers";
 
@@ -8,29 +7,31 @@ const CaptchaReplace = {
     if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) { return; }
 
     if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
-      $.ready(this.noscript);
+      $.ready(CaptchaReplace.noscript);
       return;
     }
 
     if (Conf['captchaLanguage'].trim()) {
       if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-        $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe));
+        $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe));
       } else {
-        $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe);
+        $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe);
       }
     }
   },
 
   noscript() {
-    let noscript, original, toggle;
-    if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) { return; }
-    const span = $.el('span',
-      {id: 'captcha-forced-noscript'});
+    let noscript: HTMLScriptElement | undefined, original: HTMLElement | null, toggle: HTMLElement | null;
+    if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode as ParentNode) as HTMLScriptElement))) { return; }
+    const span = $.el('span', {id: 'captcha-forced-noscript'});
     $.replace(noscript, span);
     $.rm(original);
-    const insert = function() {
-      span.innerHTML = noscript.textContent;
-      this.iframe($('iframe[src^="https://www.google.com/recaptcha/"]', span));
+    const insert = () => {
+      span.innerHTML = noscript!.textContent || '';
+      const iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', span) as HTMLIFrameElement | null;
+      if (iframe) {
+        CaptchaReplace.iframe(iframe);
+      }
     };
     if (toggle = $('#togglePostFormLink a, #form-link')) {
       $.on(toggle, 'click', insert);
@@ -39,8 +40,8 @@ const CaptchaReplace = {
     }
   },
 
-  iframe(iframe) {
-    let lang;
+  iframe(iframe: HTMLIFrameElement) {
+    let lang: string;
     if (lang = Conf['captchaLanguage'].trim()) {
       const src = /[?&]hl=/.test(iframe.src) ?
         iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
@@ -51,4 +52,3 @@ const CaptchaReplace = {
   }
 };
 export default CaptchaReplace;
-
