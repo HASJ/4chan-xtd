@@ -78,7 +78,7 @@ const tsPlugin = typescript({
           // Only files that actually have test code.
           "**/src/main/Main.ts",
           "**/src/classes/Post.ts",
-          "**/src/Linkification/Linkify.js",
+          "**/src/Linkification/Linkify.ts",
         ],
         sourceMap: minify,
       }),
@@ -197,7 +197,7 @@ const tsPlugin = typescript({
     });
 
     const eventPage = await rollup({
-      input: resolve(__dirname, '../src/meta/eventPage.js'),
+      input: resolve(__dirname, '../src/meta/eventPage.ts'),
       plugins: [
         tsPlugin,
         noFormat ? undefined : fixTsOutputFormat({ include: ["**/*.ts", "**/*.tsx"] }),

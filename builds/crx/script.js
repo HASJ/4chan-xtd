@@ -6743,36 +6743,37 @@ svg.icon {
     logo: `data:image/png;base64,${empty}`,
   };
 
-  // @ts-nocheck
-
   const CaptchaReplace = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) { return; }
-
-      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
-        $.ready(this.noscript);
+      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) {
         return;
       }
-
+      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
+        $.ready(CaptchaReplace.noscript);
+        return;
+      }
       if (Conf['captchaLanguage'].trim()) {
         if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe));
+          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe));
         } else {
-          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe);
+          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe);
         }
       }
     },
-
     noscript() {
       let noscript, original, toggle;
-      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) { return; }
-      const span = $.el('span',
-        {id: 'captcha-forced-noscript'});
+      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) {
+        return;
+      }
+      const span = $.el('span', { id: 'captcha-forced-noscript' });
       $.replace(noscript, span);
       $.rm(original);
-      const insert = function() {
-        span.innerHTML = noscript.textContent;
-        this.iframe($('iframe[src^="https://www.google.com/recaptcha/"]', span));
+      const insert = () => {
+        span.innerHTML = noscript.textContent || '';
+        const iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', span);
+        if (iframe) {
+          CaptchaReplace.iframe(iframe);
+        }
       };
       if (toggle = $('#togglePostFormLink a, #form-link')) {
         $.on(toggle, 'click', insert);
@@ -6780,15 +6781,16 @@ svg.icon {
         insert();
       }
     },
-
     iframe(iframe) {
       let lang;
       if (lang = Conf['captchaLanguage'].trim()) {
         const src = /[?&]hl=/.test(iframe.src) ?
           iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
-        :
-          iframe.src + `&hl=${encodeURIComponent(lang)}`;
-        if (iframe.src !== src) { iframe.src = src; }
+          :
+            iframe.src + `&hl=${encodeURIComponent(lang)}`;
+        if (iframe.src !== src) {
+          iframe.src = src;
+        }
       }
     }
   };
@@ -9979,33 +9981,37 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
-
   const PostRedirect = {
+    event: null,
+    delays: 0,
     init() {
-      return $.on(d, 'QRPostSuccessful', e => {
-        if (!e.detail.redirect) { return; }
-        this.event = e;
-        this.delays = 0;
-        return $.queueTask(() => {
-          if ((e === this.event) && (this.delays === 0)) {
-            return location.href = e.detail.redirect;
+      $.on(d, 'QRPostSuccessful', (e) => {
+        const customEvent = e;
+        if (!customEvent.detail.redirect) {
+          return;
+        }
+        PostRedirect.event = customEvent;
+        PostRedirect.delays = 0;
+        $.queueTask(() => {
+          if ((customEvent === PostRedirect.event) && (PostRedirect.delays === 0)) {
+            location.href = customEvent.detail.redirect;
           }
         });
       });
     },
-
-    delays: 0,
-
     delay() {
-      if (!this.event) { return null; }
-      const e = this.event;
-      this.delays++;
+      if (!PostRedirect.event) {
+        return null;
+      }
+      const e = PostRedirect.event;
+      PostRedirect.delays++;
       return () => {
-        if (e !== this.event) { return; }
-        this.delays--;
-        if (this.delays === 0) {
-          return location.href = e.detail.redirect;
+        if (e !== PostRedirect.event) {
+          return;
+        }
+        PostRedirect.delays--;
+        if (PostRedirect.delays === 0) {
+          location.href = e.detail.redirect;
         }
       };
     }
@@ -17303,46 +17309,37 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
   };
 
-  // @ts-nocheck
-
   const Captcha = {
     cache: {
+      timer: null,
+      submitCB: undefined,
+      prerequested: undefined,
+      captchas: [],
       init() {
-        $.on(d, 'SaveCaptcha', e => {
+        $.on(d, 'SaveCaptcha', (e) => {
           return this.saveAPI(e.detail);
         });
-        return $.on(d, 'NoCaptcha', e => {
+        $.on(d, 'NoCaptcha', (e) => {
           return this.noCaptcha(e.detail);
         });
       },
-
-      captchas: [],
-
       getCount() {
         return this.captchas.length;
       },
-
       neededRaw() {
-        return !(
-          this.haveCookie() || this.captchas.length || QR.req || this.submitCB
-        ) && (
-            (QR.posts.length > 1) || Conf['Auto-load captcha'] || !QR.posts[0].isOnlyQuotes() || QR.posts[0].file
-          );
+        return !(this.haveCookie() || this.captchas.length || QR.req || this.submitCB) && ((QR.posts.length > 1) || Conf['Auto-load captcha'] || !QR.posts[0].isOnlyQuotes() || QR.posts[0].file);
       },
-
       needed() {
-        return this.neededRaw() && $.event('LoadCaptcha');
+        return this.neededRaw() && $.event('LoadCaptcha', undefined);
       },
-
       haveCookie() {
         const hasCT = /\b_ct=/.test(d.cookie);
         let hasTicket = false;
         try {
           hasTicket = !!(localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'));
-        } catch (e) {}
+        } catch (e) { }
         return (hasCT || hasTicket) && (QR.posts[0].thread !== 'new');
       },
-
       getOne() {
         let captcha;
         delete this.prerequested;
@@ -17354,25 +17351,24 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return null;
         }
       },
-
       request(isReply) {
         if (!this.submitCB) {
-          if ($.event('RequestCaptcha', { isReply })) { return; }
+          if ($.event('RequestCaptcha', { isReply })) {
+            return;
+          }
         }
-        return cb => {
+        return (cb) => {
           this.submitCB = cb;
           return this.updateCount();
         };
       },
-
       abort() {
         if (this.submitCB) {
           delete this.submitCB;
-          $.event('AbortCaptcha');
+          $.event('AbortCaptcha', undefined);
           return this.updateCount();
         }
       },
-
       saveAPI(captcha) {
         let cb;
         if (cb = this.submitCB) {
@@ -17383,7 +17379,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.save(captcha);
         }
       },
-
       noCaptcha(detail) {
         let cb;
         if (cb = this.submitCB) {
@@ -17396,7 +17391,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.updateCount();
         }
       },
-
       save(captcha) {
         let cb;
         if (cb = this.submitCB) {
@@ -17408,14 +17402,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         this.captchas.sort((a, b) => a.timeout - b.timeout);
         return this.count();
       },
-
       clear() {
         if (this.captchas.length) {
           let i;
           const now = Date.now();
           for (i = 0; i < this.captchas.length; i++) {
-            var captcha = this.captchas[i];
-            if (captcha.timeout > now) { break; }
+            const captcha = this.captchas[i];
+            if (captcha.timeout > now) {
+              break;
+            }
           }
           if (i) {
             this.captchas = this.captchas.slice(i);
@@ -17423,7 +17418,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           }
         }
       },
-
       count() {
         clearTimeout(this.timer);
         if (this.captchas.length) {
@@ -17431,7 +17425,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         return this.updateCount();
       },
-
       updateCount() {
         return $.event('CaptchaCount', this.captchas.length);
       }
@@ -17440,33 +17433,37 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     t: CaptchaT,
     v2: {
       lifetime: 2 * MINUTE,
-
+      isEnabled: false,
+      noscript: false,
+      prevNeeded: false,
+      timeouts: {},
+      nodes: {},
       init() {
-        if (isPassEnabled()) { return; }
-        if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) { return; }
-
+        if (isPassEnabled()) {
+          return;
+        }
+        if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) {
+          return;
+        }
         if (this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled')) {
           $.addClass(QR.nodes.el, 'noscript-captcha');
         }
-
         Captcha.cache.init();
         $.on(d, 'CaptchaCount', this.count.bind(this));
-
         const root = $.el('div', { className: 'captcha-root' });
         $.extend(root, {
-          innerHTML:
-            '<div class="captcha-counter"><a href="javascript:;"></a></div>'
-        }
-        );
+          innerHTML: '<div class="captcha-counter"><a href="javascript:;"></a></div>'
+        });
         const counter = $('.captcha-counter > a', root);
         this.nodes = { root, counter };
         this.count();
         $.addClass(QR.nodes.el, 'has-captcha', 'captcha-v2');
         $.after(QR.nodes.com.parentNode, root);
-
         $.on(counter, 'click', this.toggle.bind(this));
-        $.on(counter, 'keydown', e => {
-          if (Keybinds.keyCode(e) !== 'Space') { return; }
+        $.on(counter, 'keydown', (e) => {
+          if (Keybinds.keyCode(e) !== 'Space') {
+            return;
+          }
           this.toggle();
           e.preventDefault();
           return e.stopPropagation();
@@ -17476,10 +17473,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return $.queueTask(() => this.save(false));
         });
       },
-
-      timeouts: {},
-      prevNeeded: 0,
-
       noscriptURL() {
         let lang;
         let url = `https://www.google.com/recaptcha/api/fallback?k=${meta.recaptchaKey}`;
@@ -17488,7 +17481,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         return url;
       },
-
       moreNeeded() {
         // Post count temporarily off by 1 when called from QR.post.rm, QR.close, or QR.submit
         return $.queueTask(() => {
@@ -17499,7 +17491,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.prevNeeded = needed;
         });
       },
-
       toggle() {
         if (this.nodes.container && !this.timeouts.destroy) {
           return this.destroy();
@@ -17507,21 +17498,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.setup(true, true);
         }
       },
-
       setup(focus, force) {
-        if (!this.isEnabled || (!Captcha.cache.needed() && !force)) { return; }
-
+        if (!this.isEnabled || (!Captcha.cache.needed() && !force)) {
+          return;
+        }
         if (focus) {
           $.addClass(QR.nodes.el, 'focus');
           this.nodes.counter.focus();
         }
-
         if (this.timeouts.destroy) {
           clearTimeout(this.timeouts.destroy);
           delete this.timeouts.destroy;
           return this.reload();
         }
-
         if (this.nodes.container) {
           // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1226835
           $.queueTask(() => {
@@ -17533,76 +17522,75 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           }); // Event handler not fired in Firefox
           return;
         }
-
         this.nodes.container = $.el('div', { className: 'captcha-container' });
         $.prepend(this.nodes.root, this.nodes.container);
-        new MutationObserver(this.afterSetup.bind(this)).observe(this.nodes.container, {
+        new MutationObserver(mutations => this.afterSetup(mutations)).observe(this.nodes.container, {
           childList: true,
           subtree: true
-        }
-        );
-
+        });
         if (this.noscript) {
-          return this.setupNoscript();
+          return this.noscriptCaptchaSetup();
         } else {
           return this.setupJS();
         }
       },
-
-      setupNoscript() {
+      noscriptCaptchaSetup() {
         const iframe = $.el('iframe', {
           id: 'qr-captcha-iframe',
           scrolling: 'no',
           src: this.noscriptURL()
-        }
-        );
+        });
         const div = $.el('div');
         const textarea = $.el('textarea');
         $.add(div, textarea);
         return $.add(this.nodes.container, [iframe, div]);
       },
-
       setupJS() {
         $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey });
       },
-
       afterSetup(mutations) {
-        for (var mutation of mutations) {
-          for (var node of mutation.addedNodes) {
-            var iframe, textarea;
-            if (iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node)) { this.setupIFrame(iframe); }
-            if (textarea = $.x('./descendant-or-self::textarea', node)) { this.setupTextArea(textarea); }
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            let iframe, textarea;
+            if (iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node)) {
+              this.setupIFrame(iframe);
+            }
+            if (textarea = $.x('./descendant-or-self::textarea', node)) {
+              this.setupTextArea(textarea);
+            }
           }
         }
       },
-
       setupIFrame(iframe) {
         let needle;
-        if (!doc.contains(iframe)) { return; }
+        if (!doc.contains(iframe)) {
+          return;
+        }
         Captcha.replace.iframe(iframe);
         $.addClass(QR.nodes.el, 'captcha-open');
         this.fixQRPosition();
-        $.on(iframe, 'load', this.fixQRPosition);
-        if (d.activeElement === this.nodes.counter) { iframe.focus(); }
+        $.on(iframe, 'load', this.fixQRPosition.bind(this));
+        if (d.activeElement === this.nodes.counter) {
+          iframe.focus();
+        }
         // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
         if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
           return $.on(iframe.parentNode, 'scroll', function () { return this.scrollTop = 0; });
         }
       },
-
       fixQRPosition() {
         if (QR.nodes.el.getBoundingClientRect().bottom > doc.clientHeight) {
           QR.nodes.el.style.top = '';
           return QR.nodes.el.style.bottom = '0px';
         }
       },
-
       setupTextArea(textarea) {
         return $.one(textarea, 'input', () => this.save(true));
       },
-
       destroy() {
-        if (!this.isEnabled) { return; }
+        if (!this.isEnabled) {
+          return;
+        }
         delete this.timeouts.destroy;
         $.rmClass(QR.nodes.el, 'captcha-open');
         if (this.nodes.container) {
@@ -17611,17 +17599,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return delete this.nodes.container;
         }
       },
-
       getOne(isReply) {
-        return Captcha.cache.getOne(isReply);
+        return Captcha.cache.getOne();
       },
-
       save(pasted, token) {
+        const textarea = $('textarea', this.nodes.container);
         Captcha.cache.save({
-          response: token || $('textarea', this.nodes.container).value,
+          response: token || (textarea ? textarea.value : ''),
           timeout: Date.now() + this.lifetime
         });
-
         const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
         if (Captcha.cache.needed()) {
           if (focus) {
@@ -17636,21 +17622,24 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           if (pasted) {
             this.destroy();
           } else {
-            if (this.timeouts.destroy == null) { this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND); }
+            if (this.timeouts.destroy == null) {
+              this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND);
+            }
           }
-          if (focus) { QR.nodes.status.focus(); }
+          if (focus) {
+            QR.nodes.status.focus();
+          }
         }
-
-        if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) { return QR.submit(); }
+        if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
+          return QR.submit(undefined);
+        }
       },
-
       count() {
         const count = Captcha.cache.getCount();
         const loading = Captcha.cache.submitCB ? '...' : '';
         this.nodes.counter.textContent = `Captchas: ${count}${loading}`;
         return this.moreNeeded();
       },
-
       reload() {
         if ($('iframe[src^="https://www.google.com/recaptcha/api/fallback?"]', this.nodes.container)) {
           this.destroy();
@@ -17659,7 +17648,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           $.global('resetCaptcha');
         }
       },
-
       occupied() {
         return !!this.nodes.container && !this.timeouts.destroy;
       }
@@ -20626,23 +20614,33 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
   };
 
-  // @ts-nocheck
-
   const PostSuccessful = {
     init() {
-      if (!Conf['Remember Your Posts']) { return; }
-      return $.ready(this.ready);
+      if (!Conf['Remember Your Posts']) {
+        return;
+      }
+      $.ready(PostSuccessful.ready);
     },
-
     ready() {
-      if (d.title !== 'Post successful!') { return; }
-
-      let [_, threadID, postID] = $('h1').nextSibling.textContent.match(/thread:(\d+),no:(\d+)/);
-      postID   = +postID;
-      threadID = +threadID || postID;
-
+      if (d.title !== 'Post successful!') {
+        return;
+      }
+      const h1 = $('h1');
+      if (!h1 || !h1.nextSibling) {
+        return;
+      }
+      const textContent = h1.nextSibling.textContent;
+      if (!textContent) {
+        return;
+      }
+      const match = textContent.match(/thread:(\d+),no:(\d+)/);
+      if (!match) {
+        return;
+      }
+      const postID = +match[2];
+      const threadID = +match[1] || postID;
       const db = new DataBoard('yourPosts');
-      return db.set({
+      db.set({
         boardID: g.BOARD.ID,
         threadID,
         postID,
@@ -26309,24 +26307,23 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
   const PassLink = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) { return; }
-      return $.on(d, '4chanXInitFinished', this.ready);
+      if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) {
+        return;
+      }
+      $.on(d, '4chanXInitFinished', PassLink.ready);
     },
-
     ready() {
       let styleSelector;
-      if (!(styleSelector = $.id('styleSelector'))) { return; }
-
-      const passLink = $.el('span',
-        {className: 'brackets-wrap pass-link-container'});
-      $.extend(passLink, {innerHTML: "<a href=\"javascript:;\">4chan Pass</a>"});
-      $.on(passLink.firstElementChild, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`,
-        Date.now(),
-        'width=500,height=280,toolbar=0'));
-      return $.before(styleSelector.previousSibling, [passLink, $.tn('\u00A0\u00A0')]);
+      if (!(styleSelector = $.id('styleSelector'))) {
+        return;
+      }
+      const passLink = $.el('span', { className: 'brackets-wrap pass-link-container' });
+      $.extend(passLink, { innerHTML: "<a href=\"javascript:;\">4chan Pass</a>" });
+      const link = passLink.firstElementChild;
+      $.on(link, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`, Date.now().toString(), 'width=500,height=280,toolbar=0'));
+      $.before(styleSelector.previousSibling, [passLink, $.tn('\u00A0\u00A0')]);
     }
   };
 

@@ -232,8 +232,8 @@
     };
     return output;
   })();
-  const d = document;
-  const doc = d.documentElement;
+  const d$1 = document;
+  const doc = d$1.documentElement;
   const c = console;
   const docSet = function () {
     // return (doc = d.documentElement);
@@ -1808,17 +1808,17 @@ current-archive-text:"Archive"]
   // http://api.jquery.com/
   // not chainable
   const $ = (selector, root = document.body) => root.querySelector(selector);
-  $.id = id => d.getElementById(id);
+  $.id = id => d$1.getElementById(id);
   $.ready = function (fc) {
-    if (d.readyState !== 'loading') {
+    if (d$1.readyState !== 'loading') {
       $.queueTask(fc);
       return;
     }
     var cb = function () {
-      $.off(d, 'DOMContentLoaded', cb);
+      $.off(d$1, 'DOMContentLoaded', cb);
       fc();
     };
-    $.on(d, 'DOMContentLoaded', cb);
+    $.on(d$1, 'DOMContentLoaded', cb);
   };
   $.formData = function (form) {
     if (form instanceof HTMLFormElement) {
@@ -1990,7 +1990,7 @@ current-archive-text:"Archive"]
     if (id != null) {
       style.id = id;
     }
-    $.onExists(doc, test, () => $.add(d.head, style));
+    $.onExists(doc, test, () => $.add(d$1.head, style));
     return style;
   };
   $.addCSP = function (policy) {
@@ -1998,28 +1998,28 @@ current-archive-text:"Archive"]
       httpEquiv: 'Content-Security-Policy',
       content: policy
     });
-    if (d.head) {
-      $.add(d.head, meta);
+    if (d$1.head) {
+      $.add(d$1.head, meta);
       return $.rm(meta);
     } else {
-      const head = $.add((doc || d), $.el('head'));
+      const head = $.add((doc || d$1), $.el('head'));
       $.add(head, meta);
       return $.rm(head);
     }
   };
   $.x = function (path, root) {
     if (!root) {
-      root = d.body;
+      root = d$1.body;
     }
     // XPathResult.ANY_UNORDERED_NODE_TYPE === 8
-    return d.evaluate(path, root, null, 8, null).singleNodeValue;
+    return d$1.evaluate(path, root, null, 8, null).singleNodeValue;
   };
   $.X = function (path, root) {
     if (!root) {
-      root = d.body;
+      root = d$1.body;
     }
     // XPathResult.ORDERED_NODE_SNAPSHOT_TYPE === 7
-    return d.evaluate(path, root, null, 7, null);
+    return d$1.evaluate(path, root, null, 7, null);
   };
   $.addClass = function (el, ...classNames) {
     el.classList.add(...classNames);
@@ -2031,8 +2031,8 @@ current-archive-text:"Archive"]
   $.hasClass = (el, className) => el.classList.contains(className);
   $.rm = el => el?.remove();
   $.rmAll = root => root.textContent = null;
-  $.tn = s => d.createTextNode(s);
-  $.frag = () => d.createDocumentFragment();
+  $.tn = s => d$1.createTextNode(s);
+  $.frag = () => d$1.createDocumentFragment();
   $.nodes = function (nodes) {
     if (!(nodes instanceof Array)) {
       return nodes;
@@ -2049,7 +2049,7 @@ current-archive-text:"Archive"]
   $.before = (root, el) => root.parentNode.insertBefore($.nodes(el), root);
   $.replace = (root, el) => root.parentNode.replaceChild($.nodes(el), root);
   $.el = function (tag, properties, properties2) {
-    const el = d.createElement(tag);
+    const el = d$1.createElement(tag);
     if (properties)
       $.extend(el, properties);
     if (properties2)
@@ -2073,15 +2073,15 @@ current-archive-text:"Archive"]
     };
     return $.on(el, events, cb);
   };
-  $.event = function (event, detail, root = d) {
+  $.event = function (event, detail, root = d$1) {
     if (!globalThis.chrome?.extension) {
       if ((detail != null) && (typeof cloneInto === 'function')) {
-        detail = cloneInto(detail, d.defaultView);
+        detail = cloneInto(detail, d$1.defaultView);
       }
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-  if (platform === 'userscript') {
+
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -2107,10 +2107,10 @@ current-archive-text:"Archive"]
             return obj;
           }
         };
-        return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
+        return $.event = (event, detail, root = d$1) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-  }
+
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -2157,16 +2157,7 @@ current-archive-text:"Archive"]
       Promise.resolve().then(execTask);
     };
   })();
-  if (platform === 'crx') {
-    const callbacks = new Map();
-    chrome.runtime.onMessage.addListener(({ id, data }) => {
-      callbacks.get(id)(data);
-      callbacks.delete(id);
-    });
-    $.eventPageRequest = (params) => new Promise(resolve => {
-      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
-    });
-  }
+
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -2183,7 +2174,7 @@ current-archive-text:"Archive"]
         if (data) {
           $.extend(script.dataset, data);
         }
-        $.add((d.head || doc), script);
+        $.add((d$1.head || doc), script);
         $.rm(script);
         return script.dataset;
       } else {
@@ -2275,178 +2266,7 @@ current-archive-text:"Archive"]
       return delete data['Redirect to HTTPS'];
     }
   };
-  if (platform === 'crx') {
-    // https://developer.chrome.com/extensions/storage.html
-    $.oldValue = {
-      local: dict(),
-      sync: dict()
-    };
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      for (var key in changes) {
-        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        $.oldValue[area][key] = dict.clone(changes[key].newValue);
-        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        var cb = $.syncing[key];
-        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
-          cb(newValue, key);
-        }
-      }
-    });
-    $.sync = (key, cb) => $.syncing[key] = cb;
-    $.forceSync = function () { };
-    $.crxWorking = function () {
-      try {
-        if (chrome.runtime.getManifest()) {
-          return true;
-        }
-      } catch (error) { }
-      if (!$.crxWarningShown) {
-        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
-        $.on($('a', msg), 'click', () => location.reload());
-        new Notice('warning', msg);
-        $.crxWarningShown = true;
-      }
-      return false;
-    };
-    $.get = $.oneItemSugar(function (data, cb) {
-      if (!$.crxWorking()) {
-        return;
-      }
-      const results = {};
-      const get = function (area) {
-        let keys = Object.keys(data);
-        // XXX slow performance in Firefox
-        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
-          keys = null;
-        }
-        return chrome.storage[area].get(keys, function (result) {
-          let key;
-          result = dict.clone(result);
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (keys === null) {
-            const result2 = dict();
-            for (key in result) {
-              var val = result[key];
-              if ($.hasOwn(data, key)) {
-                result2[key] = val;
-              }
-            }
-            result = result2;
-          }
-          for (key in data) {
-            $.oldValue[area][key] = result[key];
-          }
-          results[area] = result;
-          if (results.local && results.sync) {
-            $.extend(data, results.sync);
-            $.extend(data, results.local);
-            return cb(data);
-          }
-        });
-      };
-      get('local');
-      return get('sync');
-    });
-    (function () {
-      const items = {
-        local: dict(),
-        sync: dict()
-      };
-      const exceedsQuota = (key, value) => // bytes in UTF-8
-      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
-      $.delete = function (keys) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        if (typeof keys === 'string') {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          delete items.local[key];
-          delete items.sync[key];
-        }
-        chrome.storage.local.remove(keys);
-        return chrome.storage.sync.remove(keys);
-      };
-      const timeout = {};
-      var setArea = function (area, cb) {
-        const data = dict();
-        $.extend(data, items[area]);
-        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
-          return;
-        }
-        return chrome.storage[area].set(data, function () {
-          let err;
-          let key;
-          if (err = chrome.runtime.lastError) {
-            c.error(err.message);
-            setTimeout(setArea, MINUTE, area);
-            timeout[area] = Date.now() + MINUTE;
-            return cb?.(err);
-          }
-          delete timeout[area];
-          for (key in data) {
-            if (items[area][key] === data[key]) {
-              delete items[area][key];
-            }
-          }
-          if (area === 'local') {
-            for (key in data) {
-              var val = data[key];
-              if (!exceedsQuota(key, val)) {
-                items.sync[key] = val;
-              }
-            }
-            setSync();
-          } else {
-            chrome.storage.local.remove(((() => {
-              const result = [];
-              for (key in data) {
-                if (!(key in items.local)) {
-                  result.push(key);
-                }
-              }
-              return result;
-            })()));
-          }
-          return cb?.();
-        });
-      };
-      var setSync = debounce(SECOND, () => setArea('sync'));
-      $.set = $.oneItemSugar(function (data, cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        $.securityCheck(data);
-        $.extend(items.local, data);
-        return setArea('local', cb);
-      });
-      return $.clear = function (cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        items.local = dict();
-        items.sync = dict();
-        let count = 2;
-        let err = null;
-        const done = function () {
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (err == null) {
-            err = chrome.runtime.lastError;
-          }
-          if (!--count) {
-            return cb?.(err);
-          }
-        };
-        chrome.storage.local.clear(done);
-        return chrome.storage.sync.clear(done);
-      };
-    })();
-  } else {
+
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -2663,11 +2483,8 @@ current-archive-text:"Archive"]
         return cb?.();
       };
     }
-  }
 
-  // @ts-nocheck
-
-  var Get = {
+  const Get = {
     url(type, IDs, ...args) {
       let f, site;
       if ((site = g.sites[IDs.siteID]) && (f = $.getOwn(site.urls, type))) {
@@ -2677,28 +2494,40 @@ current-archive-text:"Archive"]
       }
     },
     threadExcerpt(thread) {
-      const {OP} = thread;
-      const excerpt = (`/${decodeURIComponent(thread.board.ID)}/ - `) + (
-        OP.info.subject?.trim() ||
+      const { OP } = thread;
+      const excerpt = (`/${decodeURIComponent(thread.board.ID)}/ - `) + (OP.info.subject?.trim() ||
         OP.commentDisplay().replace(/\n+/g, ' // ') ||
         OP.file?.name ||
         `No.${OP}`);
-      if (excerpt.length > 73) { return `${excerpt.slice(0, 70)}...`; }
+      if (excerpt.length > 73) {
+        return `${excerpt.slice(0, 70)}...`;
+      }
       return excerpt;
     },
     threadFromRoot(root) {
-      if (root == null) { return null; }
-      const {board} = root.dataset;
+      if (root == null) {
+        return null;
+      }
+      const { board } = root.dataset;
       return g.threads.get(`${board ? encodeURIComponent(board) : g.BOARD.ID}.${root.id.match(/\d*$/)[0]}`);
     },
     threadFromNode(node) {
       return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.thread}`, node));
     },
     postFromRoot(root) {
-      if (root == null) { return null; }
-      const post  = g.posts.get(root.dataset.fullID);
+      if (root == null) {
+        return null;
+      }
+      const post = g.posts.get(root.dataset.fullID);
+      if (!post) {
+        return null;
+      }
       const index = root.dataset.clone;
-      if (index) { return post.clones[+index]; } else { return post; }
+      if (index) {
+        return post.clones[+index];
+      } else {
+        return post;
+      }
     },
     postFromNode(root) {
       return Get.postFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.postContainer}[1]`, root));
@@ -2706,52 +2535,66 @@ current-archive-text:"Archive"]
     postDataFromLink(link) {
       let boardID, postID, threadID;
       if (link.dataset.postID) { // resurrected quote
-        ({boardID, threadID, postID} = link.dataset);
-        if (!threadID) { threadID = 0; }
+        ({ boardID, threadID, postID } = link.dataset);
+        if (!threadID) {
+          threadID = '0';
+        }
       } else {
         const match = link.href.match(g.SITE.regexp.quotelink);
-        [boardID, threadID, postID] = match.slice(1);
-        if (!postID) { postID = threadID; }
+        if (match) {
+          [boardID, threadID, postID] = match.slice(1);
+          if (!postID) {
+            postID = threadID;
+          }
+        } else {
+          boardID = '';
+          threadID = '0';
+          postID = '0';
+        }
       }
       return {
         boardID,
         threadID: +threadID,
-        postID:   +postID
+        postID: +postID
       };
     },
     allQuotelinksLinkingTo(post) {
       // Get quotelinks & backlinks linking to the given post.
       const quotelinks = [];
-      const {posts} = g;
-      const {fullID} = post;
-      const handleQuotes = function(qPost, type) {
+      const posts = g.posts;
+      const { fullID } = post;
+      const handleQuotes = function (qPost, type) {
         quotelinks.push(...(qPost.nodes[type] || []));
-        for (var clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
+        for (const clone of qPost.clones) {
+          quotelinks.push(...(clone.nodes[type] || []));
+        }
       };
       // First:
       //   In every posts,
       //   if it did quote this post,
       //   get all their backlinks.
-      posts.forEach(function(qPost) {
+      posts.forEach(function (qPost) {
         if (qPost.quotes.includes(fullID)) {
-          return handleQuotes(qPost, 'quotelinks');
+          handleQuotes(qPost, 'quotelinks');
         }
       });
-
       // Second:
       //   If we have quote backlinks:
       //   in all posts this post quoted
       //   and their clones,
       //   get all of their backlinks.
       if (Conf['Quote Backlinks']) {
-        for (var quote of post.quotes) { var qPost;
-        if ((qPost = posts.get(quote))) { handleQuotes(qPost, 'backlinks'); } }
+        for (const quote of post.quotes) {
+          let qPost;
+          if ((qPost = posts.get(quote))) {
+            handleQuotes(qPost, 'backlinks');
+          }
+        }
       }
-
       // Third:
       //   Filter out irrelevant quotelinks.
-      return quotelinks.filter(function(quotelink) {
-        const {boardID, postID} = Get.postDataFromLink(quotelink);
+      return quotelinks.filter(function (quotelink) {
+        const { boardID, postID } = Get.postDataFromLink(quotelink);
         return (boardID === post.board.ID) && (postID === post.ID);
       });
     }
@@ -3187,7 +3030,7 @@ current-archive-text:"Archive"]
   <button type="button" id="cancel-export">Cancel</button>
 </form>`;
 
-  const $$ = (selector, root = d.body) => Array.from(root.querySelectorAll(selector));
+  const $$ = (selector, root = d$1.body) => Array.from(root.querySelectorAll(selector));
 
   const ImageHost = {
     useFaster: undefined,
@@ -6385,30 +6228,28 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
   const CustomCSS = {
     init() {
-      if (!Conf['Custom CSS']) { return; }
-      return this.addStyle();
+      if (!Conf['Custom CSS']) {
+        return;
+      }
+      this.addStyle();
     },
-
     addStyle() {
-      return this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
+      this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
     },
-
     rmStyle() {
       if (this.style) {
         $.rm(this.style);
-        return delete this.style;
+        delete this.style;
       }
     },
-
     update() {
       if (!this.style) {
-        return this.addStyle();
+        this.addStyle();
+        return;
       }
-      return this.style.textContent = CSS.sub(Conf['usercss']);
+      this.style.textContent = CSS.sub(Conf['usercss']);
     }
   };
 
@@ -6727,14 +6568,14 @@ svg.icon {
     unread: undefined,
     unreadY: undefined,
     init() {
-      $.asap(() => d.head && (Favicon.el = $('link[rel="shortcut icon"]', d.head)), Favicon.initAsap);
+      $.asap(() => d$1.head && (Favicon.el = $('link[rel="shortcut icon"]', d$1.head)), Favicon.initAsap);
     },
     set(status) {
       Favicon.status = status;
       if (Favicon.el) {
         Favicon.el.href = Favicon[status] || Favicon.default || '';
         // `favicon.href = href` doesn't work on Firefox.
-        $.add(d.head, Favicon.el);
+        $.add(d$1.head, Favicon.el);
       }
     },
     initAsap() {
@@ -6827,36 +6668,37 @@ svg.icon {
     logo: `data:image/png;base64,${empty}`,
   };
 
-  // @ts-nocheck
-
   const CaptchaReplace = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) { return; }
-
-      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
-        $.ready(this.noscript);
+      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) {
         return;
       }
-
+      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
+        $.ready(CaptchaReplace.noscript);
+        return;
+      }
       if (Conf['captchaLanguage'].trim()) {
         if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe));
+          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe));
         } else {
-          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', this.iframe);
+          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe);
         }
       }
     },
-
     noscript() {
       let noscript, original, toggle;
-      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) { return; }
-      const span = $.el('span',
-        {id: 'captcha-forced-noscript'});
+      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) {
+        return;
+      }
+      const span = $.el('span', { id: 'captcha-forced-noscript' });
       $.replace(noscript, span);
       $.rm(original);
-      const insert = function() {
-        span.innerHTML = noscript.textContent;
-        this.iframe($('iframe[src^="https://www.google.com/recaptcha/"]', span));
+      const insert = () => {
+        span.innerHTML = noscript.textContent || '';
+        const iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', span);
+        if (iframe) {
+          CaptchaReplace.iframe(iframe);
+        }
       };
       if (toggle = $('#togglePostFormLink a, #form-link')) {
         $.on(toggle, 'click', insert);
@@ -6864,15 +6706,16 @@ svg.icon {
         insert();
       }
     },
-
     iframe(iframe) {
       let lang;
       if (lang = Conf['captchaLanguage'].trim()) {
         const src = /[?&]hl=/.test(iframe.src) ?
           iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
-        :
-          iframe.src + `&hl=${encodeURIComponent(lang)}`;
-        if (iframe.src !== src) { iframe.src = src; }
+          :
+            iframe.src + `&hl=${encodeURIComponent(lang)}`;
+        if (iframe.src !== src) {
+          iframe.src = src;
+        }
       }
     }
   };
@@ -7304,10 +7147,10 @@ svg.icon {
       // Chrome also fires the onChanged callback on the current tab,
       // so we only start syncing when we're ready.
       var init = () => {
-        $.off(d, '4chanXInitFinished', init);
+        $.off(d$1, '4chanXInitFinished', init);
         this.sync = sync;
       };
-      $.on(d, '4chanXInitFinished', init);
+      $.on(d$1, '4chanXInitFinished', init);
     }
     initData(data) {
       let boards;
@@ -7739,404 +7582,374 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
-
-  const dialog = function(id, properties) {
+  const dialog = function (id, properties) {
     const el = $.el('div', {
       className: 'dialog',
       id
+    });
+    if (properties) {
+      $.extend(el, properties);
     }
-    );
-    $.extend(el, properties);
     el.style.cssText = Conf[`${id}.position`];
-
     const move = $('.move', el);
     $.on(move, 'touchstart mousedown', dragstart);
-    for (var child of move.children) {
-      if (!child.tagName) { continue; }
-      $.on(child, 'touchstart mousedown', e => e.stopPropagation());
+    for (const child of move.children) {
+      if (!child.tagName) {
+        continue;
+      }
+      $.on(child, 'touchstart mousedown', (e) => e.stopPropagation());
     }
-
     return el;
   };
-
-  var Menu$1 = (function() {
-    let currentMenu = undefined;
-    let lastToggledButton = undefined;
-    Menu$1 = class Menu {
-      static initClass() {
-        currentMenu       = null;
-        lastToggledButton = null;
-      }
-
-      constructor(type) {
-        // XXX AddMenuEntry event is deprecated
-        this.setPosition = this.setPosition.bind(this);
-        this.close = this.close.bind(this);
-        this.keybinds = this.keybinds.bind(this);
-        this.onFocus = this.onFocus.bind(this);
-        this.addEntry = this.addEntry.bind(this);
-        this.type = type;
-        $.on(d, 'AddMenuEntry', ({detail}) => {
-          if (detail.type !== this.type) { return; }
-          delete detail.open;
-          return this.addEntry(detail);
-        });
-        this.entries = [];
-      }
-
-      makeMenu() {
-        const menu = $.el('div', {
-          className: 'dialog',
-          id:        'menu',
-          tabIndex:  0
+  class MenuClass {
+    constructor(type) {
+      this.setPosition = this.setPosition.bind(this);
+      this.close = this.close.bind(this);
+      this.keybinds = this.keybinds.bind(this);
+      this.onFocus = this.onFocus.bind(this);
+      this.addEntry = this.addEntry.bind(this);
+      this.type = type;
+      $.on(d$1, 'AddMenuEntry', ({ detail }) => {
+        if (detail.type !== this.type) {
+          return;
         }
-        );
-        menu.dataset.type = this.type;
-        $.on(menu, 'click', e => e.stopPropagation());
-        $.on(menu, 'keydown', this.keybinds);
-        return menu;
-      }
-
-      toggle(e, button, data) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (currentMenu) {
-          // Close if it's already opened.
-          // Reopen if we clicked on another button.
-          const previousButton = lastToggledButton;
-          currentMenu.close();
-          if (previousButton === button) { return; }
+        delete detail.open;
+        this.addEntry(detail);
+      });
+      this.entries = [];
+    }
+    makeMenu() {
+      const menu = $.el('div', {
+        className: 'dialog',
+        id: 'menu',
+        tabIndex: 0
+      });
+      menu.dataset.type = this.type;
+      $.on(menu, 'click', e => e.stopPropagation());
+      $.on(menu, 'keydown', this.keybinds);
+      return menu;
+    }
+    toggle(e, button, data) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (Menu$1.currentMenu) {
+        const previousButton = Menu$1.lastToggledButton;
+        Menu$1.currentMenu.close();
+        if (previousButton === button) {
+          return;
         }
-
-        if (!this.entries.length) { return; }
-        return this.open(button, data);
       }
-
-      open(button, data) {
-        let entry;
-        const menu = (this.menu = this.makeMenu());
-        currentMenu       = this;
-        lastToggledButton = button;
-
-        this.entries.sort((first, second) => first.order - second.order);
-
-        for (entry of this.entries) {
-          this.insertEntry(entry, menu, data);
-        }
-
-        $.addClass(lastToggledButton, 'active');
-
-        $.on(d, 'click CloseMenu', this.close);
-        $.on(d, 'scroll', this.setPosition);
-        $.on(window, 'resize', this.setPosition);
-        $.after(button, menu);
-
-        this.setPosition();
-
-        entry = $('.entry', menu);
-        // We've removed flexbox, so we don't use order anymore.
-        // while prevEntry = @findNextEntry entry, -1
-        //   entry = prevEntry
-        this.focus(entry);
-
-        return menu.focus();
+      if (!this.entries.length) {
+        return;
       }
-
-      setPosition() {
-        const mRect   = this.menu.getBoundingClientRect();
-        const bRect   = lastToggledButton.getBoundingClientRect();
-        const cHeight = doc.clientHeight;
-        const cWidth  = doc.clientWidth;
-        const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
-          [`${bRect.bottom}px`, '']
+      this.open(button, data);
+    }
+    open(button, data) {
+      let entry;
+      const menu = (this.menu = this.makeMenu());
+      Menu$1.currentMenu = this;
+      Menu$1.lastToggledButton = button;
+      this.entries.sort((first, second) => first.order - second.order);
+      for (entry of this.entries) {
+        this.insertEntry(entry, menu, data);
+      }
+      $.addClass(Menu$1.lastToggledButton, 'active');
+      $.on(d$1, 'click CloseMenu', this.close);
+      $.on(d$1, 'scroll', this.setPosition);
+      $.on(window, 'resize', this.setPosition);
+      $.after(button, menu);
+      this.setPosition();
+      entry = $('.entry', menu);
+      this.focus(entry);
+      menu.focus();
+    }
+    setPosition() {
+      if (!this.menu || !Menu$1.lastToggledButton) {
+        return;
+      }
+      const mRect = this.menu.getBoundingClientRect();
+      const bRect = Menu$1.lastToggledButton.getBoundingClientRect();
+      const cHeight = doc.clientHeight;
+      const cWidth = doc.clientWidth;
+      const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
+        [`${bRect.bottom}px`, '']
         :
           ['', `${cHeight - bRect.top}px`];
-        const [left, right] = (bRect.left + mRect.width) < cWidth ?
-          [`${bRect.left}px`, '']
+      const [left, right] = (bRect.left + mRect.width) < cWidth ?
+        [`${bRect.left}px`, '']
         :
           ['', `${cWidth - bRect.right}px`];
-        $.extend(this.menu.style, {top, right, bottom, left});
-        return this.menu.classList.toggle('left', right);
-      }
-
-      insertEntry(entry, parent, data) {
-        let submenu;
-        if (typeof entry.open === 'function') {
-          try {
-            if (!entry.open(data)) { return; }
-          } catch (err) {
-            Callbacks.errorHandler?.({
-              message: `Error in building the ${this.type} menu.`,
-              error: err
-            });
+      $.extend(this.menu.style, { top, right, bottom, left });
+      this.menu.classList.toggle('left', !!right);
+    }
+    insertEntry(entry, parent, data) {
+      let submenu;
+      if (typeof entry.open === 'function') {
+        try {
+          if (!entry.open(data)) {
             return;
           }
+        } catch (err) {
+          Callbacks.errorHandler?.({
+            message: `Error in building the ${this.type} menu.`,
+            error: err
+          });
+          return;
         }
-        $.add(parent, entry.el);
-
-        if (!entry.subEntries) { return; }
-        if (submenu = $('.submenu', entry.el)) {
-          // Reset sub menu, remove irrelevant entries.
-          $.rm(submenu);
-        }
-        submenu = $.el('div',
-          {className: 'dialog submenu'});
-        for (var subEntry of entry.subEntries) {
-          this.insertEntry(subEntry, submenu, data);
-        }
-        $.add(entry.el, submenu);
       }
-
-      close() {
-        $.rm(this.menu);
-        delete this.menu;
-        $.rmClass(lastToggledButton, 'active');
-        currentMenu       = null;
-        lastToggledButton = null;
-        $.off(d, 'click scroll CloseMenu', this.close);
-        $.off(d, 'scroll', this.setPosition);
-        return $.off(window, 'resize', this.setPosition);
+      $.add(parent, entry.el);
+      if (!entry.subEntries) {
+        return;
       }
-
-      findNextEntry(entry, direction) {
-        const entries = [...entry.parentNode.children];
-        entries.sort((first, second) => first.style.order - second.style.order);
-        return entries[entries.indexOf(entry) + direction];
+      if (submenu = $('.submenu', entry.el)) {
+        $.rm(submenu);
       }
-
-      keybinds(e) {
-        let subEntry;
-        let next, submenu;
-        let entry = $('.focused', this.menu);
-        while ((subEntry = $('.focused', entry))) {
-          entry = subEntry;
-        }
-
-        switch (e.keyCode) {
-          case 27: // Esc
-            lastToggledButton.focus();
-            this.close();
-            break;
-          case 13: case 32: // Enter, Space
-            entry.click();
-            break;
-          case 38: // Up
-            if (next = this.findNextEntry(entry, -1)) {
-              this.focus(next);
+      submenu = $.el('div', { className: 'dialog submenu' });
+      for (const subEntry of entry.subEntries) {
+        this.insertEntry(subEntry, submenu, data);
+      }
+      $.add(entry.el, submenu);
+    }
+    close() {
+      if (!this.menu) {
+        return;
+      }
+      $.rm(this.menu);
+      delete this.menu;
+      if (Menu$1.lastToggledButton) {
+        $.rmClass(Menu$1.lastToggledButton, 'active');
+      }
+      Menu$1.currentMenu = null;
+      Menu$1.lastToggledButton = null;
+      $.off(d$1, 'click scroll CloseMenu', this.close);
+      $.off(d$1, 'scroll', this.setPosition);
+      $.off(window, 'resize', this.setPosition);
+    }
+    findNextEntry(entry, direction) {
+      const entries = [...entry.parentNode.children];
+      entries.sort((first, second) => Number(first.style.order || 0) - Number(second.style.order || 0));
+      return entries[entries.indexOf(entry) + direction];
+    }
+    keybinds(e) {
+      if (!this.menu || !Menu$1.lastToggledButton) {
+        return;
+      }
+      let subEntry;
+      let next, submenu;
+      let entry = $('.focused', this.menu);
+      while ((subEntry = $('.focused', entry))) {
+        entry = subEntry;
+      }
+      switch (e.keyCode) {
+        case 27: // Esc
+          Menu$1.lastToggledButton.focus();
+          this.close();
+          break;
+        case 13:
+        case 32: // Enter, Space
+          entry.click();
+          break;
+        case 38: // Up
+          if (next = this.findNextEntry(entry, -1)) {
+            this.focus(next);
+          }
+          break;
+        case 40: // Down
+          if (next = this.findNextEntry(entry, +1)) {
+            this.focus(next);
+          }
+          break;
+        case 39: // Right
+          if ((submenu = $('.submenu', entry)) && (next = submenu.firstElementChild)) {
+            let nextPrev;
+            while ((nextPrev = this.findNextEntry(next, -1))) {
+              next = nextPrev;
             }
-            break;
-          case 40: // Down
-            if (next = this.findNextEntry(entry, +1)) {
-              this.focus(next);
-            }
-            break;
-          case 39: // Right
-            if ((submenu = $('.submenu', entry)) && (next = submenu.firstElementChild)) {
-              let nextPrev;
-              while ((nextPrev = this.findNextEntry(next, -1))) {
-                next = nextPrev;
-              }
-              this.focus(next);
-            }
-            break;
-          case 37: // Left
-            if (next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry)) {
-              this.focus(next);
-            }
-            break;
-          default:
-            return;
-        }
-
-        e.preventDefault();
-        return e.stopPropagation();
+            this.focus(next);
+          }
+          break;
+        case 37: // Left
+          if (next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry)) {
+            this.focus(next);
+          }
+          break;
+        default:
+          return;
       }
-
-      onFocus(e) {
-        e.stopPropagation();
-        return this.focus(e.target);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    onFocus(e) {
+      e.stopPropagation();
+      this.focus(e.target);
+    }
+    focus(entry) {
+      let focused, submenu;
+      while ((focused = $.x('parent::*/child::*[contains(@class,"focused")]', entry))) {
+        $.rmClass(focused, 'focused');
       }
-
-      focus(entry) {
-        let focused, submenu;
-        while ((focused = $.x('parent::*/child::*[contains(@class,"focused")]', entry))) {
-          $.rmClass(focused, 'focused');
-        }
-        for (focused of $$('.focused', entry)) {
-          $.rmClass(focused, 'focused');
-        }
-        $.addClass(entry, 'focused');
-
-        // Submenu positioning.
-        if (!(submenu = $('.submenu', entry))) { return; }
-        const sRect   = submenu.getBoundingClientRect();
-        const eRect   = entry.getBoundingClientRect();
-        const cHeight = doc.clientHeight;
-        const cWidth  = doc.clientWidth;
-        const [top, bottom] = (eRect.top + sRect.height) < cHeight ?
-          ['0px', 'auto']
+      for (const el of $$('.focused', entry)) {
+        $.rmClass(el, 'focused');
+      }
+      $.addClass(entry, 'focused');
+      if (!(submenu = $('.submenu', entry))) {
+        return;
+      }
+      const sRect = submenu.getBoundingClientRect();
+      const eRect = entry.getBoundingClientRect();
+      const cHeight = doc.clientHeight;
+      const cWidth = doc.clientWidth;
+      const [top, bottom] = (eRect.top + sRect.height) < cHeight ?
+        ['0px', 'auto']
         :
           ['auto', '0px'];
-        const [left, right] = (eRect.right + sRect.width) < (cWidth - 150) ?
-          ['100%', 'auto']
+      const [left, right] = (eRect.right + sRect.width) < (cWidth - 150) ?
+        ['100%', 'auto']
         :
           ['auto', '100%'];
-        const {style} = submenu;
-        style.top    = top;
-        style.bottom = bottom;
-        style.left   = left;
-        return style.right  = right;
+      const { style } = submenu;
+      style.top = top;
+      style.bottom = bottom;
+      style.left = left;
+      style.right = right;
+    }
+    addEntry(entry) {
+      this.parseEntry(entry);
+      this.entries.push(entry);
+    }
+    parseEntry(entry) {
+      const { el, subEntries } = entry;
+      $.addClass(el, 'entry');
+      $.on(el, 'focus mouseover', this.onFocus);
+      el.style.order = String(entry.order || 100);
+      if (!subEntries) {
+        return;
       }
-
-      addEntry(entry) {
-        this.parseEntry(entry);
-        return this.entries.push(entry);
+      $.addClass(el, 'has-submenu');
+      for (const subEntry of subEntries) {
+        this.parseEntry(subEntry);
       }
-
-      parseEntry(entry) {
-        const {el, subEntries} = entry;
-        $.addClass(el, 'entry');
-        $.on(el, 'focus mouseover', this.onFocus);
-        el.style.order = entry.order || 100;
-        if (!subEntries) { return; }
-        $.addClass(el, 'has-submenu');
-        for (var subEntry of subEntries) {
-          this.parseEntry(subEntry);
-        }
-        const span = $.el('span',
-          {className: 'menu-indicator'}
-        );
-        Icon.set(span, 'caretRight');
-        $.add(el, span);
-      }
-    };
-    Menu$1.initClass();
-    return Menu$1;
-  })();
-
+      const span = $.el('span', { className: 'menu-indicator' });
+      Icon.set(span, 'caretRight');
+      $.add(el, span);
+    }
+  }
+  const Menu$1 = MenuClass;
+  Menu$1.currentMenu = null;
+  Menu$1.lastToggledButton = null;
   var dragstart = function (e) {
     let isTouching;
-    if ((e.type === 'mousedown') && (e.button !== 0)) { return; } // not LMB
-    // prevent text selection
+    if ((e.type === 'mousedown') && (e.button !== 0)) {
+      return;
+    } // not LMB
     e.preventDefault();
     if (isTouching = e.type === 'touchstart') {
       e = e.changedTouches[e.changedTouches.length - 1];
     }
-    // distance from pointer to el edge is constant; calculate it here.
     const el = $.x('ancestor::div[contains(@class,"dialog")][1]', this);
     const rect = el.getBoundingClientRect();
     const screenHeight = doc.clientHeight;
-    const screenWidth  = doc.clientWidth;
+    const screenWidth = doc.clientWidth;
     const o = {
-      id:     el.id,
-      style:  el.style,
-      dx:     e.clientX - rect.left,
-      dy:     e.clientY - rect.top,
+      id: el.id,
+      style: el.style,
+      dx: e.clientX - rect.left,
+      dy: e.clientY - rect.top,
       height: screenHeight - rect.height,
-      width:  screenWidth  - rect.width,
+      width: screenWidth - rect.width,
       screenHeight,
       screenWidth,
       isTouching
     };
-
     [o.topBorder, o.bottomBorder] = Conf['Header auto-hide'] || !Conf['Fixed Header'] ?
       [0, 0]
-    : Conf['Bottom Header'] ?
-      [0, Header.bar.getBoundingClientRect().height]
-    :
-      [Header.bar.getBoundingClientRect().height, 0];
-
+      : Conf['Bottom Header'] ?
+        [0, Header.bar.getBoundingClientRect().height]
+        :
+          [Header.bar.getBoundingClientRect().height, 0];
     if (isTouching) {
       o.identifier = e.identifier;
       o.move = touchmove.bind(o);
-      o.up   = touchend.bind(o);
-      $.on(d, 'touchmove', o.move);
-      return $.on(d, 'touchend touchcancel', o.up);
+      o.up = touchend.bind(o);
+      $.on(d$1, 'touchmove', o.move);
+      $.on(d$1, 'touchend touchcancel', o.up);
     } else { // mousedown
       o.move = drag.bind(o);
-      o.up   = dragend.bind(o);
-      $.on(d, 'mousemove', o.move);
-      return $.on(d, 'mouseup',   o.up);
+      o.up = dragend.bind(o);
+      $.on(d$1, 'mousemove', o.move);
+      $.on(d$1, 'mouseup', o.up);
     }
   };
-
   var touchmove = function (e) {
-    for (var touch of e.changedTouches) {
+    for (const touch of e.changedTouches) {
       if (touch.identifier === this.identifier) {
         drag.call(this, touch);
         return;
       }
     }
   };
-
   var drag = function (e) {
-    const {clientX, clientY} = e;
-
+    const { clientX, clientY } = e;
     let left = clientX - this.dx;
     left = left < 10 ?
       0
-    : (this.width - left) < 10 ?
-      ''
-    :
-      ((left / this.screenWidth) * 100) + '%';
-
+      : (this.width - left) < 10 ?
+        ''
+        :
+          ((left / this.screenWidth) * 100) + '%';
     let top = clientY - this.dy;
     top = top < (10 + this.topBorder) ?
       this.topBorder + 'px'
-    : (this.height - top) < (10 + this.bottomBorder) ?
-      ''
-    :
-      ((top / this.screenHeight) * 100) + '%';
-
+      : (this.height - top) < (10 + this.bottomBorder) ?
+        ''
+        :
+          ((top / this.screenHeight) * 100) + '%';
     const right = left === '' ?
       0
-    :
-      '';
-
+      :
+        '';
     const bottom = top === '' ?
       this.bottomBorder + 'px'
-    :
-      '';
-
-    const {style} = this;
-    style.left   = left;
-    style.right  = right;
-    style.top    = top;
+      :
+        '';
+    const { style } = this;
+    style.left = left;
+    style.right = right;
+    style.top = top;
     style.bottom = bottom;
   };
-
   var touchend = function (e) {
-    for (var touch of e.changedTouches) {
+    for (const touch of e.changedTouches) {
       if (touch.identifier === this.identifier) {
         dragend.call(this);
         return;
       }
     }
   };
-
   var dragend = function () {
     if (this.isTouching) {
-      $.off(d, 'touchmove', this.move);
-      $.off(d, 'touchend touchcancel', this.up);
+      $.off(d$1, 'touchmove', this.move);
+      $.off(d$1, 'touchend touchcancel', this.up);
     } else { // mouseup
-      $.off(d, 'mousemove', this.move);
-      $.off(d, 'mouseup',   this.up);
+      $.off(d$1, 'mousemove', this.move);
+      $.off(d$1, 'mouseup', this.up);
     }
     if (this.style.length === 2) { // assume only left or right and top or bottom
       $.set(`${this.id}.position`, this.style.cssText);
     } else { // only include position data.
       const { left, right, top, bottom } = this.style;
       let position = '';
-      if (left) position += `left:${left};`;
-      if (right) position += `right:${right};`;
-      if (top) position += `top:${top};`;
-      if (bottom) position += `bottom:${bottom};`;
+      if (left)
+        position += `left:${left};`;
+      if (right)
+        position += `right:${right};`;
+      if (top)
+        position += `top:${top};`;
+      if (bottom)
+        position += `bottom:${bottom};`;
       $.set(`${this.id}.position`, position);
     }
   };
-
   const hoverstart = function ({ root, el, latestEvent, endEvents, height, width, cb, noRemove }) {
     const rect = root.getBoundingClientRect();
     const o = {
@@ -8148,81 +7961,84 @@ svg.icon {
       endEvents,
       latestEvent,
       clientHeight: doc.clientHeight,
-      clientWidth:  doc.clientWidth,
+      clientWidth: doc.clientWidth,
       height,
       width,
       noRemove,
       clientX: (rect.left + rect.right) / 2,
       clientY: (rect.top + rect.bottom) / 2
     };
-    o.hover    = hover.bind(o);
+    o.hover = hover.bind(o);
     o.hoverend = hoverend.bind(o);
-
     o.hover(o.latestEvent);
-    new MutationObserver(function() {
-      if (el.parentNode) { return o.hover(o.latestEvent); }
-    }).observe(el, {childList: true});
-
-    $.on(root, endEvents,   o.hoverend);
+    new MutationObserver(function () {
+      if (el.parentNode) {
+        o.hover(o.latestEvent);
+      }
+    }).observe(el, { childList: true });
+    $.on(root, endEvents, o.hoverend);
     if ($.x('ancestor::div[contains(@class,"inline")][1]', root)) {
-      $.on(d,    'keydown',   o.hoverend);
+      $.on(d$1, 'keydown', o.hoverend);
     }
     $.on(root, 'mousemove', o.hover);
-
-    // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=674955
-    o.workaround = function(e) { if (!root.contains(e.target)) { return o.hoverend(e); } };
-    return $.on(doc,  'mousemove', o.workaround);
+    o.workaround = function (e) { if (!root.contains(e.target)) {
+      o.hoverend(e);
+    } };
+    $.on(doc, 'mousemove', o.workaround);
   };
-
   hoverstart.padding = 25;
-
   var hover = function (e) {
     this.latestEvent = e;
     const height = (this.height || this.el.offsetHeight) + hoverstart.padding;
-    const width  = (this.width  || this.el.offsetWidth);
-    const {clientX, clientY} = Conf['Follow Cursor'] ? e : this;
-
+    const width = (this.width || this.el.offsetWidth);
+    const { clientX, clientY } = Conf['Follow Cursor'] ? e : this;
     const top = this.isImage ?
       Math.max(0, (clientY * (this.clientHeight - height)) / this.clientHeight)
-    :
-      Math.max(0, Math.min(this.clientHeight - height, clientY - 120));
-
+      :
+        Math.max(0, Math.min(this.clientHeight - height, clientY - 120));
     let threshold = this.clientWidth / 2;
-    if (!this.isImage) { threshold = Math.max(threshold, this.clientWidth - 400); }
+    if (!this.isImage) {
+      threshold = Math.max(threshold, this.clientWidth - 400);
+    }
     let marginX = (clientX <= threshold ? clientX : this.clientWidth - clientX) + 45;
-    if (this.isImage) { marginX = Math.min(marginX, this.clientWidth - width); }
+    if (this.isImage) {
+      marginX = Math.min(marginX, this.clientWidth - width);
+    }
     marginX += 'px';
     const [left, right] = clientX <= threshold ? [marginX, ''] : ['', marginX];
-
-    const {style} = this;
-    style.top   = top + 'px';
-    style.left  = left;
-    return style.right = right;
+    const { style } = this;
+    style.top = top + 'px';
+    style.left = left;
+    style.right = right;
   };
-
   var hoverend = function (e) {
-    if (((e.type === 'keydown') && (e.keyCode !== 13)) || (e.target.nodeName === "TEXTAREA")) { return; }
-    if (!this.noRemove) { $.rm(this.el); }
-    $.off(this.root, this.endEvents,  this.hoverend);
-    $.off(d,     'keydown',   this.hoverend);
+    if (((e.type === 'keydown') && (e.keyCode !== 13)) || (e.target.nodeName === "TEXTAREA")) {
+      return;
+    }
+    if (!this.noRemove) {
+      $.rm(this.el);
+    }
+    $.off(this.root, this.endEvents, this.hoverend);
+    $.off(d$1, 'keydown', this.hoverend);
     $.off(this.root, 'mousemove', this.hover);
-    // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=674955
-    $.off(doc,   'mousemove', this.workaround);
-    if (this.cb) { return this.cb.call(this); }
+    $.off(doc, 'mousemove', this.workaround);
+    if (this.cb) {
+      this.cb.call(this);
+    }
   };
-
   const checkbox = function (name, text, checked) {
-    if (checked == null) { checked = Conf[name]; }
+    if (checked == null) {
+      checked = Conf[name];
+    }
     const label = $.el('label');
-    const input = $.el('input', {type: 'checkbox', name, checked});
+    const input = $.el('input', { type: 'checkbox', name, checked });
     $.add(label, [input, $.tn(` ${text}`)]);
     return label;
   };
-
   const UI = {
     dialog,
     Menu: Menu$1,
-    hover:    hoverstart,
+    hover: hoverstart,
     checkbox
   };
 
@@ -8264,10 +8080,10 @@ svg.icon {
 
       $.add(span, [prev, $.tn(' '), next]);
       var append = function() {
-        $.off(d, '4chanXInitFinished', append);
-        return $.add(d.body, span);
+        $.off(d$1, '4chanXInitFinished', append);
+        return $.add(d$1.body, span);
       };
-      return $.on(d, '4chanXInitFinished', append);
+      return $.on(d$1, '4chanXInitFinished', append);
     },
 
     prev() {
@@ -8280,7 +8096,7 @@ svg.icon {
 
     next() {
       if (g.VIEW === 'thread') {
-        return window.scrollTo(0, d.body.scrollHeight);
+        return window.scrollTo(0, d$1.body.scrollHeight);
       } else {
         return Nav.scroll(+1);
       }
@@ -8300,7 +8116,7 @@ svg.icon {
 
     scroll(delta) {
       let next;
-      d.activeElement?.blur();
+      d$1.activeElement?.blur();
       let thread = Nav.getThread();
       if (!thread) { return; }
       const axis = delta === +1 ?
@@ -8315,25 +8131,25 @@ svg.icon {
         if (((delta === +1) && (top < 5)) || ((delta === -1) && (top > -5))) { thread = next; }
       }
       // Add extra space to the end of the page if necessary so that all threads can be selected by keybinds.
-      const extra = (Header.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
-      if (extra > 0) { d.body.style.marginBottom = `${extra}px`; }
+      const extra = (Header.getTopOf(thread) + doc.clientHeight) - d$1.body.getBoundingClientRect().bottom;
+      if (extra > 0) { d$1.body.style.marginBottom = `${extra}px`; }
 
       Header.scrollTo(thread);
 
       if ((extra > 0) && !Nav.haveExtra) {
         Nav.haveExtra = true;
-        return $.on(d, 'scroll', Nav.removeExtra);
+        return $.on(d$1, 'scroll', Nav.removeExtra);
       }
     },
 
     removeExtra() {
-      const extra = doc.clientHeight - d.body.getBoundingClientRect().bottom;
+      const extra = doc.clientHeight - d$1.body.getBoundingClientRect().bottom;
       if (extra > 0) {
-        return d.body.style.marginBottom = `${extra}px`;
+        return d$1.body.style.marginBottom = `${extra}px`;
       } else {
-        d.body.style.marginBottom = '';
+        d$1.body.style.marginBottom = '';
         delete Nav.haveExtra;
-        return $.off(d, 'scroll', Nav.removeExtra);
+        return $.off(d$1, 'scroll', Nav.removeExtra);
       }
     }
   };
@@ -8498,7 +8314,7 @@ svg.icon {
       Icon.set(this.EAI, 'expand', 'Expand All Images');
       $.on(this.EAI, 'click', this.cb.toggleAll);
       Header.addShortcut('expand-all', this.EAI, 520);
-      $.on(d, 'scroll visibilitychange', this.cb.playVideos);
+      $.on(d$1, 'scroll visibilitychange', this.cb.playVideos);
       this.videoControls = $.el('span', { className: 'video-controls' });
       $.extend(this.videoControls, { innerHTML: " <a href=\"javascript:;\" title=\"You can also contract the video by dragging it to the left.\">contract</a>" });
       return Callbacks.Post.push({
@@ -8628,7 +8444,7 @@ svg.icon {
       if (el = file.fullImage) {
         const top = Header.getTopOf(el);
         bottom = top + el.getBoundingClientRect().height;
-        oldHeight = d.body.clientHeight;
+        oldHeight = d$1.body.clientHeight;
         ({ scrollY } = window);
       }
       $.rmClass(post.nodes.root, 'expanded-image');
@@ -8645,7 +8461,7 @@ svg.icon {
       if (doc.contains(el)) {
         if (bottom <= 0) {
           // For images entirely above us, scroll to remain in place.
-          window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
+          window.scrollBy(0, ((scrollY - window.scrollY) + d$1.body.clientHeight) - oldHeight);
         } else {
           // For images not above us that would be moved above us, scroll to the thumbnail.
           Header.scrollToIfNeeded(post.nodes.root);
@@ -8761,7 +8577,7 @@ svg.icon {
         return;
       } // contracted before the image loaded
       const bottom = Header.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
-      const oldHeight = d.body.clientHeight;
+      const oldHeight = d$1.body.clientHeight;
       const { scrollY } = window;
       $.addClass(post.nodes.root, 'expanded-image');
       $.rmClass(file.thumb, 'expanding');
@@ -8769,7 +8585,7 @@ svg.icon {
       delete file.isExpanding;
       // Scroll to keep our place in the thread when images are expanded above us.
       if (doc.contains(post.nodes.root) && (bottom <= 0)) {
-        window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
+        window.scrollBy(0, ((scrollY - window.scrollY) + d$1.body.clientHeight) - oldHeight);
       }
       // Scroll to display full image.
       if (file.scrollIntoView) {
@@ -8792,7 +8608,7 @@ svg.icon {
       }
       fullImage.controls = false;
       $.asap((() => doc.contains(fullImage)), function () {
-        if (!d.hidden && Header.isNodeVisible(fullImage)) {
+        if (!d$1.hidden && Header.isNodeVisible(fullImage)) {
           fullImage.play();
         } else {
           post.file.wasPlaying = true;
@@ -9332,148 +9148,139 @@ svg.icon {
   PostClone.suffix = 0;
   ;
 
-  // @ts-nocheck
-
-  var BoardConfig = {
+  const BoardConfig = {
     cbs: [],
-
+    boards: undefined,
     init() {
       let middle;
-      if (g.SITE.software !== 'yotsuba') { return; }
+      if (g.SITE.software !== 'yotsuba') {
+        return;
+      }
       const now = Date.now();
       if (now - (2 * HOUR) >= ((middle = Conf['boardConfig'].lastChecked || 0)) || middle > now) {
-        return $.ajax(`${location.protocol}//a.4cdn.org/boards.json`,
-          {onloadend: this.load});
+        $.ajax(`${location.protocol}//a.4cdn.org/boards.json`, {
+          onloadend: this.load
+        });
       } else {
-        const {boards} = Conf['boardConfig'];
-        return this.set(boards);
+        const { boards } = Conf['boardConfig'];
+        this.set(boards);
       }
     },
-
     load() {
       let boards;
       if ((this.status === 200) && this.response && this.response.boards) {
         boards = dict();
-        for (var board of this.response.boards) {
+        for (const board of this.response.boards) {
           boards[board.board] = board;
         }
-        $.set('boardConfig', {boards, lastChecked: Date.now()});
+        $.set('boardConfig', { boards, lastChecked: Date.now() });
       } else {
-        ({boards} = Conf['boardConfig']);
-        const err = (() => { switch (this.status) {
-          case 0:   return 'Connection Error';
-          case 200: return 'Invalid Data';
-          default:          return `Error ${this.statusText} (${this.status})`;
-        } })();
+        boards = Conf['boardConfig'].boards;
+        const err = (() => {
+          switch (this.status) {
+            case 0: return 'Connection Error';
+            case 200: return 'Invalid Data';
+            default: return `Error ${this.statusText} (${this.status})`;
+          }
+        })();
         new Notice('warning', `Failed to load board configuration. ${err}`, 20);
       }
-      return BoardConfig.set(boards);
+      BoardConfig.set(boards);
     },
-
     set(boards) {
       this.boards = boards;
-      for (var ID in g.boards) {
-        var board = g.boards[ID];
+      for (const ID in g.boards) {
+        const board = g.boards[ID];
         board.config = this.boards[ID] || {};
       }
-      for (var cb of this.cbs) {
+      for (const cb of this.cbs) {
         $.queueTask(cb);
       }
     },
-
     ready(cb) {
       if (this.boards) {
-        return cb();
+        cb();
       } else {
-        return this.cbs.push(cb);
+        this.cbs.push(cb);
       }
     },
-
     sfwBoards(sfw) {
-      return (() => {
-        const result = [];
-        const object = this.boards || Conf['boardConfig'].boards;
-        for (var board in object) {
-          var data = object[board];
-          if (!!data.ws_board === sfw) {
-            result.push(board);
-          }
+      const result = [];
+      const object = this.boards || Conf['boardConfig'].boards;
+      for (const board in object) {
+        const data = object[board];
+        if (!!data.ws_board === sfw) {
+          result.push(board);
         }
-        return result;
-      })();
+      }
+      return result;
     },
-
     isSFW(board) {
       return !!(this.boards || Conf['boardConfig'].boards)[board]?.ws_board;
     },
-
     domain(board) {
-      // return `boards.${BoardConfig.isSFW(board) ? '4channel' : '4chan'}.org`;
       return 'boards.4chan.org';
     },
-
     isArchived(board) {
       // assume archive exists if no data available to prevent cleaning of archived threads
       const data = (this.boards || Conf['boardConfig'].boards)[board];
       return !data || data.is_archived;
     },
-
     noAudio(boardID) {
-      if (g.SITE.software !== 'yotsuba') { return false; }
+      if (g.SITE.software !== 'yotsuba') {
+        return false;
+      }
       const boards = this.boards || Conf['boardConfig'].boards;
       return boards && boards[boardID] && !boards[boardID].webm_audio;
     },
-
     title(boardID) {
       return (this.boards || Conf['boardConfig'].boards)?.[boardID]?.title || '';
     }
   };
 
-  // @ts-nocheck
-
-  var Menu = {
+  const Menu = {
+    button: null,
+    menu: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) {
+        return;
+      }
       this.button = $.el('a', {
         className: 'menu-button',
-        href:      'javascript:;'
-      }
-      );
-
+        href: 'javascript:;'
+      });
       Icon.set(this.button, 'caretDown');
-
       this.menu = new UI.Menu('post');
       Callbacks.Post.push({
         name: 'Menu',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Callbacks.CatalogThread.push({
+      Callbacks.CatalogThread.push({
         name: 'Menu',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
     },
-
     node() {
       if (this.isClone) {
         const button = $('.menu-button', this.nodes.info);
-        $.rmClass(button, 'active');
-        $.rm($('.dialog', this.nodes.info));
-        Menu.makeButton(this, button);
+        if (button) {
+          $.rmClass(button, 'active');
+          $.rm($('.dialog', this.nodes.info));
+          Menu.makeButton(this, button);
+        }
         return;
       }
-      return $.add(this.nodes.info, Menu.makeButton(this));
+      $.add(this.nodes.info, Menu.makeButton(this));
     },
-
     catalogNode() {
-      return $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
+      $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
     },
-
     makeButton(post, button) {
-      if (!button) { button = Menu.button.cloneNode(true); }
-      $.on(button, 'click', function(e) {
-        return Menu.menu.toggle(e, this, post);
+      if (!button) {
+        button = Menu.button.cloneNode(true);
+      }
+      $.on(button, 'click', function (e) {
+        Menu.menu.toggle(e, this, post);
       });
       return button;
     }
@@ -9862,7 +9669,7 @@ svg.icon {
         ['Show', 'Both', 'BothRelativeFirst'].includes(Conf.RelativeTime)) ||
         Index.enabled) {
         this.flush();
-        $.on(d, 'visibilitychange PostsInserted', this.flush);
+        $.on(d$1, 'visibilitychange PostsInserted', this.flush);
       }
       if (Conf.RelativeTime !== 'No') {
         return Callbacks.Post.push({
@@ -9950,7 +9757,7 @@ svg.icon {
     timeout: undefined,
     flush() {
       // No point in changing the dates until the user sees them.
-      if (d.hidden) {
+      if (d$1.hidden) {
         return;
       }
       const now = new Date();
@@ -10063,64 +9870,63 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
-
   const PostRedirect = {
+    event: null,
+    delays: 0,
     init() {
-      return $.on(d, 'QRPostSuccessful', e => {
-        if (!e.detail.redirect) { return; }
-        this.event = e;
-        this.delays = 0;
-        return $.queueTask(() => {
-          if ((e === this.event) && (this.delays === 0)) {
-            return location.href = e.detail.redirect;
+      $.on(d$1, 'QRPostSuccessful', (e) => {
+        const customEvent = e;
+        if (!customEvent.detail.redirect) {
+          return;
+        }
+        PostRedirect.event = customEvent;
+        PostRedirect.delays = 0;
+        $.queueTask(() => {
+          if ((customEvent === PostRedirect.event) && (PostRedirect.delays === 0)) {
+            location.href = customEvent.detail.redirect;
           }
         });
       });
     },
-
-    delays: 0,
-
     delay() {
-      if (!this.event) { return null; }
-      const e = this.event;
-      this.delays++;
+      if (!PostRedirect.event) {
+        return null;
+      }
+      const e = PostRedirect.event;
+      PostRedirect.delays++;
       return () => {
-        if (e !== this.event) { return; }
-        this.delays--;
-        if (this.delays === 0) {
-          return location.href = e.detail.redirect;
+        if (e !== PostRedirect.event) {
+          return;
+        }
+        PostRedirect.delays--;
+        if (PostRedirect.delays === 0) {
+          location.href = e.detail.redirect;
         }
       };
     }
   };
 
-  // @ts-nocheck
-
-  var ExpandComment = {
+  const ExpandComment = {
+    callbacks: [],
     init() {
-      if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) { return; }
-
-      return Callbacks.Post.push({
+      if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'Comment Expansion',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       let a;
       if (a = $('.abbr > a:not([onclick])', this.nodes.comment)) {
-        return $.on(a, 'click', ExpandComment.cb);
+        $.on(a, 'click', ExpandComment.cb);
       }
     },
-
-    callbacks: [],
-
     cb(e) {
       e.preventDefault();
-      return ExpandComment.expand(Get.postFromNode(this));
+      ExpandComment.expand(Get.postFromNode(this));
     },
-
     expand(post) {
       let a;
       if (post.nodes.longComment && !post.nodes.longComment.parentNode) {
@@ -10128,53 +9934,56 @@ svg.icon {
         post.nodes.comment = post.nodes.longComment;
         return;
       }
-      if (!(a = $('.abbr > a', post.nodes.comment))) { return; }
+      if (!(a = $('.abbr > a', post.nodes.comment))) {
+        return;
+      }
       a.textContent = `Post No.${post} Loading...`;
-      return $.cache(g.SITE.urls.threadJSON({boardID: post.boardID, threadID: post.threadID}), function() { return ExpandComment.parse(this, a, post); });
+      $.cache(g.SITE.urls.threadJSON({ boardID: post.boardID, threadID: post.threadID }), function () {
+        ExpandComment.parse(this, a, post);
+      });
     },
-
     contract(post) {
-      if (!post.nodes.shortComment) { return; }
+      if (!post.nodes.shortComment) {
+        return;
+      }
       const a = $('.abbr > a', post.nodes.shortComment);
       a.textContent = 'here';
       $.replace(post.nodes.longComment, post.nodes.shortComment);
-      return post.nodes.comment = post.nodes.shortComment;
+      post.nodes.comment = post.nodes.shortComment;
     },
-
     parse(req, a, post) {
       let postObj, spoilerRange;
-      const {status} = req;
+      const { status } = req;
       if (![200, 304].includes(status)) {
         a.textContent = status ? `Error ${req.statusText} (${status})` : 'Connection Error';
         return;
       }
-
-      const {
-        posts
-      } = req.response;
+      const { posts } = req.response;
       if (spoilerRange = posts[0].custom_spoiler) {
-        g.SITE.Build.spoilerRange[g.BOARD] = spoilerRange;
+        g.SITE.Build.spoilerRange[g.BOARD.ID] = spoilerRange;
       }
-
       for (postObj of posts) {
-        if (postObj.no === post.ID) { break; }
+        if (postObj.no === post.ID) {
+          break;
+        }
       }
       if (postObj.no !== post.ID) {
         a.textContent = `Post No.${post} not found.`;
         return;
       }
-
-      const {comment} = post.nodes;
+      const { comment } = post.nodes;
       const clone = comment.cloneNode(false);
       clone.innerHTML = postObj.com;
       // Fix pathnames
-      for (var quote of $$('.quotelink', clone)) {
-        var href = quote.getAttribute('href');
-        if (href[0] === '/') { continue; } // Cross-board quote, or board link
+      for (const quote of $$('.quotelink', clone)) {
+        const href = quote.getAttribute('href') || '';
+        if (href[0] === '/') {
+          continue;
+        } // Cross-board quote, or board link
         if (href[0] === '#') {
-          quote.href = `${a.pathname.split(/\/+/).splice(0,4).join('/')}${href}`;
+          quote.href = `${a.pathname.split(/\/+/).slice(0, 4).join('/')}${href}`;
         } else {
-          quote.href = `${a.pathname.split(/\/+/).splice(0,3).join('/')}/${href}`;
+          quote.href = `${a.pathname.split(/\/+/).slice(0, 3).join('/')}/${href}`;
         }
       }
       post.nodes.shortComment = comment;
@@ -10182,13 +9991,11 @@ svg.icon {
       post.nodes.comment = (post.nodes.longComment = clone);
       post.parseComment();
       post.parseQuotes();
-
-      for (var callback of ExpandComment.callbacks) {
+      for (const callback of ExpandComment.callbacks) {
         callback.call(post);
       }
     }
   };
-  ;
 
   // @ts-nocheck
   const ScrollMarkers = {
@@ -10269,7 +10076,7 @@ svg.icon {
       }
       this.db = new DataBoard('yourPosts');
       $.sync('Remember Your Posts', (enabled) => Conf['Remember Your Posts'] = enabled);
-      $.on(d, 'QRPostSuccessful', (e) => {
+      $.on(d$1, 'QRPostSuccessful', (e) => {
         const cb = PostRedirect.delay();
         $.get('Remember Your Posts', Conf['Remember Your Posts'], (items) => {
           if (!items['Remember Your Posts']) {
@@ -10586,7 +10393,7 @@ svg.icon {
     },
     node() {
       Unread.thread = this;
-      Unread.title = d.title;
+      Unread.title = d$1.title;
       Unread.lastReadPost = Unread.db?.get({
         boardID: this.board.ID,
         threadID: this.ID
@@ -10597,9 +10404,9 @@ svg.icon {
           Unread.readCount++;
         }
       }
-      $.one(d, '4chanXInitFinished', Unread.ready);
-      $.on(d, 'PostsInserted', Unread.onUpdate);
-      $.on(d, 'ThreadUpdate', (e) => {
+      $.one(d$1, '4chanXInitFinished', Unread.ready);
+      $.on(d$1, 'PostsInserted', Unread.onUpdate);
+      $.on(d$1, 'ThreadUpdate', (e) => {
         if (e.detail?.[404]) {
           Unread.update();
         }
@@ -10622,9 +10429,9 @@ svg.icon {
       Unread.setLine(true);
       Unread.read();
       Unread.update();
-      $.on(d, 'scroll visibilitychange', Unread.read);
+      $.on(d$1, 'scroll visibilitychange', Unread.read);
       if (Conf['Unread Line']) {
-        $.on(d, 'visibilitychange', Unread.setLine);
+        $.on(d$1, 'visibilitychange', Unread.setLine);
       }
     },
     positionPrev() {
@@ -10761,7 +10568,7 @@ svg.icon {
       if (!Unread.posts.size && (Unread.readCount !== Unread.thread.posts.keys.length)) {
         Unread.saveLastReadPost();
       }
-      if (d.hidden || !Unread.posts.size) {
+      if (d$1.hidden || !Unread.posts.size) {
         return;
       }
       let count = 0;
@@ -10821,7 +10628,7 @@ svg.icon {
       if (!Conf['Unread Line']) {
         return;
       }
-      if (Unread.hr.hidden || d.hidden || (force === true)) {
+      if (Unread.hr.hidden || d$1.hidden || (force === true)) {
         const oldPosition = Unread.linePosition;
         if ((Unread.linePosition = Unread.positionPrev())) {
           if (Unread.linePosition !== oldPosition) {
@@ -10847,7 +10654,7 @@ svg.icon {
           Unread.title.replace('-', (Unread.thread.isArchived ? '- Archived -' : '- 404 -'))
           :
             Unread.title;
-        d.title = `${titleQuotingYou}${titleCount}${titleDead}`;
+        d$1.title = `${titleQuotingYou}${titleCount}${titleDead}`;
       }
       Unread.saveThreadWatcherCount();
       if (Conf['Unread Favicon'] && (g.SITE.software === 'yotsuba')) {
@@ -10888,14 +10695,14 @@ svg.icon {
     })
   };
 
-  // @ts-nocheck
-
-  var ExpandThread = {
+  const ExpandThread = {
     statuses: dict(),
     init() {
-      if (!((g.VIEW === 'index') && Conf['Thread Expansion'])) { return; }
+      if (!((g.VIEW === 'index') && Conf['Thread Expansion'])) {
+        return;
+      }
       if (Conf['JSON Index']) {
-        $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
+        $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
       } else {
         Callbacks.Thread.push({
           name: 'Expand Thread',
@@ -10903,139 +10710,157 @@ svg.icon {
         });
       }
     },
-
     setButton(thread) {
-      if (!thread.nodes.root) return;
+      if (!thread.nodes.root)
+        return;
       const a = $('a.summary', thread.nodes.root);
-      if (!a) return;
-      a.textContent = g.SITE.Build.summaryText('+', ...a.textContent.match(/\d+/g));
+      if (!a)
+        return;
+      a.textContent = g.SITE.Build.summaryText('+', ...(a.textContent.match(/\d+/g) || []));
       a.style.cursor = 'pointer';
       $.on(a, 'click', ExpandThread.cbToggle);
     },
-
     disconnect(refresh) {
-      if ((g.VIEW === 'thread') || !Conf['Thread Expansion']) { return; }
-      for (var threadID in ExpandThread.statuses) {
-        var oldReq;
-        var status = ExpandThread.statuses[threadID];
+      if ((g.VIEW === 'thread') || !Conf['Thread Expansion']) {
+        return;
+      }
+      for (const threadID in ExpandThread.statuses) {
+        let oldReq;
+        const status = ExpandThread.statuses[threadID];
         if (oldReq = status.req) {
           delete status.req;
           oldReq.abort();
         }
         delete ExpandThread.statuses[threadID];
       }
-
-      if (!refresh) $.off(d, 'IndexRefreshInternal', this.onIndexRefresh);
+      if (!refresh)
+        $.off(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
     },
-
     onIndexRefresh() {
       ExpandThread.disconnect(true);
       g.BOARD.threads.forEach(thread => ExpandThread.setButton(thread));
     },
-
     cbToggle(e) {
-      if ($.modifiedClick(e)) { return; }
+      if ($.modifiedClick(e)) {
+        return;
+      }
       e.preventDefault();
       ExpandThread.toggle(Get.threadFromNode(this));
     },
-
     cbToggleBottom(e) {
-      if ($.modifiedClick(e)) { return; }
+      if ($.modifiedClick(e)) {
+        return;
+      }
       e.preventDefault();
       const thread = Get.threadFromNode(this);
       $.rm(this); // remove before fixing bottom of thread position
-      const {bottom} = thread.nodes.root.getBoundingClientRect();
+      const { bottom } = thread.nodes.root.getBoundingClientRect();
       ExpandThread.toggle(thread);
-      return window.scrollBy(0, (thread.nodes.root.getBoundingClientRect().bottom - bottom));
+      window.scrollBy(0, (thread.nodes.root.getBoundingClientRect().bottom - bottom));
     },
-
     toggle(thread) {
-      if (!thread.nodes.root) return;
+      if (!thread.nodes.root)
+        return;
       const a = $('a.summary', thread.nodes.root);
-      if (!a) return;
+      if (!a)
+        return;
       if (thread.ID in ExpandThread.statuses) {
         ExpandThread.contract(thread, a, thread.nodes.root);
       } else {
         ExpandThread.expand(thread, a);
       }
     },
-
     expand(thread, a) {
       let status;
-      ExpandThread.statuses[thread] = (status = {});
-      a.textContent = g.SITE.Build.summaryText('...', ...a.textContent.match(/\d+/g));
-      status.req = $.cache(g.SITE.urls.threadJSON({boardID: thread.board.ID, threadID: thread.ID}), function() {
-        if (this !== status.req) { return; } // aborted
+      ExpandThread.statuses[thread.ID] = (status = {});
+      a.textContent = g.SITE.Build.summaryText('...', ...(a.textContent.match(/\d+/g) || []));
+      status.req = $.cache(g.SITE.urls.threadJSON({ boardID: thread.board.ID, threadID: thread.ID }), function () {
+        if (this !== status.req) {
+          return;
+        } // aborted
         delete status.req;
         ExpandThread.parse(this, thread, a);
       });
       status.numReplies = $$(g.SITE.selectors.replyOriginal, thread.nodes.root).length;
     },
-
     contract(thread, a, threadRoot) {
       let oldReq;
-      const status = ExpandThread.statuses[thread];
-      delete ExpandThread.statuses[thread];
+      const status = ExpandThread.statuses[thread.ID];
+      delete ExpandThread.statuses[thread.ID];
       if (oldReq = status.req) {
         delete status.req;
         oldReq.abort();
-        if (a) { a.textContent = g.SITE.Build.summaryText('+', ...a.textContent.match(/\d+/g)); }
+        if (a) {
+          a.textContent = g.SITE.Build.summaryText('+', ...(a.textContent.match(/\d+/g) || []));
+        }
         return;
       }
-
       let replies = $$('.thread > .replyContainer', threadRoot);
-      if (status.numReplies) { replies = replies.slice(0, (-status.numReplies)); }
+      if (status.numReplies) {
+        replies = replies.slice(0, (-status.numReplies));
+      }
       let postsCount = 0;
       let filesCount = 0;
-      for (var reply of replies) {
-        // rm clones
-        if (Conf['Quote Inlining']) { var inlined;
-        while ((inlined = $('.inlined', reply))) { inlined.click(); } }
+      for (const reply of replies) {
+        if (Conf['Quote Inlining']) {
+          let inlined;
+          while ((inlined = $('.inlined', reply))) {
+            inlined.click();
+          }
+        }
         postsCount++;
-        if ('file' in Get.postFromRoot(reply)) { filesCount++; }
+        if ('file' in Get.postFromRoot(reply)) {
+          filesCount++;
+        }
         $.rm(reply);
       }
-      if (Index.enabled) { // otherwise handled by Main.addPosts
+      if (Index.enabled) {
         $.event('PostsRemoved', null, a.parentNode);
       }
       a.textContent = g.SITE.Build.summaryText('+', postsCount, filesCount);
-      $.rm($('.summary-bottom', threadRoot));
+      const summaryBottom = $('.summary-bottom', threadRoot);
+      if (summaryBottom) {
+        $.rm(summaryBottom);
+      }
     },
-
     parse(req, thread, a) {
-      let root;
+      let root = null;
       if (![200, 304].includes(req.status)) {
         a.textContent = req.status ? `Error ${req.statusText} (${req.status})` : 'Connection Error';
         return;
       }
-
-      g.SITE.Build.spoilerRange[thread.board] = req.response.posts[0].custom_spoiler;
-
-      const posts      = [];
-      const postsRoot  = [];
+      g.SITE.Build.spoilerRange[thread.board.ID] = req.response.posts[0].custom_spoiler;
+      const posts = [];
+      const postsRoot = [];
       let filesCount = 0;
-      for (var postData of req.response.posts) {
-        var post;
-        if (postData.no === thread.ID) { continue; }
+      for (const postData of req.response.posts) {
+        let post;
+        if (postData.no === thread.ID) {
+          continue;
+        }
         if ((post = thread.posts.get(postData.no)) && !post.isFetchedQuote) {
-          if ('file' in post) { filesCount++; }
-          ({root} = post.nodes);
+          if ('file' in post) {
+            filesCount++;
+          }
+          root = post.nodes.root;
           postsRoot.push(root);
           continue;
         }
         root = g.SITE.Build.postFromObject(postData, thread.board.ID);
         post = new Post(root, thread, thread.board);
-        if ('file' in post) { filesCount++; }
+        if ('file' in post) {
+          filesCount++;
+        }
         posts.push(post);
         postsRoot.push(root);
       }
-      for (const post of posts) { Callbacks.Post.execute(post); }
+      for (const post of posts) {
+        Callbacks.Post.execute(post);
+      }
       $.after(a, postsRoot);
       $.event('PostsInserted', null, a.parentNode);
-
-      const postsCount    = postsRoot.length;
+      const postsCount = postsRoot.length;
       a.textContent = g.SITE.Build.summaryText('-', postsCount, filesCount);
-
       if (root) {
         const a2 = a.cloneNode(true);
         a2.classList.add('summary-bottom');
@@ -11060,8 +10885,8 @@ svg.icon {
         name: 'Unread Line in Index',
         cb: this.node
       });
-      $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
-      $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
+      $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
+      $.on(d$1, 'PostsInserted PostsRemoved', this.onPostsInserted);
     },
     node() {
       UnreadIndex.lastReadPost[this.fullID] = UnreadIndex.db.get({
@@ -11219,7 +11044,7 @@ svg.icon {
       Icon.set(this.refreshButton, 'refresh');
       Icon.set(this.menuButton, 'caretDown');
       Icon.set(this.closeButton, 'xmark');
-      $.on(d, 'QRPostSuccessful', this.cb.post);
+      $.on(d$1, 'QRPostSuccessful', this.cb.post);
       $.on(sc, 'click', this.toggleWatcher);
       $.on(this.refreshButton, 'click', this.buttonFetchAll);
       $.on(this.closeButton, 'click', this.toggleWatcher);
@@ -11227,10 +11052,10 @@ svg.icon {
       $.onExists(doc, 'body', this.addDialog);
       switch (g.VIEW) {
         case 'index':
-          $.on(d, 'IndexUpdate', this.cb.onIndexUpdate);
+          $.on(d$1, 'IndexUpdate', this.cb.onIndexUpdate);
           break;
         case 'thread':
-          $.on(d, 'ThreadUpdate', this.cb.onThreadRefresh);
+          $.on(d$1, 'ThreadUpdate', this.cb.onThreadRefresh);
           break;
       }
       if (Conf['Fixed Thread Watcher']) {
@@ -11338,7 +11163,7 @@ svg.icon {
         return;
       }
       ThreadWatcher.build();
-      $.prepend(d.body, ThreadWatcher.dialog);
+      $.prepend(d$1.body, ThreadWatcher.dialog);
     },
     toggleWatcher() {
       $.toggleClass(ThreadWatcher.shortcut, 'disabled');
@@ -11539,7 +11364,7 @@ svg.icon {
       const { db } = ThreadWatcher;
       const interval = Conf['Show Page'] || (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) ? 5 * MINUTE : 2 * HOUR;
       const now = Date.now();
-      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d.hidden && d.hasFocus()) {
+      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d$1.hidden && d$1.hasFocus()) {
         ThreadWatcher.fetchAllStatus(interval);
       }
       ThreadWatcher.timeout = setTimeout(ThreadWatcher.fetchAuto, interval);
@@ -12344,8 +12169,8 @@ svg.icon {
       $.after(this.OP.nodes.root, ReplyPruning.summary);
       $.on(ReplyPruning.inputs.enabled, 'change', ReplyPruning.update);
       $.on(ReplyPruning.inputs.replies, 'change', ReplyPruning.update);
-      $.on(d, 'ThreadUpdate', ReplyPruning.updateCount);
-      $.on(d, 'ThreadUpdate', ReplyPruning.update);
+      $.on(d$1, 'ThreadUpdate', ReplyPruning.updateCount);
+      $.on(d$1, 'ThreadUpdate', ReplyPruning.update);
       ReplyPruning.update();
     },
     updateCount(e) {
@@ -12368,7 +12193,7 @@ svg.icon {
         :
           0;
       // Record position from bottom of document
-      const oldPos = d.body.clientHeight - window.scrollY;
+      const oldPos = d$1.body.clientHeight - window.scrollY;
       const { posts } = ReplyPruning.thread;
       if (ReplyPruning.hidden < hidden2) {
         while ((ReplyPruning.hidden < hidden2) && (ReplyPruning.position < posts.keys.length)) {
@@ -12409,7 +12234,7 @@ svg.icon {
       ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
       // Maintain position in thread when posts are added/removed above
       if ((hidden1 !== hidden2) && ((boardTop = Header.getTopOf($('.board'))) < 0)) {
-        window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
+        window.scrollBy(0, Math.max(d$1.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
       }
     }
   };
@@ -12434,7 +12259,7 @@ svg.icon {
       $.on(this.input, 'change', this.setEnabled);
       $.on(this.input, 'change', this.rethread);
       $.on(this.threadNewLink.firstElementChild, 'click', this.rethread);
-      $.on(d, '4chanXInitFinished', () => { this.ready = true; });
+      $.on(d$1, '4chanXInitFinished', () => { this.ready = true; });
       Header.menu.addEntry(this.entry = {
         el: this.controls,
         order: 99
@@ -12761,7 +12586,7 @@ svg.icon {
           rel: 'stylesheet',
           href: `//s.4cdn.org/css/flags.${cssVersion}.css`
         });
-        $.add(d.head, Fetcher.flagCSS);
+        $.add(d$1.head, Fetcher.flagCSS);
       }
       $.rmAll(this.root);
       $.add(this.root, nodes.root);
@@ -12907,7 +12732,7 @@ svg.icon {
         return;
       }
       if (g.VIEW === 'archive') {
-        $.on(d, 'mouseover', function (e) {
+        $.on(d$1, 'mouseover', function (e) {
           const target = e.target;
           if ((target.nodeName === 'A') && $.hasClass(target, 'quotelink')) {
             QuotePreview.mouseover.call(target, e);
@@ -12932,7 +12757,7 @@ svg.icon {
     },
     mouseover(e) {
       let origin;
-      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d.contains(this)) {
+      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d$1.contains(this)) {
         return;
       }
       const { boardID, threadID, postID } = Get.postDataFromLink(this);
@@ -13030,55 +12855,50 @@ svg.icon {
   <a href="./catalog">Catalog</a>
 </div>`;
 
-  // @ts-nocheck
-
-  var Index = {
+  const Index = {
     showHiddenThreads: false,
     changed: {},
-
-    enabledOn({siteID, boardID}) {
+    search: '',
+    currentSort: '',
+    currentPage: 1,
+    root: $.el('div', { className: 'board json-index' }),
+    enabledOn({ siteID, boardID }) {
       return Conf['JSON Index'] && (g.sites[siteID].software === 'yotsuba') && (boardID !== 'f');
     },
-
     init() {
-      let input, inputs, name;
-      if (g.VIEW !== 'index') { return; }
-
+      let input, name;
+      if (g.VIEW !== 'index') {
+        return;
+      }
       // For IndexRefresh events
-      $.one(d, '4chanXInitFinished', this.cb.initFinished);
-      $.on(d, 'PostsInserted', this.cb.postsInserted);
-
-      if (!this.enabledOn(g.BOARD)) { return; }
-
+      $.one(d$1, '4chanXInitFinished', this.cb.initFinished);
+      $.on(d$1, 'PostsInserted', this.cb.postsInserted);
+      if (!this.enabledOn(g.BOARD)) {
+        return;
+      }
       this.enabled = true;
-
       Callbacks.Post.push({
         name: 'Index Page Numbers',
-        cb:   this.node
+        cb: this.node
       });
       Callbacks.CatalogThread.push({
         name: 'Catalog Features',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
-
       this.search = history.state?.searched || '';
       if (history.state?.mode) {
         Conf['Index Mode'] = history.state?.mode;
       }
       this.currentSort = history.state?.sort;
-      if (!this.currentSort) { this.currentSort = typeof Conf['Index Sort'] === 'object' ? (
-          Conf['Index Sort'][g.BOARD.ID] || 'bump'
-        ) : (
-          Conf['Index Sort']
-        ); }
+      if (!this.currentSort) {
+        this.currentSort = typeof Conf['Index Sort'] === 'object' ? (Conf['Index Sort'][g.BOARD.ID] || 'bump') : (Conf['Index Sort']);
+      }
       this.currentPage = this.getCurrentPage();
       this.processHash();
-
       $.addClass(doc, 'index-loading', `${Conf['Index Mode'].replace(/\ /g, '-')}-mode`);
       $.on(window, 'popstate', this.cb.popstate);
-      $.on(d, 'scroll', this.scroll);
-      $.on(d, 'SortIndex', this.cb.resort);
-
+      $.on(d$1, 'scroll', this.scroll.bind(this));
+      $.on(d$1, 'SortIndex', this.cb.resort);
       // Header refresh button
       this.button = $.el('a', {
         title: 'Refresh',
@@ -13087,16 +12907,16 @@ svg.icon {
       Icon.set(this.button, 'refresh', 'Refresh');
       $.on(this.button, 'click', () => Index.update());
       Header.addShortcut('index-refresh', this.button, 590);
-
       // Header "Index Navigation" submenu
       const entries = [];
-      this.inputs = (inputs = dict());
+      const inputs = dict();
+      this.inputs = inputs;
       for (name in Config.Index) {
-        var arr = Config.Index[name];
+        const arr = Config.Index[name];
         if (arr instanceof Array) {
-          var label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
+          const label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
           label.title = arr[1];
-          entries.push({el: label});
+          entries.push({ el: label });
           input = label.firstChild;
           $.on(input, 'change', $.cb.checked);
           inputs[name] = input;
@@ -13106,61 +12926,54 @@ svg.icon {
       $.on(inputs['Catalog Hover Expand'], 'change', this.cb.hover);
       $.on(inputs['Pin Watched Threads'], 'change', this.cb.resort);
       $.on(inputs['Anchor Hidden Threads'], 'change', this.cb.resort);
-
-      const watchSettings = function(e) {
+      const watchSettings = function (e) {
         if (input = $.getOwn(inputs, e.target.name)) {
           input.checked = e.target.checked;
-          return $.event('change', null, input);
+          $.event('change', null, input);
         }
       };
-      $.on(d, 'OpenSettings', () => $.on($.id('fourchanx-settings'), 'change', watchSettings));
-
+      $.on(d$1, 'OpenSettings', () => $.on($.id('fourchanx-settings'), 'change', watchSettings));
       const sortEntry = UI.checkbox('Per-Board Sort Type', 'Per-board sort type', (typeof Conf['Index Sort'] === 'object'));
       sortEntry.title = 'Set the sorting order of each board independently.';
       $.on(sortEntry.firstChild, 'change', this.cb.perBoardSort);
-      entries.splice(3, 0, {el: sortEntry});
-
+      entries.splice(3, 0, { el: sortEntry });
       Header.menu.addEntry({
-        el: $.el('span',
-          {textContent: 'Index Navigation'}),
+        el: $.el('span', { textContent: 'Index Navigation' }),
         order: 100,
         subEntries: entries
       });
-
       // Navigation links at top of index
-      this.navLinks = $.el('div', {className: 'navLinks json-index'});
-      $.extend(this.navLinks, {innerHTML: NavLinksPage});
+      this.navLinks = $.el('div', { className: 'navLinks json-index' });
+      $.extend(this.navLinks, { innerHTML: NavLinksPage });
       $('.cataloglink a', this.navLinks).href = CatalogLinks.catalog();
-      if (!BoardConfig.isArchived(g.BOARD.ID)) { $('.archlistlink', this.navLinks).hidden = true; }
+      if (!BoardConfig.isArchived(g.BOARD.ID)) {
+        $('.archlistlink', this.navLinks).hidden = true;
+      }
       $.on($('#index-last-refresh a', this.navLinks), 'click', this.cb.refreshFront);
-
       // Search field
       this.searchInput = $('#index-search', this.navLinks);
       this.setupSearch();
-      $.on(this.searchInput, 'input', this.onSearchInput);
-      $.on($('#index-search-clear', this.navLinks), 'click', this.clearSearch);
+      $.on(this.searchInput, 'input', this.onSearchInput.bind(this));
+      $.on($('#index-search-clear', this.navLinks), 'click', this.clearSearch.bind(this));
       Icon.set($('#index-search-clear', this.navLinks), 'xmark');
-
       // Hidden threads toggle
       this.hideLabel = $('#hidden-label', this.navLinks);
       $.on($('#hidden-toggle a', this.navLinks), 'click', this.cb.toggleHiddenThreads);
-
       // Drop-down menus and reverse sort toggle
-      this.selectRev   = $('#index-rev',  this.navLinks);
-      this.selectMode  = $('#index-mode', this.navLinks);
-      this.selectSort  = $('#index-sort', this.navLinks);
-      this.selectSize  = $('#index-size', this.navLinks);
-      $.on(this.selectRev,  'change', this.cb.sort);
+      this.selectRev = $('#index-rev', this.navLinks);
+      this.selectMode = $('#index-mode', this.navLinks);
+      this.selectSort = $('#index-sort', this.navLinks);
+      this.selectSize = $('#index-size', this.navLinks);
+      $.on(this.selectRev, 'change', this.cb.sort);
       $.on(this.selectMode, 'change', this.cb.mode);
       $.on(this.selectSort, 'change', this.cb.sort);
       $.on(this.selectSize, 'change', $.cb.value);
       $.on(this.selectSize, 'change', this.cb.size);
-      for (var select of [this.selectMode, this.selectSize]) {
+      for (const select of [this.selectMode, this.selectSize]) {
         select.value = Conf[select.name];
       }
       this.selectRev.checked = /-rev$/.test(Index.currentSort);
-      this.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
-
+      this.selectSort.value = Index.currentSort.replace(/-rev$/, '');
       // Last Long Reply options
       this.lastLongOptions = $('#lastlong-options', this.navLinks);
       this.lastLongInputs = $$('input', this.lastLongOptions);
@@ -13169,117 +12982,108 @@ svg.icon {
       for (let i = 0; i < this.lastLongInputs.length; i++) {
         input = this.lastLongInputs[i];
         $.on(input, 'change', this.cb.lastLongThresholds);
-        var tRaw = Conf[`Last Long Reply Thresholds ${i}`];
-        input.value = (this.lastLongThresholds[i] =
+        const tRaw = Conf[`Last Long Reply Thresholds ${i}`];
+        input.value = String(this.lastLongThresholds[i] =
           typeof tRaw === 'object' ? (tRaw[g.BOARD.ID] ?? 100) : tRaw);
       }
-
       // Thread container
-      this.root = $.el('div', {className: 'board json-index'});
       $.on(this.root, 'click', this.cb.hoverToggle);
       this.cb.size();
       this.cb.hover();
-
       // Page list
-      this.pagelist = $.el('div', {className: 'pagelist json-index'});
-      $.extend(this.pagelist, {innerHTML: PageList});
+      this.pagelist = $.el('div', { className: 'pagelist json-index' });
+      $.extend(this.pagelist, { innerHTML: PageList });
       $('.cataloglink a', this.pagelist).href = CatalogLinks.catalog();
       $.on(this.pagelist, 'click', this.cb.pageNav);
-
       this.update(true);
-
-      $.onExists(doc, 'title + *', () => d.title = d.title.replace(/\ -\ Page\ \d+/, ''));
-
-      $.onExists(doc, '.board > .thread > .postContainer, .board + *', function() {
-        let el;
+      $.onExists(doc, 'title + *', () => d$1.title = d$1.title.replace(/\ -\ Page\ \d+/, ''));
+      $.onExists(doc, '.board > .thread > .postContainer, .board + *', function () {
         g.SITE.Build.hat = $('.board > .thread > img:first-child');
         if (g.SITE.Build.hat) {
-          g.BOARD.threads.forEach(function(thread) {
+          g.BOARD.threads.forEach(function (thread) {
             if (thread.nodes.root) {
-              return $.prepend(thread.nodes.root, g.SITE.Build.hat.cloneNode(false));
+              $.prepend(thread.nodes.root, g.SITE.Build.hat.cloneNode(false));
             }
           });
           $.addClass(doc, 'hats-enabled');
           $.addStyle(`.catalog-thread::after {background-image: url(${g.SITE.Build.hat.src});}`);
         }
-
         const board = $('.board');
         $.replace(board, Index.root);
         if (Index.loaded) {
           $.event('PostsInserted', null, Index.root);
         }
-        // Hacks:
-        // - When removing an element from the document during page load,
-        //   its ancestors will still be correctly created inside of it.
-        // - Creating loadable elements inside of an origin-less document
-        //   will not download them.
-        // - Combine the two and you get a download canceller!
-        //   Does not work on Firefox unfortunately. bugzil.la/939713
         try {
-          d.implementation.createDocument(null, null, null).appendChild(board);
-        } catch (error) {}
-
-        for (el of $$('.navLinks')) { $.rm(el); }
+          d$1.implementation.createDocument(null, null, null).appendChild(board);
+        } catch (error) { }
+        for (const el of $$('.navLinks')) {
+          $.rm(el);
+        }
         $.rm($.id('ctrl-top'));
         const topNavPos = $.id('delform').previousElementSibling;
         $.before(topNavPos, $.el('hr'));
         $.before(topNavPos, Index.navLinks);
         const timeEl = $('#index-last-refresh time', Index.navLinks);
-        if (timeEl.dataset.utc) { return RelativeDates.update(timeEl); }
+        if (timeEl.dataset.utc) {
+          RelativeDates.update(timeEl);
+        }
       });
-
-      return $.on(d, '4chanXInitFinished', function() {
+      $.on(d$1, '4chanXInitFinished', function () {
         let pagelist;
         if (pagelist = $('.pagelist')) {
           $.replace(pagelist, Index.pagelist);
         }
-        return $.rmClass(doc, 'index-loading');
+        $.rmClass(doc, 'index-loading');
       });
     },
-
     scroll() {
-      if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) { return; }
-      if (Index.pageNum == null) { Index.pageNum = Index.currentPage; } // Avoid having to pushState to keep track of the current page
-
+      if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) {
+        return;
+      }
+      if (Index.pageNum == null) {
+        Index.pageNum = Index.currentPage;
+      } // Avoid having to pushState to keep track of the current page
       const pageNum = ++Index.pageNum;
-      if (pageNum > Index.pagesNum) { return Index.endNotice(); }
-
+      if (pageNum > Index.pagesNum) {
+        return Index.endNotice();
+      }
       const threadIDs = Index.threadsOnPage(pageNum);
-      return Index.buildStructure(threadIDs);
+      Index.buildStructure(threadIDs);
     },
-
-    endNotice: (function() {
+    endNotice: (function () {
       let notify = false;
       const reset = () => notify = false;
-      return function() {
-        if (notify) { return; }
+      return function () {
+        if (notify) {
+          return;
+        }
         notify = true;
         new Notice('info', "Last page reached.", 2);
-        return setTimeout(reset, 3 * SECOND);
+        setTimeout(reset, 3 * SECOND);
       };
     })(),
-
     menu: {
       init() {
-        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link'] || !Index.enabledOn(g.BOARD)) { return; }
-
-        return Menu.menu.addEntry({
+        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link'] || !Index.enabledOn(g.BOARD)) {
+          return;
+        }
+        Menu.menu.addEntry({
           el: $.el('a', {
-            href:      'javascript:;',
+            href: 'javascript:;',
             className: 'has-shortcut-text'
-          }
-          , {innerHTML: "<span></span><span class=\"shortcut-text\">Shift+click</span>"}),
+          }, { innerHTML: "<span></span><span class=\"shortcut-text\">Shift+click</span>" }),
           order: 20,
-          open({thread}) {
-            if (Conf['Index Mode'] !== 'catalog') { return false; }
-            this.el.firstElementChild.textContent = thread.isHidden ?
-              'Unhide'
-            :
-              'Hide';
-            if (this.cb) { $.off(this.el, 'click', this.cb); }
-            this.cb = function() {
-              $.event('CloseMenu');
-              return Index.toggleHide(thread);
+          open({ thread }) {
+            if (Conf['Index Mode'] !== 'catalog') {
+              return false;
+            }
+            this.el.firstElementChild.textContent = thread.isHidden ? 'Unhide' : 'Hide';
+            if (this.cb) {
+              $.off(this.el, 'click', this.cb);
+            }
+            this.cb = function () {
+              $.event('CloseMenu', undefined);
+              Index.toggleHide(thread);
             };
             $.on(this.el, 'click', this.cb);
             return true;
@@ -13287,15 +13091,16 @@ svg.icon {
         });
       }
     },
-
     node() {
-      if (this.isReply || this.isClone || (Index.threadPosition[this.ID] == null)) { return; }
-      return this.thread.setPage(Math.floor(Index.threadPosition[this.ID] / Index.threadsNumPerPage) + 1);
+      if (this.isReply || this.isClone || (Index.threadPosition[this.ID] == null)) {
+        return;
+      }
+      this.thread.setPage(Math.floor(Index.threadPosition[this.ID] / Index.threadsNumPerPage) + 1);
     },
-
     catalogNode() {
-      return $.on(this.nodes.root, 'click', e => {
-        if ((e.button !== 0) || !e.shiftKey) return;
+      $.on(this.nodes.root, 'click', e => {
+        if ((e.button !== 0) || !e.shiftKey)
+          return;
         e.preventDefault();
         getSelection().removeAllRanges();
         if (Conf['MD5 Quick Filter in the Catalog'] && e.target.classList.contains('catalog-thumb')) {
@@ -13305,72 +13110,69 @@ svg.icon {
         }
       });
     },
-
     toggleHide(thread) {
       if (Index.showHiddenThreads) {
         ThreadHiding.show(thread);
-        if (!ThreadHiding.db.get({boardID: thread.board.ID, threadID: thread.ID})) { return; }
-        // Don't save when un-hiding filtered threads.
+        if (!ThreadHiding.db.get({ boardID: thread.board.ID, threadID: thread.ID })) {
+          return;
+        }
       } else {
         ThreadHiding.hide(thread);
       }
-      return ThreadHiding.saveHiddenState(thread);
+      ThreadHiding.saveHiddenState(thread);
     },
-
     cycleSortType() {
       let i;
-      const types = Index.selectSort.options.filter(option => !option.disabled);
+      const types = Index.selectSort.options.filter((option) => !option.disabled);
       for (i = 0; i < types.length; i++) {
-        var type = types[i];
-        if (type.selected) { break; }
+        const type = types[i];
+        if (type.selected) {
+          break;
+        }
       }
       types[(i + 1) % types.length].selected = true;
-      return $.event('change', null, Index.selectSort);
+      $.event('change', null, Index.selectSort);
     },
-
     cb: {
       initFinished() {
         Index.initFinishedFired = true;
-        return $.queueTask(() => Index.cb.postsInserted());
+        $.queueTask(() => Index.cb.postsInserted());
       },
-
       postsInserted() {
-        if (!Index.initFinishedFired) { return; }
+        if (!Index.initFinishedFired) {
+          return;
+        }
         let n = 0;
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (!post.isFetchedQuote && !post.indexRefreshSeen && doc.contains(post.nodes.root)) {
             post.indexRefreshSeen = true;
-            return n++;
+            n++;
           }
         });
-        if (n) { return $.event('IndexRefresh'); }
+        if (n) {
+          $.event('IndexRefresh', undefined);
+        }
       },
-
       toggleHiddenThreads() {
-        $('#hidden-toggle a', Index.navLinks).textContent = (Index.showHiddenThreads = !Index.showHiddenThreads) ?
-          'Hide'
-        :
-          'Show';
+        $('#hidden-toggle a', Index.navLinks).textContent = (Index.showHiddenThreads = !Index.showHiddenThreads) ? 'Hide' : 'Show';
         Index.sort();
-        return Index.buildIndex();
+        Index.buildIndex();
       },
-
       mode() {
-        Index.pushState({mode: this.value});
-        return Index.pageLoad(false);
+        Index.pushState({ mode: this.value });
+        Index.pageLoad(false);
       },
-
       sort() {
         const value = Index.selectRev.checked ? Index.selectSort.value + "-rev" : Index.selectSort.value;
-        Index.pushState({sort: value});
-        return Index.pageLoad(false);
+        Index.pushState({ sort: value });
+        Index.pageLoad(false);
       },
-
       resort(e) {
         Index.changed.order = true;
-        if (!e?.detail?.deferred) { return Index.pageLoad(false); }
+        if (!e?.detail?.deferred) {
+          Index.pageLoad(false);
+        }
       },
-
       perBoardSort() {
         Conf['Index Sort'] = this.checked ? dict() : '';
         Index.saveSort();
@@ -13379,42 +13181,39 @@ svg.icon {
           Index.saveLastLongThresholds(i);
         }
       },
-
       lastLongThresholds() {
         const i = [...this.parentNode.children].indexOf(this);
         const value = +this.value;
         if (!Number.isFinite(value)) {
-          this.value = Index.lastLongThresholds[i];
+          this.value = String(Index.lastLongThresholds[i]);
           return;
         }
         Index.lastLongThresholds[i] = value;
         Index.saveLastLongThresholds(i);
         Index.changed.order = true;
-        return Index.pageLoad(false);
+        Index.pageLoad(false);
       },
-
       size(e) {
         if (Conf['Index Mode'] !== 'catalog') {
           $.rmClass(Index.root, 'catalog-small');
           $.rmClass(Index.root, 'catalog-large');
         } else if (Conf['Index Size'] === 'small') {
           $.addClass(Index.root, 'catalog-small');
-          $.rmClass(Index.root,  'catalog-large');
+          $.rmClass(Index.root, 'catalog-large');
         } else {
           $.addClass(Index.root, 'catalog-large');
-          $.rmClass(Index.root,  'catalog-small');
+          $.rmClass(Index.root, 'catalog-small');
         }
-        if (e) { return Index.buildIndex(); }
+        if (e) {
+          Index.buildIndex();
+        }
       },
-
       replies() {
-        return Index.buildIndex();
+        Index.buildIndex();
       },
-
       hover() {
-        return doc.classList.toggle('catalog-hover-expand', Conf['Catalog Hover Expand']);
+        doc.classList.toggle('catalog-hover-expand', Conf['Catalog Hover Expand']);
       },
-
       hoverToggle(e) {
         if (Conf['Catalog Hover Toggle'] && $.hasClass(doc, 'catalog-mode') && !$.modifiedClick(e) && !$.x('ancestor-or-self::a', e.target)) {
           let thread;
@@ -13423,31 +13222,31 @@ svg.icon {
           $.event('change', null, input);
           if (thread = Get.threadFromNode(e.target)) {
             Index.cb.catalogReplies.call(thread);
-            return Index.cb.hoverAdjust.call(thread.OP.nodes);
+            Index.cb.hoverAdjust.call(thread.OP.nodes);
           }
         }
       },
-
       popstate(e) {
         if (e?.state) {
-          const {searched, mode, sort} = e.state;
+          const { searched, mode, sort } = e.state;
           const page = Index.getCurrentPage();
-          Index.setState({search: searched, mode, sort, page});
-          return Index.pageLoad(false);
+          Index.setState({ search: searched, mode, sort, page });
+          Index.pageLoad(false);
         } else {
           // page load or hash change
           const nCommands = Index.processHash();
           if (Conf['Refreshed Navigation'] && nCommands) {
-            return Index.update();
+            Index.update();
           } else {
-            return Index.pageLoad();
+            Index.pageLoad();
           }
         }
       },
-
       pageNav(e) {
         let a;
-        if ($.modifiedClick(e)) { return; }
+        if ($.modifiedClick(e)) {
+          return;
+        }
         switch (e.target.nodeName) {
           case 'BUTTON':
             e.target.blur();
@@ -13459,83 +13258,77 @@ svg.icon {
           default:
             return;
         }
-        if (a.textContent === 'Catalog') { return; }
+        if (a.textContent === 'Catalog') {
+          return;
+        }
         e.preventDefault();
-        return Index.userPageNav(+a.pathname.split(/\/+/)[2] || 1);
+        Index.userPageNav(+a.pathname.split(/\/+/)[2] || 1);
       },
-
       refreshFront() {
-        Index.pushState({page: 1});
-        return Index.update();
+        Index.pushState({ page: 1 });
+        Index.update();
       },
-
       catalogReplies() {
         if (Conf['Show Replies'] && $.hasClass(doc, 'catalog-hover-expand') && !this.catalogView.nodes.replies) {
-          return Index.buildCatalogReplies(this);
+          Index.buildCatalogReplies(this);
         }
       },
-
       hoverAdjust() {
         // Prevent hovered catalog threads from going offscreen.
         let x;
-        if (!$.hasClass(doc, 'catalog-hover-expand')) { return; }
+        if (!$.hasClass(doc, 'catalog-hover-expand')) {
+          return;
+        }
         const rect = this.post.getBoundingClientRect();
         if (x = $.minmax(0, -rect.left, doc.clientWidth - rect.right)) {
-          const {style} = this.post;
+          const { style } = this.post;
           style.left = `${x}px`;
           style.right = `${-x}px`;
-          return $.one(this.root, 'mouseleave', () => style.left = (style.right = null));
+          $.one(this.root, 'mouseleave', () => style.left = (style.right = null));
         }
       }
     },
-
     scrollToIndex() {
       // Scroll to navlinks, or top of board if navlinks are hidden.
-      return Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
+      Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
     },
-
     getCurrentPage() {
       return +window.location.pathname.split(/\/+/)[2] || 1;
     },
-
     userPageNav(page) {
-      Index.pushState({page});
+      Index.pushState({ page });
       if (Conf['Refreshed Navigation']) {
-        return Index.update();
+        Index.update();
       } else {
-        return Index.pageLoad();
+        Index.pageLoad();
       }
     },
-
     hashCommands: {
       mode: {
-        'paged':         'paged',
+        'paged': 'paged',
         'infinite-scrolling': 'infinite',
-        'infinite':      'infinite',
-        'all-threads':   'all pages',
-        'all-pages':     'all pages',
-        'catalog':       'catalog'
+        'infinite': 'infinite',
+        'all-threads': 'all pages',
+        'all-pages': 'all pages',
+        'catalog': 'catalog'
       },
       sort: {
-        'bump-order':        'bump',
-        'last-reply':        'lastreply',
-        'last-long-reply':   'lastlong',
-        'creation-date':     'birth',
-        'reply-count':       'replycount',
-        'file-count':        'filecount',
-        'posts-per-minute':  'activity'
+        'bump-order': 'bump',
+        'last-reply': 'lastreply',
+        'last-long-reply': 'lastlong',
+        'creation-date': 'birth',
+        'reply-count': 'replycount',
+        'file-count': 'filecount',
+        'posts-per-minute': 'activity'
       }
     },
-
     processHash() {
-      // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=483304
       let hash = location.href.match(/#.*/)?.[0] || '';
-      const state =
-        {replace: true};
+      const state = { replace: true };
       const commands = hash.slice(1).split('/');
       const leftover = [];
-      for (var command of commands) {
-        var mode, sort;
+      for (const command of commands) {
+        let mode, sort;
         if (mode = $.getOwn(Index.hashCommands.mode, command)) {
           state.mode = mode;
         } else if (command === 'index') {
@@ -13543,7 +13336,9 @@ svg.icon {
           state.page = 1;
         } else if (sort = $.getOwn(Index.hashCommands.sort, command.replace(/-rev$/, ''))) {
           state.sort = sort;
-          if (/-rev$/.test(command)) { state.sort += '-rev'; }
+          if (/-rev$/.test(command)) {
+            state.sort += '-rev';
+          }
         } else if (/^s=/.test(command)) {
           state.search = decodeURIComponent(command.slice(2)).replace(/\+/g, ' ').trim();
         } else {
@@ -13551,13 +13346,14 @@ svg.icon {
         }
       }
       hash = leftover.join('/');
-      if (hash) { state.hash = `#${hash}`; }
+      if (hash) {
+        state.hash = `#${hash}`;
+      }
       Index.pushState(state);
       return commands.length - leftover.length;
     },
-
     pushState(state) {
-      let {search, hash, replace} = state;
+      let { search, hash, replace } = state;
       let pageBeforeSearch = history.state?.oldpage;
       if ((search != null) && (search !== Index.search)) {
         state.page = search ? 1 : (pageBeforeSearch || 1);
@@ -13569,17 +13365,17 @@ svg.icon {
       }
       Index.setState(state);
       const pathname = Index.currentPage === 1 ? `/${g.BOARD}/` : `/${g.BOARD}/${Index.currentPage}`;
-      if (!hash) { hash = ''; }
-      return history[replace ? 'replaceState' : 'pushState']({
-        mode:     Conf['Index Mode'],
-        sort:     Index.currentSort,
-        searched: Index.search,
-        oldpage:  pageBeforeSearch
+      if (!hash) {
+        hash = '';
       }
-      , '', `${location.protocol}//${location.host}${pathname}${hash}`);
+      history[replace ? 'replaceState' : 'pushState']({
+        mode: Conf['Index Mode'],
+        sort: Index.currentSort,
+        searched: Index.search,
+        oldpage: pageBeforeSearch
+      }, '', `${location.protocol}//${location.host}${pathname}${hash}`);
     },
-
-    setState({search, mode, sort, page, hash}) {
+    setState({ search, mode, sort, page, hash }) {
       if ((search != null) && (search !== Index.search)) {
         Index.changed.search = true;
         Index.search = search;
@@ -13598,65 +13394,82 @@ svg.icon {
         Index.currentSort = sort;
         Index.saveSort();
       }
-      if (['all pages', 'catalog'].includes(Conf['Index Mode'])) { page = 1; }
+      if (['all pages', 'catalog'].includes(Conf['Index Mode'])) {
+        page = 1;
+      }
       if ((page != null) && (page !== Index.currentPage)) {
         Index.changed.page = true;
         Index.currentPage = page;
       }
       if (hash != null) {
-        return Index.changed.hash = true;
+        Index.changed.hash = true;
       }
     },
-
     savePerBoard(key, value) {
       if (typeof Conf[key] === 'object') {
         Conf[key][g.BOARD.ID] = value;
       } else {
         Conf[key] = value;
       }
-      return $.set(key, Conf[key]);
+      $.set(key, Conf[key]);
     },
-
     saveSort() {
-      return Index.savePerBoard('Index Sort', Index.currentSort);
+      Index.savePerBoard('Index Sort', Index.currentSort);
     },
-
     saveLastLongThresholds(i) {
-      return Index.savePerBoard(`Last Long Reply Thresholds ${i}`, Index.lastLongThresholds[i]);
+      Index.savePerBoard(`Last Long Reply Thresholds ${i}`, Index.lastLongThresholds[i]);
     },
-
-    pageLoad(scroll=true) {
-      if (!Index.liveThreadData) { return; }
-      let {threads, order, search, mode, sort, page, hash} = Index.changed;
-      if (!threads) { threads = search; }
-      if (!order) { order = sort; }
-      if (threads || order) { Index.sort(); }
-      if (threads) { Index.buildPagelist(); }
-      if (search) { Index.setupSearch(); }
-      if (mode) { Index.setupMode(); }
-      if (sort) { Index.setupSort(); }
-      if (threads || mode || page || order) { Index.buildIndex(); }
-      if (threads || page) { Index.setPage(); }
-      if (scroll && !hash) { Index.scrollToIndex(); }
-      return Index.changed = {};
+    pageLoad(scroll = true) {
+      if (!Index.liveThreadData) {
+        return;
+      }
+      let { threads, order, search, mode, sort, page, hash } = Index.changed;
+      if (!threads) {
+        threads = search;
+      }
+      if (!order) {
+        order = sort;
+      }
+      if (threads || order) {
+        Index.sort();
+      }
+      if (threads) {
+        Index.buildPagelist();
+      }
+      if (search) {
+        Index.setupSearch();
+      }
+      if (mode) {
+        Index.setupMode();
+      }
+      if (sort) {
+        Index.setupSort();
+      }
+      if (threads || mode || page || order) {
+        Index.buildIndex();
+      }
+      if (threads || page) {
+        Index.setPage();
+      }
+      if (scroll && !hash) {
+        Index.scrollToIndex();
+      }
+      Index.changed = {};
     },
-
     setupMode() {
-      for (var mode of ['paged', 'infinite', 'all pages', 'catalog']) {
+      for (const mode of ['paged', 'infinite', 'all pages', 'catalog']) {
         $[mode === Conf['Index Mode'] ? 'addClass' : 'rmClass'](doc, `${mode.replace(/\ /g, '-')}-mode`);
       }
       Index.selectMode.value = Conf['Index Mode'];
       Index.cb.size();
       Index.showHiddenThreads = false;
-      return $('#hidden-toggle a', Index.navLinks).textContent = 'Show';
+      $('#hidden-toggle a', Index.navLinks).textContent = 'Show';
     },
-
     setupSort() {
       Index.selectRev.checked = /-rev$/.test(Index.currentSort);
-      Index.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
-      return Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong');
+      Index.selectSort.value = Index.currentSort.replace(/-rev$/, '');
+      Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong');
     },
-
     getPagesNum() {
       if (Index.search) {
         return Math.ceil(Index.sortedThreadIDs.length / Index.threadsNumPerPage);
@@ -13664,126 +13477,118 @@ svg.icon {
         return Index.pagesNum;
       }
     },
-
     getMaxPageNum() {
       return Math.max(1, Index.getPagesNum());
     },
-
     buildPagelist() {
       const pagesRoot = $('.pages', Index.pagelist);
       const maxPageNum = Index.getMaxPageNum();
       if (pagesRoot.childElementCount !== maxPageNum) {
         const nodes = [];
         for (let i = 1, end = maxPageNum; i <= end; i++) {
-          var a = $.el('a', {
-            textContent: i,
-            href: i === 1 ? './' : i
-          }
-          );
+          const a = $.el('a', {
+            textContent: String(i),
+            href: i === 1 ? './' : String(i)
+          });
           nodes.push($.tn('['), a, $.tn('] '));
         }
         $.rmAll(pagesRoot);
-        return $.add(pagesRoot, nodes);
+        $.add(pagesRoot, nodes);
       }
     },
-
     setPage() {
       let a, strong;
-      const pageNum    = Index.currentPage;
+      const pageNum = Index.currentPage;
       const maxPageNum = Index.getMaxPageNum();
-      const pagesRoot  = $('.pages', Index.pagelist);
-
+      const pagesRoot = $('.pages', Index.pagelist);
       // Previous/Next buttons
       const prev = pagesRoot.previousElementSibling.firstElementChild;
       const next = pagesRoot.nextElementSibling.firstElementChild;
       let href = Math.max(pageNum - 1, 1);
-      prev.href = href === 1 ? './' : href;
+      prev.href = href === 1 ? './' : String(href);
       prev.firstElementChild.disabled = href === pageNum;
       href = Math.min(pageNum + 1, maxPageNum);
-      next.href = href === 1 ? './' : href;
+      next.href = href === 1 ? './' : String(href);
       next.firstElementChild.disabled = href === pageNum;
-
       // <strong> current page
       if (strong = $('strong', pagesRoot)) {
-        if (+strong.textContent === pageNum) { return; }
+        if (+strong.textContent === pageNum) {
+          return;
+        }
         $.replace(strong, strong.firstChild);
       } else {
         strong = $.el('strong');
       }
-
       if (a = pagesRoot.children[pageNum - 1]) {
         $.before(a, strong);
-        return $.add(strong, a);
+        $.add(strong, a);
       }
     },
-
     updateHideLabel() {
-      if (!Index.hideLabel) { return; }
+      if (!Index.hideLabel) {
+        return;
+      }
       let hiddenCount = 0;
-      for (var threadID of Index.liveThreadIDs) {
+      for (const threadID of Index.liveThreadIDs) {
         if (Index.isHidden(threadID)) {
           hiddenCount++;
         }
       }
       if (!hiddenCount) {
         Index.hideLabel.hidden = true;
-        if (Index.showHiddenThreads) { Index.cb.toggleHiddenThreads(); }
+        if (Index.showHiddenThreads) {
+          Index.cb.toggleHiddenThreads();
+        }
         return;
       }
       Index.hideLabel.hidden = false;
-      return $('#hidden-count', Index.navLinks).textContent = hiddenCount === 1 ?
+      $('#hidden-count', Index.navLinks).textContent = hiddenCount === 1 ?
         '1 hidden thread'
-      :
-        `${hiddenCount} hidden threads`;
+        :
+          `${hiddenCount} hidden threads`;
     },
-
     update(firstTime) {
       let oldReq;
       if (oldReq = Index.req) {
         delete Index.req;
         oldReq.abort();
       }
-
       if (Conf['Index Refresh Notifications']) {
-        // Optional notification for manual refreshes
-        if (!Index.notice) { Index.notice = new Notice('info', 'Refreshing index...'); }
-        if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => {
+        if (!Index.notice) {
+          Index.notice = new Notice('info', 'Refreshing index...');
+        }
+        if (!Index.nTimeout) {
+          Index.nTimeout = setTimeout(() => {
             if (Index.notice) {
               Index.notice.el.lastElementChild.textContent += ' (disable JSON Index if this takes too long)';
             }
-          }
-          , 3 * SECOND); }
+          }, 3 * SECOND);
+        }
       } else {
-        // Also display notice if Index Refresh is taking too long
-        if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)'))
-        , 3 * SECOND); }
+        if (!Index.nTimeout) {
+          Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)')), 3 * SECOND);
+        }
       }
-
-      // Hard refresh in case of incomplete page load.
-      if (!firstTime && (d.readyState !== 'loading') && !$('.board + *')) {
+      if (!firstTime && (d$1.readyState !== 'loading') && !$('.board + *')) {
         location.reload();
         return;
       }
-
-      Index.req = $.whenModified(
-        g.SITE.urls.catalogJSON({boardID: g.BOARD.ID}),
-        'Index',
-        Index.load
-      );
-      return $.addClass(Index.button, 'spin');
+      Index.req = $.whenModified(g.SITE.urls.catalogJSON({ boardID: g.BOARD.ID }), 'Index', Index.load);
+      $.addClass(Index.button, 'spin');
     },
-
     load() {
       let err;
-      if (this !== Index.req) { return; } // aborted
-
+      if (this !== Index.req) {
+        return;
+      } // aborted
       $.rmClass(Index.button, 'spin');
-      const {notice, nTimeout} = Index;
-      if (nTimeout) { clearTimeout(nTimeout); }
+      const { notice, nTimeout } = Index;
+      if (nTimeout) {
+        clearTimeout(nTimeout);
+      }
       delete Index.nTimeout;
       delete Index.req;
       delete Index.notice;
-
       if (![200, 304].includes(this.status)) {
         err = `Index refresh failed. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`;
         if (notice) {
@@ -13795,7 +13600,6 @@ svg.icon {
         }
         return;
       }
-
       try {
         if (this.status === 200) {
           Index.parse(this.response);
@@ -13814,7 +13618,6 @@ svg.icon {
         }
         return;
       }
-
       if (notice) {
         if (Conf['Index Refresh Notifications']) {
           notice.setType('success');
@@ -13824,53 +13627,50 @@ svg.icon {
           notice.close();
         }
       }
-
       const timeEl = $('#index-last-refresh time', Index.navLinks);
-      timeEl.dataset.utc = Date.parse(this.getResponseHeader('Last-Modified'));
-      return RelativeDates.update(timeEl);
+      timeEl.dataset.utc = String(Date.parse(this.getResponseHeader('Last-Modified') || ''));
+      RelativeDates.update(timeEl);
     },
-
     parse(pages) {
       $.cleanCache(url => /^https?:\/\/a\.4cdn\.org\//.test(url));
       Index.parseThreadList(pages);
       Index.changed.threads = true;
-      return Index.pageLoad();
+      Index.pageLoad();
     },
-
     parseThreadList(pages) {
-      Index.pagesNum          = pages.length;
+      Index.pagesNum = pages.length;
       Index.threadsNumPerPage = pages[0]?.threads.length || 1;
-      Index.liveThreadData    = pages.reduce(((arr, next) => arr.concat(next.threads)), []);
-      Index.liveThreadIDs     = Index.liveThreadData.map(data => data.no);
-      Index.liveThreadDict    = dict();
-      Index.threadPosition    = dict();
-      Index.parsedThreads     = dict();
-      Index.replyData         = dict();
+      Index.liveThreadData = pages.reduce(((arr, next) => arr.concat(next.threads)), []);
+      Index.liveThreadIDs = Index.liveThreadData.map(data => data.no);
+      Index.liveThreadDict = dict();
+      Index.threadPosition = dict();
+      Index.parsedThreads = dict();
+      Index.replyData = dict();
       for (let i = 0; i < Index.liveThreadData.length; i++) {
-        var obj, results;
-        var data = Index.liveThreadData[i];
+        let obj;
+        const data = Index.liveThreadData[i];
         Index.liveThreadDict[data.no] = data;
         Index.threadPosition[data.no] = i;
         Index.parsedThreads[data.no] = (obj = g.SITE.Build.parseJSON(data, g.BOARD));
-        results = Filter.test(obj);
-        obj.isOnTop  = results.top;
+        const results = Filter.test(obj);
+        obj.isOnTop = results.top;
         obj.isHidden = results.hide || ThreadHiding.isHidden(obj.boardID, obj.threadID);
         if (data.last_replies) {
-          for (var reply of data.last_replies) {
-            Index.replyData[`${g.BOARD}.${reply.no}`] = reply;
+          for (const reply of data.last_replies) {
+            Index.replyData[`${g.BOARD.ID}.${reply.no}`] = reply;
           }
         }
       }
       if (Index.liveThreadData[0]) {
         g.SITE.Build.spoilerRange[g.BOARD.ID] = Index.liveThreadData[0].custom_spoiler;
       }
-      g.BOARD.threads.forEach(function(thread) {
-        if (!Index.liveThreadIDs.includes(thread.ID)) { return thread.collect(); }
+      g.BOARD.threads.forEach(function (thread) {
+        if (!Index.liveThreadIDs.includes(thread.ID)) {
+          thread.collect();
+        }
       });
-      $.event('IndexUpdate',
-        {threads: ((Index.liveThreadIDs.map((ID) => `${g.BOARD}.${ID}`)))});
+      $.event('IndexUpdate', { threads: ((Index.liveThreadIDs.map((ID) => `${g.BOARD.ID}.${ID}`))) });
     },
-
     isHidden(threadID) {
       let thread;
       if ((thread = g.BOARD.threads.get(threadID)) && thread.OP && !thread.OP.isFetchedQuote) {
@@ -13879,27 +13679,24 @@ svg.icon {
         return Index.parsedThreads[threadID].isHidden;
       }
     },
-
     isHiddenReply(threadID, replyData) {
       return PostHiding.isHidden(g.BOARD.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD));
     },
-
     buildThreads(threadIDs, isCatalog, withReplies) {
       let errors;
-      const threads    = [];
+      const threads = [];
       const newThreads = [];
-      let newPosts   = [];
-      for (var ID of threadIDs) {
-        var opRoot, thread;
+      let newPosts = [];
+      for (const ID of threadIDs) {
+        let opRoot, thread;
         try {
-          var OP;
-          var threadData = Index.liveThreadDict[ID];
-
+          let OP;
+          const threadData = Index.liveThreadDict[ID];
           if (thread = g.BOARD.threads.get(ID)) {
-            var isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
+            const isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
             if (isStale) {
-              thread.setCount('post', threadData.replies + 1,                threadData.bumplimit);
-              thread.setCount('file', threadData.images  + !!threadData.ext, threadData.imagelimit);
+              thread.setCount('post', threadData.replies + 1, threadData.bumplimit);
+              thread.setCount('file', threadData.images + !!threadData.ext, threadData.imagelimit);
               thread.setStatus('Sticky', !!threadData.sticky);
               thread.setStatus('Closed', !!threadData.closed);
             }
@@ -13911,28 +13708,29 @@ svg.icon {
             thread = new Thread(ID, g.BOARD);
             newThreads.push(thread);
           }
-          var lastPost = threadData.last_replies && threadData.last_replies.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
-          if (lastPost > thread.lastPost) { thread.lastPost = lastPost; }
+          const lastPost = threadData.last_replies && threadData.last_replies.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
+          if (lastPost > thread.lastPost) {
+            thread.lastPost = lastPost;
+          }
           thread.json = threadData;
           threads.push(thread);
-
           if ((OP = thread.OP) && !OP.isFetchedQuote) {
             OP.setCatalogOP(isCatalog);
             thread.setPage(Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1);
           } else {
-            var obj = Index.parsedThreads[ID];
+            const obj = Index.parsedThreads[ID];
             opRoot = g.SITE.Build.post(obj);
             OP = new Post(opRoot, thread, g.BOARD);
             OP.filterResults = obj.filterResults;
             newPosts.push(OP);
           }
-
           if (!isCatalog || !thread.nodes.root) {
             g.SITE.Build.thread(thread, threadData, withReplies);
           }
         } catch (err) {
-          // Skip posts that we failed to parse.
-          if (!errors) { errors = []; }
+          if (!errors) {
+            errors = [];
+          }
           errors.push({
             message: `Parsing of Thread No.${thread} failed. Thread will be skipped.`,
             error: err,
@@ -13940,29 +13738,33 @@ svg.icon {
           });
         }
       }
-      if (errors) { Callbacks.errorHandler?.(errors); }
-
+      if (errors) {
+        Callbacks.errorHandler?.(errors);
+      }
       if (withReplies) {
         newPosts = newPosts.concat(Index.buildReplies(threads));
       }
-
-      for (const thread of newThreads) { Callbacks.Thread.execute(thread); }
-      for (const post of newPosts) { Callbacks.Post.execute(post); }
+      for (const thread of newThreads) {
+        Callbacks.Thread.execute(thread);
+      }
+      for (const post of newPosts) {
+        Callbacks.Post.execute(post);
+      }
       Index.updateHideLabel();
-      $.event('IndexRefreshInternal', {threadIDs: (threads.map((t) => t.fullID)), isCatalog});
-
+      $.event('IndexRefreshInternal', { threadIDs: (threads.map((t) => t.fullID)), isCatalog });
       return threads;
     },
-
     buildReplies(threads) {
       let errors;
       const posts = [];
-      for (var thread of threads) {
-        var lastReplies;
-        if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { continue; }
-        var nodes = [];
-        for (var data of lastReplies) {
-          var node, post;
+      for (const thread of threads) {
+        let lastReplies;
+        if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) {
+          continue;
+        }
+        const nodes = [];
+        for (const data of lastReplies) {
+          let node, post;
           if ((post = thread.posts.get(data.no)) && !post.isFetchedQuote) {
             nodes.push(post.nodes.root);
             continue;
@@ -13971,8 +13773,9 @@ svg.icon {
           try {
             posts.push(new Post(node, thread, thread.board));
           } catch (err) {
-            // Skip posts that we failed to parse.
-            if (!errors) { errors = []; }
+            if (!errors) {
+              errors = [];
+            }
             errors.push({
               message: `Parsing of Post No.${data.no} failed. Post will be skipped.`,
               error: err,
@@ -13982,95 +13785,108 @@ svg.icon {
         }
         $.add(thread.nodes.root, nodes);
       }
-
-      if (errors) { Callbacks.errorHandler?.(errors); }
+      if (errors) {
+        Callbacks.errorHandler?.(errors);
+      }
       return posts;
     },
-
     buildCatalogViews(threads) {
       const catalogThreads = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         if (!thread.catalogView) {
-          var {ID} = thread;
-          var page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
-          var root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
+          const { ID } = thread;
+          const page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
+          const root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
           catalogThreads.push(new CatalogThread(root, thread));
         }
       }
-      for (const catalogThread of catalogThreads) { Callbacks.CatalogThread.execute(catalogThread); }
-    },
-
-    sizeCatalogViews(threads) {
-      // XXX When browsers support CSS3 attr(), use it instead.
-      const size = Conf['Index Size'] === 'small' ? 150 : 250;
-      for (var thread of threads) {
-        var {thumb} = thread.catalogView.nodes;
-        var {width, height} = thumb.dataset;
-        if (!width) { continue; }
-        var ratio = size / Math.max(width, height);
-        thumb.style.width  = (width  * ratio) + 'px';
-        thumb.style.height = (height * ratio) + 'px';
+      for (const catalogThread of catalogThreads) {
+        Callbacks.CatalogThread.execute(catalogThread);
       }
     },
-
+    sizeCatalogViews(threads) {
+      const size = Conf['Index Size'] === 'small' ? 150 : 250;
+      for (const thread of threads) {
+        const { thumb } = thread.catalogView.nodes;
+        const { width, height } = thumb.dataset;
+        if (!width) {
+          continue;
+        }
+        const ratio = size / Math.max(width, height);
+        thumb.style.width = (Number(width) * ratio) + 'px';
+        thumb.style.height = (Number(height) * ratio) + 'px';
+      }
+    },
     buildCatalogReplies(thread) {
       let lastReplies;
-      const {nodes} = thread.catalogView;
-      if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { return; }
-
+      const { nodes } = thread.catalogView;
+      if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) {
+        return;
+      }
       const replies = [];
-      for (var data of lastReplies) {
-        if (Index.isHiddenReply(thread.ID, data)) { continue; }
-        var reply = g.SITE.Build.catalogReply(thread, data);
+      for (const data of lastReplies) {
+        if (Index.isHiddenReply(thread.ID, data)) {
+          continue;
+        }
+        const reply = g.SITE.Build.catalogReply(thread, data);
         RelativeDates.update($('time', reply));
         $.on($('.catalog-reply-preview', reply), 'mouseover', QuotePreview.mouseover);
         replies.push(reply);
       }
-
-      nodes.replies = $.el('div', {className: 'catalog-replies'});
+      nodes.replies = $.el('div', { className: 'catalog-replies' });
       $.add(nodes.replies, replies);
       $.add(thread.OP.nodes.post, nodes.replies);
     },
-
     sort() {
       let threadIDs;
-      const {liveThreadIDs, liveThreadData} = Index;
-      if (!liveThreadData) { return; }
-      const tmp_time = new Date().getTime()/1000;
+      const { liveThreadIDs, liveThreadData } = Index;
+      if (!liveThreadData) {
+        return;
+      }
+      const tmp_time = new Date().getTime() / 1000;
       const sortType = Index.currentSort.replace(/-rev$/, '');
-      Index.sortedThreadIDs = (() => { switch (sortType) {
-        case 'lastreply': case 'lastlong':
-          var repliesAvailable = liveThreadData.some(thread => thread.last_replies?.length);
-          var lastlong = function(thread) {
-            if (!repliesAvailable) {
-              return thread.last_modified;
-            }
-            const iterable = thread.last_replies || [];
-            for (let i = iterable.length - 1; i >= 0; i--) {
-              var r = iterable[i];
-              if (Index.isHiddenReply(thread.no, r)) { continue; }
-              if (sortType === 'lastreply') {
-                return r;
+      Index.sortedThreadIDs = (() => {
+        switch (sortType) {
+          case 'lastreply':
+          case 'lastlong':
+            const repliesAvailable = liveThreadData.some(thread => thread.last_replies?.length);
+            const lastlong = function (thread) {
+              if (!repliesAvailable) {
+                return thread.last_modified;
               }
-              var len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
-              if (len >= Index.lastLongThresholds[+!!r.ext]) {
-                return r;
+              const iterable = thread.last_replies || [];
+              for (let i = iterable.length - 1; i >= 0; i--) {
+                const r = iterable[i];
+                if (Index.isHiddenReply(thread.no, r)) {
+                  continue;
+                }
+                if (sortType === 'lastreply') {
+                  return r;
+                }
+                const len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
+                if (len >= Index.lastLongThresholds[+!!r.ext]) {
+                  return r;
+                }
               }
+              if (thread.omitted_posts && thread.last_replies?.length) {
+                return thread.last_replies[0];
+              } else {
+                return thread;
+              }
+            };
+            const lastlongD = dict();
+            for (const thread of liveThreadData) {
+              lastlongD[thread.no] = lastlong(thread).no;
             }
-            if (thread.omitted_posts && thread.last_replies?.length) { return thread.last_replies[0]; } else { return thread; }
-          };
-          var lastlongD = dict();
-          for (var thread of liveThreadData) {
-            lastlongD[thread.no] = lastlong(thread).no;
-          }
-          return [...liveThreadData].sort((a, b) => lastlongD[b.no] - lastlongD[a.no]).map(post => post.no);
-        case 'bump':       return liveThreadIDs;
-        case 'birth':      return [...liveThreadIDs ].sort((a, b) => b - a);
-        case 'replycount': return [...liveThreadData].sort((a, b) => b.replies - a.replies).map(post => post.no);
-        case 'filecount':  return [...liveThreadData].sort((a, b) => b.images  - a.images).map(post => post.no);
-        case 'activity':   return [...liveThreadData].sort((a, b) => ((tmp_time-a.time)/(a.replies+1)) - ((tmp_time-b.time)/(b.replies+1))).map(post => post.no);
-        default: return liveThreadIDs;
-      } })();
+            return [...liveThreadData].sort((a, b) => lastlongD[b.no] - lastlongD[a.no]).map(post => post.no);
+          case 'bump': return liveThreadIDs;
+          case 'birth': return [...liveThreadIDs].sort((a, b) => b - a);
+          case 'replycount': return [...liveThreadData].sort((a, b) => b.replies - a.replies).map(post => post.no);
+          case 'filecount': return [...liveThreadData].sort((a, b) => b.images - a.images).map(post => post.no);
+          case 'activity': return [...liveThreadData].sort((a, b) => ((tmp_time - a.time) / (a.replies + 1)) - ((tmp_time - b.time) / (b.replies + 1))).map(post => post.no);
+          default: return liveThreadIDs;
+        }
+      })();
       if (/-rev$/.test(Index.currentSort)) {
         Index.sortedThreadIDs.reverse();
       }
@@ -14082,21 +13898,23 @@ svg.icon {
       // Highlighted threads
       Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && ThreadWatcher.isWatchedRaw(obj.boardID, obj.threadID)));
       // Non-hidden threads
-      if (Conf['Anchor Hidden Threads']) { return Index.sortOnTop(obj => !Index.isHidden(obj.threadID)); }
+      if (Conf['Anchor Hidden Threads']) {
+        Index.sortOnTop(obj => !Index.isHidden(obj.threadID));
+      }
     },
-
     sortOnTop(match) {
-      const topThreads    = [];
+      const topThreads = [];
       const bottomThreads = [];
-      for (var ID of Index.sortedThreadIDs) {
+      for (const ID of Index.sortedThreadIDs) {
         (match(Index.parsedThreads[ID]) ? topThreads : bottomThreads).push(ID);
       }
-      return Index.sortedThreadIDs = topThreads.concat(bottomThreads);
+      Index.sortedThreadIDs = topThreads.concat(bottomThreads);
     },
-
     buildIndex() {
       let threadIDs;
-      if (!Index.liveThreadData) { return; }
+      if (!Index.liveThreadData) {
+        return;
+      }
       switch (Conf['Index Mode']) {
         case 'all pages':
           threadIDs = Index.sortedThreadIDs;
@@ -14119,17 +13937,15 @@ svg.icon {
         Index.buildStructure(threadIDs);
       }
     },
-
     threadsOnPage(pageNum) {
       const nodesPerPage = Index.threadsNumPerPage;
       const offset = nodesPerPage * (pageNum - 1);
-      return Index.sortedThreadIDs.slice(offset ,  offset + nodesPerPage);
+      return Index.sortedThreadIDs.slice(offset, offset + nodesPerPage);
     },
-
     buildStructure(threadIDs) {
       const threads = Index.buildThreads(threadIDs, false, Conf['Show Replies']);
       const nodes = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         nodes.push(thread.nodes.root, $.el('hr'));
       }
       $.add(Index.root, nodes);
@@ -14138,34 +13954,34 @@ svg.icon {
       }
       Index.loaded = true;
     },
-
     buildCatalog(threadIDs) {
       let i = 0;
       const n = threadIDs.length;
       let node0 = null;
-      var fn = function() {
-        if (node0 && !node0.parentNode) { return; } // Index.root cleared
+      const fn = function () {
+        if (node0 && !node0.parentNode) {
+          return;
+        } // Index.root cleared
         const j = (i > 0) && Index.root.parentNode ? n : i + 30;
         node0 = Index.buildCatalogPart(threadIDs.slice(i, j))[0];
         i = j;
         if (i < n) {
-          return $.queueTask(fn);
+          $.queueTask(fn);
         } else {
           if (Index.root.parentNode) {
             $.event('PostsInserted', null, Index.root);
           }
-          return Index.loaded = true;
+          Index.loaded = true;
         }
       };
       fn();
     },
-
     buildCatalogPart(threadIDs) {
       const threads = Index.buildThreads(threadIDs, true);
       Index.buildCatalogViews(threads);
       Index.sizeCatalogViews(threads);
       const nodes = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         thread.OP.setCatalogOP(true);
         $.add(thread.catalogView.nodes.root, thread.OP.nodes.root);
         nodes.push(thread.catalogView.nodes.root);
@@ -14175,33 +13991,30 @@ svg.icon {
       $.add(Index.root, nodes);
       return nodes;
     },
-
     clearSearch() {
       Index.searchInput.value = '';
       Index.onSearchInput();
-      return Index.searchInput.focus();
+      Index.searchInput.focus();
     },
-
     setupSearch() {
       Index.searchInput.value = Index.search;
       if (Index.search) {
-        return Index.searchInput.dataset.searching = 1;
+        Index.searchInput.dataset.searching = '1';
       } else {
-        // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1021289
-        return Index.searchInput.removeAttribute('data-searching');
+        Index.searchInput.removeAttribute('data-searching');
       }
     },
-
     onSearchInput() {
       const search = Index.searchInput.value.trim();
-      if (search === Index.search) { return; }
+      if (search === Index.search) {
+        return;
+      }
       Index.pushState({
         search,
-        replace: !!search === !!Index.search
+        replace: !search === !Index.search
       });
-      return Index.pageLoad(false);
+      Index.pageLoad(false);
     },
-
     querySearch(query) {
       let keywords, match;
       if (match = query.match(/^([\w+]+):\/(.*)\/(\w*)$/)) {
@@ -14213,156 +14026,164 @@ svg.icon {
         }
         return Index.sortedThreadIDs.filter(ID => regexp.test(Filter.values(match[1], Index.parsedThreads[ID]).join('\n')));
       }
-      if (!(keywords = query.toLowerCase().match(/\S+/g))) { return; }
+      if (!(keywords = query.toLowerCase().match(/\S+/g))) {
+        return;
+      }
       return Index.sortedThreadIDs.filter(ID => Index.searchMatch(Index.parsedThreads[ID], keywords));
     },
-
     searchMatch(obj, keywords) {
-      const {info, file} = obj;
-      if (info.comment == null) { info.comment = g.SITE.Build.parseComment(info.commentHTML.innerHTML); }
-      let text = [];
-      for (var key of ['comment', 'subject', 'name', 'tripcode']) {
-        if (key in info) { text.push(info[key]); }
+      const { info, file } = obj;
+      if (info.comment == null) {
+        info.comment = g.SITE.Build.parseComment(info.commentHTML.innerHTML);
       }
-      if (file) { text.push(file.name); }
-      text = text.join(' ').toLowerCase();
-      for (var keyword of keywords) {
-        if (-1 === text.indexOf(keyword)) { return false; }
+      const text = [];
+      for (const key of ['comment', 'subject', 'name', 'tripcode']) {
+        if (key in info) {
+          text.push(info[key]);
+        }
+      }
+      if (file) {
+        text.push(file.name);
+      }
+      const textJoined = text.join(' ').toLowerCase();
+      for (const keyword of keywords) {
+        if (-1 === textJoined.indexOf(keyword)) {
+          return false;
+        }
       }
       return true;
     }
   };
 
-  // @ts-nocheck
-
-  var ThreadHiding = {
+  const ThreadHiding = {
+    db: null,
+    hiddenThreads: {},
     init() {
-      if (!['index', 'catalog'].includes(g.VIEW) || (!Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index'])) { return; }
+      if (!['index', 'catalog'].includes(g.VIEW) || !Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index']) {
+        return;
+      }
       this.db = new DataBoard('hiddenThreads');
-      if (g.VIEW === 'catalog') { return this.catalogWatch(); }
+      if (g.VIEW === 'catalog') {
+        this.catalogWatch();
+        return;
+      }
       this.catalogSet(g.BOARD);
-      $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
+      $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
       if (Conf['Thread Hiding Buttons']) {
         $.addClass(doc, 'thread-hide');
       }
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Thread Hiding',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     catalogSet(board) {
-      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) { return; }
-      const hiddenThreads = ThreadHiding.db.get({
+      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) {
+        return;
+      }
+      const hiddenThreads = this.db.get({
         boardID: board.ID,
         defaultValue: dict()
       });
-      for (var threadID in hiddenThreads) { hiddenThreads[threadID] = true; }
-      return localStorage.setItem(`4chan-hide-t-${board}`, JSON.stringify(hiddenThreads));
+      for (const threadID in hiddenThreads) {
+        hiddenThreads[threadID] = true;
+      }
+      localStorage.setItem(`4chan-hide-t-${board}`, JSON.stringify(hiddenThreads));
     },
-
     catalogWatch() {
-      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) { return; }
+      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) {
+        return;
+      }
       this.hiddenThreads = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
-      return $.on(d, '4chanXInitFinished', () => // 4chan's catalog sets the style to "display: none;" when hiding or unhiding a thread.
-      new MutationObserver(ThreadHiding.catalogSave).observe($.id('threads'), {
+      $.on(d$1, '4chanXInitFinished', () => // 4chan's catalog sets the style to "display: none;" when hiding or unhiding a thread.
+      new MutationObserver(this.catalogSave.bind(this)).observe($.id('threads'), {
         attributes: true,
         subtree: true,
         attributeFilter: ['style']
       }));
     },
-
     catalogSave() {
       let threadID;
       const hiddenThreads2 = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
       for (threadID in hiddenThreads2) {
-        if (!$.hasOwn(ThreadHiding.hiddenThreads, threadID)) {
-          ThreadHiding.db.set({
-            boardID:  g.BOARD.ID,
+        if (!$.hasOwn(this.hiddenThreads, threadID)) {
+          this.db.set({
+            boardID: g.BOARD.ID,
             threadID,
-            val:      {makeStub: Conf['Stubs']}});
+            val: { makeStub: Conf['Stubs'] }
+          });
         }
       }
-      for (threadID in ThreadHiding.hiddenThreads) {
+      for (threadID in this.hiddenThreads) {
         if (!$.hasOwn(hiddenThreads2, threadID)) {
-          ThreadHiding.db.delete({
-            boardID:  g.BOARD.ID,
+          this.db.delete({
+            boardID: g.BOARD.ID,
             threadID
           });
         }
       }
-      return ThreadHiding.hiddenThreads = hiddenThreads2;
+      this.hiddenThreads = hiddenThreads2;
     },
-
     isHidden(boardID, threadID) {
-      return !!(ThreadHiding.db && ThreadHiding.db.get({boardID, threadID}));
+      return !!(this.db && this.db.get({ boardID, threadID }));
     },
-
     node() {
       let data;
-      if (this.isReply || this.isClone || this.isFetchedQuote) { return; }
-
+      if (this.isReply || this.isClone || this.isFetchedQuote) {
+        return;
+      }
       if (Conf['Thread Hiding Buttons']) {
         $.prepend(this.nodes.root, ThreadHiding.makeButton(this.thread, 'hide'));
       }
-
-      if (data = ThreadHiding.db.get({boardID: this.board.ID, threadID: this.ID})) {
+      if (data = ThreadHiding.db.get({ boardID: this.board.ID, threadID: this.ID })) {
         ThreadHiding.hide(this.thread, data.makeStub, 'Hidden manually');
       }
     },
-
     onIndexRefresh() {
-      return g.BOARD.threads.forEach(function(thread) {
-        const {root} = thread.nodes;
+      g.BOARD.threads.forEach(function (thread) {
+        const { root } = thread.nodes;
         if (thread.isHidden && thread.stub && !root.contains(thread.stub)) {
           ThreadHiding.makeStub(thread, root);
         }
       });
     },
-
     menu: {
       init() {
-        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link']) { return; }
-
-        let div = $.el('div', {
+        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link']) {
+          return;
+        }
+        const hideDiv = $.el('div', {
           className: 'hide-thread-link',
           textContent: 'Hide'
-        }
-        );
-
+        });
         const apply = $.el('a', {
           textContent: 'Apply',
           href: 'javascript:;'
-        }
-        );
-        $.on(apply, 'click', ThreadHiding.menu.hide);
-
+        });
+        $.on(apply, 'click', this.hide);
         const makeStub = UI.checkbox('Stubs', 'Make stub');
-
         Menu.menu.addEntry({
-          el: div,
+          el: hideDiv,
           order: 20,
-          open({thread, isReply}) {
+          open({ thread, isReply }) {
             if (isReply || thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
               return false;
             }
             ThreadHiding.menu.thread = thread;
             return true;
           },
-          subEntries: [{el: apply}, {el: makeStub}]});
-
-        div = $.el('a', {
+          subEntries: [{ el: apply }, { el: makeStub }]
+        });
+        const showLink = $.el('a', {
           className: 'show-thread-link',
           textContent: 'Show',
           href: 'javascript:;'
-        }
-        );
-        $.on(div, 'click', ThreadHiding.menu.show);
-
+        });
+        $.on(showLink, 'click', this.show);
         Menu.menu.addEntry({
-          el: div,
+          el: showLink,
           order: 20,
-          open({thread, isReply}) {
+          open({ thread, isReply }) {
             if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
               return false;
             }
@@ -14370,73 +14191,66 @@ svg.icon {
             return true;
           }
         });
-
         const hideStubLink = $.el('a', {
           textContent: 'Hide stub',
           href: 'javascript:;'
-        }
-        );
-        $.on(hideStubLink, 'click', ThreadHiding.menu.hideStub);
-
-        return Menu.menu.addEntry({
+        });
+        $.on(hideStubLink, 'click', this.hideStub);
+        Menu.menu.addEntry({
           el: hideStubLink,
           order: 15,
-          open({thread, isReply}) {
+          open({ thread, isReply }) {
             if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
               return false;
             }
-            return ThreadHiding.menu.thread = thread;
+            ThreadHiding.menu.thread = thread;
+            return true;
           }
         });
       },
-
       hide() {
         const makeStub = $('input', this.parentNode).checked;
-        const {thread} = ThreadHiding.menu;
+        const thread = ThreadHiding.menu.thread;
         ThreadHiding.hide(thread, makeStub, 'Hidden manually');
         ThreadHiding.saveHiddenState(thread, makeStub);
-        return $.event('CloseMenu');
+        return $.event('CloseMenu', undefined);
       },
-
       show() {
-        const {thread} = ThreadHiding.menu;
+        const thread = ThreadHiding.menu.thread;
         ThreadHiding.show(thread);
         ThreadHiding.saveHiddenState(thread);
-        return $.event('CloseMenu');
+        return $.event('CloseMenu', undefined);
       },
-
       hideStub() {
-        const {thread} = ThreadHiding.menu;
+        const thread = ThreadHiding.menu.thread;
         ThreadHiding.show(thread);
         ThreadHiding.hide(thread, false);
         ThreadHiding.saveHiddenState(thread, false);
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       }
     },
-
     makeButton(thread, type) {
       const span = $.el('span', {
         className: 'stub-icon',
       });
       const a = $.el('a', {
         className: `${type}-post-button ${type}-thread-button`,
-        href:      'javascript:;'
+        href: 'javascript:;'
       });
       Icon.set(span, type === 'hide' ? 'squareMinus' : 'squarePlus');
       $.add(a, span);
       a.dataset.fullID = thread.fullID;
-      $.on(a, 'click', ThreadHiding.toggle);
+      $.on(a, 'click', this.toggle);
       return a;
     },
-
     makeStub(thread, root, reason) {
       let summary, threadDivider;
-      let numReplies  = $$(g.SITE.selectors.replyOriginal, root).length;
-      if (summary = $(g.SITE.selectors.summary, root)) { numReplies += +summary.textContent.match(/\d+/); }
-
-      const a = ThreadHiding.makeButton(thread, 'show');
+      let numReplies = $$(g.SITE.selectors.replyOriginal, root).length;
+      if (summary = $(g.SITE.selectors.summary, root)) {
+        numReplies += +(summary.textContent.match(/\d+/) || [0])[0];
+      }
+      const a = this.makeButton(thread, 'show');
       const { nameBlock, subject } = thread.OP.info;
-
       if (subject) {
         $.add(a, $.el('span', {
           className: 'stub-subject',
@@ -14451,61 +14265,58 @@ svg.icon {
         className: 'stub-replies',
         textContent: `(${numReplies} repl${numReplies === 1 ? 'y' : 'ies'})`
       }));
-
       let reasons = thread.OP.filterResults?.reasons || [];
-      if (reason) reasons = [...reasons, reason];
-
+      if (reason)
+        reasons = [...reasons, reason];
       if (Conf['Filter Reason'] && reasons.length) {
         const reasonsSpan = $.el('span', { className: 'stub-reasons' });
         $.add(reasonsSpan, reasons.map(re => $.el('span', { className: 'stub-reason', textContent: re })));
         a.appendChild(reasonsSpan);
       }
-
-      thread.stub = $.el('div', {className: 'stub'});
-
+      thread.stub = $.el('div', { className: 'stub' });
       if (Conf['Menu']) {
         $.add(thread.stub, [a, Menu.makeButton(thread.OP)]);
       } else {
         $.add(thread.stub, a);
       }
-      if (!Conf['Filter Reason'] && reasons) thread.stub.title = reasons.join(' & ');
+      if (!Conf['Filter Reason'] && reasons.length)
+        thread.stub.title = reasons.join(' & ');
       $.prepend(root, thread.stub);
-
       // Prevent hiding of thread divider on sites that put it inside the thread
       if (threadDivider = $(g.SITE.selectors.threadDivider, root)) {
-        return $.addClass(threadDivider, 'threadDivider');
+        $.addClass(threadDivider, 'threadDivider');
       }
     },
-
     saveHiddenState(thread, makeStub) {
       if (thread.isHidden) {
-        ThreadHiding.db.set({
-          boardID:  thread.board.ID,
+        this.db.set({
+          boardID: thread.board.ID,
           threadID: thread.ID,
-          val: {makeStub}});
+          val: { makeStub }
+        });
       } else {
-        ThreadHiding.db.delete({
-          boardID:  thread.board.ID,
+        this.db.delete({
+          boardID: thread.board.ID,
           threadID: thread.ID
         });
       }
-      return ThreadHiding.catalogSet(thread.board);
+      this.catalogSet(thread.board);
     },
-
     toggle(thread) {
       if (!(thread instanceof Thread)) {
-        thread = g.threads.get(this.dataset.fullID);
+        thread = g.threads.get(thread.dataset.fullID);
       }
       if (thread.isHidden) {
         ThreadHiding.show(thread);
       } else {
         ThreadHiding.hide(thread, undefined, 'Hidden manually');
       }
-      return ThreadHiding.saveHiddenState(thread);
+      ThreadHiding.saveHiddenState(thread);
     },
-
-    hide(thread, makeStub=Conf['Stubs'], reason) {
-      if (thread.isHidden) { return; }
+    hide(thread, makeStub = Conf['Stubs'], reason) {
+      if (thread.isHidden) {
+        return;
+      }
       const threadRoot = thread.nodes.root;
       thread.isHidden = true;
       Index.updateHideLabel();
@@ -14513,12 +14324,12 @@ svg.icon {
         $.rm(thread.catalogView.nodes.root);
         $.event('PostsRemoved', null, Index.root);
       }
-
-      if (!makeStub) { return threadRoot.hidden = true; }
-
-      ThreadHiding.makeStub(thread, threadRoot, reason);
+      if (!makeStub) {
+        threadRoot.hidden = true;
+        return;
+      }
+      this.makeStub(thread, threadRoot, reason);
     },
-
     show(thread) {
       if (thread.stub) {
         $.rm(thread.stub);
@@ -14529,26 +14340,23 @@ svg.icon {
       Index.updateHideLabel();
       if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
         const { root } = thread.catalogView.nodes;
-
         if (Index.showHiddenThreads) {
           $.rm(root);
           $.event('PostsRemoved', null, Index.root);
         } else {
           let i = Index.sortedThreadIDs.indexOf(thread.ID) - 1;
-
           while (true) {
             if (i < 0) {
               $('.board').insertAdjacentElement('afterbegin', root);
               break;
             }
-            const rootPrevious = d.getElementById(`t${Index.sortedThreadIDs[i]}`);
+            const rootPrevious = d$1.getElementById(`t${Index.sortedThreadIDs[i]}`);
             if (rootPrevious) {
               rootPrevious.insertAdjacentElement('afterend', root);
               break;
             }
             --i;
           }
-
           $.event('PostsInserted', null, Index.root);
         }
       }
@@ -14885,7 +14693,7 @@ svg.icon {
       let dialog, thumb = null;
       const cb = Gallery.cb;
       if (Conf['Fullscreen Gallery']) {
-        $.one(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
+        $.one(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
         doc.mozRequestFullScreen?.();
         doc.webkitRequestFullScreen?.(Element.ALLOW_KEYBOARD_INPUT);
       }
@@ -14941,9 +14749,9 @@ svg.icon {
         entry.order = 0;
         nodes.menu.addEntry(entry);
       }
-      $.on(d, 'keydown', cb.keybinds);
+      $.on(d$1, 'keydown', cb.keybinds);
       if (Conf['Keybinds']) {
-        $.off(d, 'keydown', Keybinds.keydown);
+        $.off(d$1, 'keydown', Keybinds.keydown);
       }
       $.on(window, 'resize', Gallery.cb.setHeight);
       for (const postThumb of $$(g.SITE.selectors.file.thumb)) {
@@ -14965,7 +14773,7 @@ svg.icon {
         }
       }
       $.addClass(doc, 'gallery-open');
-      $.add(d.body, dialog);
+      $.add(d$1.body, dialog);
       nodes.thumbs.scrollTop = 0;
       nodes.current.parentElement.scrollTop = 0;
       if (image) {
@@ -15262,16 +15070,16 @@ svg.icon {
         $.rm(Gallery.nodes.el);
         $.rmClass(doc, 'gallery-open');
         if (Conf['Fullscreen Gallery']) {
-          $.off(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', Gallery.cb.close);
-          d.mozCancelFullScreen?.();
-          d.webkitExitFullscreen?.();
+          $.off(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', Gallery.cb.close);
+          d$1.mozCancelFullScreen?.();
+          d$1.webkitExitFullscreen?.();
         }
         delete Gallery.nodes;
         delete Gallery.fileIDs;
         doc.style.overflow = '';
-        $.off(d, 'keydown', Gallery.cb.keybinds);
+        $.off(d$1, 'keydown', Gallery.cb.keybinds);
         if (Conf['Keybinds']) {
-          $.on(d, 'keydown', Keybinds.keydown);
+          $.on(d$1, 'keydown', Keybinds.keydown);
         }
         $.off(window, 'resize', Gallery.cb.setHeight);
         clearTimeout(Gallery.timeoutID);
@@ -15357,84 +15165,316 @@ svg.icon {
 </div>
 <div id="media-embed"><div></div></div>`;
 
-  // @ts-nocheck
-
-  var Linkify = {
+  const Test = {
+    postsRemaining: 0,
+    postsFailed: 0,
+    time: 0,
     init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      if (Conf['Menu']) {
+        const a = $.el('a', { textContent: 'Test HTML building' });
+        $.on(a, 'click', this.cb.testOne);
+        Menu.menu.addEntry({
+          el: a,
+          open(post) {
+            a.dataset.fullID = post.fullID;
+            return true;
+          }
+        });
+      }
+      const a2 = $.el('a', { textContent: 'Test HTML building' });
+      $.on(a2, 'click', this.cb.testAll);
+      Header.menu.addEntry({ el: a2 });
+      if (Unread.posts) {
+        const testOrderLink = $.el('a', { textContent: 'Test Post Order' });
+        $.on(testOrderLink, 'click', this.cb.testOrder);
+        Header.menu.addEntry({ el: testOrderLink });
+      }
+      $.on(d$1, 'keydown', this.cb.keydown);
+    },
+    assert(condition) {
+      if (!condition()) {
+        new Notice('warning', `Assertion failed: ${condition}`, 30);
+      }
+    },
+    normalize(root) {
+      let node;
+      const root2 = root.cloneNode(true);
+      for (const el of $$('.mobile', root2)) {
+        $.rm(el);
+      }
+      for (const el of $$('a[href]', root2)) {
+        let { href } = el;
+        href = href.replace(/(^\w+:\/\/boards\.4chan(?:nel)?\.org\/[^\/]+\/thread\/\d+)\/.*/, '$1');
+        el.setAttribute('href', href);
+      }
+      ImageHost.fixLinks($$('.fileText > a, a.fileThumb', root2));
+      for (const el of $$('img[src]', root2)) {
+        el.src = el.src.replace(/(spoiler-\w+)\d(\.png)$/, '$11$2');
+      }
+      for (const el of $$('pre.prettyprinted', root2)) {
+        const snapshot = $.X('.//br|.//wbr|.//text()', el);
+        let i = 0;
+        const nodes = [];
+        while (node = snapshot.snapshotItem(i++)) {
+          nodes.push(node);
+        }
+        $.rmAll(el);
+        $.add(el, nodes);
+        el.normalize();
+        $.rmClass(el, 'prettyprinted');
+      }
+      for (const el of $$('pre[style=""]', root2)) {
+        el.removeAttribute('style');
+      }
+      $('.fileInfo[data-md5]', root2)?.removeAttribute('data-md5');
+      const textNodes = $.X('.//text()', root2);
+      let i = 0;
+      while (node = textNodes.snapshotItem(i++)) {
+        const textNode = node;
+        textNode.data = textNode.data.replace(/\ +/g, ' ');
+        if (textNode.previousSibling?.nodeName === 'BR') {
+          textNode.data = textNode.data.replace(/^\n+/g, '');
+        }
+        if (textNode.nextSibling?.nodeName === 'BR') {
+          textNode.data = textNode.data.replace(/\n+$/g, '');
+        }
+        if (textNode.data === '') {
+          $.rm(textNode);
+        }
+      }
+      return root2;
+    },
+    firstDiff(x, y) {
+      let x2 = x.cloneNode(false);
+      let y2 = y.cloneNode(false);
+      if (!x2.isEqualNode(y2)) {
+        return [x2, y2];
+      }
+      let i = 0;
+      while (true) {
+        x2 = x.childNodes[i];
+        y2 = y.childNodes[i];
+        if (!x2 || !y2) {
+          return [x2, y2];
+        }
+        if (!x2.isEqualNode(y2)) {
+          return Test.firstDiff(x2, y2);
+        }
+        i++;
+      }
+    },
+    testOne(post) {
+      Test.postsRemaining++;
+      $.cache(g.SITE.urls.threadJSON({ boardID: post.boardID, threadID: post.threadID }), function () {
+        if (!this.response) {
+          return;
+        }
+        const { posts } = this.response;
+        g.SITE.Build.spoilerRange[post.board.ID] = posts[0].custom_spoiler;
+        for (const postData of posts) {
+          if (postData.no === post.ID) {
+            const t1 = new Date().getTime();
+            const obj = g.SITE.Build.parseJSON(postData, post.board);
+            const root = g.SITE.Build.post(obj);
+            const t2 = new Date().getTime();
+            Test.time += t2 - t1;
+            const post2 = new Post(root, post.thread, post.board, { forBuildTest: true });
+            let fail = false;
+            const x = post.normalizedOriginal;
+            const y = post2.normalizedOriginal;
+            if (!x.isEqualNode(y)) {
+              fail = true;
+              c.log(`${post.fullID} differs`);
+              const [x2, y2] = Test.firstDiff(x, y);
+              c.log(x2);
+              c.log(y2);
+              c.log(x.outerHTML);
+              c.log(y.outerHTML);
+            }
+            for (const key in Config.filter) {
+              if ((key !== 'General') && !((key === 'MD5') && (post.board.ID === 'f'))) {
+                const val1 = Filter.values(key, obj);
+                const val2 = Filter.values(key, post2);
+                if ((val1.length !== val2.length) || !val1.every((x, i) => x === val2[i])) {
+                  fail = true;
+                  c.log(`${post.fullID} has filter bug in ${key}`);
+                  c.log(val1);
+                  c.log(val2);
+                }
+              }
+            }
+            if (fail) {
+              Test.postsFailed++;
+            } else {
+              c.log(`${post.fullID} correct`);
+            }
+            Test.postsRemaining--;
+            if (Test.postsRemaining === 0) {
+              Test.report();
+            }
+          }
+        }
+      });
+    },
+    testAll() {
+      g.posts.forEach(function (post) {
+        if (!post.isClone && !post.isFetchedQuote) {
+          let abbr;
+          if (!((abbr = $('.abbr', post.nodes.comment)) && /Comment too long\./.test(abbr.textContent))) {
+            Test.testOne(post);
+          }
+        }
+      });
+    },
+    report() {
+      if (Test.postsFailed) {
+        new Notice('warning', `${Test.postsFailed} post(s) differ (${Test.time} ms)`, 30);
+      } else {
+        new Notice('success', `All correct (${Test.time} ms)`, 5);
+      }
+      Test.postsFailed = 0;
+      Test.time = 0;
+    },
+    cb: {
+      testOne() {
+        Test.testOne(g.posts.get(this.dataset.fullID));
+        Menu.menu.close();
+      },
+      testAll() {
+        Test.testAll();
+        Header.menu.close();
+      },
+      testOrder() {
+        let x;
+        const list1 = (() => {
+          const result = [];
+          for (x of Unread.order.order()) {
+            result.push(x.ID);
+          }
+          return result;
+        })();
+        const list2 = (() => {
+          const result1 = [];
+          for (x of $$((g.SITE.isOPContainerThread ? `${g.SITE.selectors.thread}, ` : '') + g.SITE.selectors.postContainer)) {
+            result1.push(+x.id.match(/\d*$/)[0]);
+          }
+          return result1;
+        })();
+        const pass = (function () {
+          if (list1.length !== list2.length) {
+            return false;
+          }
+          for (let i = 0, end = list1.length; i < end; i++) {
+            if (list1[i] !== list2[i]) {
+              return false;
+            }
+          }
+          return true;
+        })();
+        if (pass) {
+          new Notice('success', `Orders same (${list1.length} posts)`, 5);
+        } else {
+          new Notice('warning', 'Orders differ.', 30);
+          c.log(list1);
+          c.log(list2);
+        }
+      },
+      keydown(e) {
+        if (Keybinds.keyCode(e) !== 'v') {
+          return;
+        }
+        if (['INPUT', 'TEXTAREA'].includes(e.target.nodeName)) {
+          return;
+        }
+        Test.testAll();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+  };
 
+  const Linkify = {
+    init() {
+      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
       Callbacks.Post.push({
         name: 'Linkify',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Embedding.init();
+      Embedding.init();
     },
-
     node() {
-      let link;
-      if (this.isClone) { return Embedding.events(this); }
-      if (!Linkify.regString.test(this.info.comment)) { return; }
-      for (link of $$('a', this.nodes.comment)) {
+      if (this.isClone) {
+        return Embedding.events(this);
+      }
+      if (!Linkify.regString.test(this.info.comment)) {
+        return;
+      }
+      for (const link of $$('a', this.nodes.comment)) {
         if (g.SITE.isLinkified?.(link)) {
           $.addClass(link, 'linkify');
-          if (ImageHost.useFaster) { ImageHost.fixLinks([link]); }
+          if (ImageHost.useFaster) {
+            ImageHost.fixLinks([link]);
+          }
           Embedding.process(link, this);
         }
       }
       const links = Linkify.process(this.nodes.comment);
-      if (ImageHost.useFaster) { ImageHost.fixLinks(links); }
-      for (link of links) { Embedding.process(link, this); }
+      if (ImageHost.useFaster) {
+        ImageHost.fixLinks(links);
+      }
+      for (const link of links) {
+        Embedding.process(link, this);
+      }
     },
-
     process(node) {
       let length;
-      const test     = /[^\s"]+/g;
-      const space    = /[\s"]/;
+      const test = /[^\s"]+/g;
+      const space = /[\s"]/;
       const snapshot = $.X('.//br|.//text()', node);
       let i = 0;
       const links = [];
-      while ((node = snapshot.snapshotItem(i++))) {
-        var result;
-        var {data} = node;
-        if (!data || (node.parentElement.nodeName === "A")) { continue; }
-
+      let currNode;
+      while ((currNode = snapshot.snapshotItem(i++))) {
+        let result;
+        let { data } = currNode;
+        if (!data || (currNode.parentElement.nodeName === "A")) {
+          continue;
+        }
         while ((result = test.exec(data))) {
-          var {index} = result;
-          var endNode = node;
-          var word    = result[0];
+          const { index } = result;
+          let endNode = currNode;
+          let word = result[0];
           // End of node, not necessarily end of space-delimited string
           if ((length = index + word.length) === data.length) {
-            var saved;
+            let saved;
             test.lastIndex = 0;
-
             while (saved = snapshot.snapshotItem(i++)) {
-              var end;
+              let end;
               if ((saved.nodeName === 'BR') || ((saved.parentElement.nodeName === 'P') && !saved.previousSibling)) {
-                var part1, part2;
+                let part1, part2;
                 if (
-                  // link deliberately split
-                  (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
+                // link deliberately split
+                (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
                   (part2 = snapshot.snapshotItem(i)?.data?.match(/^(\.[a-z\d-]+)*\//i)) &&
-                  ((part1[0] + part2[0]).search(Linkify.regString) === 0)
-                ) {
+                  ((part1[0] + part2[0]).search(Linkify.regString) === 0)) {
                   continue;
                 } else {
                   break;
                 }
               }
-
               if ((saved.parentElement.nodeName === "A") && !Linkify.regString.test(word)) {
                 break;
               }
-
-              endNode  = saved;
-              ({data}   = saved);
-
+              endNode = saved;
+              ({ data } = saved);
               if (end = space.exec(data)) {
                 // Set our snapshot and regex to start on this node at this position when the loop resumes
                 word += data.slice(0, end.index);
@@ -15442,28 +15482,31 @@ svg.icon {
                 i--;
                 break;
               } else {
-                ({length} = data);
-                word    += data;
+                ({ length } = data);
+                word += data;
               }
             }
           }
-
           if (Linkify.regString.test(word)) {
-            links.push(Linkify.makeRange(node, endNode, index, length));
-
+            links.push(Linkify.makeRange(currNode, endNode, index, length));
+            // #region tests_enabled
+            if (links.length) {
+              Test.assert(() => word === links[links.length - 1]?.toString());
+            }
+            // #endregion
           }
-
-          if (!test.lastIndex || (node !== endNode)) { break; }
+          if (!test.lastIndex || (currNode !== endNode)) {
+            break;
+          }
         }
       }
-
+      const aLinks = [];
       i = links.length;
       while (i--) {
-        links[i] = Linkify.makeLink(links[i]);
+        aLinks[i] = Linkify.makeLink(links[i]);
       }
-      return links;
+      return aLinks;
     },
-
     regString: new RegExp(`(\
 \
 (https?|mailto|git|magnet|ftp|irc):(\
@@ -15478,74 +15521,70 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 |\
 [-\\w\\d.@]+@[a-z\\d.-]+\\.[a-z\\d]\
 )`, 'i'),
-
     makeRange(startNode, endNode, startOffset, endOffset) {
       const range = document.createRange();
       range.setStart(startNode, startOffset);
-      range.setEnd(endNode,   endOffset);
+      range.setEnd(endNode, endOffset);
       return range;
     },
-
     makeLink(range) {
       let t;
       let encodedDomain;
       let text = range.toString();
-
       // Clean start of range
       let i = text.search(Linkify.regString);
-
       if (i > 0) {
         text = text.slice(i);
-        while ((range.startOffset + i) >= range.startContainer.data.length) { i--; }
-
-        if (i) { range.setStart(range.startContainer, range.startOffset + i); }
+        while ((range.startOffset + i) >= range.startContainer.data.length) {
+          i--;
+        }
+        if (i) {
+          range.setStart(range.startContainer, range.startOffset + i);
+        }
       }
-
       // Clean end of range
       i = 0;
       while (/[)\]}>.,]/.test(t = text.charAt(text.length - (1 + i)))) {
-        if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) { break; }
+        if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) {
+          break;
+        }
         i++;
       }
-
       if (i) {
         text = text.slice(0, -i);
-        while ((range.endOffset - i) < 0) { i--; }
-
+        while ((range.endOffset - i) < 0) {
+          i--;
+        }
         if (i) {
           range.setEnd(range.endContainer, range.endOffset - i);
         }
       }
-
       // Make our link 'valid' if it is formatted incorrectly.
       if (!/((mailto|magnet):|.+:\/\/)/.test(text)) {
-        text = (
-          /@/.test(text) ?
-            'mailto:'
+        text = (/@/.test(text) ?
+          'mailto:'
           :
-            'http://'
-        ) + text;
+            'http://') + text;
       }
-
       // Decode percent-encoded characters in domain so that they behave consistently across browsers.
       if (encodedDomain = text.match(/^(https?:\/\/[^/]*%[0-9a-f]{2})(.*)$/i)) {
-        text = encodedDomain[1].replace(/%([0-9a-f]{2})/ig, function(x, y) {
-          if (y === '25') { return x; } else { return String.fromCharCode(parseInt(y, 16)); }
+        text = encodedDomain[1].replace(/%([0-9a-f]{2})/ig, function (x, y) {
+          if (y === '25') {
+            return x;
+          } else {
+            return String.fromCharCode(parseInt(y, 16));
+          }
         }) + encodedDomain[2];
       }
-
       const a = $.el('a', {
         className: 'linkify',
-        rel:       'noreferrer noopener',
-        target:    '_blank',
-        href:      text
-      }
-      );
-
+        rel: 'noreferrer noopener',
+        target: '_blank',
+        href: text
+      });
       // Insert the range into the anchor, the anchor into the range's DOM location, and destroy the range.
       $.add(a, range.extractContents());
       range.insertNode(a);
-
       return a;
     }
   };
@@ -15844,8 +15883,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (Conf['Embedding'] && (g.VIEW !== 'archive')) {
         this.dialog = UI.dialog('embedding', { innerHTML: EmbeddingPage });
         this.media = $('#media-embed', this.dialog);
-        $.one(d, '4chanXInitFinished', this.ready);
-        $.on(d, 'IndexRefreshInternal', () => g.posts.forEach(function (post) {
+        $.one(d$1, '4chanXInitFinished', this.ready);
+        $.on(d$1, 'IndexRefreshInternal', () => g.posts.forEach(function (post) {
           for (post of [post, ...post.clones]) {
             for (var embed of post.nodes.embedlinks) {
               Embedding.cb.catalogRemove.call(embed);
@@ -15854,7 +15893,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }));
       }
       if (Embedding.shouldFetchTitles()) {
-        $.on(d, '4chanXInitFinished PostsInserted', function () {
+        $.on(d$1, '4chanXInitFinished PostsInserted', function () {
           for (const service of Object.values(Embedding.types)) {
             if (service.title?.batchSize) {
               Embedding.flushTitles(service.title);
@@ -15958,7 +15997,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
       Icon.set(jump, 'arrowRightLong');
       Icon.set(close, 'xmark');
-      return $.add(d.body, Embedding.dialog);
+      return $.add(d$1.body, Embedding.dialog);
     },
     closeFloat() {
       delete Embedding.lastEmbed;
@@ -15969,12 +16008,12 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       // only webkit can handle a blocking div
       const { style } = Embedding.media;
       if (Embedding.dragEmbed.mouseup) {
-        $.off(d, 'mouseup', Embedding.dragEmbed);
+        $.off(d$1, 'mouseup', Embedding.dragEmbed);
         Embedding.dragEmbed.mouseup = false;
         style.pointerEvents = '';
         return;
       }
-      $.on(d, 'mouseup', Embedding.dragEmbed);
+      $.on(d$1, 'mouseup', Embedding.dragEmbed);
       Embedding.dragEmbed.mouseup = true;
       return style.pointerEvents = 'none';
     },
@@ -16549,7 +16588,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       } else {
         this.dialog = (sc = UI.dialog('updater', { innerHTML: '<div class="move"></div><span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' }));
         $.addClass(doc, 'float');
-        $.ready(() => $.add(d.body, sc));
+        $.ready(() => $.add(d$1.body, sc));
       }
       this.checkPostCount = 0;
       this.timer = $('#update-timer', sc);
@@ -16558,7 +16597,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       $.on(this.status, 'click', this.update);
       const updateLink = $.el('span', { className: 'brackets-wrap updatelink' });
       $.extend(updateLink, { innerHTML: '<a href="javascript:;">Update</a>' });
-      $.on(d, '4chanXInitFinished', function () {
+      $.on(d$1, '4chanXInitFinished', function () {
         let navLinksBot;
         if (navLinksBot = $('.navLinksBot')) {
           return $.add(navLinksBot, [$.tn(' '), updateLink]);
@@ -16609,8 +16648,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
       });
       ThreadUpdater.cb.interval.call($.el('input', { value: Conf['Interval'] }));
-      $.on(d, 'QRPostSuccessful', ThreadUpdater.cb.checkpost);
-      $.on(d, 'visibilitychange', ThreadUpdater.cb.visibility);
+      $.on(d$1, 'QRPostSuccessful', ThreadUpdater.cb.checkpost);
+      $.on(d$1, 'visibilitychange', ThreadUpdater.cb.visibility);
       return ThreadUpdater.setInterval();
     },
     /*
@@ -16641,7 +16680,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return ThreadUpdater.setInterval();
       },
       visibility() {
-        if (d.hidden) {
+        if (d$1.hidden) {
           return;
         }
         // Reset the counter when we focus this tab.
@@ -16654,7 +16693,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return ThreadUpdater.scrollBG = Conf['Scroll BG'] ?
           () => true
           :
-            () => !d.hidden;
+            () => !d$1.hidden;
       },
       interval(e) {
         let val = parseInt(this.value, 10);
@@ -16746,7 +16785,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       const { interval } = ThreadUpdater;
       if (Conf['Optional Increase']) {
         // Lower the max refresh rate limit on visible tabs.
-        const limit = d.hidden ? 10 : 5;
+        const limit = d$1.hidden ? 10 : 5;
         const j = Math.min(ThreadUpdater.outdateCount, limit);
         // 1 second to 100, 30 to 300.
         const cur = (Math.floor(interval * 0.1) || 1) * j * j;
@@ -16890,7 +16929,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         for (const post of posts) {
           Callbacks.Post.execute(post);
         }
-        if (d.hidden || !d.hasFocus()) {
+        if (d$1.hidden || !d$1.hasFocus()) {
           if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
             ThreadUpdater.playBeep();
             if (Conf['Beep']) {
@@ -16914,7 +16953,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         $.event('PostsInserted', null, ThreadUpdater.root);
         if (scroll) {
           if (Conf['Bottom Scroll']) {
-            window.scrollTo(0, d.body.clientHeight);
+            window.scrollTo(0, d$1.body.clientHeight);
           } else {
             if (firstPost) {
               Header.scrollTo(firstPost);
@@ -16941,41 +16980,43 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
   };
 
-  // @ts-nocheck
-
-  var Keybinds = {
+  const Keybinds = {
     init() {
-      if (!Conf['Keybinds']) { return; }
-
-      for (var hotkey in Config.hotkeys) {
+      if (!Conf['Keybinds']) {
+        return;
+      }
+      for (const hotkey in Config.hotkeys) {
         $.sync(hotkey, Keybinds.sync);
       }
-
-      var init = function() {
-        $.off(d, '4chanXInitFinished', init);
-        $.on(d, 'keydown', Keybinds.keydown);
-        for (var node of $$('[accesskey]')) {
+      const init = function () {
+        $.off(d$1, '4chanXInitFinished', init);
+        $.on(d$1, 'keydown', Keybinds.keydown);
+        for (const node of $$('[accesskey]')) {
           node.removeAttribute('accesskey');
         }
       };
-      return $.on(d, '4chanXInitFinished', init);
+      $.on(d$1, '4chanXInitFinished', init);
     },
-
     sync(key, hotkey) {
-      return Conf[hotkey] = key;
+      Conf[hotkey] = key;
     },
-
     keydown(e) {
       let key, thread, threadRoot;
       let catalog, notifications;
-      if (!(key = Keybinds.keyCode(e))) { return; }
-      const {target} = e;
+      if (!(key = Keybinds.keyCode(e))) {
+        return;
+      }
+      const target = e.target;
       if (['INPUT', 'TEXTAREA'].includes(target.nodeName)) {
-        if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) { return; }
+        if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) {
+          return;
+        }
       }
       if (['index', 'thread'].includes(g.VIEW)) {
         threadRoot = Nav.getThread();
-        thread = Get.threadFromRoot(threadRoot);
+        if (threadRoot) {
+          thread = Get.threadFromRoot(threadRoot);
+        }
       }
       let hasAction = false;
       // QR & Options
@@ -17003,7 +17044,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (Settings.dialog) {
           Settings.close();
         } else if ((notifications = $$('.notification')).length) {
-          for (var notification of notifications) {
+          for (const notification of notifications) {
             $('.close', notification).click();
           }
         } else if (QR.nodes?.preview) {
@@ -17064,12 +17105,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (key === Conf['Update']) {
         switch (g.VIEW) {
           case 'thread':
-            if (ThreadUpdater.enabled) ThreadUpdater.update();
+            if (ThreadUpdater.enabled)
+              ThreadUpdater.update();
             hasAction = true;
-          break;
+            break;
           case 'index':
-            if (Index.enabled) Index.update();
+            if (Index.enabled)
+              Index.update();
             hasAction = true;
+            break;
         }
       }
       if (key === Conf['Watch'] && ThreadWatcher.enabled && thread) {
@@ -17088,16 +17132,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QuoteThreading.toggleThreading();
         hasAction = true;
       }
-      if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled) {
+      if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled && threadRoot) {
         UnreadIndex.markRead.call(threadRoot);
         hasAction = true;
       }
       // Images
       if (key === Conf['Expand image'] && ImageExpand.enabled && threadRoot) {
-        var post = Get.postFromNode(Keybinds.post(threadRoot));
-        if (post.file) {
-          ImageExpand.toggle(post);
-          hasAction = true;
+        const p = Keybinds.post(threadRoot);
+        if (p) {
+          const post = Get.postFromNode(p);
+          if (post.file) {
+            ImageExpand.toggle(post);
+            hasAction = true;
+          }
         }
       }
       if (key === Conf['Expand images'] && ImageExpand.enabled) {
@@ -17131,8 +17178,9 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       if (key === Conf['Next page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
         if (Index.enabled) {
-          if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-          $('.next button', Index.pagelist).click();
+          if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+            $('.next button', Index.pagelist).click();
+          }
         } else {
           $(g.SITE.selectors.nav.next)?.click();
         }
@@ -17140,20 +17188,21 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       if (key === Conf['Previous page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
         if (Index.enabled) {
-          if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-          $('.prev button', Index.pagelist).click();
+          if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+            $('.prev button', Index.pagelist).click();
+          }
         } else {
           $(g.SITE.selectors.nav.prev)?.click();
         }
         hasAction = true;
       }
       if (key === Conf['Search form'] && g.VIEW === 'index') {
-        var searchInput = Index.enabled ?
+        const searchInput = Index.enabled ?
           Index.searchInput
-        : g.SITE.selectors.searchBox ?
-          $(g.SITE.selectors.searchBox)
-        :
-          undefined;
+          : g.SITE.selectors.searchBox ?
+            $(g.SITE.selectors.searchBox)
+            :
+              undefined;
         if (searchInput) {
           Header.scrollToIfNeeded(searchInput);
           searchInput.focus();
@@ -17185,17 +17234,16 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         Nav.scroll(-1);
         hasAction = true;
       }
-      if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot && thread) {
         ExpandThread.toggle(thread);
-        // Keep thread from moving off screen when contracted.
         Header.scrollTo(threadRoot);
         hasAction = true;
       }
-      if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot && thread) {
         Keybinds.open(thread);
         hasAction = true;
       }
-      if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot && thread) {
         Keybinds.open(thread, true);
         hasAction = true;
       }
@@ -17212,16 +17260,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         Keybinds.hl(0, threadRoot);
         hasAction = true;
       }
-      if (key === Conf['Hide'] && thread && ThreadHiding.db) {
+      if (key === Conf['Hide'] && thread && ThreadHiding.db && threadRoot) {
         Header.scrollTo(threadRoot);
         ThreadHiding.toggle(thread);
         hasAction = true;
       }
       if (key === Conf['Quick Filter MD5'] && threadRoot) {
-        post = Keybinds.post(threadRoot);
-        Keybinds.hl(+1, threadRoot);
-        Filter.quickFilterMD5.call(post, e);
-        hasAction = true;
+        const p = Keybinds.post(threadRoot);
+        if (p) {
+          const post = Get.postFromNode(p);
+          Keybinds.hl(+1, threadRoot);
+          Filter.quickFilterMD5.call(post, e);
+          hasAction = true;
+        }
       }
       if (key === Conf['Previous Post Quoting You'] && threadRoot && QuoteYou.db) {
         QuoteYou.cb.seek('preceding');
@@ -17236,138 +17287,147 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         e.stopPropagation();
       }
     },
-
     keyCode(e) {
-      let key = (() => { let kc;
-      switch ((kc = e.keyCode)) {
-        case 8: // return
-          return '';
-        case 13:
-          return 'Enter';
-        case 27:
-          return 'Esc';
-        case 32:
-          return 'Space';
-        case 37:
-          return 'Left';
-        case 38:
-          return 'Up';
-        case 39:
-          return 'Right';
-        case 40:
-          return 'Down';
-        case 188:
-          return 'Comma';
-        case 190:
-          return 'Period';
-        case 191:
-          return 'Slash';
-        case 59: case 186:
-          return 'Semicolon';
-        default:
-          if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
-            return String.fromCharCode(kc).toLowerCase();
-          } else if (96 <= kc && kc <= 105) { // numpad 0-9
-            return String.fromCharCode(kc - 48);
-          } else {
-            return null;
-          }
-      } })();
+      const key = (() => {
+        const kc = e.keyCode;
+        switch (kc) {
+          case 8: // return
+            return '';
+          case 13:
+            return 'Enter';
+          case 27:
+            return 'Esc';
+          case 32:
+            return 'Space';
+          case 37:
+            return 'Left';
+          case 38:
+            return 'Up';
+          case 39:
+            return 'Right';
+          case 40:
+            return 'Down';
+          case 188:
+            return 'Comma';
+          case 190:
+            return 'Period';
+          case 191:
+            return 'Slash';
+          case 59:
+          case 186:
+            return 'Semicolon';
+          default:
+            if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
+              return String.fromCharCode(kc).toLowerCase();
+            } else if (96 <= kc && kc <= 105) { // numpad 0-9
+              return String.fromCharCode(kc - 48);
+            } else {
+              return null;
+            }
+        }
+      })();
       if (key) {
-        if (e.altKey) {   key = 'Alt+'   + key; }
-        if (e.ctrlKey) {  key = 'Ctrl+'  + key; }
-        if (e.metaKey) {  key = 'Meta+'  + key; }
-        if (e.shiftKey) { key = 'Shift+' + key; }
+        let finalKey = key;
+        if (e.altKey) {
+          finalKey = 'Alt+' + finalKey;
+        }
+        if (e.ctrlKey) {
+          finalKey = 'Ctrl+' + finalKey;
+        }
+        if (e.metaKey) {
+          finalKey = 'Meta+' + finalKey;
+        }
+        if (e.shiftKey) {
+          finalKey = 'Shift+' + finalKey;
+        }
+        return finalKey;
       }
       return key;
     },
-
     post(thread) {
       const s = g.SITE.selectors;
-      return (
-        $(`${s.postContainer}${s.highlightable.reply}.${g.SITE.classes.highlight}`, thread) ||
-        $(`${g.SITE.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread)
-      );
+      return ($(`${s.postContainer}${s.highlightable.reply}.${g.SITE.classes.highlight}`, thread) ||
+        $(`${g.SITE.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread));
     },
-
     qr(thread) {
       QR.open();
       if (thread != null) {
-        QR.quote.call(Keybinds.post(thread));
+        const p = Keybinds.post(thread);
+        if (p) {
+          QR.quote.call(Get.postFromNode(p));
+        }
       }
-      return QR.nodes.com.focus();
+      QR.nodes.com.focus();
     },
-
     tags(tag, ta) {
-      BoardConfig.ready(function() {
-        const {config} = g.BOARD;
-        const supported = (() => { switch (tag) {
-          case 'spoiler':     return !!config.spoilers;
-          case 'code':        return !!config.code_tags;
-          case 'math': case 'eqn': return !!config.math_tags;
-          case 'sjis':        return !!config.sjis_tags;
-        } })();
-        if (!supported) { return new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD}/.`, 20); }
+      BoardConfig.ready(function () {
+        const { config } = g.BOARD;
+        const supported = (() => {
+          switch (tag) {
+            case 'spoiler': return !!config.spoilers;
+            case 'code': return !!config.code_tags;
+            case 'math':
+            case 'eqn': return !!config.math_tags;
+            case 'sjis': return !!config.sjis_tags;
+            default: return false;
+          }
+        })();
+        if (!supported) {
+          new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD.ID}/.`, 20);
+        }
       });
-
-      const {
-        value
-      } = ta;
+      const { value } = ta;
       const selStart = ta.selectionStart;
-      const selEnd   = ta.selectionEnd;
-
+      const selEnd = ta.selectionEnd;
       ta.value =
         value.slice(0, selStart) +
-        `[${tag}]` + value.slice(selStart, selEnd) + `[/${tag}]` +
-        value.slice(selEnd);
-
+          `[${tag}]` + value.slice(selStart, selEnd) + `[/${tag}]` +
+          value.slice(selEnd);
       // Move the caret to the end of the selection.
       const range = (`[${tag}]`).length + selEnd;
       ta.setSelectionRange(range, range);
-
-      // Fire the 'input' event
-      return $.event('input', null, ta);
+      $.event('input', null, ta);
     },
-
     sage() {
-      const isSage  = /sage/i.test(QR.nodes.email.value);
-      return QR.nodes.email.value = isSage ?
-        ""
-      : "sage";
+      const isSage = /sage/i.test(QR.nodes.email.value);
+      QR.nodes.email.value = isSage ? "" : "sage";
     },
-
     open(thread, tab) {
-      if (g.VIEW !== 'index') { return; }
-      const url = Get.url('thread', thread);
-      if (tab) {
-        return $.open(url);
-      } else {
-        return location.href = url;
-      }
-    },
-
-    hl(delta, thread) {
-      const replySelector = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
-      const {highlight} = g.SITE.classes;
-
-      const postEl = $(`${replySelector}.${highlight}`, thread);
-
-      if (!delta) {
-        if (postEl) { $.rmClass(postEl, highlight); }
+      if (g.VIEW !== 'index') {
         return;
       }
-
+      const url = Get.url('thread', thread);
+      if (tab) {
+        $.open(url);
+      } else {
+        location.href = url;
+      }
+    },
+    hl(delta, thread) {
+      const replySelector = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
+      const { highlight } = g.SITE.classes;
+      const postEl = $(`${replySelector}.${highlight}`, thread);
+      if (!delta) {
+        if (postEl) {
+          $.rmClass(postEl, highlight);
+        }
+        return;
+      }
       if (postEl) {
-        const {height} = postEl.getBoundingClientRect();
+        const { height } = postEl.getBoundingClientRect();
         if ((Header.getTopOf(postEl) >= -height) && (Header.getBottomOf(postEl) >= -height)) { // We're at least partially visible
           let next;
-          const {root} = Get.postFromNode(postEl).nodes;
+          const { root } = Get.postFromNode(postEl).nodes;
           const axis = delta === +1 ?
             'following'
-          :
-            'preceding';
-          if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
-          if (!next.matches(replySelector)) { next = $(replySelector, next); }
+            :
+              'preceding';
+          if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) {
+            return;
+          }
+          if (!next.matches(replySelector)) {
+            next = $(replySelector, next);
+          }
           Header.scrollToIfNeeded(next, delta === +1);
           $.addClass(next, highlight);
           $.rmClass(postEl, highlight);
@@ -17375,10 +17435,11 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         $.rmClass(postEl, highlight);
       }
-
       const replies = $$(replySelector, thread);
-      if (delta === -1) { replies.reverse(); }
-      for (var reply of replies) {
+      if (delta === -1) {
+        replies.reverse();
+      }
+      for (const reply of replies) {
         if (((delta === +1) && (Header.getTopOf(reply) > 0)) || ((delta === -1) && (Header.getBottomOf(reply) > 0))) {
           $.addClass(reply, highlight);
           return;
@@ -17387,46 +17448,37 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
   };
 
-  // @ts-nocheck
-
   const Captcha = {
     cache: {
+      timer: null,
+      submitCB: undefined,
+      prerequested: undefined,
+      captchas: [],
       init() {
-        $.on(d, 'SaveCaptcha', e => {
+        $.on(d$1, 'SaveCaptcha', (e) => {
           return this.saveAPI(e.detail);
         });
-        return $.on(d, 'NoCaptcha', e => {
+        $.on(d$1, 'NoCaptcha', (e) => {
           return this.noCaptcha(e.detail);
         });
       },
-
-      captchas: [],
-
       getCount() {
         return this.captchas.length;
       },
-
       neededRaw() {
-        return !(
-          this.haveCookie() || this.captchas.length || QR.req || this.submitCB
-        ) && (
-            (QR.posts.length > 1) || Conf['Auto-load captcha'] || !QR.posts[0].isOnlyQuotes() || QR.posts[0].file
-          );
+        return !(this.haveCookie() || this.captchas.length || QR.req || this.submitCB) && ((QR.posts.length > 1) || Conf['Auto-load captcha'] || !QR.posts[0].isOnlyQuotes() || QR.posts[0].file);
       },
-
       needed() {
-        return this.neededRaw() && $.event('LoadCaptcha');
+        return this.neededRaw() && $.event('LoadCaptcha', undefined);
       },
-
       haveCookie() {
-        const hasCT = /\b_ct=/.test(d.cookie);
+        const hasCT = /\b_ct=/.test(d$1.cookie);
         let hasTicket = false;
         try {
           hasTicket = !!(localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'));
-        } catch (e) {}
+        } catch (e) { }
         return (hasCT || hasTicket) && (QR.posts[0].thread !== 'new');
       },
-
       getOne() {
         let captcha;
         delete this.prerequested;
@@ -17438,25 +17490,24 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return null;
         }
       },
-
       request(isReply) {
         if (!this.submitCB) {
-          if ($.event('RequestCaptcha', { isReply })) { return; }
+          if ($.event('RequestCaptcha', { isReply })) {
+            return;
+          }
         }
-        return cb => {
+        return (cb) => {
           this.submitCB = cb;
           return this.updateCount();
         };
       },
-
       abort() {
         if (this.submitCB) {
           delete this.submitCB;
-          $.event('AbortCaptcha');
+          $.event('AbortCaptcha', undefined);
           return this.updateCount();
         }
       },
-
       saveAPI(captcha) {
         let cb;
         if (cb = this.submitCB) {
@@ -17467,20 +17518,18 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.save(captcha);
         }
       },
-
       noCaptcha(detail) {
         let cb;
         if (cb = this.submitCB) {
           if (!this.haveCookie() || detail?.error) {
             QR.error(detail?.error || 'Failed to retrieve captcha.');
-            QR.captcha.setup(d.activeElement === QR.nodes.status);
+            QR.captcha.setup(d$1.activeElement === QR.nodes.status);
           }
           delete this.submitCB;
           cb();
           return this.updateCount();
         }
       },
-
       save(captcha) {
         let cb;
         if (cb = this.submitCB) {
@@ -17492,14 +17541,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         this.captchas.sort((a, b) => a.timeout - b.timeout);
         return this.count();
       },
-
       clear() {
         if (this.captchas.length) {
           let i;
           const now = Date.now();
           for (i = 0; i < this.captchas.length; i++) {
-            var captcha = this.captchas[i];
-            if (captcha.timeout > now) { break; }
+            const captcha = this.captchas[i];
+            if (captcha.timeout > now) {
+              break;
+            }
           }
           if (i) {
             this.captchas = this.captchas.slice(i);
@@ -17507,7 +17557,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           }
         }
       },
-
       count() {
         clearTimeout(this.timer);
         if (this.captchas.length) {
@@ -17515,7 +17564,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         return this.updateCount();
       },
-
       updateCount() {
         return $.event('CaptchaCount', this.captchas.length);
       }
@@ -17524,33 +17572,37 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     t: CaptchaT,
     v2: {
       lifetime: 2 * MINUTE,
-
+      isEnabled: false,
+      noscript: false,
+      prevNeeded: false,
+      timeouts: {},
+      nodes: {},
       init() {
-        if (isPassEnabled()) { return; }
-        if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) { return; }
-
+        if (isPassEnabled()) {
+          return;
+        }
+        if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) {
+          return;
+        }
         if (this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled')) {
           $.addClass(QR.nodes.el, 'noscript-captcha');
         }
-
         Captcha.cache.init();
-        $.on(d, 'CaptchaCount', this.count.bind(this));
-
+        $.on(d$1, 'CaptchaCount', this.count.bind(this));
         const root = $.el('div', { className: 'captcha-root' });
         $.extend(root, {
-          innerHTML:
-            '<div class="captcha-counter"><a href="javascript:;"></a></div>'
-        }
-        );
+          innerHTML: '<div class="captcha-counter"><a href="javascript:;"></a></div>'
+        });
         const counter = $('.captcha-counter > a', root);
         this.nodes = { root, counter };
         this.count();
         $.addClass(QR.nodes.el, 'has-captcha', 'captcha-v2');
         $.after(QR.nodes.com.parentNode, root);
-
         $.on(counter, 'click', this.toggle.bind(this));
-        $.on(counter, 'keydown', e => {
-          if (Keybinds.keyCode(e) !== 'Space') { return; }
+        $.on(counter, 'keydown', (e) => {
+          if (Keybinds.keyCode(e) !== 'Space') {
+            return;
+          }
           this.toggle();
           e.preventDefault();
           return e.stopPropagation();
@@ -17560,10 +17612,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return $.queueTask(() => this.save(false));
         });
       },
-
-      timeouts: {},
-      prevNeeded: 0,
-
       noscriptURL() {
         let lang;
         let url = `https://www.google.com/recaptcha/api/fallback?k=${meta.recaptchaKey}`;
@@ -17572,18 +17620,16 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         return url;
       },
-
       moreNeeded() {
         // Post count temporarily off by 1 when called from QR.post.rm, QR.close, or QR.submit
         return $.queueTask(() => {
           const needed = Captcha.cache.needed();
           if (needed && !this.prevNeeded) {
-            this.setup(QR.cooldown.auto && (d.activeElement === QR.nodes.status));
+            this.setup(QR.cooldown.auto && (d$1.activeElement === QR.nodes.status));
           }
           return this.prevNeeded = needed;
         });
       },
-
       toggle() {
         if (this.nodes.container && !this.timeouts.destroy) {
           return this.destroy();
@@ -17591,102 +17637,99 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return this.setup(true, true);
         }
       },
-
       setup(focus, force) {
-        if (!this.isEnabled || (!Captcha.cache.needed() && !force)) { return; }
-
+        if (!this.isEnabled || (!Captcha.cache.needed() && !force)) {
+          return;
+        }
         if (focus) {
           $.addClass(QR.nodes.el, 'focus');
           this.nodes.counter.focus();
         }
-
         if (this.timeouts.destroy) {
           clearTimeout(this.timeouts.destroy);
           delete this.timeouts.destroy;
           return this.reload();
         }
-
         if (this.nodes.container) {
           // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1226835
           $.queueTask(() => {
             let iframe;
-            if (this.nodes.container && (d.activeElement === this.nodes.counter) && (iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', this.nodes.container))) {
+            if (this.nodes.container && (d$1.activeElement === this.nodes.counter) && (iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', this.nodes.container))) {
               iframe.focus();
               return QR.focus();
             }
           }); // Event handler not fired in Firefox
           return;
         }
-
         this.nodes.container = $.el('div', { className: 'captcha-container' });
         $.prepend(this.nodes.root, this.nodes.container);
-        new MutationObserver(this.afterSetup.bind(this)).observe(this.nodes.container, {
+        new MutationObserver(mutations => this.afterSetup(mutations)).observe(this.nodes.container, {
           childList: true,
           subtree: true
-        }
-        );
-
+        });
         if (this.noscript) {
-          return this.setupNoscript();
+          return this.noscriptCaptchaSetup();
         } else {
           return this.setupJS();
         }
       },
-
-      setupNoscript() {
+      noscriptCaptchaSetup() {
         const iframe = $.el('iframe', {
           id: 'qr-captcha-iframe',
           scrolling: 'no',
           src: this.noscriptURL()
-        }
-        );
+        });
         const div = $.el('div');
         const textarea = $.el('textarea');
         $.add(div, textarea);
         return $.add(this.nodes.container, [iframe, div]);
       },
-
       setupJS() {
         $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey });
       },
-
       afterSetup(mutations) {
-        for (var mutation of mutations) {
-          for (var node of mutation.addedNodes) {
-            var iframe, textarea;
-            if (iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node)) { this.setupIFrame(iframe); }
-            if (textarea = $.x('./descendant-or-self::textarea', node)) { this.setupTextArea(textarea); }
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            let iframe, textarea;
+            if (iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node)) {
+              this.setupIFrame(iframe);
+            }
+            if (textarea = $.x('./descendant-or-self::textarea', node)) {
+              this.setupTextArea(textarea);
+            }
           }
         }
       },
-
       setupIFrame(iframe) {
         let needle;
-        if (!doc.contains(iframe)) { return; }
+        if (!doc.contains(iframe)) {
+          return;
+        }
         Captcha.replace.iframe(iframe);
         $.addClass(QR.nodes.el, 'captcha-open');
         this.fixQRPosition();
-        $.on(iframe, 'load', this.fixQRPosition);
-        if (d.activeElement === this.nodes.counter) { iframe.focus(); }
+        $.on(iframe, 'load', this.fixQRPosition.bind(this));
+        if (d$1.activeElement === this.nodes.counter) {
+          iframe.focus();
+        }
         // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
         if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
           return $.on(iframe.parentNode, 'scroll', function () { return this.scrollTop = 0; });
         }
       },
-
       fixQRPosition() {
         if (QR.nodes.el.getBoundingClientRect().bottom > doc.clientHeight) {
           QR.nodes.el.style.top = '';
           return QR.nodes.el.style.bottom = '0px';
         }
       },
-
       setupTextArea(textarea) {
         return $.one(textarea, 'input', () => this.save(true));
       },
-
       destroy() {
-        if (!this.isEnabled) { return; }
+        if (!this.isEnabled) {
+          return;
+        }
         delete this.timeouts.destroy;
         $.rmClass(QR.nodes.el, 'captcha-open');
         if (this.nodes.container) {
@@ -17695,18 +17738,16 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           return delete this.nodes.container;
         }
       },
-
       getOne(isReply) {
-        return Captcha.cache.getOne(isReply);
+        return Captcha.cache.getOne();
       },
-
       save(pasted, token) {
+        const textarea = $('textarea', this.nodes.container);
         Captcha.cache.save({
-          response: token || $('textarea', this.nodes.container).value,
+          response: token || (textarea ? textarea.value : ''),
           timeout: Date.now() + this.lifetime
         });
-
-        const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
+        const focus = (d$1.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d$1.activeElement.src);
         if (Captcha.cache.needed()) {
           if (focus) {
             if (QR.cooldown.auto || Conf['Post on Captcha Completion']) {
@@ -17720,21 +17761,24 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           if (pasted) {
             this.destroy();
           } else {
-            if (this.timeouts.destroy == null) { this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND); }
+            if (this.timeouts.destroy == null) {
+              this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND);
+            }
           }
-          if (focus) { QR.nodes.status.focus(); }
+          if (focus) {
+            QR.nodes.status.focus();
+          }
         }
-
-        if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) { return QR.submit(); }
+        if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
+          return QR.submit(undefined);
+        }
       },
-
       count() {
         const count = Captcha.cache.getCount();
         const loading = Captcha.cache.submitCB ? '...' : '';
         this.nodes.counter.textContent = `Captchas: ${count}${loading}`;
         return this.moreNeeded();
       },
-
       reload() {
         if ($('iframe[src^="https://www.google.com/recaptcha/api/fallback?"]', this.nodes.container)) {
           this.destroy();
@@ -17743,7 +17787,6 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           $.global('resetCaptcha');
         }
       },
-
       occupied() {
         return !!this.nodes.container && !this.timeouts.destroy;
       }
@@ -18015,7 +18058,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return;
       }
       this.posts = [];
-      $.on(d, '4chanXInitFinished', () => BoardConfig.ready(QR.initReady));
+      $.on(d$1, '4chanXInitFinished', () => BoardConfig.ready(QR.initReady));
       Callbacks.Post.push({
         name: 'Quick Reply',
         cb: this.node
@@ -18086,15 +18129,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           $.prepend(navLinksBot, linkBot);
         }
       }
-      $.on(d, 'QRGetFile', QR.getFile);
-      $.on(d, 'QRDrawFile', QR.drawFile);
-      $.on(d, 'QRSetFile', QR.setFile);
-      $.on(d, 'paste', QR.paste);
-      $.on(d, 'dragover', QR.dragOver);
-      $.on(d, 'drop', QR.dropFile);
-      $.on(d, 'dragstart dragend', QR.drag);
-      $.on(d, 'IndexRefreshInternal', QR.generatePostableThreadsList);
-      $.on(d, 'ThreadUpdate', QR.statusCheck);
+      $.on(d$1, 'QRGetFile', QR.getFile);
+      $.on(d$1, 'QRDrawFile', QR.drawFile);
+      $.on(d$1, 'QRSetFile', QR.setFile);
+      $.on(d$1, 'paste', QR.paste);
+      $.on(d$1, 'dragover', QR.dragOver);
+      $.on(d$1, 'drop', QR.dropFile);
+      $.on(d$1, 'dragstart dragend', QR.drag);
+      $.on(d$1, 'IndexRefreshInternal', QR.generatePostableThreadsList);
+      $.on(d$1, 'ThreadUpdate', QR.statusCheck);
       if (!Conf['Persistent QR']) {
         return;
       }
@@ -18162,14 +18205,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     focus() {
       return $.queueTask(function () {
         if (!QR.inBubble()) {
-          QR.hasFocus = d.activeElement && QR.nodes.el.contains(d.activeElement);
+          QR.hasFocus = d$1.activeElement && QR.nodes.el.contains(d$1.activeElement);
           return QR.nodes.el.classList.toggle('focus', QR.hasFocus);
         }
       });
     },
     inBubble() {
       const bubbles = $$('iframe[src^="https://www.google.com/recaptcha/api2/frame"]');
-      return bubbles.includes(d.activeElement) || bubbles.some(el => (getComputedStyle(el).visibility !== 'hidden') && (el.getBoundingClientRect().bottom > 0));
+      return bubbles.includes(d$1.activeElement) || bubbles.some(el => (getComputedStyle(el).visibility !== 'hidden') && (el.getBoundingClientRect().bottom > 0));
     },
     hide() {
       QR.blur();
@@ -18188,8 +18231,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
     },
     blur() {
-      if (QR.nodes.el.contains(d.activeElement)) {
-        return d.activeElement.blur();
+      if (QR.nodes.el.contains(d$1.activeElement)) {
+        return d$1.activeElement.blur();
       }
     },
     toggleSJIS(e) {
@@ -18240,10 +18283,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       const notice = new Notice('warning', el);
       QR.notifications.push(notice);
       if (!Header.areNotificationsEnabled) {
-        if (d.hidden && !QR.cooldown.auto) {
+        if (d$1.hidden && !QR.cooldown.auto) {
           return alert(el.textContent);
         }
-      } else if (d.hidden || !(focusOverride || d.hasFocus())) {
+      } else if (d$1.hidden || !(focusOverride || d$1.hasFocus())) {
         const notif = new Notification(el.textContent, {
           body: el.textContent,
           icon: Favicon.logo
@@ -18313,7 +18356,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (!QR.postingIsEnabled) {
         return;
       }
-      const sel = d.getSelection();
+      const sel = d$1.getSelection();
       const post = Get.postFromNode(this);
       const { root } = post.nodes;
       const postRange = new Range();
@@ -18468,8 +18511,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     drag(e) {
       // Let it drag anything from the page.
       const toggle = e.type === 'dragstart' ? $.off : $.on;
-      toggle(d, 'dragover', QR.dragOver);
-      return toggle(d, 'drop', QR.dropFile);
+      toggle(d$1, 'dragover', QR.dragOver);
+      return toggle(d$1, 'drop', QR.dropFile);
     },
     dragOver(e) {
       e.preventDefault();
@@ -18564,7 +18607,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QR.handleFile(file, files.length);
       }
       $.addClass(QR.nodes.el, 'dump');
-      if ((d.activeElement === QR.nodes.fileButton) && $.hasClass(QR.nodes.fileSubmit, 'has-file')) {
+      if ((d$1.activeElement === QR.nodes.fileButton) && $.hasClass(QR.nodes.fileSubmit, 'has-file')) {
         return QR.nodes.filename.focus();
       }
     },
@@ -18701,7 +18744,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       window.addEventListener('focus', QR.focus, true);
       window.addEventListener('blur', QR.focus, true);
       // We don't receive blur events from captcha iframe.
-      $.on(d, 'click', QR.focus);
+      $.on(d$1, 'click', QR.focus);
       // XXX Workaround for image pasting in Firefox, obsolete as of v50.
       // https://bugzilla.mozilla.org/show_bug.cgi?id=906420
       if (($.engine === 'gecko') && !window.DataTransferItemList) {
@@ -18735,7 +18778,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       QR.status();
       QR.cooldown.setup();
       QR.captcha.init();
-      $.add(d.body, dialog);
+      $.add(d$1.body, dialog);
       QR.captcha.setup();
       QR.oekaki.setup();
       // Create a custom event when the QR dialog is first initialized.
@@ -18831,7 +18874,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           err = 'Original comment required.';
         }
       }
-      if (QR.captcha.isEnabled && !((QR.captcha === Captcha.v2) && /\b_ct=/.test(d.cookie) && threadID) && !(err && !force)) {
+      if (QR.captcha.isEnabled && !((QR.captcha === Captcha.v2) && /\b_ct=/.test(d$1.cookie) && threadID) && !(err && !force)) {
         captcha = QR.captcha.getOne(!!threadID);
         if (QR.captcha === Captcha.v2) {
           if (!captcha) {
@@ -18840,7 +18883,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         if (!captcha) {
           err = 'No valid captcha.';
-          QR.captcha.setup(!QR.cooldown.auto || (d.activeElement === QR.nodes.status));
+          QR.captcha.setup(!QR.cooldown.auto || (d$1.activeElement === QR.nodes.status));
         }
       }
       QR.cleanNotifications();
@@ -19006,7 +19049,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } else { // stop auto-posting
           QR.cooldown.auto = false;
         }
-        QR.captcha.setup(QR.cooldown.auto && [QR.nodes.status, d.body].includes(d.activeElement));
+        QR.captcha.setup(QR.cooldown.auto && [QR.nodes.status, d$1.body].includes(d$1.activeElement));
         QR.status();
         QR.error(err);
         return;
@@ -19035,7 +19078,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       } })());
       if (postsCount) {
         post.rm();
-        QR.captcha.setup(d.activeElement === QR.nodes.status);
+        QR.captcha.setup(d$1.activeElement === QR.nodes.status);
       } else if (Conf['Persistent QR']) {
         post.rm();
         if (Conf['Auto Hide QR']) {
@@ -19146,7 +19189,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (!QR.selected.file)
         return;
       QR.nodes.preview = $.el('div', { id: 'overlay', className: 'media-preview' });
-      $.add(d.body, QR.nodes.preview);
+      $.add(d$1.body, QR.nodes.preview);
       QR.previewUrl = URL.createObjectURL(QR.selected.file);
       if (QR.selected.file.type.startsWith('video/')) {
         const video = $.el('video', { controls: true, src: QR.previewUrl, autoplay: true });
@@ -19466,7 +19509,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         $.global('setupQR');
       },
       load(cb) {
-        if ($('script[src^="//s.4cdn.org/js/tegaki"]', d.head)) {
+        if ($('script[src^="//s.4cdn.org/js/tegaki"]', d$1.head)) {
           cb();
         } else {
           const style = $.el('link', {
@@ -19481,7 +19524,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           };
           $.on(style, 'load', onload);
           $.on(script, 'load', onload);
-          $.add(d.head, [style, script]);
+          $.add(d$1.head, [style, script]);
         }
       },
       draw() {
@@ -19562,7 +19605,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         let m;
         if (QR.persona.pwd != null) {
           return QR.persona.pwd;
-        } else if (m = d.cookie.match(/4chan_pass=([^;]+)/)) {
+        } else if (m = d$1.cookie.match(/4chan_pass=([^;]+)/)) {
           return decodeURIComponent(m[1]);
         } else {
           return '';
@@ -20176,14 +20219,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      if (platform === 'crx') {
-        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
-          .then(({ response, responseHeaderString }) => {
-          if (response)
-            response = new Uint8Array(response);
-          cb(response, responseHeaderString);
-        });
-      } else {
+
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -20235,7 +20271,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } catch (error) {
           return fallback();
         }
-      }
+
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20307,7 +20343,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-      if (platform === 'userscript') {
+
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -20355,14 +20391,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             } catch (error1) { }
           };
         }
-      } else {
-        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
-          if (result.status) {
-            $.extend(req, result);
-          }
-          return req.onloadend();
-        });
-      }
+
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20377,15 +20406,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-      if (platform === 'crx') {
-        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
-          if (result) {
-            return cb();
-          } else {
-            return cbFail();
-          }
-        });
-      }
+
       return cb();
     },
   };
@@ -20526,7 +20547,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             download,
             hidden: true
           });
-          $.add(d.body, a);
+          $.add(d$1.body, a);
           a.click();
           return $.rm(a);
         } else {
@@ -20566,7 +20587,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (hd = $.id('hd')) {
           return $.after(hd, msg);
         } else {
-          return $.prepend(d.body, msg);
+          return $.prepend(d$1.body, msg);
         }
       });
     }
@@ -20596,7 +20617,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       new MutationObserver(function() {
         Report.fit('iframe[src^="https://www.google.com/recaptcha/api2/frame"]');
         return Report.fit('body');
-      }).observe(d.body, {
+      }).observe(d$1.body, {
         childList:  true,
         attributes: true,
         subtree:    true
@@ -20704,29 +20725,39 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (fieldset) {
           $.before(fieldset, line);
         } else {
-          $.add(d.body, line);
+          $.add(d$1.body, line);
         }
       }
     }
   };
 
-  // @ts-nocheck
-
   const PostSuccessful = {
     init() {
-      if (!Conf['Remember Your Posts']) { return; }
-      return $.ready(this.ready);
+      if (!Conf['Remember Your Posts']) {
+        return;
+      }
+      $.ready(PostSuccessful.ready);
     },
-
     ready() {
-      if (d.title !== 'Post successful!') { return; }
-
-      let [_, threadID, postID] = $('h1').nextSibling.textContent.match(/thread:(\d+),no:(\d+)/);
-      postID   = +postID;
-      threadID = +threadID || postID;
-
+      if (d$1.title !== 'Post successful!') {
+        return;
+      }
+      const h1 = $('h1');
+      if (!h1 || !h1.nextSibling) {
+        return;
+      }
+      const textContent = h1.nextSibling.textContent;
+      if (!textContent) {
+        return;
+      }
+      const match = textContent.match(/thread:(\d+),no:(\d+)/);
+      if (!match) {
+        return;
+      }
+      const postID = +match[2];
+      const threadID = +match[1] || postID;
       const db = new DataBoard('yourPosts');
-      return db.set({
+      db.set({
         boardID: g.BOARD.ID,
         threadID,
         postID,
@@ -20981,13 +21012,13 @@ $\
     isThisPageLegit() {
       // not 404 error page or similar.
       return ['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname) &&
-        d.doctype &&
-        !$('link[href*="favicon-status.ico"]', d.head) &&
-        !['4chan - Temporarily Offline', '4chan - Error', '504 Gateway Time-out', 'MathJax Equation Source'].includes(d.title);
+        d$1.doctype &&
+        !$('link[href*="favicon-status.ico"]', d$1.head) &&
+        !['4chan - Temporarily Offline', '4chan - Error', '504 Gateway Time-out', 'MathJax Equation Source'].includes(d$1.title);
     },
     is404() {
       // XXX Sometimes threads don't 404 but are left over as stubs containing one garbage reply post.
-      return ['4chan - Temporarily Offline', '4chan - 404 Not Found'].includes(d.title) || ((g.VIEW === 'thread') && $('.board') && !$('.opContainer'));
+      return ['4chan - Temporarily Offline', '4chan - 404 Not Found'].includes(d$1.title) || ((g.VIEW === 'thread') && $('.board') && !$('.opContainer'));
     },
     isIncomplete() {
       return ['index', 'thread'].includes(g.VIEW) && !$('.board + *');
@@ -21044,7 +21075,7 @@ $\
       }
     },
     scriptData() {
-      for (var script of $$('script:not([src])', d.head)) {
+      for (var script of $$('script:not([src])', d$1.head)) {
         if (/\bcooldowns *=/.test(script.textContent)) {
           return script.textContent;
         }
@@ -21551,7 +21582,7 @@ $\
       'Reply Pruning'
     ],
     detect() {
-      for (const script of $$('script:not([src])', d.head)) {
+      for (const script of $$('script:not([src])', d$1.head)) {
         let m;
         if (m = script.textContent.match(/\bvar configRoot=(".*?")/)) {
           const properties = dict();
@@ -21574,7 +21605,7 @@ $\
         const s = (this.selectors = Object.create(this.selectors));
         s.boardFor = { index: '.page-container' };
         s.thread = 'div[id^="thread_"]';
-        return $.on(d, '4chanXMounted', cb);
+        return $.on(d$1, '4chanXMounted', cb);
       } else {
         return cb();
       }
@@ -21935,8 +21966,8 @@ $\
       add('Sauce', this.sauce);
       add('Advanced', this.advanced);
       add('Keybinds', this.keybinds);
-      $.on(d, 'AddSettingsSection', Settings.addSection);
-      $.on(d, 'OpenSettings', e => Settings.open(e.detail));
+      $.on(d$1, 'AddSettingsSection', Settings.addSection);
+      $.on(d$1, 'OpenSettings', e => Settings.open(e.detail));
       if ((g.SITE.software === 'yotsuba') && Conf['Disable Native Extension']) {
         if ($.hasStorage) {
           // Run in page context to handle case where 4chan X has localStorage access but not the page.
@@ -21981,12 +22012,12 @@ $\
       $.on(window, 'beforeunload', Settings.close);
       $.on(dialog, 'click', () => {
         // Do not close when the mouse ends up outside the modal when selecting text in an input.
-        if (d.activeElement?.tagName === 'INPUT' || d.activeElement?.tagName === 'TEXTAREA')
+        if (d$1.activeElement?.tagName === 'INPUT' || d$1.activeElement?.tagName === 'TEXTAREA')
           return;
         Settings.close();
       });
       $.on(dialog.firstElementChild, 'click', e => e.stopPropagation());
-      $.add(d.body, dialog);
+      $.add(d$1.body, dialog);
       links[0].focus();
       $.event('OpenSettings', null, dialog);
     },
@@ -21995,7 +22026,7 @@ $\
         return;
       }
       // Unfocus current field to trigger change event.
-      d.activeElement?.blur();
+      d$1.activeElement?.blur();
       $.rm(Settings.dialog);
       delete Settings.dialog;
     },
@@ -22169,7 +22200,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         const form = $('form', dialog);
         const { history, ask } = form.elements;
         history.checked = Conf['Export History'];
-        $.add(d.body, dialog);
+        $.add(d$1.body, dialog);
         const exportBtnRect = $('.export', Settings.dialog).getBoundingClientRect();
         dialog.style.top = `${exportBtnRect.y + exportBtnRect.height}px`;
         dialog.style.left = `${exportBtnRect.x}px`;
@@ -23353,105 +23384,101 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var CatalogLinks = {
+  const CatalogLinks = {
     init() {
       if ((g.SITE.software === 'yotsuba') && (Conf['External Catalog'] || Conf['JSON Index']) && !(Conf['JSON Index'] && (g.VIEW === 'index'))) {
-        const selector = (() => { switch (g.VIEW) {
-          case 'thread': case 'archive': return '.navLinks.desktop > a';
-          case 'catalog':           return '.navLinks > :first-child > a';
-          case 'index':             return '#ctrl-top > a, .cataloglink > a';
-        } })();
-        $.ready(function() {
-          for (var link of $$(selector)) {
-            var catalogURL;
+        const selector = (() => {
+          switch (g.VIEW) {
+            case 'thread':
+            case 'archive': return '.navLinks.desktop > a';
+            case 'catalog': return '.navLinks > :first-child > a';
+            case 'index': return '#ctrl-top > a, .cataloglink > a';
+            default: return '';
+          }
+        })();
+        $.ready(function () {
+          for (const link of $$(selector, d)) {
+            let catalogURL;
             switch (link.pathname.replace(/\/+/g, '/')) {
               case `/${g.BOARD}/`:
-                if (Conf['JSON Index']) { link.textContent = 'Index'; }
-                link.href = CatalogLinks.index();
+                if (Conf['JSON Index']) {
+                  link.textContent = 'Index';
+                }
+                link.href = CatalogLinks.index() || '';
                 break;
               case `/${g.BOARD}/catalog`:
-                link.href = CatalogLinks.catalog();
+                link.href = CatalogLinks.catalog() || '';
                 break;
             }
             if ((g.VIEW === 'catalog') && ((catalogURL = CatalogLinks.catalog()) !== g.SITE.urls.catalog?.(g.BOARD))) {
-              var catalogLink = link.parentNode.cloneNode(true);
-              var link2 = catalogLink.firstElementChild;
-              link2.href = catalogURL;
+              const catalogLink = link.parentNode.cloneNode(true);
+              const link2 = catalogLink.firstElementChild;
+              link2.href = catalogURL || '';
               link2.textContent = link2.hostname === location.hostname ? `${meta.name} Catalog` : 'External Catalog';
               $.after(link.parentNode, [$.tn(' '), catalogLink]);
             }
           }
         });
       }
-
       if ((g.SITE.software === 'yotsuba') && Conf['JSON Index'] && Conf[`Use ${meta.name} Catalog`]) {
         Callbacks.Post.push({
           name: 'Catalog Link Rewrite',
-          cb:   this.node
+          cb: this.node
         });
       }
-
       if (this.enabled = Conf['Catalog Links']) {
-        let el;
-        CatalogLinks.el = (el = UI.checkbox('Header catalog links', 'Catalog Links'));
+        const el = UI.checkbox('Header catalog links', 'Catalog Links');
+        CatalogLinks.el = el;
         el.id = 'toggleCatalog';
         const input = $('input', el);
         $.on(input, 'change', this.toggle);
         $.sync('Header catalog links', CatalogLinks.set);
-        return Header.menu.addEntry({
+        Header.menu.addEntry({
           el,
           order: 95
         });
       }
     },
-
     node() {
-      for (var a of $$('a', this.nodes.comment)) {
-        var m;
+      for (const a of $$('a', this.nodes.comment)) {
+        let m;
         if (m = a.href.match(/^https?:\/\/(boards\.4chan(?:nel)?\.org\/[^\/]+)\/catalog(#s=.*)?/)) {
           a.href = `//${m[1]}/${m[2] || '#catalog'}`;
         }
       }
     },
-
     toggle() {
       $.event('CloseMenu');
       $.set('Header catalog links', this.checked);
-      return CatalogLinks.set(this.checked);
+      CatalogLinks.set(this.checked);
     },
-
     set(useCatalog) {
       Conf['Header catalog links'] = useCatalog;
       CatalogLinks.setLinks(Header.boardList);
       CatalogLinks.setLinks(Header.bottomBoardList);
       CatalogLinks.el.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
-      return $('input', CatalogLinks.el).checked = useCatalog;
+      $('input', CatalogLinks.el).checked = useCatalog;
     },
-
-    // Also called by Header when board lists are loaded / generated.
     setLinks(list) {
-      if ((!(CatalogLinks.enabled ?? Conf['Catalog Links'])) || !list) { return; }
-
+      if ((!(CatalogLinks.enabled ?? Conf['Catalog Links'])) || !list) {
+        return;
+      }
       // do not transform links unless they differ from the expected value at most by this tail
       const tail = /(?:index)?(?:\.\w+)?$/;
-
-      for (var a of $$('a:not([data-only])', list)) {
-        var {siteID, boardID} = a.dataset;
+      for (const a of $$('a:not([data-only])', list)) {
+        let { siteID, boardID } = a.dataset;
         if (!siteID || !boardID) {
-          var VIEW;
-          ({siteID, boardID, VIEW} = Site.parseURL(a));
-          if (
-            !siteID || !boardID ||
+          let VIEW;
+          ({ siteID, boardID, VIEW } = Site.parseURL(a));
+          if (!siteID || !boardID ||
             !['index', 'catalog'].includes(VIEW) ||
-            (!a.dataset.indexOptions && (a.href.replace(tail, '') !== (Get.url(VIEW, {siteID, boardID}) || '').replace(tail, '')))
-          ) { continue; }
-          $.extend(a.dataset, {siteID, boardID});
+            (!a.dataset.indexOptions && (a.href.replace(tail, '') !== (Get.url(VIEW, { siteID, boardID }) || '').replace(tail, '')))) {
+            continue;
+          }
+          $.extend(a.dataset, { siteID, boardID });
         }
-
-        var board = {siteID, boardID};
-        var url = Conf['Header catalog links'] ? CatalogLinks.catalog(board) : Get.url('index', board);
+        const board = { siteID, boardID };
+        const url = Conf['Header catalog links'] ? CatalogLinks.catalog(board) : Get.url('index', board);
         if (url) {
           a.href = url;
           if (a.dataset.indexOptions && (url.split('#')[0] === Get.url('index', board))) {
@@ -23460,28 +23487,33 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       }
     },
-
     externalParse() {
       CatalogLinks.externalList = dict();
-      for (var line of Conf['externalCatalogURLs'].split('\n')) {
-        if (line[0] === '#') { continue; }
-        var url = line.split(';')[0];
-        var boards   = Filter.parseBoards(line.match(/;boards:([^;]+)/)?.[1] || '*');
-        var excludes = Filter.parseBoards(line.match(/;exclude:([^;]+)/)?.[1]) || dict();
-        for (var board in boards) {
+      for (const line of Conf['externalCatalogURLs'].split('\n')) {
+        if (line[0] === '#') {
+          continue;
+        }
+        const url = line.split(';')[0];
+        const boards = Filter.parseBoards(line.match(/;boards:([^;]+)/)?.[1] || '*');
+        const excludes = Filter.parseBoards(line.match(/;exclude:([^;]+)/)?.[1]) || dict();
+        for (const board in boards) {
           if (!excludes[board] && !excludes[board.split('/')[0] + '/*']) {
             CatalogLinks.externalList[board] = url;
           }
         }
       }
     },
-
-    external({siteID, boardID}) {
-      if (!CatalogLinks.externalList) { CatalogLinks.externalParse(); }
+    external({ siteID, boardID }) {
+      if (!CatalogLinks.externalList) {
+        CatalogLinks.externalParse();
+      }
       const external = (CatalogLinks.externalList[`${siteID}/${boardID}`] || CatalogLinks.externalList[`${siteID}/*`]);
-      if (external) { return external.replace(/%board/g, boardID); } else { return undefined; }
+      if (external) {
+        return external.replace(/%board/g, boardID);
+      } else {
+        return undefined;
+      }
     },
-
     jsonIndex(board, hash) {
       if ((g.SITE.ID === board.siteID) && (g.BOARD.ID === board.boardID) && (g.VIEW === 'index')) {
         return hash;
@@ -23489,8 +23521,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return Get.url('index', board) + hash;
       }
     },
-
-    catalog(board=g.BOARD) {
+    catalog(board = g.BOARD) {
       let external, nativeCatalog;
       if (Conf['External Catalog'] && (external = CatalogLinks.external(board))) {
         return external;
@@ -23502,8 +23533,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return CatalogLinks.external(board);
       }
     },
-
-    index(board=g.BOARD) {
+    index(board = g.BOARD) {
       if (Index.enabledOn(board)) {
         return CatalogLinks.jsonIndex(board, '#index');
       } else {
@@ -23519,8 +23549,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return;
         }
         $.add(this.bar, [this.noticesRoot, this.toggle]);
-        $.prepend(d.body, this.bar);
-        $.add(d.body, Header.hover);
+        $.prepend(d$1.body, this.bar);
+        $.add(d$1.body, Header.hover);
         return this.setBarPosition(Conf['Bottom Header']);
       });
       this.menu = new UI.Menu('header');
@@ -23586,7 +23616,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           { el: editCustomNav }
         ]
       });
-      $.on(d, 'CreateNotification', this.createNotification);
+      $.on(d$1, 'CreateNotification', this.createNotification);
       this.setBoardList();
       $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
       $.ready(function () {
@@ -24038,7 +24068,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return bottom;
     },
     isNodeVisible(node) {
-      if (d.hidden || !doc.contains(node)) {
+      if (d$1.hidden || !doc.contains(node)) {
         return false;
       }
       const { height } = node.getBoundingClientRect();
@@ -24144,11 +24174,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     add() {
       if (this.closed)
         return;
-      if (d.hidden) {
-        $.on(d, 'visibilitychange', this.add);
+      if (d$1.hidden) {
+        $.on(d$1, 'visibilitychange', this.add);
         return;
       }
-      $.off(d, 'visibilitychange', this.add);
+      $.off(d$1, 'visibilitychange', this.add);
       $.add(Header.noticesRoot, this.el);
       this.el.clientHeight; // force reflow
       this.el.style.opacity = '1';
@@ -24160,7 +24190,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       if (this.timeoutId)
         clearTimeout(this.timeoutId);
       this.closed = true;
-      $.off(d, 'visibilitychange', this.add);
+      $.off(d$1, 'visibilitychange', this.add);
       $.rm(this.el);
       this.onclose?.();
     }
@@ -24542,12 +24572,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   }
 
-  // @ts-nocheck
-
   const Anonymize = {
     init() {
-      if (!Conf['Anonymize']) { return; }
-      return $.addClass(doc, 'anonymize');
+      if (!Conf['Anonymize']) {
+        return;
+      }
+      $.addClass(doc, 'anonymize');
     }
   };
 
@@ -24658,7 +24688,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
                 download: `${folderName}/${seqName}`,
                 hidden: true
               });
-              $.add(d.body, a);
+              $.add(d$1.body, a);
               a.click();
               setTimeout(() => {
                 URL.revokeObjectURL(a.href);
@@ -24806,13 +24836,13 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         name: 'Image Replace',
         cb: this.node
       });
-      $.on(d, 'PostsInserted', () => {
+      $.on(d$1, 'PostsInserted', () => {
         if (ImageLoader.prefetchEnabled || replace) {
           g.posts.forEach(ImageLoader.prefetchAll);
         }
       });
       if (Conf['Replace WEBM']) {
-        $.on(d, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
+        $.on(d$1, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
       }
       if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(g.VIEW)) {
         return;
@@ -24983,7 +25013,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           }
           $.before(this, output);
           parent.tabIndex = 0;
-          if (d.activeElement === this) {
+          if (d$1.activeElement === this) {
             parent.focus();
           }
           this.tabIndex = -1;
@@ -25055,75 +25085,68 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const ArchiveLink = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) { return; }
-
-      const div = $.el('div',
-        {textContent: 'Archive'});
-
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) {
+        return;
+      }
+      const div = $.el('div', { textContent: 'Archive' });
       const entry = {
         el: div,
         order: 60,
-        open({ID, thread, board}) {
-          return !!Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
+        open({ ID, thread, board }) {
+          return !!Redirect.to('thread', { postID: ID, threadID: thread.ID, boardID: board.ID });
         },
         subEntries: []
       };
-
-      for (var type of [
-        ['Post',      'post'],
-        ['Name',      'name'],
-        ['Tripcode',  'tripcode'],
-        ['Capcode',   'capcode'],
-        ['Subject',   'subject'],
-        ['Flag',      'country'],
-        ['Filename',  'filename'],
+      const types = [
+        ['Post', 'post'],
+        ['Name', 'name'],
+        ['Tripcode', 'tripcode'],
+        ['Capcode', 'capcode'],
+        ['Subject', 'subject'],
+        ['Flag', 'country'],
+        ['Filename', 'filename'],
         ['Image MD5', 'MD5']
-      ]) {
+      ];
+      for (const [text, type] of types) {
         // Add a sub entry for each type.
-        entry.subEntries.push(this.createSubEntry(type[0], type[1]));
+        entry.subEntries.push(this.createSubEntry(text, type));
       }
-
-      return Menu.menu.addEntry(entry);
+      Menu.menu.addEntry(entry);
     },
-
     createSubEntry(text, type) {
       const el = $.el('a', {
         textContent: text,
         target: '_blank'
-      }
-      );
-
+      });
       const open = type === 'post' ?
-        function({ID, thread, board}) {
-          el.href = Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
+        function ({ ID, thread, board }) {
+          el.href = Redirect.to('thread', { postID: ID, threadID: thread.ID, boardID: board.ID }) || '';
           return true;
         }
-      :
-        function(post) {
-          const typeParam = (type === 'country') && post.info.flagCodeTroll ?
-            'troll_country'
-          :
-            type;
-          const value = type === 'country' ?
-            post.info.flagCode || post.info.flagCodeTroll?.toLowerCase()
-          :
-            Filter.values(type, post)[0];
-          // We want to parse the exact same stuff as the filter does already.
-          if (!value) { return false; }
-          el.href = Redirect.to('search', {
-            boardID:  post.board.ID,
-            type:     typeParam,
-            value,
-            isSearch: true
-          }
-          );
-          return true;
-        };
-
+        :
+          function (post) {
+            const typeParam = (type === 'country') && post.info.flagCodeTroll ?
+              'troll_country'
+              :
+                type;
+            const value = type === 'country' ?
+              post.info.flagCode || post.info.flagCodeTroll?.toLowerCase()
+              :
+                Filter.values(type, post)[0];
+            // We want to parse the exact same stuff as the filter does already.
+            if (!value) {
+              return false;
+            }
+            el.href = Redirect.to('search', {
+              boardID: post.board.ID,
+              type: typeParam,
+              value,
+              isSearch: true
+            }) || '';
+            return true;
+          };
       return {
         el,
         open
@@ -25131,21 +25154,19 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var CopyTextLink = {
+  const CopyTextLink = {
+    text: '',
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'copy-text-link',
         href: 'javascript:;',
         textContent: 'Copy Text'
-      }
-      );
-      $.on(a, 'click', CopyTextLink.copy);
-
-      return Menu.menu.addEntry({
+      });
+      $.on(a, 'click', this.copy.bind(this));
+      Menu.menu.addEntry({
         el: a,
         order: 12,
         open(post) {
@@ -25154,49 +25175,44 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       });
     },
-
     copy() {
       const el = $.el('textarea', {
         className: 'copy-text-element',
-        value: CopyTextLink.text
-      }
-      );
-      $.add(d.body, el);
+        value: this.text
+      });
+      $.add(d$1.body, el);
       el.select();
       try {
-        d.execCommand('copy');
-      } catch (error) {}
-      return $.rm(el);
+        d$1.execCommand('copy');
+      } catch (error) { }
+      $.rm(el);
     }
   };
 
-  // @ts-nocheck
-  var DeleteLink = {
+  const DeleteLink = {
     auto: [dict(), dict()],
-
+    nodes: null,
+    post: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Delete Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Delete Link']) {
+        return;
+      }
       const div = $.el('div', {
         className: 'delete-link',
         textContent: 'Delete'
-      }
-      );
+      });
       const postEl = $.el('a', {
         className: 'delete-post',
         href: 'javascript:;'
-      }
-      );
+      });
       const fileEl = $.el('a', {
         className: 'delete-file',
         href: 'javascript:;'
-      }
-      );
+      });
       this.nodes = {
-        menu:  div.firstChild,
+        menu: div.firstChild,
         links: [postEl, fileEl]
       };
-
       const postEntry = {
         el: postEl,
         open() {
@@ -25207,27 +25223,30 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       };
       const fileEntry = {
         el: fileEl,
-        open({file}) {
-          if (!file || file.isDead) { return false; }
+        open({ file }) {
+          if (!file || file.isDead) {
+            return false;
+          }
           fileEl.textContent = DeleteLink.linkText(true);
           $.on(fileEl, 'click', DeleteLink.toggle);
           return true;
         }
       };
-
-      return Menu.menu.addEntry({
+      Menu.menu.addEntry({
         el: div,
         order: 40,
         open(post) {
-          if (post.isDead) { return false; }
+          if (post.isDead) {
+            return false;
+          }
           DeleteLink.post = post;
           DeleteLink.nodes.menu.textContent = DeleteLink.menuText();
           DeleteLink.cooldown.start(post);
           return true;
         },
-        subEntries: [postEntry, fileEntry]});
+        subEntries: [postEntry, fileEntry]
+      });
     },
-
     menuText() {
       let seconds;
       if ((seconds = DeleteLink.cooldown.seconds[DeleteLink.post.fullID])) {
@@ -25236,7 +25255,6 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return 'Delete';
       }
     },
-
     linkText(fileOnly) {
       let text = fileOnly ? 'File' : 'Post';
       if (DeleteLink.auto[+fileOnly][DeleteLink.post.fullID]) {
@@ -25244,97 +25262,100 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       }
       return text;
     },
-
     toggle() {
-      const {post} = DeleteLink;
+      const post = DeleteLink.post;
       const fileOnly = $.hasClass(this, 'delete-file');
       const auto = DeleteLink.auto[+fileOnly];
-
       if (auto[post.fullID]) {
         delete auto[post.fullID];
       } else {
         auto[post.fullID] = true;
       }
       this.textContent = DeleteLink.linkText(fileOnly);
-
       if (!DeleteLink.cooldown.seconds[post.fullID]) {
-        return DeleteLink.delete(post, fileOnly);
+        DeleteLink.delete(post, fileOnly);
       }
     },
-
     delete(post, fileOnly) {
       const link = DeleteLink.nodes.links[+fileOnly];
       delete DeleteLink.auto[+fileOnly][post.fullID];
-      if (post.fullID === DeleteLink.post.fullID) { $.off(link, 'click', DeleteLink.toggle); }
-
+      if (post.fullID === DeleteLink.post.fullID) {
+        $.off(link, 'click', DeleteLink.toggle);
+      }
       const form = {
         mode: 'usrdel',
         onlyimgdel: fileOnly,
         pwd: QR.persona.getPassword()
       };
       form[+post.ID] = 'delete';
-
-      return $.ajax($.id('delform').action.replace(`/${g.BOARD}/`, `/${post.board}/`), {
+      $.ajax($.id('delform').action.replace(`/${g.BOARD}/`, `/${post.board}/`), {
         responseType: 'document',
         withCredentials: true,
-        onloadend() { return DeleteLink.load(link, post, fileOnly, this.response); },
+        onloadend() { DeleteLink.load(link, post, fileOnly, this.response); },
         form: $.formData(form)
-      }
-      );
+      });
     },
-
     load(link, post, fileOnly, resDoc) {
       let msg;
       if (!resDoc) {
         new Notice('warning', 'Connection error, please retry.', 20);
-        if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          $.on(link, 'click', DeleteLink.toggle);
+        }
         return;
       }
-
       link.textContent = DeleteLink.linkText(fileOnly);
       if (resDoc.title === '4chan - Banned') { // Ban/warn check
-        const el = $.el('span', {innerHTML: "You can&#039;t delete posts because you are <a href=\"//www.4chan.org/banned\" target=\"_blank\">banned</a>."});
-        return new Notice('warning', el, 20);
+        const el = $.el('span', { innerHTML: "You can&#039;t delete posts because you are <a href=\"//www.4chan.org/banned\" target=\"_blank\">banned</a>." });
+        new Notice('warning', el, 20);
       } else if (msg = resDoc.getElementById('errmsg')) { // error!
         new Notice('warning', msg.textContent, 20);
-        if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          $.on(link, 'click', DeleteLink.toggle);
+        }
         if (QR.cooldown.data && Conf['Cooldown'] && /\bwait\b/i.test(msg.textContent)) {
           DeleteLink.cooldown.start(post, 5);
           DeleteLink.auto[+fileOnly][post.fullID] = true;
-          return DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
+          DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
         }
       } else {
-        if (!fileOnly) { QR.cooldown.delete(post); }
+        if (!fileOnly) {
+          QR.cooldown.delete(post);
+        }
         if (resDoc.title === 'Updating index...') {
           // We're 100% sure.
           (post.origin || post).kill(fileOnly);
         }
-        if (post.fullID === DeleteLink.post.fullID) { return link.textContent = 'Deleted'; }
+        if (post.fullID === DeleteLink.post.fullID) {
+          link.textContent = 'Deleted';
+        }
       }
     },
-
     cooldown: {
       seconds: dict(),
-
       start(post, seconds) {
         // Already counting.
-        if (DeleteLink.cooldown.seconds[post.fullID] != null) { return; }
-
-        if (seconds == null) { seconds = QR.cooldown.secondsDeletion(post); }
+        if (DeleteLink.cooldown.seconds[post.fullID] != null) {
+          return;
+        }
+        if (seconds == null) {
+          seconds = QR.cooldown.secondsDeletion(post);
+        }
         if (seconds > 0) {
           DeleteLink.cooldown.seconds[post.fullID] = seconds;
-          return DeleteLink.cooldown.count(post);
+          DeleteLink.cooldown.count(post);
         }
       },
-
       count(post) {
-        if (post.fullID === DeleteLink.post.fullID) { DeleteLink.nodes.menu.textContent = DeleteLink.menuText(); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          DeleteLink.nodes.menu.textContent = DeleteLink.menuText();
+        }
         if ((DeleteLink.cooldown.seconds[post.fullID] > 0) && Conf['Cooldown']) {
           DeleteLink.cooldown.seconds[post.fullID]--;
           setTimeout(DeleteLink.cooldown.count, 1000, post);
         } else {
           delete DeleteLink.cooldown.seconds[post.fullID];
-          for (var fileOnly of [false, true]) {
+          for (const fileOnly of [false, true]) {
             if (DeleteLink.auto[+fileOnly][post.fullID]) {
               DeleteLink.delete(post, fileOnly);
             }
@@ -25344,27 +25365,25 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const DownloadLink = {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'download-link',
         textContent: 'Download file'
-      }
-      );
-
+      });
       // Specifying the filename with the download attribute only works for same-origin links.
       $.on(a, 'click', ImageCommon.download);
-
-      return Menu.menu.addEntry({
+      Menu.menu.addEntry({
         el: a,
         order: 100,
-        open({file}) {
-          if (!file) { return false; }
-          a.href     = file.url;
+        open({ file }) {
+          if (!file) {
+            return false;
+          }
+          a.href = file.url;
           a.download = file.name;
           return true;
         }
@@ -25372,21 +25391,20 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var ReportLink = {
+  const ReportLink = {
+    url: '',
+    dims: '',
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'report-link',
         href: 'javascript:;',
         textContent: 'Report'
-      }
-      );
-      $.on(a, 'click', ReportLink.report);
-
-      return Menu.menu.addEntry({
+      });
+      $.on(a, 'click', this.report);
+      Menu.menu.addEntry({
         el: a,
         order: 10,
         open(post) {
@@ -25400,113 +25418,107 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       });
     },
-
     report() {
-      const {url, dims} = ReportLink;
-      const id  = Date.now();
+      const { url, dims } = ReportLink;
+      const id = String(Date.now());
       const set = `toolbar=0,scrollbars=1,location=0,status=1,menubar=0,resizable=1,${dims}`;
-      return window.open(url, id, set);
+      window.open(url, id, set);
     }
   };
 
-  // @ts-nocheck
-
-  var AntiAutoplay = {
+  const AntiAutoplay = {
     init() {
-      if (!Conf['Disable Autoplaying Sounds']) { return; }
+      if (!Conf['Disable Autoplaying Sounds']) {
+        return;
+      }
       $.addClass(doc, 'anti-autoplay');
-      for (var audio of $$('audio[autoplay]', doc)) { this.stop(audio); }
-      window.addEventListener('loadstart', (e => this.stop(e.target)), true);
+      for (const audio of $$('audio[autoplay]', doc)) {
+        this.stop(audio);
+      }
+      window.addEventListener('loadstart', ((e) => this.stop(e.target)), true);
       Callbacks.Post.push({
         name: 'Disable Autoplaying Sounds',
-        cb:   this.node
+        cb: this.node
       });
-      return $.ready(() => this.process(d.body));
+      $.ready(() => this.process(d$1.body));
     },
-
     stop(audio) {
-      if (!audio.autoplay) { return; }
+      if (!audio.autoplay) {
+        return;
+      }
       audio.pause();
       audio.autoplay = false;
-      if (audio.controls) { return; }
+      if (audio.controls) {
+        return;
+      }
       audio.controls = true;
-      return $.addClass(audio, 'controls-added');
+      $.addClass(audio, 'controls-added');
     },
-
     node() {
-      return AntiAutoplay.process(this.nodes.comment);
+      AntiAutoplay.process(this.nodes.comment);
     },
-
     process(root) {
-      for (var iframe of $$('iframe[src*="youtube"][src*="autoplay=1"]', root)) {
+      for (const iframe of $$('iframe[src*="youtube"][src*="autoplay=1"]', root)) {
         AntiAutoplay.processVideo(iframe, 'src');
       }
-      for (var object of $$('object[data*="youtube"][data*="autoplay=1"]', root)) {
+      for (const object of $$('object[data*="youtube"][data*="autoplay=1"]', root)) {
         AntiAutoplay.processVideo(object, 'data');
       }
     },
-
     processVideo(el, attr) {
       el[attr] = el[attr].replace(/\?autoplay=1&?/, '?').replace('&autoplay=1', '');
-      if (window.getComputedStyle(el).display === 'none') { el.style.display = 'block'; }
-      return $.addClass(el, 'autoplay-removed');
+      if (window.getComputedStyle(el).display === 'none') {
+        el.style.display = 'block';
+      }
+      $.addClass(el, 'autoplay-removed');
     }
   };
 
-  // @ts-nocheck
-
-  var Banner = {
+  const Banner = {
+    original: dict(),
     init() {
       if (Conf['Custom Board Titles']) {
-        this.db = new DataBoard('customTitles', null, true);
+        this.db = new DataBoard('customTitles', undefined, true);
       }
-
-      $.asap((() => d.body), () => $.asap((() => $('hr')), Banner.ready));
-
+      $.asap((() => d$1.body), () => $.asap((() => $('hr')), Banner.ready));
       // Let 4chan's JS load the banner if enabled; otherwise, load it ourselves.
       if (g.BOARD.ID !== 'f') {
-        return $.on(d, '4chanXInitFinished', () => $.queueTask(Banner.load));
+        $.on(d$1, '4chanXInitFinished', () => $.queueTask(Banner.load));
       }
     },
-
     ready() {
       const banner = $(".boardBanner");
-      const {children} = banner;
-
+      const { children } = banner;
       if ((g.VIEW === 'thread') && Conf['Remove Thread Excerpt']) {
-        Banner.setTitle(children[1].textContent);
+        Banner.setTitle(children[1].textContent || '');
       }
-
       children[0].title = "Click to change";
       $.on(children[0], 'click', Banner.cb.toggle);
-
       if (Conf['Custom Board Titles']) {
         Banner.custom(children[1]);
-        if (children[2]) { return Banner.custom(children[2]); }
+        if (children[2]) {
+          Banner.custom(children[2]);
+        }
       }
     },
-
     load() {
       const bannerCnt = $.id('bannerCnt');
-      if (!bannerCnt.firstChild) {
+      if (bannerCnt && !bannerCnt.firstChild) {
         const img = $.el('img', {
           alt: '4chan',
           src: '//s.4cdn.org/image/title/' + bannerCnt.dataset.src
-        }
-        );
-        return $.add(bannerCnt, img);
+        });
+        $.add(bannerCnt, img);
       }
     },
-
     setTitle(title) {
       if (Unread.title != null) {
         Unread.title = title;
-        return Unread.update();
+        Unread.update();
       } else {
-        return d.title = title;
+        d$1.title = title;
       }
     },
-
     cb: {
       toggle() {
         if (!Banner.choices?.length) {
@@ -25514,77 +25526,77 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
         const i = Math.floor(Banner.choices.length * Math.random());
         const banner = Banner.choices.splice(i, 1);
-        return $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
+        $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
       },
-
       click(e) {
-        if (!e.ctrlKey && !e.metaKey) { return; }
-        if (Banner.original[this.className] == null) { Banner.original[this.className] = this.cloneNode(true); }
-        this.contentEditable = true;
-        for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-        return this.focus();
+        if (!e.ctrlKey && !e.metaKey) {
+          return;
+        }
+        if (Banner.original[this.className] == null) {
+          Banner.original[this.className] = this.cloneNode(true);
+        }
+        this.contentEditable = 'true';
+        for (const br of $$('br', this)) {
+          $.replace(br, $.tn('\n'));
+        }
+        this.focus();
       },
-
       keydown(e) {
         e.stopPropagation();
-        if (!e.shiftKey && (e.keyCode === 13)) { return this.blur(); }
+        if (!e.shiftKey && (e.keyCode === 13)) {
+          this.blur();
+        }
       },
-
       blur() {
-        for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-        if (this.textContent = this.textContent.replace(/\n*$/, '')) {
-          this.contentEditable = false;
-          return Banner.db.set({
-            boardID:  g.BOARD.ID,
+        for (const br of $$('br', this)) {
+          $.replace(br, $.tn('\n'));
+        }
+        const text = this.textContent || '';
+        if (this.textContent = text.replace(/\n*$/, '')) {
+          this.contentEditable = 'false';
+          Banner.db.set({
+            boardID: g.BOARD.ID,
             threadID: this.className,
             val: {
               title: this.textContent,
-              orig:  Banner.original[this.className].textContent
+              orig: Banner.original[this.className].textContent
             }
           });
         } else {
           $.rmAll(this);
           $.add(this, [...Banner.original[this.className].cloneNode(true).childNodes]);
-          return Banner.db.delete({
-            boardID:  g.BOARD.ID,
+          Banner.db.delete({
+            boardID: g.BOARD.ID,
             threadID: this.className
           });
         }
       }
     },
-
-    original: dict(),
-
     custom(child) {
       let data;
-      const {className} = child;
+      const { className } = child;
       child.title = `Ctrl/\u2318+click to edit board ${className.slice(5).toLowerCase()}`;
       child.spellcheck = false;
-
-      for (var event of ['click', 'keydown', 'blur']) {
+      for (const event of ['click', 'keydown', 'blur']) {
         $.on(child, event, Banner.cb[event]);
       }
-
-      if (data = Banner.db.get({boardID: g.BOARD.ID, threadID: className})) {
+      if (data = Banner.db.get({ boardID: g.BOARD.ID, threadID: className })) {
         if (Conf['Persistent Custom Board Titles'] || (data.orig === child.textContent)) {
           Banner.original[className] = child.cloneNode(true);
-          return child.textContent = data.title;
+          child.textContent = data.title;
         } else {
-          return Banner.db.delete({boardID: g.BOARD.ID, threadID: className});
+          Banner.db.delete({ boardID: g.BOARD.ID, threadID: className });
         }
       }
     }
   };
 
-  // @ts-nocheck
-
-  var Flash = {
+  const Flash = {
     init() {
       if ((g.BOARD.ID === 'f') && Conf['Enable Native Flash Embedding']) {
-        return $.ready(Flash.initReady);
+        $.ready(Flash.initReady);
       }
     },
-
     initReady() {
       if ($.hasStorage) {
         $.global('initFlash');
@@ -25597,201 +25609,204 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var Fourchan = {
+  const Fourchan = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) {
+        return;
+      }
       BoardConfig.ready(this.initBoard);
-      return $.on(d, '4chanXInitFinished', this.initReady);
+      $.on(d$1, '4chanXInitFinished', this.initReady);
     },
-
     initBoard() {
       if (g.BOARD.config.code_tags) {
-        $.on(window, 'prettyprint:cb', function(e) {
+        $.on(window, 'prettyprint:cb', function (e) {
           let post, pre;
-          if (!(post = g.posts.get(e.detail.ID))) { return; }
-          if (!(pre  = $$('.prettyprint', post.nodes.comment)[+e.detail.i])) { return; }
+          if (!(post = g.posts.get(e.detail.ID))) {
+            return;
+          }
+          if (!(pre = $$('.prettyprint', post.nodes.comment)[+e.detail.i])) {
+            return;
+          }
           if (!$.hasClass(pre, 'prettyprinted')) {
             pre.innerHTML = e.detail.html;
-            return $.addClass(pre, 'prettyprinted');
+            $.addClass(pre, 'prettyprinted');
           }
         });
         $.global('fourChanPrettyPrintListener');
         Callbacks.Post.push({
           name: 'Parse [code] tags',
-          cb:   Fourchan.code
+          cb: Fourchan.code
         });
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (post.callbacksExecuted) {
-            return Callbacks.Post.execute(post, ['Parse [code] tags'], true);
+            Callbacks.Post.execute(post, ['Parse [code] tags'], true);
           }
         });
         ExpandComment.callbacks.push(Fourchan.code);
       }
-
       if (g.BOARD.config.math_tags) {
         $.global('fourChanMathjaxListener');
         Callbacks.Post.push({
           name: 'Parse [math] tags',
-          cb:   Fourchan.math
+          cb: Fourchan.math
         });
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (post.callbacksExecuted) {
-            return Callbacks.Post.execute(post, ['Parse [math] tags'], true);
+            Callbacks.Post.execute(post, ['Parse [math] tags'], true);
           }
         });
-        return ExpandComment.callbacks.push(Fourchan.math);
+        ExpandComment.callbacks.push(Fourchan.math);
       }
     },
-
     // Disable 4chan's ID highlighting (replaced by IDHighlight) and reported post hiding.
     initReady() {
-      return $.global('disable4chanIdHl');
+      $.global('disable4chanIdHl');
     },
-
     code() {
-      if (this.isClone) { return; }
-      return $.ready(() => {
+      if (this.isClone) {
+        return;
+      }
+      $.ready(() => {
         const iterable = $$('.prettyprint', this.nodes.comment);
         for (let i = 0; i < iterable.length; i++) {
-          var pre = iterable[i];
+          const pre = iterable[i];
           if (!$.hasClass(pre, 'prettyprinted')) {
-            $.event('prettyprint', {ID: this.fullID, i, html: pre.innerHTML}, window);
+            $.event('prettyprint', { ID: this.fullID, i, html: pre.innerHTML }, window);
           }
         }
       });
     },
-
     math() {
       let wbrs;
-      if (!/\[(math|eqn)\]/.test(this.nodes.comment.textContent)) { return; }
+      if (!/\[(math|eqn)\]/.test(this.nodes.comment.textContent)) {
+        return;
+      }
       // XXX <wbr> tags frequently break MathJax; remove them.
       if ((wbrs = $$('wbr', this.nodes.comment)).length) {
-        for (var wbr of wbrs) { $.rm(wbr); }
+        for (const wbr of wbrs) {
+          $.rm(wbr);
+        }
         this.nodes.comment.normalize();
       }
-      var cb = () => {
-        if (!doc.contains(this.nodes.comment)) { return; }
-        $.off(d, 'PostsInserted', cb);
-        return $.event('mathjax', null, this.nodes.comment);
+      const cb = () => {
+        if (!doc.contains(this.nodes.comment)) {
+          return;
+        }
+        $.off(d$1, 'PostsInserted', cb);
+        $.event('mathjax', null, this.nodes.comment);
       };
-      $.on(d, 'PostsInserted', cb);
-      return cb();
+      $.on(d$1, 'PostsInserted', cb);
+      cb();
     }
   };
 
-  // @ts-nocheck
-
-  var IDColor = {
+  const IDColor = {
+    ids: dict(),
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Color User IDs']) { return; }
-      this.ids = dict();
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Color User IDs']) {
+        return;
+      }
       this.ids['Heaven'] = [0, 0, 0, '#fff'];
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Color User IDs',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       let span, uid;
-      if (this.isClone || !((uid = this.info.uniqueID) && (span = this.nodes.uniqueID))) { return; }
-
+      if (this.isClone || !((uid = this.info.uniqueID) && (span = this.nodes.uniqueID))) {
+        return;
+      }
       const rgb = IDColor.ids[uid] || IDColor.compute(uid);
-
       // Style the damn node.
-      const {style} = span;
+      const { style } = span;
       style.color = rgb[3];
       style.backgroundColor = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-      return $.addClass(span, 'painted');
+      $.addClass(span, 'painted');
     },
-
     compute(uid) {
       // Convert chars to integers, bitshift and math to create a larger integer
       // Create a nice string of binary
       const hash = g.SITE.uidColor ? g.SITE.uidColor(uid) : parseInt(uid, 16);
-
       // Convert binary string to numerical values with bitshift and '&' truncation.
       const rgb = [
         (hash >> 16) & 0xFF,
-        (hash >> 8)  & 0xFF,
+        (hash >> 8) & 0xFF,
         hash & 0xFF
       ];
-
       // Weight color luminance values, assign a font color that should be readable.
       rgb.push($.luma(rgb) > 125 ?
         '#000'
-      :
-        '#fff'
-      );
-
+        :
+          '#fff');
       // Cache.
       return this.ids[uid] = rgb;
     }
   };
 
-  // @ts-nocheck
-
-  var IDHighlight = {
-    init() {
-      if (!['index', 'thread'].includes(g.VIEW)) { return; }
-
-      return Callbacks.Post.push({
-        name: 'Highlight by User ID',
-        cb:   this.node
-      });
-    },
-
+  const IDHighlight = {
     uniqueID: null,
-
-    node() {
-      if (this.nodes.uniqueIDRoot) { $.on(this.nodes.uniqueIDRoot, 'click', IDHighlight.click(this)); }
-      if (this.nodes.capcode) { $.on(this.nodes.capcode,      'click', IDHighlight.click(this)); }
-      if (!this.isClone) { return IDHighlight.set(this); }
-    },
-
-    set(post) {
-      const match = (post.info.uniqueID || post.info.capcode) === IDHighlight.uniqueID;
-      return $[match ? 'addClass' : 'rmClass'](post.nodes.post, 'highlight');
-    },
-
-    click(post) { return function() {
-      const uniqueID = post.info.uniqueID || post.info.capcode;
-      IDHighlight.uniqueID = IDHighlight.uniqueID === uniqueID ? null : uniqueID;
-      return g.posts.forEach(IDHighlight.set);
-    }; }
-  };
-
-  // @ts-nocheck
-
-  var IDPostCount = {
     init() {
-      if ((g.VIEW !== 'thread') || !Conf['Count Posts by ID']) { return; }
-      Callbacks.Thread.push({
-        name: 'Count Posts by ID',
-        cb() { return IDPostCount.thread = this; }
-      });
-      return Callbacks.Post.push({
-        name: 'Count Posts by ID',
-        cb:   this.node
+      if (!['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      Callbacks.Post.push({
+        name: 'Highlight by User ID',
+        cb: this.node
       });
     },
-
     node() {
-      if (this.nodes.uniqueID && (this.thread === IDPostCount.thread)) {
-        return $.on(this.nodes.uniqueID, 'mouseover', IDPostCount.count);
+      if (this.nodes.uniqueIDRoot) {
+        $.on(this.nodes.uniqueIDRoot, 'click', IDHighlight.click(this));
+      }
+      if (this.nodes.capcode) {
+        $.on(this.nodes.capcode, 'click', IDHighlight.click(this));
+      }
+      if (!this.isClone) {
+        IDHighlight.set(this);
       }
     },
+    set(post) {
+      const match = (post.info.uniqueID || post.info.capcode) === IDHighlight.uniqueID;
+      $[match ? 'addClass' : 'rmClass'](post.nodes.post, 'highlight');
+    },
+    click(post) {
+      return function () {
+        const uniqueID = post.info.uniqueID || post.info.capcode;
+        IDHighlight.uniqueID = IDHighlight.uniqueID === uniqueID ? null : uniqueID;
+        g.posts.forEach(IDHighlight.set);
+      };
+    }
+  };
 
-    count() {
-      const {uniqueID} = Get.postFromNode(this).info;
-      let n = 0;
-      IDPostCount.thread.posts.forEach(function(post) {
-        if (post.info.uniqueID === uniqueID) { return n++; }
+  const IDPostCount = {
+    init() {
+      if ((g.VIEW !== 'thread') || !Conf['Count Posts by ID']) {
+        return;
+      }
+      Callbacks.Thread.push({
+        name: 'Count Posts by ID',
+        cb() { IDPostCount.thread = this; }
       });
-      return this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
+      Callbacks.Post.push({
+        name: 'Count Posts by ID',
+        cb: this.node
+      });
+    },
+    node() {
+      if (this.nodes.uniqueID && (this.thread === IDPostCount.thread)) {
+        $.on(this.nodes.uniqueID, 'mouseover', IDPostCount.count);
+      }
+    },
+    count() {
+      const { uniqueID } = Get.postFromNode(this).info;
+      let n = 0;
+      IDPostCount.thread.posts.forEach(function (post) {
+        if (post.info.uniqueID === uniqueID) {
+          n++;
+        }
+      });
+      this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
     }
   };
 
@@ -25962,7 +25977,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       if ('samachan.org' in Conf['siteProperties'] && !Conf['PSAseen'].includes('samachan')) {
         el = $.el('span',
           {innerHTML: "<a href=\"https://sushigirl.us/yakuza/res/776.html\" target=\"_blank\" rel=\"noopener\">Looking for a new home?<br>Some former Samachan users are regrouping on SushiChan.</a><br>(a message from 4chan X)"});
-        return $.on(d, '4chanXInitFinished', function() {
+        return $.on(d$1, '4chanXInitFinished', function() {
           new Notice('info', el);
           Conf['PSAseen'].push('samachan');
           return $.set('PSAseen', Conf['PSAseen']);});
@@ -26124,7 +26139,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     init() {
       if (g.SITE.software !== 'tinyboard') { return; }
       if (g.VIEW === 'thread') {
-        return $.on(d, '4chanXInitFinished', () => $.global("initTinyBoard", { boardID: g.BOARD.ID, threadID: g.THREADID.toString() }));
+        return $.on(d$1, '4chanXInitFinished', () => $.global("initTinyBoard", { boardID: g.BOARD.ID, threadID: g.THREADID.toString() }));
       }
     }
   };
@@ -26144,7 +26159,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     node() {
       MarkNewIPs.ipCount = this.ipCount;
       MarkNewIPs.postCount = this.posts.keys.length;
-      $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
+      $.on(d$1, 'ThreadUpdate', MarkNewIPs.onUpdate);
     },
     onUpdate(e) {
       let fullID;
@@ -26243,7 +26258,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           innerHTML: `<div class="move" title="${E(statsTitle)}">${statsHTML.innerHTML}</div>`
         }));
         $.addClass(doc, 'float');
-        $.ready(() => $.add(d.body, sc));
+        $.ready(() => $.add(d$1.body, sc));
       }
       this.postCountEl = $('#post-count', sc);
       this.fileCountEl = $('#file-count', sc);
@@ -26262,8 +26277,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       ThreadStats.count();
       ThreadStats.update();
       ThreadStats.fetchPage();
-      $.on(d, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
-      $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
+      $.on(d$1, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
+      $.on(d$1, 'ThreadUpdate', ThreadStats.onUpdate);
     },
     count() {
       const { posts } = ThreadStats.thread;
@@ -26393,24 +26408,23 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
   const PassLink = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) { return; }
-      return $.on(d, '4chanXInitFinished', this.ready);
+      if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) {
+        return;
+      }
+      $.on(d$1, '4chanXInitFinished', PassLink.ready);
     },
-
     ready() {
       let styleSelector;
-      if (!(styleSelector = $.id('styleSelector'))) { return; }
-
-      const passLink = $.el('span',
-        {className: 'brackets-wrap pass-link-container'});
-      $.extend(passLink, {innerHTML: "<a href=\"javascript:;\">4chan Pass</a>"});
-      $.on(passLink.firstElementChild, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`,
-        Date.now(),
-        'width=500,height=280,toolbar=0'));
-      return $.before(styleSelector.previousSibling, [passLink, $.tn('\u00A0\u00A0')]);
+      if (!(styleSelector = $.id('styleSelector'))) {
+        return;
+      }
+      const passLink = $.el('span', { className: 'brackets-wrap pass-link-container' });
+      $.extend(passLink, { innerHTML: "<a href=\"javascript:;\">4chan Pass</a>" });
+      const link = passLink.firstElementChild;
+      $.on(link, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`, Date.now().toString(), 'width=500,height=280,toolbar=0'));
+      $.before(styleSelector.previousSibling, [passLink, $.tn('\u00A0\u00A0')]);
     }
   };
 
@@ -26889,9 +26903,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-        if (platform === 'crx') {
-          w = (w.wrappedJSObject || w);
-        }
+
         if (`${meta.name} antidup` in w) {
           return;
         }
@@ -26921,7 +26933,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       } catch (e) {
         console.error(e);
       }
-      $.on(d, '4chanXInitFinished', function () {
+      $.on(d$1, '4chanXInitFinished', function () {
         if (Main.expectInitFinished) {
           return delete Main.expectInitFinished;
         } else {
@@ -26931,7 +26943,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       });
       // Detect "mounted" event from Kissu
       const mountedCB = function () {
-        d.removeEventListener('mounted', mountedCB, true);
+        d$1.removeEventListener('mounted', mountedCB, true);
         Main.isMounted = true;
         Main.mountedCBs.map((cb) => (() => {
           try {
@@ -26939,7 +26951,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           } catch (error2) { }
         })());
       };
-      d.addEventListener('mounted', mountedCB, true);
+      d$1.addEventListener('mounted', mountedCB, true);
       // Flatten default values from Config into Conf
       const flatten = function (parent, obj) {
         if (obj instanceof Array) {
@@ -26987,7 +26999,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       if (/\.4chan(?:nel)?\.org$/.test(location.hostname) &&
         !SW.yotsuba.regexp.pass.test(location.href) &&
         !SW.yotsuba.regexp.captcha.test(location.href) &&
-        !$$('script:not([src])', d).filter(s => /this\[/.test(s.textContent)).length) {
+        !$$('script:not([src])', d$1).filter(s => /this\[/.test(s.textContent)).length) {
         ($.getSync || $.get)({ 'jsWhitelist': Conf['jsWhitelist'] }, ({ jsWhitelist }) => {
           const parsedList = jsWhitelist.replace(/^#.*$/mg, '').replace(/[\s;]+/g, ' ').trim();
           if (/\S/.test(parsedList))
@@ -27075,7 +27087,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       if (g.VIEW === 'file') {
-        $.asap((() => d.readyState !== 'loading'), function () {
+        $.asap((() => d$1.readyState !== 'loading'), function () {
           let video;
           if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect'] && g.SITE.is404?.()) {
             const pathname = location.pathname.split(/\/+/);
@@ -27125,7 +27137,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       // disable the mobile layout
-      const mobileLink = $('link[href*=mobile]', d.head);
+      const mobileLink = $('link[href*=mobile]', d$1.head);
       if (mobileLink)
         mobileLink.disabled = true;
       doc.dataset.host = location.host;
@@ -27136,7 +27148,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         $.addClass(doc, 'autohiding-scrollbar');
       }
       $.ready(function () {
-        if ((d.body.clientHeight > doc.clientHeight) && ((window.innerWidth === doc.clientWidth) !== Conf['Autohiding Scrollbar'])) {
+        if ((d$1.body.clientHeight > doc.clientHeight) && ((window.innerWidth === doc.clientWidth) !== Conf['Autohiding Scrollbar'])) {
           Conf['Autohiding Scrollbar'] = !Conf['Autohiding Scrollbar'];
           $.set('Autohiding Scrollbar', Conf['Autohiding Scrollbar']);
           return $.toggleClass(doc, 'autohiding-scrollbar');
@@ -27186,13 +27198,13 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         const div = g.SITE.bgColoredEl();
         div.style.position = 'absolute';
         div.style.visibility = 'hidden';
-        $.add(d.body, div);
+        $.add(d$1.body, div);
         let bgColor = window.getComputedStyle(div).backgroundColor;
         $.rm(div);
         const rgb = bgColor.match(/[\d.]+/g);
         // Use body background if reply background is transparent
         if (!/^rgb\(/.test(bgColor)) {
-          const s = window.getComputedStyle(d.body);
+          const s = window.getComputedStyle(d$1.body);
           bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
         }
         let css = `\
@@ -27209,8 +27221,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         Main.bgColorStyle.textContent = css;
         return $.after($.id('fourchanx-css'), Main.bgColorStyle);
       };
-      $.onExists(d.head, g.SITE.selectors.styleSheet, function () {
-        styleSheets = $$(g.SITE.selectors.styleSheet, d.head);
+      $.onExists(d$1.head, g.SITE.selectors.styleSheet, function () {
+        styleSheets = $$(g.SITE.selectors.styleSheet, d$1.head);
         if (g.SITE.software === 'yotsuba') {
           const observer = new MutationObserver(setStyle);
           for (const styleSheet of styleSheets) {
@@ -27496,7 +27508,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     handleErrors(errors) {
       // Detect conflicts with 4chan X v2
       let error;
-      if (d.body && $.hasClass(d.body, 'fourchan_x') && !$.hasClass(doc, 'tainted')) {
+      if (d$1.body && $.hasClass(d$1.body, 'fourchan_x') && !$.hasClass(doc, 'tainted')) {
         new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
         $.addClass(doc, 'tainted');
       }
