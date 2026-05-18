@@ -1,16 +1,15 @@
-﻿// @ts-nocheck
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Flash = {
+interface FlashType {
+  init(): void;
+  initReady(): void;
+}
+
+const Flash: FlashType = {
   init() {
-    if ((g.BOARD.ID === 'f') && Conf['Enable Native Flash Embedding']) {
-      return $.ready(Flash.initReady);
+    if ((g.BOARD!.ID === 'f') && Conf['Enable Native Flash Embedding']) {
+      $.ready(Flash.initReady);
     }
   },
 
@@ -25,5 +24,5 @@ var Flash = {
     }
   }
 };
-export default Flash;
 
+export default Flash;

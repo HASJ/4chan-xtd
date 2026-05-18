@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Notice from "../classes/Notice";
 import Config from "../config/Config";
 import Filter from "../Filtering/Filter";
@@ -25,46 +24,54 @@ import CatalogLinks from "./CatalogLinks";
 import ExpandThread from "./ExpandThread";
 import Nav from "./Nav";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Keybinds = {
+interface KeybindsType {
+  init(): void;
+  sync(key: string, hotkey: string): void;
+  keydown(e: KeyboardEvent): void;
+  keyCode(e: KeyboardEvent): string | null;
+  post(thread: HTMLElement): HTMLElement | null;
+  qr(thread?: HTMLElement): void;
+  tags(tag: string, ta: HTMLTextAreaElement): void;
+  sage(): void;
+  open(thread: any, tab?: boolean): void;
+  hl(delta: number, thread: HTMLElement): void;
+}
+
+const Keybinds: KeybindsType = {
   init() {
     if (!Conf['Keybinds']) { return; }
 
-    for (var hotkey in Config.hotkeys) {
+    for (const hotkey in Config.hotkeys) {
       $.sync(hotkey, Keybinds.sync);
     }
 
-    var init = function() {
+    const init = function() {
       $.off(d, '4chanXInitFinished', init);
       $.on(d, 'keydown', Keybinds.keydown);
-      for (var node of $$('[accesskey]')) {
+      for (const node of $$('[accesskey]') as HTMLElement[]) {
         node.removeAttribute('accesskey');
       }
     };
-    return $.on(d, '4chanXInitFinished', init);
+    $.on(d, '4chanXInitFinished', init);
   },
 
   sync(key, hotkey) {
-    return Conf[hotkey] = key;
+    Conf[hotkey] = key;
   },
 
   keydown(e) {
     let key, thread, threadRoot;
     let catalog, notifications;
     if (!(key = Keybinds.keyCode(e))) { return; }
-    const {target} = e;
+    const target = e.target as HTMLElement;
     if (['INPUT', 'TEXTAREA'].includes(target.nodeName)) {
       if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) { return; }
     }
-    if (['index', 'thread'].includes(g.VIEW)) {
+    if (['index', 'thread'].includes(g.VIEW!)) {
       threadRoot = Nav.getThread();
-      thread = Get.threadFromRoot(threadRoot);
+      if (threadRoot) {
+        thread = Get.threadFromRoot(threadRoot);
+      }
     }
     let hasAction = false;
     // QR & Options
@@ -92,8 +99,8 @@ var Keybinds = {
       if (Settings.dialog) {
         Settings.close();
       } else if ((notifications = $$('.notification')).length) {
-        for (var notification of notifications) {
-          $('.close', notification).click();
+        for (const notification of notifications as HTMLElement[]) {
+          ($('.close', notification) as HTMLElement).click();
         }
       } else if (QR.nodes?.preview) {
         QR.closePreview();
@@ -109,23 +116,23 @@ var Keybinds = {
       hasAction = true;
     }
     if (key === Conf['Spoiler tags'] && target.nodeName === 'TEXTAREA') {
-      Keybinds.tags('spoiler', target);
+      Keybinds.tags('spoiler', target as HTMLTextAreaElement);
       hasAction = true;
     }
     if (key === Conf['Code tags'] && target.nodeName === 'TEXTAREA') {
-      Keybinds.tags('code', target);
+      Keybinds.tags('code', target as HTMLTextAreaElement);
       hasAction = true;
     }
     if (key === Conf['Eqn tags'] && target.nodeName === 'TEXTAREA') {
-      Keybinds.tags('eqn', target);
+      Keybinds.tags('eqn', target as HTMLTextAreaElement);
       hasAction = true;
     }
     if (key === Conf['Math tags'] && target.nodeName === 'TEXTAREA') {
-      Keybinds.tags('math', target);
+      Keybinds.tags('math', target as HTMLTextAreaElement);
       hasAction = true;
     }
     if (key === Conf['SJIS tags'] && target.nodeName === 'TEXTAREA') {
-      Keybinds.tags('sjis', target);
+      Keybinds.tags('sjis', target as HTMLTextAreaElement);
       hasAction = true;
     }
     if (key === Conf['Toggle sage'] && QR.nodes && !QR.nodes.el.hidden) {
@@ -151,14 +158,15 @@ var Keybinds = {
     }
     // Index/Thread related
     if (key === Conf['Update']) {
-      switch (g.VIEW) {
+      switch (g.VIEW!) {
         case 'thread':
           if (ThreadUpdater.enabled) ThreadUpdater.update();
           hasAction = true;
-        break;
+          break;
         case 'index':
           if (Index.enabled) Index.update();
           hasAction = true;
+          break;
       }
     }
     if (key === Conf['Watch'] && ThreadWatcher.enabled && thread) {
@@ -177,16 +185,19 @@ var Keybinds = {
       QuoteThreading.toggleThreading();
       hasAction = true;
     }
-    if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled) {
+    if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled && threadRoot) {
       UnreadIndex.markRead.call(threadRoot);
       hasAction = true;
     }
     // Images
     if (key === Conf['Expand image'] && ImageExpand.enabled && threadRoot) {
-      var post = Get.postFromNode(Keybinds.post(threadRoot));
-      if (post.file) {
-        ImageExpand.toggle(post);
-        hasAction = true;
+      const p = Keybinds.post(threadRoot);
+      if (p) {
+        const post = Get.postFromNode(p);
+        if (post.file) {
+          ImageExpand.toggle(post);
+          hasAction = true;
+        }
       }
     }
     if (key === Conf['Expand images'] && ImageExpand.enabled) {
@@ -218,29 +229,31 @@ var Keybinds = {
       $.open(`${location.origin}/${g.BOARD}/`);
       hasAction = true;
     }
-    if (key === Conf['Next page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
+    if (key === Conf['Next page'] && g.VIEW === 'index' && !g.SITE!.isOnePage?.(g.BOARD!)) {
       if (Index.enabled) {
-        if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-        $('.next button', Index.pagelist).click();
+        if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+          ($('.next button', Index.pagelist!) as HTMLElement).click();
+        }
       } else {
-        $(g.SITE.selectors.nav.next)?.click();
+        ( $(g.SITE!.selectors.nav.next) as HTMLElement)?.click();
       }
       hasAction = true;
     }
-    if (key === Conf['Previous page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
+    if (key === Conf['Previous page'] && g.VIEW === 'index' && !g.SITE!.isOnePage?.(g.BOARD!)) {
       if (Index.enabled) {
-        if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-        $('.prev button', Index.pagelist).click();
+        if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+          ($('.prev button', Index.pagelist!) as HTMLElement).click();
+        }
       } else {
-        $(g.SITE.selectors.nav.prev)?.click();
+        ( $(g.SITE!.selectors.nav.prev) as HTMLElement)?.click();
       }
       hasAction = true;
     }
     if (key === Conf['Search form'] && g.VIEW === 'index') {
-      var searchInput = Index.enabled ?
+      const searchInput = Index.enabled ?
         Index.searchInput
-      : g.SITE.selectors.searchBox ?
-        $(g.SITE.selectors.searchBox)
+      : g.SITE!.selectors.searchBox ?
+        $(g.SITE!.selectors.searchBox) as HTMLInputElement
       :
         undefined;
       if (searchInput) {
@@ -249,13 +262,13 @@ var Keybinds = {
         hasAction = true;
       }
     }
-    if (key === Conf['Paged mode'] && Index.enabledOn(g.BOARD)) {
+    if (key === Conf['Paged mode'] && Index.enabledOn(g.BOARD!)) {
       location.href = g.VIEW === 'index' ? '#paged' : `/${g.BOARD}/#paged`;
     }
-    if (key === Conf['Infinite scrolling mode'] && Index.enabledOn(g.BOARD)) {
+    if (key === Conf['Infinite scrolling mode'] && Index.enabledOn(g.BOARD!)) {
       location.href = g.VIEW === 'index' ? '#infinite' : `/${g.BOARD}/#infinite`;
     }
-    if (key === Conf['All pages mode'] && Index.enabledOn(g.BOARD)) {
+    if (key === Conf['All pages mode'] && Index.enabledOn(g.BOARD!)) {
       location.href = g.VIEW === 'index' ? '#all-pages' : `/${g.BOARD}/#all-pages`;
     }
     if (key === Conf['Open catalog'] && (catalog = CatalogLinks.catalog())) {
@@ -274,17 +287,16 @@ var Keybinds = {
       Nav.scroll(-1);
       hasAction = true;
     }
-    if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot) {
+    if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot && thread) {
       ExpandThread.toggle(thread);
-      // Keep thread from moving off screen when contracted.
       Header.scrollTo(threadRoot);
       hasAction = true;
     }
-    if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot) {
+    if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot && thread) {
       Keybinds.open(thread);
       hasAction = true;
     }
-    if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot) {
+    if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot && thread) {
       Keybinds.open(thread, true);
       hasAction = true;
     }
@@ -301,16 +313,19 @@ var Keybinds = {
       Keybinds.hl(0, threadRoot);
       hasAction = true;
     }
-    if (key === Conf['Hide'] && thread && ThreadHiding.db) {
+    if (key === Conf['Hide'] && thread && ThreadHiding.db && threadRoot) {
       Header.scrollTo(threadRoot);
       ThreadHiding.toggle(thread);
       hasAction = true;
     }
     if (key === Conf['Quick Filter MD5'] && threadRoot) {
-      post = Keybinds.post(threadRoot);
-      Keybinds.hl(+1, threadRoot);
-      Filter.quickFilterMD5.call(post, e);
-      hasAction = true;
+      const p = Keybinds.post(threadRoot);
+      if (p) {
+        const post = Get.postFromNode(p);
+        Keybinds.hl(+1, threadRoot);
+        Filter.quickFilterMD5.call(post, e);
+        hasAction = true;
+      }
     }
     if (key === Conf['Previous Post Quoting You'] && threadRoot && QuoteYou.db) {
       QuoteYou.cb.seek('preceding');
@@ -327,81 +342,89 @@ var Keybinds = {
   },
 
   keyCode(e) {
-    let key = (() => { let kc;
-    switch ((kc = e.keyCode)) {
-      case 8: // return
-        return '';
-      case 13:
-        return 'Enter';
-      case 27:
-        return 'Esc';
-      case 32:
-        return 'Space';
-      case 37:
-        return 'Left';
-      case 38:
-        return 'Up';
-      case 39:
-        return 'Right';
-      case 40:
-        return 'Down';
-      case 188:
-        return 'Comma';
-      case 190:
-        return 'Period';
-      case 191:
-        return 'Slash';
-      case 59: case 186:
-        return 'Semicolon';
-      default:
-        if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
-          return String.fromCharCode(kc).toLowerCase();
-        } else if (96 <= kc && kc <= 105) { // numpad 0-9
-          return String.fromCharCode(kc - 48);
-        } else {
-          return null;
-        }
-    } })();
+    const key = (() => {
+      const kc = e.keyCode;
+      switch (kc) {
+        case 8: // return
+          return '';
+        case 13:
+          return 'Enter';
+        case 27:
+          return 'Esc';
+        case 32:
+          return 'Space';
+        case 37:
+          return 'Left';
+        case 38:
+          return 'Up';
+        case 39:
+          return 'Right';
+        case 40:
+          return 'Down';
+        case 188:
+          return 'Comma';
+        case 190:
+          return 'Period';
+        case 191:
+          return 'Slash';
+        case 59: case 186:
+          return 'Semicolon';
+        default:
+          if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
+            return String.fromCharCode(kc).toLowerCase();
+          } else if (96 <= kc && kc <= 105) { // numpad 0-9
+            return String.fromCharCode(kc - 48);
+          } else {
+            return null;
+          }
+      }
+    })();
     if (key) {
-      if (e.altKey) {   key = 'Alt+'   + key; }
-      if (e.ctrlKey) {  key = 'Ctrl+'  + key; }
-      if (e.metaKey) {  key = 'Meta+'  + key; }
-      if (e.shiftKey) { key = 'Shift+' + key; }
+      let finalKey = key;
+      if (e.altKey) {   finalKey = 'Alt+'   + finalKey; }
+      if (e.ctrlKey) {  finalKey = 'Ctrl+'  + finalKey; }
+      if (e.metaKey) {  finalKey = 'Meta+'  + finalKey; }
+      if (e.shiftKey) { finalKey = 'Shift+' + finalKey; }
+      return finalKey;
     }
     return key;
   },
 
   post(thread) {
-    const s = g.SITE.selectors;
+    const s = g.SITE!.selectors;
     return (
-      $(`${s.postContainer}${s.highlightable.reply}.${g.SITE.classes.highlight}`, thread) ||
-      $(`${g.SITE.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread)
-    );
+      $(`${s.postContainer}${s.highlightable.reply}.${g.SITE!.classes.highlight}`, thread) ||
+      $(`${g.SITE!.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread)
+    ) as HTMLElement | null;
   },
 
   qr(thread) {
     QR.open();
     if (thread != null) {
-      QR.quote.call(Keybinds.post(thread));
+      const p = Keybinds.post(thread);
+      if (p) {
+        QR.quote.call(Get.postFromNode(p));
+      }
     }
-    return QR.nodes.com.focus();
+    QR.nodes!.com.focus();
   },
 
   tags(tag, ta) {
     BoardConfig.ready(function() {
-      const {config} = g.BOARD;
+      const {config} = g.BOARD!;
       const supported = (() => { switch (tag) {
         case 'spoiler':     return !!config.spoilers;
         case 'code':        return !!config.code_tags;
         case 'math': case 'eqn': return !!config.math_tags;
         case 'sjis':        return !!config.sjis_tags;
+        default: return false;
       } })();
-      if (!supported) { return new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD}/.`, 20); }
+      if (!supported) {
+        new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD!.ID}/.`, 20);
+      }
     });
 
-    const {
-      value
-    } = ta;
+    const {value} = ta;
     const selStart = ta.selectionStart;
     const selEnd   = ta.selectionEnd;
 
@@ -414,32 +437,29 @@ var Keybinds = {
     const range = (`[${tag}]`).length + selEnd;
     ta.setSelectionRange(range, range);
 
-    // Fire the 'input' event
-    return $.event('input', null, ta);
+    $.event('input', null, ta);
   },
 
   sage() {
-    const isSage  = /sage/i.test(QR.nodes.email.value);
-    return QR.nodes.email.value = isSage ?
-      ""
-    : "sage";
+    const isSage  = /sage/i.test(QR.nodes!.email.value);
+    QR.nodes!.email.value = isSage ? "" : "sage";
   },
 
   open(thread, tab) {
     if (g.VIEW !== 'index') { return; }
     const url = Get.url('thread', thread);
     if (tab) {
-      return $.open(url);
+      $.open(url);
     } else {
-      return location.href = url;
+      location.href = url;
     }
   },
 
   hl(delta, thread) {
-    const replySelector = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
-    const {highlight} = g.SITE.classes;
+    const replySelector = `${g.SITE!.selectors.postContainer}${g.SITE!.selectors.highlightable.reply}`;
+    const {highlight} = g.SITE!.classes;
 
-    const postEl = $(`${replySelector}.${highlight}`, thread);
+    const postEl = $(`${replySelector}.${highlight}`, thread) as HTMLElement;
 
     if (!delta) {
       if (postEl) { $.rmClass(postEl, highlight); }
@@ -455,7 +475,7 @@ var Keybinds = {
           'following'
         :
           'preceding';
-        if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
+        if (!(next = $.x(`${axis}-sibling::${g.SITE!.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
         if (!next.matches(replySelector)) { next = $(replySelector, next); }
         Header.scrollToIfNeeded(next, delta === +1);
         $.addClass(next, highlight);
@@ -465,9 +485,9 @@ var Keybinds = {
       $.rmClass(postEl, highlight);
     }
 
-    const replies = $$(replySelector, thread);
+    const replies = $$(replySelector, thread) as HTMLElement[];
     if (delta === -1) { replies.reverse(); }
-    for (var reply of replies) {
+    for (const reply of replies) {
       if (((delta === +1) && (Header.getTopOf(reply) > 0)) || ((delta === -1) && (Header.getBottomOf(reply) > 0))) {
         $.addClass(reply, highlight);
         return;
@@ -475,5 +495,5 @@ var Keybinds = {
     }
   }
 };
-export default Keybinds;
 
+export default Keybinds;

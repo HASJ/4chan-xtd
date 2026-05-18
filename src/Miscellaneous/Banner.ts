@@ -1,4 +1,3 @@
-// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
 import Unread from "../Monitoring/Unread";
@@ -6,93 +5,106 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Banner = {
+interface BannerType {
+  db?: DataBoard;
+  choices?: string[];
+  original: Record<string, HTMLElement>;
+  init(): void;
+  ready(): void;
+  load(): void;
+  setTitle(title: string): void;
+  cb: {
+    toggle(this: HTMLElement): void;
+    click(this: HTMLElement, e: MouseEvent): void;
+    keydown(this: HTMLElement, e: KeyboardEvent): void;
+    blur(this: HTMLElement): void;
+  };
+  custom(child: HTMLElement): void;
+}
+
+const Banner: BannerType = {
+  original: dict(),
+
   init() {
     if (Conf['Custom Board Titles']) {
-      this.db = new DataBoard('customTitles', null, true);
+      this.db = new DataBoard('customTitles', undefined as any, true);
     }
 
     $.asap((() => d.body), () => $.asap((() => $('hr')), Banner.ready));
 
     // Let 4chan's JS load the banner if enabled; otherwise, load it ourselves.
-    if (g.BOARD.ID !== 'f') {
-      return $.on(d, '4chanXInitFinished', () => $.queueTask(Banner.load));
+    if (g.BOARD!.ID !== 'f') {
+      $.on(d, '4chanXInitFinished', () => $.queueTask(Banner.load));
     }
   },
 
   ready() {
-    const banner = $(".boardBanner");
+    const banner = $(".boardBanner")!;
     const {children} = banner;
 
     if ((g.VIEW === 'thread') && Conf['Remove Thread Excerpt']) {
-      Banner.setTitle(children[1].textContent);
+      Banner.setTitle(children[1].textContent || '');
     }
 
-    children[0].title = "Click to change";
+    (children[0] as HTMLElement).title = "Click to change";
     $.on(children[0], 'click', Banner.cb.toggle);
 
     if (Conf['Custom Board Titles']) {
-      Banner.custom(children[1]);
-      if (children[2]) { return Banner.custom(children[2]); }
+      Banner.custom(children[1] as HTMLElement);
+      if (children[2]) { Banner.custom(children[2] as HTMLElement); }
     }
   },
 
   load() {
     const bannerCnt = $.id('bannerCnt');
-    if (!bannerCnt.firstChild) {
+    if (bannerCnt && !bannerCnt.firstChild) {
       const img = $.el('img', {
         alt: '4chan',
         src: '//s.4cdn.org/image/title/' + bannerCnt.dataset.src
-      }
-      );
-      return $.add(bannerCnt, img);
+      });
+      $.add(bannerCnt, img);
     }
   },
 
   setTitle(title) {
     if (Unread.title != null) {
       Unread.title = title;
-      return Unread.update();
+      Unread.update();
     } else {
-      return d.title = title;
+      d.title = title;
     }
   },
 
   cb: {
-    toggle() {
+    toggle(this: HTMLElement) {
       if (!Banner.choices?.length) {
         Banner.choices = Conf['knownBanners'].split(',').slice();
       }
       const i = Math.floor(Banner.choices.length * Math.random());
       const banner = Banner.choices.splice(i, 1);
-      return $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
+      ( $('img', this.parentNode as HTMLElement) as HTMLImageElement).src = `//s.4cdn.org/image/title/${banner}`;
     },
 
-    click(e) {
+    click(this: HTMLElement, e: MouseEvent) {
       if (!e.ctrlKey && !e.metaKey) { return; }
-      if (Banner.original[this.className] == null) { Banner.original[this.className] = this.cloneNode(true); }
-      this.contentEditable = true;
-      for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-      return this.focus();
+      if (Banner.original[this.className] == null) { Banner.original[this.className] = this.cloneNode(true) as HTMLElement; }
+      this.contentEditable = 'true';
+      for (const br of $$('br', this)) { $.replace(br, $.tn('\n')); }
+      this.focus();
     },
 
-    keydown(e) {
+    keydown(this: HTMLElement, e: KeyboardEvent) {
       e.stopPropagation();
-      if (!e.shiftKey && (e.keyCode === 13)) { return this.blur(); }
+      if (!e.shiftKey && (e.keyCode === 13)) { this.blur(); }
     },
 
-    blur() {
-      for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-      if (this.textContent = this.textContent.replace(/\n*$/, '')) {
-        this.contentEditable = false;
-        return Banner.db.set({
-          boardID:  g.BOARD.ID,
+    blur(this: HTMLElement) {
+      for (const br of $$('br', this)) { $.replace(br, $.tn('\n')); }
+      const text = this.textContent || '';
+      if (this.textContent = text.replace(/\n*$/, '')) {
+        this.contentEditable = 'false';
+        Banner.db!.set({
+          boardID:  g.BOARD!.ID,
           threadID: this.className,
           val: {
             title: this.textContent,
@@ -102,15 +114,13 @@ var Banner = {
       } else {
         $.rmAll(this);
         $.add(this, [...Banner.original[this.className].cloneNode(true).childNodes]);
-        return Banner.db.delete({
-          boardID:  g.BOARD.ID,
+        Banner.db!.delete({
+          boardID:  g.BOARD!.ID,
           threadID: this.className
         });
       }
     }
   },
-
-  original: dict(),
 
   custom(child) {
     let data;
@@ -118,19 +128,19 @@ var Banner = {
     child.title = `Ctrl/\u2318+click to edit board ${className.slice(5).toLowerCase()}`;
     child.spellcheck = false;
 
-    for (var event of ['click', 'keydown', 'blur']) {
+    for (const event of ['click', 'keydown', 'blur'] as const) {
       $.on(child, event, Banner.cb[event]);
     }
 
-    if (data = Banner.db.get({boardID: g.BOARD.ID, threadID: className})) {
+    if (data = Banner.db!.get({boardID: g.BOARD!.ID, threadID: className})) {
       if (Conf['Persistent Custom Board Titles'] || (data.orig === child.textContent)) {
-        Banner.original[className] = child.cloneNode(true);
-        return child.textContent = data.title;
+        Banner.original[className] = child.cloneNode(true) as HTMLElement;
+        child.textContent = data.title;
       } else {
-        return Banner.db.delete({boardID: g.BOARD.ID, threadID: className});
+        Banner.db!.delete({boardID: g.BOARD!.ID, threadID: className});
       }
     }
   }
 };
-export default Banner;
 
+export default Banner;

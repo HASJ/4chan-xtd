@@ -1,36 +1,39 @@
-﻿// @ts-nocheck
 import $ from "../platform/$";
 import CSS from "../css/CSS";
 import { Conf } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-const CustomCSS = {
+interface CustomCSSType {
+  style?: HTMLStyleElement;
+  init(): void;
+  addStyle(): void;
+  rmStyle(): void;
+  update(): void;
+}
+
+const CustomCSS: CustomCSSType = {
   init() {
     if (!Conf['Custom CSS']) { return; }
-    return this.addStyle();
+    this.addStyle();
   },
 
   addStyle() {
-    return this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
+    this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
   },
 
   rmStyle() {
     if (this.style) {
       $.rm(this.style);
-      return delete this.style;
+      delete this.style;
     }
   },
 
   update() {
     if (!this.style) {
-      return this.addStyle();
+      this.addStyle();
+      return;
     }
-    return this.style.textContent = CSS.sub(Conf['usercss']);
+    this.style.textContent = CSS.sub(Conf['usercss']);
   }
 };
-export default CustomCSS;
 
+export default CustomCSS;
