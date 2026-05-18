@@ -132,7 +132,7 @@ var Header: any = {
         $.global('stubCloneTopNav');
       }
       if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
-        for (var a of $$('a', Header.bottomBoardList)) {
+        for (var a of $$<HTMLAnchorElement>('a', Header.bottomBoardList)) {
           if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
         }
         return CatalogLinks.setLinks(Header.bottomBoardList);
@@ -201,7 +201,7 @@ var Header: any = {
     }
     const fullBoardList = $('.boardList', Header.boardList);
     $.add(fullBoardList, nodes);
-    for (var a of $$('a', fullBoardList)) {
+    for (var a of $$<HTMLAnchorElement>('a', fullBoardList)) {
       if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
     }
     return CatalogLinks.setLinks(fullBoardList);

@@ -198,7 +198,7 @@ const CaptchaT = {
         slider.value = '' + i;
         slider.dispatchEvent(new Event('change', { bubbles: true }));
         slider.dispatchEvent(new Event('input', { bubbles: true }));
-        $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
+        $$<HTMLElement>('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
         $.addClass(strip, 'selected');
       });
       $.add(stripsContainer, strip);
@@ -262,7 +262,7 @@ const CaptchaT = {
       slider.dispatchEvent(new Event('input', { bubbles: true }));
       
       const targetValue = parseInt(originalSliderValue, 10) || 0;
-      const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
+      const targetStrip = $$<HTMLElement>('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0] as HTMLElement;
       if (targetStrip) targetStrip.click();
     };
 
@@ -281,7 +281,7 @@ const CaptchaT = {
           }
         } else if (key >= '1' && key <= '9') {
           const index = parseInt(key, 10) - 1;
-          const stripElements = $$('.captcha-strip', this.nodes.root);
+          const stripElements = $$<HTMLElement>('.captcha-strip', this.nodes.root);
           if (stripElements[index]) {
             e.preventDefault();
             stripElements[index].click();
@@ -427,7 +427,7 @@ const CaptchaT = {
           slider.value = i;
           slider.dispatchEvent(new Event('change', { bubbles: true }));
           slider.dispatchEvent(new Event('input', { bubbles: true }));
-          $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
+          $$<HTMLElement>('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
           $.addClass(strip, 'selected');
         });
         $.add(strips, strip);
@@ -441,7 +441,7 @@ const CaptchaT = {
     const bg = taskEl.style.backgroundImage;
     const isChallenge = bg && bg.includes('url(');
     if (isChallenge) {
-      $$('.captcha-strip', strips).forEach(strip => {
+      $$<HTMLElement>('.captcha-strip', strips).forEach(strip => {
         strip.style.backgroundImage = bg;
       });
       taskEl.style.setProperty('background-image', 'none', 'important');
