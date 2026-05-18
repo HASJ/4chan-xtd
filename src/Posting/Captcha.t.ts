@@ -1,16 +1,36 @@
-// @ts-nocheck
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QR from "./QR";
 import { isPassEnabled } from "../platform/helpers";
 
+interface ThreadInfo {
+  boardID: string;
+  threadID: string;
+  autoLoad?: string;
+}
+
+interface CaptchaTNodes {
+  root: HTMLDivElement;
+  container?: HTMLDivElement;
+}
+
 const CaptchaT = {
-  init() {
+  isEnabled: false,
+  isCapturing: false,
+  _isNotLikeOthers: false,
+  pollInterval: undefined as any,
+  observer: undefined as MutationObserver | undefined,
+  iframeObserver: undefined as MutationObserver | undefined,
+  keydownListener: undefined as ((e: KeyboardEvent) => void) | undefined,
+  currentThread: undefined as ThreadInfo | undefined,
+  nodes: undefined as unknown as CaptchaTNodes,
+
+  init(this: typeof CaptchaT) {
     if (isPassEnabled()) { return; }
     if (!(this.isEnabled = !!$('#t-root') || !$.id('postForm'))) { return; }
 
-    const root = $.el('div', {className: 'captcha-root'});
+    const root = $.el('div', {className: 'captcha-root'}) as HTMLDivElement;
     this.nodes = {root};
 
     $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
@@ -197,7 +217,7 @@ const CaptchaT = {
     const runCapture = async () => {
       let lastBg = taskEl.style.backgroundImage; // Track the actual style property
       for (let i = startIndex; i < count; i++) {
-        await new Promise(resolve => {
+        await new Promise<void>(resolve => {
           let isResolved = false;
           
           const observer = new MutationObserver(() => {
@@ -224,7 +244,7 @@ const CaptchaT = {
         });
 
         const stripIndex = i - startIndex;
-        const strip = stripsContainer.children[stripIndex];
+        const strip = stripsContainer.children[stripIndex] as HTMLElement;
         if (strip) {
           lastBg = taskEl.style.backgroundImage;
           strip.style.backgroundImage = lastBg;
@@ -362,9 +382,10 @@ const CaptchaT = {
     this.createIframeStrips(mainDiv, slider);
 
     $.on(window, 'message', (e) => {
-      if (e.data && e.data.type === 'select-strip') {
-        const index = e.data.index;
-        const strips = $$('.captcha-strip', mainDiv);
+      const me = e as MessageEvent;
+      if (me.data && me.data.type === 'select-strip') {
+        const index = me.data.index;
+        const strips = $$('.captcha-strip', mainDiv) as HTMLElement[];
         if (strips[index]) {
           strips[index].click();
           strips[index].focus();
@@ -378,7 +399,7 @@ const CaptchaT = {
         const key = e.key;
         if (key >= '1' && key <= '9') {
           const index = parseInt(key, 10) - 1;
-          const strips = $$('.captcha-strip', mainDiv);
+          const strips = $$('.captcha-strip', mainDiv) as HTMLElement[];
           if (strips[index]) {
             e.preventDefault();
             strips[index].click();
@@ -399,8 +420,8 @@ const CaptchaT = {
 
       strips = $.el('div', {className: 'captcha-strips'});
       for (let i = 0; i < count; i++) {
-        const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
-        strip.dataset.index = i;
+        const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0}) as HTMLElement;
+        strip.dataset.index = '' + i;
         strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
         $.on(strip, 'click', () => {
           slider.value = i;
