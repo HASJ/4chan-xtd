@@ -1,13 +1,14 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g, Conf } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var ThreadLinks = {
+interface ThreadLinksType {
+  init(): void;
+  node(this: any): void;
+  catalogNode(this: any): void;
+  process(link: HTMLAnchorElement): void;
+}
+
+const ThreadLinks: ThreadLinksType = {
   init() {
     if ((g.VIEW !== 'index') || !Conf['Open Threads in New Tab']) { return; }
 
@@ -15,24 +16,24 @@ var ThreadLinks = {
       name: 'Thread Links',
       cb:   this.node
     });
-    return Callbacks.CatalogThread.push({
+    Callbacks.CatalogThread.push({
       name: 'Thread Links',
       cb:   this.catalogNode
     });
   },
 
-  node() {
+  node(this: any) {
     if (this.isReply || this.isClone) { return; }
-    return ThreadLinks.process(this.nodes.reply);
+    ThreadLinks.process(this.nodes.reply);
   },
 
-  catalogNode() {
-    return ThreadLinks.process(this.nodes.thumb.parentNode);
+  catalogNode(this: any) {
+    ThreadLinks.process(this.nodes.thumb.parentNode);
   },
 
   process(link) {
-    return link.target = '_blank';
+    link.target = '_blank';
   }
 };
-export default ThreadLinks;
 
+export default ThreadLinks;

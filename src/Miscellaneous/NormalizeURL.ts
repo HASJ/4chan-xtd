@@ -1,18 +1,16 @@
-﻿// @ts-nocheck
 import { Conf, g } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-const NormalizeURL = {
+interface NormalizeURLType {
+  init(): void;
+}
+
+const NormalizeURL: NormalizeURLType = {
   init() {
     if (!Conf['Normalize URL']) { return; }
 
     let pathname = location.pathname.split(/\/+/);
-    if (g.SITE.software === 'yotsuba') {
-      switch (g.VIEW) {
+    if (g.SITE!.software === 'yotsuba') {
+      switch (g.VIEW!) {
         case 'thread':
           pathname[2] = 'thread';
           pathname = pathname.slice(0, 4);
@@ -22,11 +20,11 @@ const NormalizeURL = {
           break;
       }
     }
-    pathname = pathname.join('/');
-    if (location.pathname !== pathname) {
-      return history.replaceState(history.state, '', `${location.protocol}//${location.host}${pathname}${location.hash}`);
+    const pathJoined = pathname.join('/');
+    if (location.pathname !== pathJoined) {
+      history.replaceState(history.state, '', `${location.protocol}//${location.host}${pathJoined}${location.hash}`);
     }
   }
 };
-export default NormalizeURL;
 
+export default NormalizeURL;

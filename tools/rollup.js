@@ -199,7 +199,13 @@ const tsPlugin = typescript({
     const eventPage = await rollup({
       input: resolve(__dirname, '../src/meta/eventPage.ts'),
       plugins: [
-        tsPlugin,
+        typescript({
+          tsconfig: resolve(__dirname, '../tsconfig.json'),
+          compilerOptions: {
+            outDir: buildDir,
+            noEmit: false,
+          },
+        }),
         noFormat ? undefined : fixTsOutputFormat({ include: ["**/*.ts", "**/*.tsx"] }),
         cleanupPlugin,
       ].filter(Boolean),

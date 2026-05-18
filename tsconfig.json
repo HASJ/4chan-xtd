@@ -33,6 +33,6 @@
   },
   "exclude": [
     "builds/",
-    "src/meta/"
+    "src/meta/*.js"
   ]
 }

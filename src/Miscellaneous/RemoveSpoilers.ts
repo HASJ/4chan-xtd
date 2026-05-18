@@ -1,15 +1,15 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var RemoveSpoilers = {
+interface RemoveSpoilersType {
+  init(): void;
+  node(this: any): void;
+  unspoiler(el: HTMLElement | null): void;
+}
+
+const RemoveSpoilers: RemoveSpoilersType = {
   init() {
     if (Conf['Reveal Spoilers']) {
       $.addClass(doc, 'reveal-spoilers');
@@ -23,22 +23,23 @@ var RemoveSpoilers = {
     });
 
     if (g.VIEW === 'archive') {
-      return $.ready(() => RemoveSpoilers.unspoiler($.id('arc-list')));
+      $.ready(() => RemoveSpoilers.unspoiler($.id('arc-list')));
     }
   },
 
-  node() {
-    return RemoveSpoilers.unspoiler(this.nodes.comment);
+  node(this: any) {
+    RemoveSpoilers.unspoiler(this.nodes.comment);
   },
 
   unspoiler(el) {
-    const spoilers = $$(g.SITE.selectors.spoiler, el);
-    for (var spoiler of spoilers) {
-      var span = $.el('span', {className: 'removed-spoiler'});
+    if (!el) { return; }
+    const spoilers = $$(g.SITE!.selectors.spoiler, el) as HTMLElement[];
+    for (const spoiler of spoilers) {
+      const span = $.el('span', {className: 'removed-spoiler'}) as HTMLSpanElement;
       $.replace(spoiler, span);
       $.add(span, [...spoiler.childNodes]);
     }
   }
 };
-export default RemoveSpoilers;
 
+export default RemoveSpoilers;

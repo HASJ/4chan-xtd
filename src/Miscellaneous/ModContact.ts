@@ -1,32 +1,34 @@
-﻿// @ts-nocheck
 import $ from "../platform/$";
 import Callbacks from "../classes/Callbacks";
 import { g } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var ModContact = {
+interface ModContactType {
+  init(): void;
+  node(this: any): void;
+  template(capcode: string): { innerHTML: string };
+  specific: Record<string, () => { innerHTML: string }>;
+  moveNote: Record<string, { innerHTML: string }>;
+}
+
+const ModContact: ModContactType = {
   init() {
-    if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) { return; }
-    return Callbacks.Post.push({
+    if ((g.SITE!.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW!)) { return; }
+    Callbacks.Post.push({
       name: 'Mod Contact Links',
       cb:   this.node
     });
   },
 
-  node() {
+  node(this: any) {
     let moved;
     if (this.isClone || !$.hasOwn(ModContact.specific, this.info.capcode)) { return; }
-    const links = $.el('span', {className: 'contact-links brackets-wrap'});
+    const links = $.el('span', {className: 'contact-links brackets-wrap'}) as HTMLSpanElement;
     $.extend(links, ModContact.template(this.info.capcode));
     $.after(this.nodes.capcode, links);
     if ((moved = this.info.comment.match(/This thread was moved to >>>\/(\w+)\//)) && $.hasOwn(ModContact.moveNote, moved[1])) {
-      const moveNote = $.el('div', {className: 'move-note'});
+      const moveNote = $.el('div', {className: 'move-note'}) as HTMLDivElement;
       $.extend(moveNote, ModContact.moveNote[moved[1]]);
-      return $.add(this.nodes.post, moveNote);
+      $.add(this.nodes.post, moveNote);
     }
   },
 
@@ -45,5 +47,5 @@ var ModContact = {
     qa: {innerHTML: "Moving a thread to /qa/ does not imply mods will read it. If you wish to contact mods, use <a href=\"https://www.4chan.org/feedback\" target=\"_blank\">feedback</a><span class=\"invisible\"> (https://www.4chan.org/feedback)</span> or <a href=\"https://www.4chan-x.net/4chan-irc.html\" target=\"_blank\">IRC</a><span class=\"invisible\"> (https://www.4chan-x.net/4chan-irc.html)</span>."}
   }
 };
-export default ModContact;
 
+export default ModContact;
