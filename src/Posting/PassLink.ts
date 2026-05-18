@@ -1,29 +1,24 @@
-// @ts-nocheck
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
+
 const PassLink = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) { return; }
-    return $.on(d, '4chanXInitFinished', this.ready);
+    $.on(d, '4chanXInitFinished', PassLink.ready);
   },
 
   ready() {
-    let styleSelector;
+    let styleSelector: HTMLElement | null;
     if (!(styleSelector = $.id('styleSelector'))) { return; }
 
     const passLink = $.el('span',
       {className: 'brackets-wrap pass-link-container'});
     $.extend(passLink, {innerHTML: "<a href=\"javascript:;\">4chan Pass</a>"});
-    $.on(passLink.firstElementChild, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`,
-      Date.now(),
+    const link = passLink.firstElementChild as HTMLElement;
+    $.on(link, 'click', () => window.open(`//sys.${location.hostname.split('.')[1]}.org/auth`,
+      Date.now().toString(),
       'width=500,height=280,toolbar=0'));
-    return $.before(styleSelector.previousSibling, [passLink, $.tn('\u00A0\u00A0')]);
+    $.before(styleSelector.previousSibling as ChildNode, [passLink, $.tn('\u00A0\u00A0')]);
   }
 };
 export default PassLink;
-
