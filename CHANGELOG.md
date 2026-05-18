@@ -21,6 +21,9 @@ and import them in XT.
 - Added "Download All Media" thread downloader enhancements:
   - Implemented persistent download tracking to automatically skip previously downloaded files.
   - Enabled background downloading using `GM_download` to ensure tasks continue running even if the tab is closed or navigated away.
+- Core architecture migration to TypeScript:
+  - Migrated core codebase entry points and configuration files to TypeScript for strict type safety and cleaner maintenance.
+  - Resolved circular references and updated Rollup configuration for robust `.ts` compilation.
 
 ### 2.24.2 (2025-12-23 🎅🏻)
 
