@@ -1,28 +1,27 @@
-﻿// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const PostSuccessful = {
   init() {
     if (!Conf['Remember Your Posts']) { return; }
-    return $.ready(this.ready);
+    $.ready(PostSuccessful.ready);
   },
 
   ready() {
     if (d.title !== 'Post successful!') { return; }
 
-    let [_, threadID, postID] = $('h1').nextSibling.textContent.match(/thread:(\d+),no:(\d+)/);
-    postID   = +postID;
-    threadID = +threadID || postID;
+    const h1 = $('h1');
+    if (!h1 || !h1.nextSibling) { return; }
+    const textContent = h1.nextSibling.textContent;
+    if (!textContent) { return; }
+    const match = textContent.match(/thread:(\d+),no:(\d+)/);
+    if (!match) { return; }
+    const postID = +match[2];
+    const threadID = +match[1] || postID;
 
     const db = new DataBoard('yourPosts');
-    return db.set({
+    db.set({
       boardID: g.BOARD.ID,
       threadID,
       postID,
@@ -31,4 +30,3 @@ const PostSuccessful = {
   }
 };
 export default PostSuccessful;
-
