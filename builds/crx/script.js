@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.25.1",
-    "date": "2026-05-18T06:00:00Z"
+    "version": "2.25.2",
+    "date": "2026-05-18T06:27:00Z"
   };
 
   var meta = {
@@ -148,13 +148,1286 @@
     };
     return output;
   })();
-  const d = document;
-  const doc = d.documentElement;
+  const d$1 = document;
+  const doc = d$1.documentElement;
   const c = console;
   const docSet = function () {
     // return (doc = d.documentElement);
     return doc;
   };
+
+  // This file was created because these functions on $ were sometimes not initialized yet because of circular
+  // dependencies, so try to keep this file without dependencies, so these functions don't have to wait for something else
+  /**
+   * @param wait Time to wait in milliseconds.
+   * @param fn The function to execute
+   * @param leading Wether to run immediately, otherwise it waits for timeout even if there is no older call.
+   */
+  const debounce = (wait, fn, leading = true) => {
+    let lastCall = 0;
+    let timeout = null;
+    let that = null;
+    let args = null;
+    const exec = function () {
+      lastCall = Date.now();
+      return fn.apply(that, args);
+    };
+    return function () {
+      args = arguments;
+      that = this;
+      if (leading && lastCall < (Date.now() - wait)) {
+        exec();
+        return;
+      }
+      // stop current reset
+      if (timeout !== null)
+        clearTimeout(timeout);
+      // after wait, let next invocation execute immediately
+      timeout = setTimeout(exec, wait);
+    };
+  };
+  const dict = () => Object.create(null);
+  dict.clone = function (obj) {
+    if ((typeof obj !== 'object') || (obj === null)) {
+      return obj;
+    } else if (obj instanceof Array) {
+      const arr = [];
+      for (let i = 0, end = obj.length; i < end; i++) {
+        arr.push(dict.clone(obj[i]));
+      }
+      return arr;
+    } else {
+      const map = Object.create(null);
+      for (var key in obj) {
+        var val = obj[key];
+        map[key] = dict.clone(val);
+      }
+      return map;
+    }
+  };
+  dict.json = (str) => dict.clone(JSON.parse(str));
+  const SECOND = 1000;
+  const MINUTE = SECOND * 60;
+  const HOUR = MINUTE * 60;
+  const DAY = HOUR * 24;
+  const platform = window.GM_xmlhttpRequest ? 'userscript' : 'crx';
+  const isPassEnabled = () => {
+    if (document.cookie.indexOf('pass_enabled=1') >= 0)
+      return true;
+    try {
+      if (localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'))
+        return true;
+    } catch (e) { }
+    return false;
+  };
+
+  // @ts-nocheck
+  /**
+   * Because of increased security in manifest v3, scripts can no longer just inject a script tag into the main page.
+   * Functions to be called in the main context must be predefined. Those functions should be in this file, and they will
+   * be loaded in the worker context in the extension version.
+   *
+   * These are the functions for `$.global`. They will be called by name.
+   *
+   * They are stringified, so don't use the short `fnName() {` notation.
+   */
+  const PageContextFunctions = {
+    stubCloneTopNav: () => { window.cloneTopNav = function () { }; },
+    disableNativeExtension: () => {
+      try {
+        const settings = JSON.parse(localStorage.getItem('4chan-settings')) || {};
+        if (settings.disableAll)
+          return;
+        settings.disableAll = true;
+        localStorage.setItem('4chan-settings', JSON.stringify(settings));
+      } catch (error) {
+        Object.defineProperty(window, 'Config', { value: { disableAll: true } });
+      }
+    },
+    disableNativeExtensionNoStorage: () => { Object.defineProperty(window, 'Config', { value: { disableAll: true } }); },
+    prettyPrint: ({ id }) => {
+      // @ts-ignore
+      window.prettyPrint?.((function () { }), document.getElementById(id).parentNode);
+    },
+    exposeVersion: ({ buildDate, version }) => {
+      const date = +buildDate;
+      Object.defineProperty(window, 'fourchanXT', {
+        value: Object.freeze({
+          version,
+          // Getter to prevent mutations.
+          get buildDate() { return new Date(date); },
+        }),
+        writable: false,
+      });
+    },
+    initMain: () => {
+      document.documentElement.classList.add('js-enabled');
+      window.FCX = {};
+    },
+    initFlash: () => {
+      if (JSON.parse(localStorage['4chan-settings'] || '{}').disableAll)
+        window.SWFEmbed.init();
+    },
+    initFlashNoStorage: () => { window.SWFEmbed.init(); },
+    setThreadId: () => { window.Main.tid = location.pathname.split(/\/+/)[3]; },
+    fourChanPrettyPrintListener: () => {
+      window.addEventListener('prettyprint', (e) => window.dispatchEvent(new CustomEvent('prettyprint:cb', {
+        detail: { ID: e.detail.ID, i: e.detail.i, html: window.prettyPrintOne(e.detail.html) }
+      })), false);
+    },
+    fourChanMathjaxListener: () => {
+      window.addEventListener('mathjax', function (e) {
+        if (window.MathJax) {
+          window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, e.target]);
+        } else {
+          if (!document.querySelector('script[src^="//cdn.mathjax.org/"]')) { // don't load MathJax if already loading
+            window.loadMathJax();
+            window.loadMathJax = function () { };
+          }
+          // 4chan only handles post comments on MathJax load; anything else (e.g. the QR preview) must be queued explicitly.
+          if (!e.target.classList.contains('postMessage')) {
+            document.querySelector('script[src^="//cdn.mathjax.org/"]').addEventListener('load', () => window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, e.target]), false);
+          }
+        }
+      }, false);
+    },
+    disable4chanIdHl: () => {
+      window.clickable_ids = false;
+      for (var node of document.querySelectorAll('.posteruid, .capcode')) {
+        node.removeEventListener('click', window.idClick, false);
+      }
+    },
+    initTinyBoard: ({ boardID, threadID }) => {
+      threadID = +threadID;
+      const form = document.querySelector('form[name="post"]');
+      window.$(document).ajaxComplete(function (event, request, settings) {
+        let postID;
+        if (settings.url !== form.action)
+          return;
+        if (!(postID = +request.responseJSON?.id))
+          return;
+        const detail = { boardID, threadID, postID };
+        try {
+          const { redirect, noko } = request.responseJSON;
+          if (redirect && (originalNoko != null) && !originalNoko && !noko) {
+            detail.redirect = redirect;
+          }
+        } catch (error) { }
+        event = new CustomEvent('QRPostSuccessful', { bubbles: true, detail });
+        document.dispatchEvent(event);
+      });
+      var originalNoko = window.tb_settings?.ajax?.always_noko_replies;
+      let base;
+      (((base = window.tb_settings || (window.tb_settings = {}))).ajax || (base.ajax = {})).always_noko_replies = true;
+    },
+    setupCaptcha: ({ recaptchaKey }) => {
+      const render = function () {
+        const { classList } = document.documentElement;
+        const container = document.querySelector('#qr .captcha-container');
+        container.dataset.widgetID = window.grecaptcha.render(container, {
+          sitekey: recaptchaKey,
+          theme: classList.contains('tomorrow') || classList.contains('spooky') || classList.contains('dark-captcha') ? 'dark' : 'light',
+          callback(response) {
+            window.dispatchEvent(new CustomEvent('captcha:success', { detail: response }));
+          }
+        });
+      };
+      if (window.grecaptcha) {
+        render();
+      } else {
+        const cbNative = window.onRecaptchaLoaded;
+        window.onRecaptchaLoaded = function () {
+          render();
+          cbNative();
+        };
+        if (!document.head.querySelector('script[src^="https://www.google.com/recaptcha/api.js"]')) {
+          const script = document.createElement('script');
+          script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoaded&render=explicit';
+          document.head.appendChild(script);
+        }
+      }
+    },
+    resetCaptcha: () => {
+      window.grecaptcha.reset(document.querySelector('#qr .captcha-container').dataset.widgetID);
+    },
+    setupTCaptcha: ({ boardID, threadID, autoLoad }) => {
+      const { TCaptcha } = window;
+      TCaptcha.init(document.querySelector('#qr .captcha-container'), boardID, +threadID);
+      TCaptcha.setErrorCb(err => window.dispatchEvent(new CustomEvent('CreateNotification', {
+        detail: { type: 'warning', content: '' + err }
+      })));
+      if (autoLoad === '1')
+        TCaptcha.load(boardID, threadID);
+    },
+    captureTCaptchaStrips: () => {
+      const slider = document.querySelector('#qr #t-slider');
+      const task = document.querySelector('#qr #t-task');
+      const strips = document.querySelectorAll('#qr .captcha-strip');
+      if (!slider || !task || !strips.length)
+        return;
+      const max = parseInt(slider.getAttribute('max') || '3', 10);
+      const origVal = slider.value;
+      const step = (i) => {
+        if (i > max) {
+          slider.value = origVal;
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+        slider.value = '' + i;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        setTimeout(() => {
+          const bg = task.style.backgroundImage;
+          if (strips[i] && bg) {
+            strips[i].style.backgroundImage = bg;
+            strips[i].style.backgroundSize = 'contain';
+            strips[i].style.backgroundPosition = 'center';
+          }
+          step(i + 1);
+        }, 100);
+      };
+      step(0);
+    },
+    destroyTCaptcha: () => { window.TCaptcha.destroy(); },
+    TCaptchaClearChallenge: () => { window.TCaptcha.clearChallenge(); },
+    setupQR: () => {
+      window.FCX.oekakiCB = () => window.Tegaki.flatten().toBlob(function (file) {
+        const source = `oekaki-${Date.now()}`;
+        window.FCX.oekakiLatest = source;
+        document.dispatchEvent(new CustomEvent('QRSetFile', {
+          bubbles: true,
+          detail: { file, name: window.FCX.oekakiName, source }
+        }));
+      });
+      if (window.Tegaki) {
+        document.querySelector('#qr .oekaki').hidden = false;
+      }
+    },
+    qrTegakiDraw: () => {
+      const { Tegaki, FCX } = window;
+      if (Tegaki.bg) {
+        Tegaki.destroy();
+      }
+      FCX.oekakiName = 'tegaki.png';
+      Tegaki.open({
+        onDone: FCX.oekakiCB,
+        onCancel() { Tegaki.bgColor = '#ffffff'; },
+        width: +document.querySelector('#qr [name=oekaki-width]').value,
+        height: +document.querySelector('#qr [name=oekaki-height]').value,
+        bgColor: document.querySelector('#qr [name=oekaki-bg]').checked ?
+          document.querySelector('#qr [name=oekaki-bgcolor]').value :
+          'transparent'
+      });
+    },
+    qrTegakiLoad: () => {
+      const { Tegaki, FCX } = window;
+      const name = document.getElementById('qr-filename').value.replace(/\.\w+$/, '') + '.png';
+      const { source } = document.getElementById('file-n-submit').dataset;
+      const error = content => document.dispatchEvent(new CustomEvent('CreateNotification', {
+        bubbles: true,
+        detail: { type: 'warning', content, lifetime: 20 }
+      }));
+      var cb = function (e) {
+        if (e) {
+          this.removeEventListener('QRMetadata', cb, false);
+        }
+        const selected = document.getElementById('selected');
+        if (!selected?.dataset.type)
+          return error('No file to edit.');
+        if (!/^(image|video)\//.test(selected.dataset.type)) {
+          return error('Not an image.');
+        }
+        if (!selected.dataset.height)
+          return error('Metadata not available.');
+        if (selected.dataset.height === 'loading') {
+          selected.addEventListener('QRMetadata', cb, false);
+          return;
+        }
+        if (Tegaki.bg) {
+          Tegaki.destroy();
+        }
+        FCX.oekakiName = name;
+        Tegaki.open({
+          onDone: FCX.oekakiCB,
+          onCancel() { Tegaki.bgColor = '#ffffff'; },
+          width: +selected.dataset.width,
+          height: +selected.dataset.height,
+          bgColor: 'transparent'
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = (canvas.naturalWidth = +selected.dataset.width);
+        canvas.height = (canvas.naturalHeight = +selected.dataset.height);
+        canvas.hidden = true;
+        document.body.appendChild(canvas);
+        canvas.addEventListener('QRImageDrawn', function () {
+          this.remove();
+          Tegaki.onOpenImageLoaded.call(this);
+        }, false);
+        canvas.dispatchEvent(new CustomEvent('QRDrawFile', { bubbles: true }));
+      };
+      if (Tegaki.bg && (Tegaki.onDoneCb === FCX.oekakiCB) && (source === FCX.oekakiLatest)) {
+        FCX.oekakiName = name;
+        Tegaki.resume();
+      } else {
+        cb();
+      }
+    },
+    testNativeExtension: (output = {}) => {
+      if (window.Parser?.postMenuIcon)
+        output.enabled = 'true';
+      return output;
+    },
+  };
+
+  // @ts-nocheck
+  // loosely follows the jquery api:
+  // http://api.jquery.com/
+  // not chainable
+  const $ = (selector, root = document.body) => root.querySelector(selector);
+  $.id = id => d$1.getElementById(id);
+  $.ready = function (fc) {
+    if (d$1.readyState !== 'loading') {
+      $.queueTask(fc);
+      return;
+    }
+    var cb = function () {
+      $.off(d$1, 'DOMContentLoaded', cb);
+      fc();
+    };
+    $.on(d$1, 'DOMContentLoaded', cb);
+  };
+  $.formData = function (form) {
+    if (form instanceof HTMLFormElement) {
+      return new FormData(form);
+    }
+    const fd = new FormData();
+    for (var key in form) {
+      var val = form[key];
+      if (val) {
+        if ((typeof val === 'object') && 'newName' in val) {
+          fd.append(key, val, val.newName);
+        } else {
+          fd.append(key, val);
+        }
+      }
+    }
+    return fd;
+  };
+  $.extend = function (object, properties) {
+    for (var key in properties) {
+      var val = properties[key];
+      object[key] = val;
+    }
+  };
+  $.hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+  $.getOwn = function (obj, key) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      return obj[key];
+    } else {
+      return undefined;
+    }
+  };
+  $.ajax = (function () {
+    let pageXHR = XMLHttpRequest;
+    if (window.wrappedJSObject && !XMLHttpRequest.wrappedJSObject) {
+      try {
+        pageXHR = XPCNativeWrapper(window.wrappedJSObject.XMLHttpRequest);
+      } catch (e) { }
+    }
+    return function (url, options = {}) {
+      if (options.responseType == null) {
+        options.responseType = 'json';
+      }
+      if (!options.type) {
+        options.type = (options.form && 'post') || 'get';
+      }
+      // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
+      url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
+      const { onloadend, timeout, responseType, withCredentials, type, onprogress, form, headers } = options;
+      const r = new pageXHR();
+      try {
+        r.open(type, url, true);
+        const object = headers || {};
+        for (var key in object) {
+          var value = object[key];
+          r.setRequestHeader(key, value);
+        }
+        $.extend(r, { onloadend, timeout, responseType, withCredentials });
+        $.extend(r.upload, { onprogress });
+        // connection error or content blocker
+        $.on(r, 'error', function () { if (!r.status) {
+          c.warn(`${meta.name} failed to load: ${url}`);
+        } });
+        r.send(form);
+      } catch (err) {
+        // XXX Some content blockers in Firefox (e.g. Adblock Plus and NoScript) throw an exception instead of simulating a connection error.
+        if (err.result !== 0x805e0006) {
+          throw err;
+        }
+        r.onloadend = onloadend;
+        $.queueTask($.event, 'error', null, r);
+        $.queueTask($.event, 'loadend', null, r);
+      }
+      return r;
+    };
+  })();
+  // Status Code 304: Not modified
+  // With the `If-Modified-Since` header we only receive the HTTP headers and no body for 304 responses.
+  // This saves a lot of bandwidth and CPU time for both the users and the servers.
+  $.lastModified = dict();
+  $.whenModified = function (url, bucket, cb, options = {}) {
+    let t;
+    const { timeout, ajax } = options;
+    const headers = dict();
+    if ((t = $.lastModified[bucket]?.[url]) != null) {
+      headers['If-Modified-Since'] = t;
+    }
+    const r = (ajax || $.ajax)(url, {
+      onloadend() {
+        ($.lastModified[bucket] || ($.lastModified[bucket] = dict()))[url] = this.getResponseHeader('Last-Modified');
+        return cb.call(this);
+      },
+      timeout,
+      headers
+    });
+    return r;
+  };
+  (function () {
+    const reqs = dict();
+    $.cache = function (url, cb, options = {}) {
+      let req;
+      const { ajax } = options;
+      if (req = reqs[url]) {
+        if (req.callbacks) {
+          req.callbacks.push(cb);
+        } else {
+          $.queueTask(() => cb.call(req, { isCached: true }));
+        }
+        return req;
+      }
+      const onloadend = function () {
+        if (!this.status) {
+          delete reqs[url];
+        }
+        for (cb of this.callbacks) {
+          (cb => $.queueTask(() => cb.call(this, { isCached: false })))(cb);
+        }
+        return delete this.callbacks;
+      };
+      req = (ajax || $.ajax)(url, { onloadend });
+      req.callbacks = [cb];
+      return reqs[url] = req;
+    };
+    return $.cleanCache = function (testf) {
+      for (var url in reqs) {
+        if (testf(url)) {
+          delete reqs[url];
+        }
+      }
+    };
+  })();
+  $.cb = {
+    checked() {
+      if ($.hasOwn(Conf, this.name)) {
+        $.set(this.name, this.checked);
+        return Conf[this.name] = this.checked;
+      }
+    },
+    value() {
+      if ($.hasOwn(Conf, this.name)) {
+        $.set(this.name, this.value.trim());
+        return Conf[this.name] = this.value;
+      }
+    }
+  };
+  $.asap = function (test, cb) {
+    if (test()) {
+      return cb();
+    } else {
+      return setTimeout($.asap, 25, test, cb);
+    }
+  };
+  $.onExists = function (root, selector, cb) {
+    let el;
+    if (el = $(selector, root)) {
+      cb(el);
+      return;
+    }
+    var observer = new MutationObserver(function () {
+      if (el = $(selector, root)) {
+        observer.disconnect();
+        cb(el);
+      }
+    });
+    observer.observe(root, { childList: true, subtree: true });
+  };
+  $.addStyle = function (css, id, test = 'head') {
+    const style = $.el('style', { textContent: css });
+    if (id != null) {
+      style.id = id;
+    }
+    $.onExists(doc, test, () => $.add(d$1.head, style));
+    return style;
+  };
+  $.addCSP = function (policy) {
+    const meta = $.el('meta', {
+      httpEquiv: 'Content-Security-Policy',
+      content: policy
+    });
+    if (d$1.head) {
+      $.add(d$1.head, meta);
+      return $.rm(meta);
+    } else {
+      const head = $.add((doc || d$1), $.el('head'));
+      $.add(head, meta);
+      return $.rm(head);
+    }
+  };
+  $.x = function (path, root) {
+    if (!root) {
+      root = d$1.body;
+    }
+    // XPathResult.ANY_UNORDERED_NODE_TYPE === 8
+    return d$1.evaluate(path, root, null, 8, null).singleNodeValue;
+  };
+  $.X = function (path, root) {
+    if (!root) {
+      root = d$1.body;
+    }
+    // XPathResult.ORDERED_NODE_SNAPSHOT_TYPE === 7
+    return d$1.evaluate(path, root, null, 7, null);
+  };
+  $.addClass = function (el, ...classNames) {
+    el.classList.add(...classNames);
+  };
+  $.rmClass = function (el, ...classNames) {
+    el.classList.remove(...classNames);
+  };
+  $.toggleClass = (el, className) => el.classList.toggle(className);
+  $.hasClass = (el, className) => el.classList.contains(className);
+  $.rm = el => el?.remove();
+  $.rmAll = root => root.textContent = null;
+  $.tn = s => d$1.createTextNode(s);
+  $.frag = () => d$1.createDocumentFragment();
+  $.nodes = function (nodes) {
+    if (!(nodes instanceof Array)) {
+      return nodes;
+    }
+    const frag = $.frag();
+    for (var node of nodes) {
+      frag.appendChild(node);
+    }
+    return frag;
+  };
+  $.add = (parent, el) => parent.appendChild($.nodes(el));
+  $.prepend = (parent, el) => parent.insertBefore($.nodes(el), parent.firstChild);
+  $.after = (root, el) => root.parentNode.insertBefore($.nodes(el), root.nextSibling);
+  $.before = (root, el) => root.parentNode.insertBefore($.nodes(el), root);
+  $.replace = (root, el) => root.parentNode.replaceChild($.nodes(el), root);
+  $.el = function (tag, properties, properties2) {
+    const el = d$1.createElement(tag);
+    if (properties)
+      $.extend(el, properties);
+    if (properties2)
+      $.extend(el, properties2);
+    return el;
+  };
+  $.on = function (el, events, handler) {
+    for (var event of events.split(' ')) {
+      el.addEventListener(event, handler, false);
+    }
+  };
+  $.off = function (el, events, handler) {
+    for (var event of events.split(' ')) {
+      el.removeEventListener(event, handler, false);
+    }
+  };
+  $.one = function (el, events, handler) {
+    var cb = function (e) {
+      $.off(el, events, cb);
+      return handler.call(this, e);
+    };
+    return $.on(el, events, cb);
+  };
+  $.event = function (event, detail, root = d$1) {
+    if (!globalThis.chrome?.extension) {
+      if ((detail != null) && (typeof cloneInto === 'function')) {
+        detail = cloneInto(detail, d$1.defaultView);
+      }
+    }
+    return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
+  };
+
+  $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
+  if (!globalThis.chrome?.extension) {
+    $.open =
+      (GM?.openInTab != null) ?
+        GM.openInTab
+        : (typeof GM_openInTab !== 'undefined' && GM_openInTab !== null) ?
+          GM_openInTab
+          :
+            url => window.open(url, '_blank');
+  } else {
+    $.open =
+      url => window.open(url, '_blank');
+  }
+  $.debounce = function (wait, fn) {
+    let lastCall = 0;
+    let timeout = null;
+    let that = null;
+    let args = null;
+    const exec = function () {
+      lastCall = Date.now();
+      return fn.apply(that, args);
+    };
+    return function () {
+      args = arguments;
+      that = this;
+      if (lastCall < (Date.now() - wait)) {
+        return exec();
+      }
+      // stop current reset
+      clearTimeout(timeout);
+      // after wait, let next invocation execute immediately
+      return timeout = setTimeout(exec, wait);
+    };
+  };
+  $.queueTask = (function () {
+    const taskQueue = [];
+    const execTask = function () {
+      const [func, ...args] = taskQueue.shift();
+      func(...args);
+    };
+    return function () {
+      taskQueue.push(arguments);
+      // setTimeout is throttled in background tabs on firefox
+      Promise.resolve().then(execTask);
+    };
+  })();
+
+    const callbacks = new Map();
+    chrome.runtime.onMessage.addListener(({ id, data }) => {
+      callbacks.get(id)(data);
+      callbacks.delete(id);
+    });
+    $.eventPageRequest = (params) => new Promise(resolve => {
+      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
+    });
+
+  /**
+   * Runs a function on the page instead of the user script or extension context.
+   * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
+   * @param data Data to pass to the function. Will be passed as `this`.
+   * @returns A promise with the data object, which might be mutated by the function. If you're not using that, you can
+   * still await it to make sure the function is done.
+   */
+  $.global = async function (fn, data) {
+    if (platform === 'crx' && chrome.runtime.getManifest().manifest_version === 3) {
+      return $.eventPageRequest({ type: 'runInPageContext', fn, data });
+    } else {
+      if (doc) {
+        const script = $.el('script', { textContent: `(${PageContextFunctions[fn]})(document.currentScript.dataset);` });
+        if (data) {
+          $.extend(script.dataset, data);
+        }
+        $.add((d$1.head || doc), script);
+        $.rm(script);
+        return script.dataset;
+      } else {
+        // XXX dwb
+        try {
+          PageContextFunctions[fn](data);
+        } catch (error) {
+          console.error(error);
+        }
+        return data;
+      }
+    }
+  };
+  $.bytesToString = function (size) {
+    let unit = 0; // Bytes
+    while (size >= 1024) {
+      size /= 1024;
+      unit++;
+    }
+    // Remove trailing 0s.
+    size =
+      unit > 1 ?
+        // Keep the size as a float if the size is greater than 2^20 B.
+        // Round to hundredth.
+        Math.round(size * 100) / 100
+        :
+          // Round to an integer otherwise.
+          Math.round(size);
+    return `${size} ${['B', 'KB', 'MB', 'GB'][unit]}`;
+  };
+  $.minmax = (value, min, max) => value < min ?
+    min
+    :
+      value > max ?
+        max
+        :
+          value;
+  $.hasAudio = video => video.mozHasAudio || !!video.webkitAudioDecodedByteCount ||
+    video.nextElementSibling?.tagName === 'AUDIO'; // sound posts
+  $.luma = rgb => (rgb[0] * 0.299) + (rgb[1] * 0.587) + (rgb[2] * 0.114);
+  $.unescape = function (text) {
+    if (text == null) {
+      return text;
+    }
+    return text.replace(/<[^>]*>/g, '').replace(/&(amp|#039|quot|lt|gt|#44);/g, c => ({ '&amp;': '&', '&#039;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>', '&#44;': ',' })[c]);
+  };
+  $.isImage = url => /\.(jpe?g|jfif|png|gif|bmp|webp|avif|jxl)$/i.test(url);
+  $.isVideo = url => /\.(webm|mp4|ogv)$/i.test(url);
+  $.engine = (function () {
+    if (/Edge\//.test(navigator.userAgent)) {
+      return 'edge';
+    }
+    if (/Chrome\//.test(navigator.userAgent)) {
+      return 'blink';
+    }
+    if (/WebKit\//.test(navigator.userAgent)) {
+      return 'webkit';
+    }
+    if (/Gecko\/|Goanna/.test(navigator.userAgent)) {
+      return 'gecko';
+    } // Goanna = Pale Moon 26+
+  })();
+  $.hasStorage = (function () {
+    try {
+      if (localStorage.getItem(g.NAMESPACE + 'hasStorage') === 'true') {
+        return true;
+      }
+      localStorage.setItem(g.NAMESPACE + 'hasStorage', 'true');
+      return localStorage.getItem(g.NAMESPACE + 'hasStorage') === 'true';
+    } catch (error) {
+      return false;
+    }
+  })();
+  $.item = function (key, val) {
+    const item = dict();
+    item[key] = val;
+    return item;
+  };
+  $.oneItemSugar = fn => (function (key, val, cb) {
+    if (typeof key === 'string') {
+      return fn($.item(key, val), cb);
+    } else {
+      return fn(key, val);
+    }
+  });
+  $.syncing = dict();
+  $.securityCheck = function (data) {
+    if (location.protocol !== 'https:') {
+      return delete data['Redirect to HTTPS'];
+    }
+  };
+
+    // https://developer.chrome.com/extensions/storage.html
+    $.oldValue = {
+      local: dict(),
+      sync: dict()
+    };
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      for (var key in changes) {
+        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        $.oldValue[area][key] = dict.clone(changes[key].newValue);
+        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        var cb = $.syncing[key];
+        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
+          cb(newValue, key);
+        }
+      }
+    });
+    $.sync = (key, cb) => $.syncing[key] = cb;
+    $.forceSync = function () { };
+    $.crxWorking = function () {
+      try {
+        if (chrome.runtime.getManifest()) {
+          return true;
+        }
+      } catch (error) { }
+      if (!$.crxWarningShown) {
+        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
+        $.on($('a', msg), 'click', () => location.reload());
+        new Notice('warning', msg);
+        $.crxWarningShown = true;
+      }
+      return false;
+    };
+    $.get = $.oneItemSugar(function (data, cb) {
+      if (!$.crxWorking()) {
+        return;
+      }
+      const results = {};
+      const get = function (area) {
+        let keys = Object.keys(data);
+        // XXX slow performance in Firefox
+        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
+          keys = null;
+        }
+        return chrome.storage[area].get(keys, function (result) {
+          let key;
+          result = dict.clone(result);
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (keys === null) {
+            const result2 = dict();
+            for (key in result) {
+              var val = result[key];
+              if ($.hasOwn(data, key)) {
+                result2[key] = val;
+              }
+            }
+            result = result2;
+          }
+          for (key in data) {
+            $.oldValue[area][key] = result[key];
+          }
+          results[area] = result;
+          if (results.local && results.sync) {
+            $.extend(data, results.sync);
+            $.extend(data, results.local);
+            return cb(data);
+          }
+        });
+      };
+      get('local');
+      return get('sync');
+    });
+    (function () {
+      const items = {
+        local: dict(),
+        sync: dict()
+      };
+      const exceedsQuota = (key, value) => // bytes in UTF-8
+      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
+      $.delete = function (keys) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        if (typeof keys === 'string') {
+          keys = [keys];
+        }
+        for (var key of keys) {
+          delete items.local[key];
+          delete items.sync[key];
+        }
+        chrome.storage.local.remove(keys);
+        return chrome.storage.sync.remove(keys);
+      };
+      const timeout = {};
+      var setArea = function (area, cb) {
+        const data = dict();
+        $.extend(data, items[area]);
+        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
+          return;
+        }
+        return chrome.storage[area].set(data, function () {
+          let err;
+          let key;
+          if (err = chrome.runtime.lastError) {
+            c.error(err.message);
+            setTimeout(setArea, MINUTE, area);
+            timeout[area] = Date.now() + MINUTE;
+            return cb?.(err);
+          }
+          delete timeout[area];
+          for (key in data) {
+            if (items[area][key] === data[key]) {
+              delete items[area][key];
+            }
+          }
+          if (area === 'local') {
+            for (key in data) {
+              var val = data[key];
+              if (!exceedsQuota(key, val)) {
+                items.sync[key] = val;
+              }
+            }
+            setSync();
+          } else {
+            chrome.storage.local.remove(((() => {
+              const result = [];
+              for (key in data) {
+                if (!(key in items.local)) {
+                  result.push(key);
+                }
+              }
+              return result;
+            })()));
+          }
+          return cb?.();
+        });
+      };
+      var setSync = debounce(SECOND, () => setArea('sync'));
+      $.set = $.oneItemSugar(function (data, cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        $.securityCheck(data);
+        $.extend(items.local, data);
+        return setArea('local', cb);
+      });
+      return $.clear = function (cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        items.local = dict();
+        items.sync = dict();
+        let count = 2;
+        let err = null;
+        const done = function () {
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (err == null) {
+            err = chrome.runtime.lastError;
+          }
+          if (!--count) {
+            return cb?.(err);
+          }
+        };
+        chrome.storage.local.clear(done);
+        return chrome.storage.sync.clear(done);
+      };
+    })();
+
+  /*
+   * This file has the code for the jsx to { innerHTML: "safe string" }
+   *
+   * Usage: import h from this file.
+   * Attributes are stringified raw, so the names must be like html text: eg class and not className.
+   * Boolean values are stringified as followed: true will mean the attribute is there, false means it will be omitted.
+   * Strings bound to attributes and children will be escaped automatically.
+   * It returns interface EscapedHtml { innerHTML: "safe string", [isEscaped]: true }
+   *
+   * For strings that don't have a parent element you can use fragments: <></>.
+   * Note that you need to import hFragment, which for some reason isn't auto imported on "add all missing imports"
+   */
+  /**
+   * The symbol indicating that a string is safely escaped.
+   * This is a symbol so it can't be faked by a json blob from the internet.
+   */
+  const isEscaped = Symbol('isEscaped');
+  const voidElements = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr',]);
+  const hFragment = Symbol('hFragment');
+  /** Function that jsx/tsx will be compiled to. */
+  function h(tag, attributes, ...children) {
+    let innerHTML = tag === hFragment ? '' : `<${tag}`;
+    if (attributes) {
+      for (const [attribute, value] of Object.entries(attributes)) {
+        if (!value && value !== 0)
+          continue;
+        innerHTML += ` ${attribute}`;
+        if (value === true)
+          continue;
+        innerHTML += `="${E(value.toString())}"`;
+      }
+    }
+    if (tag !== hFragment)
+      innerHTML += '>';
+    const isVoid = tag !== hFragment && voidElements.has(tag);
+    if (isVoid) {
+      if (children.length)
+        throw new TypeError(`${tag} is a void html element and can't have child elements`);
+    } else {
+      for (const child of children) {
+        if (child === null || child === undefined || child === '')
+          continue;
+        if (child instanceof Object && "innerHTML" in child && child[isEscaped]) {
+          innerHTML += child.innerHTML;
+          continue;
+        }
+        innerHTML += E(child.toString());
+      }
+    }
+    if (!isVoid && tag !== hFragment)
+      innerHTML += `</${tag}>`;
+    return { innerHTML, [isEscaped]: true };
+  }
+
+  const ImageSvg = 'M448 80c8.8 0 16 7.2 16 16V415.8l-5-6.5-136-176c-4.5-5.9-11.6-9.3-19-9.3s-14.4 3.4-19 9.3L202 340.7l-30.5-42.7C167 291.7 159.8 288 152 288s-15 3.7-19.5 10.1l-80 112L48 416.3l0-.3V96c0-8.8 7.2-16 16-16H448zM64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 192a48 48 0 1 0 0-96 48 48 0 1 0 0 96z';
+  const ImageW = 512, ImageH = 512;
+
+  const EyeSvg = 'M288 80c-65.2 0-118.8 29.6-159.9 67.7C89.6 183.5 63 226 49.4 256c13.6 30 40.2 72.5 78.6 108.3C169.2 402.4 222.8 432 288 432s118.8-29.6 159.9-67.7C486.4 328.5 513 286 526.6 256c-13.6-30-40.2-72.5-78.6-108.3C406.8 109.6 353.2 80 288 80zM95.4 112.6C142.5 68.8 207.2 32 288 32s145.5 36.8 192.6 80.6c46.8 43.5 78.1 95.4 93 131.1c3.3 7.9 3.3 16.7 0 24.6c-14.9 35.7-46.2 87.7-93 131.1C433.5 443.2 368.8 480 288 480s-145.5-36.8-192.6-80.6C48.6 356 17.3 304 2.5 268.3c-3.3-7.9-3.3-16.7 0-24.6C17.3 208 48.6 156 95.4 112.6zM288 336c44.2 0 80-35.8 80-80s-35.8-80-80-80c-.7 0-1.3 0-2 0c1.3 5.1 2 10.5 2 16c0 35.3-28.7 64-64 64c-5.5 0-10.9-.7-16-2c0 .7 0 1.3 0 2c0 44.2 35.8 80 80 80zm0-208a128 128 0 1 1 0 256 128 128 0 1 1 0-256z';
+  const EyeW = 576, EyeH = 512;
+
+  const UpRightAndDownLeftFromCenterSvg = 'M344 0H488c13.3 0 24 10.7 24 24V168c0 9.7-5.8 18.5-14.8 22.2s-19.3 1.7-26.2-5.2l-39-39-87 87c-9.4 9.4-24.6 9.4-33.9 0l-32-32c-9.4-9.4-9.4-24.6 0-33.9l87-87L327 41c-6.9-6.9-8.9-17.2-5.2-26.2S334.3 0 344 0zM168 512H24c-13.3 0-24-10.7-24-24V344c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2l39 39 87-87c9.4-9.4 24.6-9.4 33.9 0l32 32c9.4 9.4 9.4 24.6 0 33.9l-87 87 39 39c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8z';
+  const UpRightAndDownLeftFromCenterW = 512, UpRightAndDownLeftFromCenterH = 512;
+
+  const CommentSvg = 'M123.6 391.3c12.9-9.4 29.6-11.8 44.6-6.4c26.5 9.6 56.2 15.1 87.8 15.1c124.7 0 208-80.5 208-160s-83.3-160-208-160S48 160.5 48 240c0 32 12.4 62.8 35.7 89.2c8.6 9.7 12.8 22.5 11.8 35.5c-1.4 18.1-5.7 34.7-11.3 49.4c17-7.9 31.1-16.7 39.4-22.7zM21.2 431.9c1.8-2.7 3.5-5.4 5.1-8.1c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208s-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6c-15.1 6.6-32.3 12.6-50.1 16.1c-.8 .2-1.6 .3-2.4 .5c-4.4 .8-8.7 1.5-13.2 1.9c-.2 0-.5 .1-.7 .1c-5.1 .5-10.2 .8-15.3 .8c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4c4.1-4.2 7.8-8.7 11.3-13.5c1.7-2.3 3.3-4.6 4.8-6.9c.1-.2 .2-.3 .3-.5z';
+  const CommentW = 512, CommentH = 512;
+
+  const RotateSvg = 'M142.9 142.9c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8H463.5c0 0 0 0 0 0H472c13.3 0 24-10.7 24-24V72c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5c7.7-21.8 20.2-42.3 37.8-59.8zM16 312v7.6 .7V440c0 9.7 5.8 18.5 14.8 22.2s19.3 1.7 26.2-5.2l41.6-41.6c87.6 86.5 228.7 86.2 315.8-1c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.2 62.2-162.7 62.5-225.3 1L185 329c6.9-6.9 8.9-17.2 5.2-26.2s-12.5-14.8-22.2-14.8H48.4h-.7H40c-13.3 0-24 10.7-24 24z';
+  const RotateW = 512, RotateH = 512;
+
+  const WrenchSvg = 'M352 320c88.4 0 160-71.6 160-160c0-15.3-2.2-30.1-6.2-44.2c-3.1-10.8-16.4-13.2-24.3-5.3l-76.8 76.8c-3 3-7.1 4.7-11.3 4.7H336c-8.8 0-16-7.2-16-16V118.6c0-4.2 1.7-8.3 4.7-11.3l76.8-76.8c7.9-7.9 5.4-21.2-5.3-24.3C382.1 2.2 367.3 0 352 0C263.6 0 192 71.6 192 160c0 19.1 3.4 37.5 9.5 54.5L19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L297.5 310.5c17 6.2 35.4 9.5 54.5 9.5zM80 408a24 24 0 1 1 0 48 24 24 0 1 1 0-48z';
+  const WrenchW = 512, WrenchH = 512;
+
+  const BoltSvg = 'M349.4 44.6c5.9-13.7 1.5-29.7-10.6-38.5s-28.6-8-39.9 1.8l-256 224c-10 8.8-13.6 22.9-8.9 35.3S50.7 288 64 288H175.5L98.6 467.4c-5.9 13.7-1.5 29.7 10.6 38.5s28.6 8 39.9-1.8l256-224c10-8.8 13.6-22.9 8.9-35.3s-16.6-20.7-30-20.7H272.5L349.4 44.6z';
+  const BoltW = 448, BoltH = 512;
+
+  const PencilSvg = 'M410.3 231l11.3-11.3-33.9-33.9-62.1-62.1L291.7 89.8l-11.3 11.3-22.6 22.6L58.6 322.9c-10.4 10.4-18 23.3-22.2 37.4L1 480.7c-2.5 8.4-.2 17.5 6.1 23.7s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L387.7 253.7 410.3 231zM160 399.4l-9.1 22.7c-4 3.1-8.5 5.4-13.3 6.9L59.4 452l23-78.1c1.4-4.9 3.8-9.4 6.9-13.3l22.7-9.1v32c0 8.8 7.2 16 16 16h32zM362.7 18.7L348.3 33.2 325.7 55.8 314.3 67.1l33.9 33.9 62.1 62.1 33.9 33.9 11.3-11.3 22.6-22.6 14.5-14.5c25-25 25-65.5 0-90.5L453.3 18.7c-25-25-65.5-25-90.5 0zm-47.4 168l-144 144c-6.2 6.2-16.4 6.2-22.6 0s-6.2-16.4 0-22.6l144-144c6.2-6.2 16.4-6.2 22.6 0s6.2 16.4 0 22.6z';
+  const PencilW = 512, PencilH = 512;
+
+  const ClipboardSvg = 'M192 0c-41.8 0-77.4 26.7-90.5 64H64C28.7 64 0 92.7 0 128V448c0 35.3 28.7 64 64 64H320c35.3 0 64-28.7 64-64V128c0-35.3-28.7-64-64-64H282.5C269.4 26.7 233.8 0 192 0zm0 64a32 32 0 1 1 0 64 32 32 0 1 1 0-64zM112 192H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z';
+  const ClipboardW = 384, ClipboardH = 512;
+
+  const ClockSvg = 'M464 256A208 208 0 1 1 48 256a208 208 0 1 1 416 0zM0 256a256 256 0 1 0 512 0A256 256 0 1 0 0 256zM232 120V256c0 8 4 15.5 10.7 20l96 64c11 7.4 25.9 4.4 33.3-6.7s4.4-25.9-6.7-33.3L280 243.2V120c0-13.3-10.7-24-24-24s-24 10.7-24 24z';
+  const ClockW = 512, ClockH = 512;
+
+  const LinkSvg = 'M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-56.5-186.3-15.4l-1.6 1.1c-14.4 10.3-17.7 30.3-7.4 44.6s30.3 17.7 44.6 7.4l1.6-1.1c32.1-22.9 76-19.3 103.8 8.6c31.5 31.5 31.5 82.5 0 114L422.3 334.8c-31.5 31.5-82.5 31.5-114 0c-27.9-27.9-31.5-71.8-8.6-103.8l1.1-1.6c10.3-14.4 6.9-34.4-7.4-44.6s-34.4-6.9-44.6 7.4l-1.1 1.6C206.5 251.2 213 330 263 380c56.5 56.5 148 56.5 204.5 0L579.8 267.7zM60.2 244.3c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 56.5 186.3 15.4l1.6-1.1c14.4-10.3 17.7-30.3 7.4-44.6s-30.3-17.7-44.6-7.4l-1.6 1.1c-32.1 22.9-76 19.3-103.8-8.6C74 372 74 321 105.5 289.5L217.7 177.2c31.5-31.5 82.5-31.5 114 0c27.9 27.9 31.5 71.8 8.6 103.9l-1.1 1.6c-10.3 14.4-6.9 34.4 7.4 44.6s34.4 6.9 44.6-7.4l1.1-1.6C433.5 260.8 427 182 377 132c-56.5-56.5-148-56.5-204.5 0L60.2 244.3z';
+  const LinkW = 640, LinkH = 512;
+
+  const ShuffleSvg = 'M403.8 34.4c12-5 25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V160H352c-10.1 0-19.6 4.7-25.6 12.8L284 229.3 244 176l31.2-41.6C293.3 110.2 321.8 96 352 96h32V64c0-12.9 7.8-24.6 19.8-29.6zM164 282.7L204 336l-31.2 41.6C154.7 401.8 126.2 416 96 416H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c10.1 0 19.6-4.7 25.6-12.8L164 282.7zm274.6 188c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V416H352c-30.2 0-58.7-14.2-76.8-38.4L121.6 172.8c-6-8.1-15.5-12.8-25.6-12.8H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c30.2 0 58.7 14.2 76.8 38.4L326.4 339.2c6 8.1 15.5 12.8 25.6 12.8h32V320c0-12.9 7.8-24.6 19.8-29.6s25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64z';
+  const ShuffleW = 512, ShuffleH = 512;
+
+  const RotateLeftSvg = 'M48.5 224H40c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2L98.6 96.6c87.6-86.5 228.7-86.2 315.8 1c87.5 87.5 87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3c-62.2-62.2-162.7-62.5-225.3-1L185 183c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H48.5z';
+  const RotateLeftW = 512, RotateLeftH = 512;
+
+  const DownloadSvg = 'M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H346.5l-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352H64zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z';
+  const DownloadW = 512, DownloadH = 512;
+
+  const BookOpenSvg = 'M249.6 471.5c10.8 3.8 22.4-4.1 22.4-15.5V78.6c0-4.2-1.6-8.4-5-11C247.4 52 202.4 32 144 32C93.5 32 46.3 45.3 18.1 56.1C6.8 60.5 0 71.7 0 83.8V454.1c0 11.9 12.8 20.2 24.1 16.5C55.6 460.1 105.5 448 144 448c33.9 0 79 14 105.6 23.5zm76.8 0C353 462 398.1 448 432 448c38.5 0 88.4 12.1 119.9 22.6c11.3 3.8 24.1-4.6 24.1-16.5V83.8c0-12.1-6.8-23.3-18.1-27.6C529.7 45.3 482.5 32 432 32c-58.4 0-103.4 20-123 35.6c-3.3 2.6-5 6.8-5 11V456c0 11.4 11.7 19.3 22.4 15.5z';
+  const BookOpenW = 576, BookOpenH = 512;
+
+  const DownLeftAndUpRightToCenterSvg = 'M439 7c9.4-9.4 24.6-9.4 33.9 0l32 32c9.4 9.4 9.4 24.6 0 33.9l-87 87 39 39c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H296c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2l39 39L439 7zM72 272H216c13.3 0 24 10.7 24 24V440c0 9.7-5.8 18.5-14.8 22.2s-19.3 1.7-26.2-5.2l-39-39L73 505c-9.4 9.4-24.6 9.4-33.9 0L7 473c-9.4-9.4-9.4-24.6 0-33.9l87-87L55 313c-6.9-6.9-8.9-17.2-5.2-26.2s12.5-14.8 22.2-14.8z';
+  const DownLeftAndUpRightToCenterW = 512, DownLeftAndUpRightToCenterH = 512;
+
+  const HeartSvg = 'M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z';
+  const HeartW = 512, HeartH = 512;
+
+  const CaretRightSvg = 'M246.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-9.2-9.2-22.9-11.9-34.9-6.9s-19.8 16.6-19.8 29.6l0 256c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l128-128z';
+  const CaretRightW = 256, CaretRightH = 512;
+
+  const CaretLeftSvg = 'M9.4 278.6c-12.5-12.5-12.5-32.8 0-45.3l128-128c9.2-9.2 22.9-11.9 34.9-6.9s19.8 16.6 19.8 29.6l0 256c0 12.9-7.8 24.6-19.8 29.6s-25.7 2.2-34.9-6.9l-128-128z';
+  const CaretLeftW = 256, CaretLeftH = 512;
+
+  const CaretDownSvg = 'M137.4 374.6c12.5 12.5 32.8 12.5 45.3 0l128-128c9.2-9.2 11.9-22.9 6.9-34.9s-16.6-19.8-29.6-19.8L32 192c-12.9 0-24.6 7.8-29.6 19.8s-2.2 25.7 6.9 34.9l128 128z';
+  const CaretDownW = 320, CaretDownH = 512;
+
+  const ScissorsSvg = 'M256 192l-39.5-39.5c4.9-12.6 7.5-26.2 7.5-40.5C224 50.1 173.9 0 112 0S0 50.1 0 112s50.1 112 112 112c14.3 0 27.9-2.7 40.5-7.5L192 256l-39.5 39.5c-12.6-4.9-26.2-7.5-40.5-7.5C50.1 288 0 338.1 0 400s50.1 112 112 112s112-50.1 112-112c0-14.3-2.7-27.9-7.5-40.5L499.2 76.8c7.1-7.1 7.1-18.5 0-25.6c-28.3-28.3-74.1-28.3-102.4 0L256 192zm22.6 150.6L396.8 460.8c28.3 28.3 74.1 28.3 102.4 0c7.1-7.1 7.1-18.5 0-25.6L342.6 278.6l-64 64zM64 112a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm48 240a48 48 0 1 1 0 96 48 48 0 1 1 0-96z';
+  const ScissorsW = 512, ScissorsH = 512;
+
+  const XmarkSvg = 'M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z';
+  const XmarkW = 384, XmarkH = 512;
+
+  const ArrowRightLongSvg = 'M502.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L402.7 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l370.7 0-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l128-128z';
+  const ArrowRightLongW = 512, ArrowRightLongH = 512;
+
+  const PlusSvg = 'M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z';
+  const PlusW = 448, PlusH = 512;
+
+  const SquarePlusSvg = 'M64 80c-8.8 0-16 7.2-16 16V416c0 8.8 7.2 16 16 16H384c8.8 0 16-7.2 16-16V96c0-8.8-7.2-16-16-16H64zM0 96C0 60.7 28.7 32 64 32H384c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM200 344V280H136c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H248v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z';
+  const SquarePlusW = 448, SquarePlusH = 512;
+
+  const SquareMinusSvg = 'M64 80c-8.8 0-16 7.2-16 16V416c0 8.8 7.2 16 16 16H384c8.8 0 16-7.2 16-16V96c0-8.8-7.2-16-16-16H64zM0 96C0 60.7 28.7 32 64 32H384c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM152 232H296c13.3 0 24 10.7 24 24s-10.7 24-24 24H152c-13.3 0-24-10.7-24-24s10.7-24 24-24z';
+  const SquareMinusW = 448, SquareMinusH = 512;
+
+  const PlaySvg = 'M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z';
+  const PlayW = 384, PlayH = 512;
+
+  const StopSvg = 'M0 128C0 92.7 28.7 64 64 64H320c35.3 0 64 28.7 64 64V384c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128z';
+  const StopW = 384, StopH = 512;
+
+  const ArrowUpLongSvg = 'M214.6 9.4c-12.5-12.5-32.8-12.5-45.3 0l-128 128c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 109.3V480c0 17.7 14.3 32 32 32s32-14.3 32-32V109.3l73.4 73.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-128-128z';
+  const ArrowUpLongW = 384, ArrowUpLongH = 512;
+
+  const ArrowDownLongSvg = 'M169.4 502.6c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 402.7 224 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 370.7L86.6 329.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128z';
+  const ArrowDownLongW = 384, ArrowDownLongH = 512;
+
+  const toSvg = (svgPathData, width, height) => {
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 ${width} ${height}">` +
+      `<path d="${svgPathData}" fill="currentColor" /></svg>`;
+  };
+  const icons$1 = {
+    image: toSvg(ImageSvg, ImageW, ImageH),
+    eye: toSvg(EyeSvg, EyeW, EyeH),
+    expand: toSvg(UpRightAndDownLeftFromCenterSvg, UpRightAndDownLeftFromCenterW, UpRightAndDownLeftFromCenterH),
+    comment: toSvg(CommentSvg, CommentW, CommentH),
+    refresh: toSvg(RotateSvg, RotateW, RotateH),
+    wrench: toSvg(WrenchSvg, WrenchW, WrenchH),
+    bolt: toSvg(BoltSvg, BoltW, BoltH),
+    link: toSvg(LinkSvg, LinkW, LinkH),
+    pencil: toSvg(PencilSvg, PencilW, PencilH),
+    clipboard: toSvg(ClipboardSvg, ClipboardW, ClipboardH),
+    clock: toSvg(ClockSvg, ClockW, ClockH),
+    shuffle: toSvg(ShuffleSvg, ShuffleW, ShuffleH),
+    undo: toSvg(RotateLeftSvg, RotateLeftW, RotateLeftH),
+    download: toSvg(DownloadSvg, DownloadW, DownloadH),
+    bookOpen: toSvg(BookOpenSvg, BookOpenW, BookOpenH),
+    shrink: toSvg(DownLeftAndUpRightToCenterSvg, DownLeftAndUpRightToCenterW, DownLeftAndUpRightToCenterH),
+    heart: toSvg(HeartSvg, HeartW, HeartH),
+    caretRight: toSvg(CaretRightSvg, CaretRightW, CaretRightH),
+    caretLeft: toSvg(CaretLeftSvg, CaretLeftW, CaretLeftH),
+    caretDown: toSvg(CaretDownSvg, CaretDownW, CaretDownH),
+    scissors: toSvg(ScissorsSvg, ScissorsW, ScissorsH),
+    xmark: toSvg(XmarkSvg, XmarkW, XmarkH),
+    arrowRightLong: toSvg(ArrowRightLongSvg, ArrowRightLongW, ArrowRightLongH),
+    plus: toSvg(PlusSvg, PlusW, PlusH),
+    squarePlus: toSvg(SquarePlusSvg, SquarePlusW, SquarePlusH),
+    squareMinus: toSvg(SquareMinusSvg, SquareMinusW, SquareMinusH),
+    play: toSvg(PlaySvg, PlayW, PlayH),
+    stop: toSvg(StopSvg, StopW, StopH),
+    arrowUpLong: toSvg(ArrowUpLongSvg, ArrowUpLongW, ArrowUpLongH),
+    arrowDownLong: toSvg(ArrowDownLongSvg, ArrowDownLongW, ArrowDownLongH)
+  };
+  var Icon = {
+    /** Sets an icon in an HTML element */
+    set(node, name, altText) {
+      const html = icons$1[name];
+      if (!html)
+        throw new Error(`Icon "${name}" not found.`);
+      if (altText) {
+        node.innerHTML = `<span class="icon--alt-text">${E(altText)}</span>${html}`;
+      } else {
+        node.innerHTML = html;
+      }
+    },
+    /** Get the raw SVG string for an icon. */
+    get(name) {
+      return icons$1[name];
+    },
+    /** Get the raw SVG string for an icon wrapped for use in JSX. */
+    raw(name) {
+      return { innerHTML: icons$1[name], [isEscaped]: true };
+    },
+  };
+
+  class Notice {
+    constructor(type, content, timeout, onclose) {
+      this.add = this.add.bind(this);
+      this.close = this.close.bind(this);
+      this.timeout = timeout;
+      this.onclose = onclose;
+      this.el = $.el('div', {
+        innerHTML: `<a href="javascript:;" class="close" title="Close">${Icon.get('xmark')}</a><div class="message"></div>`
+      });
+      this.el.style.opacity = '0';
+      this.setType(type);
+      $.on(this.el.firstElementChild, 'click', this.close);
+      let contentNode;
+      if (typeof content === 'string') {
+        contentNode = $.tn(content);
+      } else if (content instanceof Array) {
+        contentNode = $.nodes(content);
+      } else {
+        contentNode = content;
+      }
+      $.add(this.el.lastElementChild, contentNode);
+      $.ready(this.add);
+    }
+    setType(type) {
+      this.el.className = `notification ${type}`;
+    }
+    add() {
+      if (this.closed)
+        return;
+      if (d$1.hidden) {
+        $.on(d$1, 'visibilitychange', this.add);
+        return;
+      }
+      $.off(d$1, 'visibilitychange', this.add);
+      $.add($.id('notifications') || d$1.body, this.el);
+      this.el.clientHeight; // force reflow
+      this.el.style.opacity = '1';
+      if (this.timeout) {
+        this.timeoutId = setTimeout(this.close, this.timeout * SECOND);
+      }
+    }
+    close() {
+      if (this.timeoutId)
+        clearTimeout(this.timeoutId);
+      this.closed = true;
+      $.off(d$1, 'visibilitychange', this.add);
+      $.rm(this.el);
+      this.onclose?.();
+    }
+    resetTimer() {
+      if (this.timeout) {
+        clearTimeout(this.timeoutId);
+        this.timeoutId = setTimeout(this.close, this.timeout * SECOND);
+      }
+    }
+  }
+
+  var QuickReplyPage = `<div class="move">
+  <label>
+    <input type="checkbox" id="autohide" title="Auto-hide">
+    Quick Reply
+  </label>
+  <a href="javascript:;" class="close" title="Close">✕</a>
+  <select data-name="thread" title="Create a new thread / Reply">
+    <option value="new">New thread</option>
+  </select>
+</div>
+<form>
+  <div class="persona">
+    <button type="button" id="sjis-toggle" class="qr-button" title="Toggle Mona font">∀</button>
+    <button type="button" id="tex-preview-button" class="qr-button" title="Preview TeX">T<sub>E</sub>X</button>
+    <input name="name" data-name="name" list="list-name" placeholder="Name" class="field" size="1">
+    <input name="email" data-name="email" list="list-email" placeholder="Options" class="field" size="1">
+    <input name="sub" data-name="sub" list="list-sub" placeholder="Subject" class="field" size="1" maxlength="100">
+  </div>
+  <div class="textarea">
+    <textarea data-name="com" placeholder="Comment" class="field"></textarea>
+    <span id="char-count"></span>
+    <div id="tex-preview"></div>
+  </div>
+  <div id="dump-list-container">
+    <div id="dump-list"></div>
+    <a id="add-post" href="javascript:;" title="Add a post">+</a>
+  </div>
+  <div class="oekaki" hidden>
+    <input type="button" id="qr-draw-button" class="qr-button" value="Draw">
+    <label><span>Width:</span><input name="oekaki-width" value="400" type="number" class="field" size="1"></label>
+    <label><span>Height:</span><input name="oekaki-height" value="400" type="number" class="field" size="1"></label>
+    <span class="oekaki-bg" title="Background Color"><input name="oekaki-bg" type="checkbox" checked><input name="oekaki-bgcolor" type="color" value="#ffffff"></span>
+  </div>
+  <div id="file-n-submit">
+    <span id="qr-file" class="row">
+      <input type="button" id="qr-file-button" class="qr-button" value="Files">
+      <span id="qr-filename-container" class="field">
+        <span id="qr-no-file">No selected file</span>
+        <input id="qr-filename" data-name="filename" spellcheck="false">
+        <label id="qr-spoiler-label">
+          <input type="checkbox" id="qr-file-spoiler" title="Spoiler image">
+          <a class="checkbox-letter">S</a>
+        </label>
+      </span>
+    </span>
+    <span id="qr-actions-container" class="row space">
+      <span id="qr-actions" class="row">
+        <a href="javascript:;" id="qr-oekaki-button" class="qr-action-button" title="Edit in Tegaki">✎︎</a>
+        <a href="javascript:;" id="qr-jpg" class="qr-action-button" title="Compress to jpg">C</a>
+        <a href="javascript:;" id="qr-view" class="qr-action-button" title="Preview">V</a>
+        <a href="javascript:;" id="qr-randomize" class="qr-action-button" title="Randomize filename">R</a>
+        <a href="javascript:;" id="qr-restore-name" class="qr-action-button" title="Reset filename">U</a>
+        <a href="javascript:;" id="qr-filerm" class="qr-action-button" title="Remove file">✕</a>
+        <a href="javascript:;" id="url-button" class="qr-action-button" title="Post from URL">🔗︎</a>
+        <a href="javascript:;" hidden id="paste-area" class="qr-action-button" title="Select to paste images" tabindex="-1" contentEditable="true">📋︎</a>
+        <a href="javascript:;" id="custom-cooldown-button" class="qr-action-button" title="Toggle custom cooldown" class="disabled">🕒︎</a>
+        <a href="javascript:;" id="split-post" class="qr-action-button" title="Split into multiple posts" hidden>✂️</a>
+        <a href="javascript:;" id="dump-button" class="qr-action-button" title="Dump list">➕︎</a>
+      </span>
+      <input class="qr-button" type="submit">
+    </span>
+  </div>
+  <select data-default="4" name="filetag">
+    <option value="0">Hentai</option>
+    <option value="6">Porn</option>
+    <option value="1">Japanese</option>
+    <option value="2">Anime</option>
+    <option value="3">Game</option>
+    <option value="5">Loop</option>
+    <option value="4" selected>Other</option>
+  </select>
+  <input type="file" multiple>
+</form>
+<datalist id="list-name"></datalist>
+<datalist id="list-email"></datalist>
+<datalist id="list-sub"></datalist>`;
 
   class Callbacks {
     constructor(type) {
@@ -198,6 +1471,657 @@
   Callbacks.Thread = new Callbacks('Thread');
   Callbacks.CatalogThread = new Callbacks('Catalog Thread');
   Callbacks.CatalogThreadNative = new Callbacks('Catalog Thread');
+
+  var ferongr_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///9zBQC/AADpDAP/gID/q6voCwJJTwpOAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
+
+  var ferongr_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxUlEQVR42q1TOwrCQBB9s0FRtJI0WoqFtSLYegoP4gVSeJsUHsHSI3iFeIqRXXgwrhlXwYHHhLwPTB7B36abBCV+0pA4DUBQUNZYQptGtW3jtoKyxgoe0yrBCoyZfL/5ioQ3URZOXW9I341l3oo+NXEZiW4CEuIzvPECopED4OaZ3RNmeAm4u+a8Jr5f17VyVoL8fr8qcltzwlyyj2iqcgPOQ9ExkHAITgD75bYBe0A5S4H/P9htuWMF3QXoQpwaKeT+lnsC6JE5I6aq6fEAAAAASUVORK5CYII=';
+
+  var ferongr_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///8AcH4AtswA2PJ55fKi6fIA1/FtpPADAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
+
+  var ferongr_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxElEQVQ4y2NgoBq4/vE/HJOsBiRQUIfA2AzBqQYqUfn00/9FLz+BaQxDCKqBmX7jExijKEDSDJPHrnnbGQhGV4RmOFwdVkNwhQMheYwQxhaIi7b9Z9A3gWAQm2BUoQOgRhgA8o7j1ozLC4LCyAZcx6kZI5qg4kLKqggDFFWxJySsUQVzlb4pwgAJaTRvokcVNgOqOv8zcHBCsL07DgNg8YsczzA5MxtUL+DMD8g0slxI/H8GQ/P/DJKyeKIRpglXZsIiBwBhP5O+VbI/JgAAAABJRU5ErkJggg==';
+
+  var ferongr_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///8oeQBJ3ABV/wHM/7Lu/+ZU/gAqUP3dAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
+
+  var ferongr_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAx0lEQVQ4y2NgoBYI+cfwH4ZJVgMS0KhEYGyG4FQDkzjzf9P/d/+fgWl0QwiqgSkI/c8IxsgKkDXD5LFq9rwDweiK0A2HqcNqCK5wICSPEcLYAtH+AMN/IXMIBrEJRie6OEgjDAC5x3FqxuUFNiEUA67j1IweTTBxBQ1puAG86jgSEraogskJWSBcwCGF5k30qMJmgMFEhv/MXBAs5oLDAFj8IsczTE7UEeECbhU8+QGZRpaTi2b4L2zF8J9TGk80wjThykzY5AAW/2O1C2mIbgAAAABJRU5ErkJggg==';
+
+  var xat_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAG1BMVEX+AACLkZFub2yfaF3zZGIAAAD/AAD/iYr/zs8IPcF6AAAABXRSTlMAeprJ7xzg6IEAAABZSURBVAjXY2DABKGBSkqioQwMrGmpxsZhaQEMDGFpIa5pqSCRtPDSNJBIaGh5eShQDYOye0V7iREKAyQFYoiCFAcyILQDGcGmEEZYkGoqiMHKysAQEICwGwAAjBmBqhYlagAAAABJRU5ErkJggg==';
+
+  var xat_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAPFBMVEUAAACEgoBva2ilamDxcG7IaWYgFBNOSEf//f0PDQwBAAA7LCwAAAD/AAD+hIX+m5z+zc5HAADPAAAGAADl032uAAAADHRSTlMAzNv0/vz+6v3+7ALrmfyXAAAAaUlEQVQY042PyxKAIAhFAc1eV7T6/3/N8VXOtAgWwBm4ANEPA8AswpySXHvvYZLlpBNrh9pDtcSqAQ1BUTVIjNUQY5icmwfglmXNgE0d6QBF9GigrU0A9LoM53U1kFzk6SBQuWfD/vHqDUCpBmVKTTM4AAAAAElFTkSuQmCC';
+
+  var xat_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAIVBMVEUAAACRjop4dXVpZ2tdcI9dfKdisfMAAAAumMN9xv+s2/+PADT2AAAAB3RSTlMAepGdv83v3HIc4QAAAFxJREFUCNdjYMAE5YXKRuLlDAzsHe2uIRUdBQwMFR1l6R3tIJGOyukdIJHy8lkry4FqGEwzV62aFozMUAFJOQEZ4iDFhQwI7UBGaTiEUVFs3g5isLMzMBQUIOwGAJRlIu9hk08QAAAAAElFTkSuQmCC';
+
+  var xat_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAMFBMVEUAAACAgYVlc4ljsu4AAAAAAAAAAAAumMODyP6b1P6e1f/g8v89msgSIiwNFxwbPU3tQYj5AAAABnRSTlMAxej+9VTmD9ciAAAAZElEQVQI12NgwARpiUKKYmkMDGzlZUpK6eUJDAzp5clm5WUgkfKMtnKQSFpa54o0oBoGJYvZO88+gjJu7wMyhIBS2SCGGFDxaxADpP32NjAjSe0bSFd6epIaWISNjYEhJRVhNwAGlyJpYtcvcAAAAABJRU5ErkJggg==';
+
+  var xat_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAHlBMVEUfJSCRi5Frbm9dn19082KR/30AAABmzDOq/5vZ/9Gt/vt2AAAABnRSTlMAe5rJ7/4vxEp4AAAAWUlEQVQI12NgwARpiUpKYmkMDGzlZcbG6eUJDAzp5Slu5WUgkfLUsHKQSFpaRGsaUA2DsmvnjBAjFAZICsQQAylOZEBoBzKSzSCM9CS1MhCDjY2BISEBYTcAtgAcKSK2vuIAAAAASUVORK5CYII=';
+
+  var xat_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAM1BMVEUAAACBj39tfm1qj2RepFlu2VQAAQAAAAAAAABmyzOX/oSr/pus/pzk/98PGgtatC4CBAI1ENblAAAACHRSTlMA09/p9v77ig0SBcQAAABnSURBVBjTjY9LDsAgCEQRsR2xWu9/2hK/adJFYQG8wABEPwyAYzNnSatjjPAiviWLhPCqI1R7HBrQdCmGBrEETTmnUAq/QMm5dODHyAQOXXR1zLUGsIEI7lonMGfeHQTq9xw4P159AIxSBSC53km7AAAAAElFTkSuQmCC';
+
+  var Mayhem_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABFklEQVR4AZ2R4WqEMBCEFy1yiJQQ14gcIhIuFBFR+qPQ93+v66QMksrlTwMfkZ2ZZbMKTgVqYIDl3YAbeCM31lJP/Zul4MAEPJjBQGNDLGsz8PQ6aqLAP5PTdd1WlmU09mSKtdTDRgrkzspJPKq6RxMahfj9yhOzQEZwZAwfzrk1ox3MXibIN8hO4MAjeV72CemJGWblnRsOYOdoGw0jebB20BPAwKzUQPlrFhrXFw1Wagu9yuzZwINzVAZCURRL+gRr7Wd8Vtqg4Th/lsUmewyk9WQ/A7NiwJz5VV/GmO+MNjMrFvh/NPDMigHTaeJN09a27ZHRJmalBg54CgfvAGYSLpoHjlmpuAwFdzDy7oGS/qIpM9UPFGg1b1kUlssAAAAASUVORK5CYII=';
+
+  var Mayhem_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABR0lEQVR4AYWSQWq0QBCFCw0SRIK0PQ4hiIhEZBhEySLyewUPEMgqR/JIXiDhzz7kKKYePIZajEzDRxfV9dWU3SO6IiVWUsVxT5R75Y4gTmwNnUh4kCulUiuV8sjChDjmKtaUcHgmHsnNrMPh0IVhiMIjKZGzNXDoyhMzF7C89z2KtFGD+FoNXEUKZdgpaPM8P++cDXTtBDca7EyQK8+bXTufYBccuvLAG26UnqN1LCgI4g/lm7zTgSux4vk0J8rnKw3+m1//pBPbBrVyGZVNmiAITviEtm3t+D+2QcJx7GUxlN4594K4ZY75Xzh0JVWqnad6TdP0H+LRNBjHcYNDV5xS32qwaC4my7Lwn6guu5QoomgbdFmWDYhnM8E8zxscuhLzPWtKA/dGqUizrityX9M0YX+DQ1ciXobnP6vgfmTOM7Znnk70B58pPaEvx+epAAAAAElFTkSuQmCC';
+
+  var Mayhem_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA/ElEQVR4AZ3RUWqEMBSF4ftQZAhSREQJIiIXpQwi+tSldkFdWPsLhyEE0ocKH2Fyzg1mNJ4KAQ1arTUeeJMH6qwTUJmCHjMcC6KKtbSIylzdXpl18J/k4fdTpUFmPLOOa9bGe+P4+n5RYYfLXuiMsAlXofBxK2QXpvwN/jqg+AY91vR+pStk+apZe0fEhhMXDhUmWXEoO9WNmrWAzvRPq7jnB2jvUGfWTEgPcJzZFTbZk/0Tnh5QI+af6lVGvq/Do2atwVL4VJ+3QrZo1lr4Pw5wzVqDWaV7SUvHrZDNmrWAHq7g0rphkS3LXDMBVqFGhxGT1gGdDFnWaab6BRmXRvbxDmYiAAAAAElFTkSuQmCC';
+
+  var Mayhem_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABQElEQVR4AY2SQUrEQBBFS9CMNFEkhAQdYmiCIUgcZlYGc4VsBcGVF/AuWXme4F7RtXiVWF9+Y9MYtOHRTdX/NZWaEj2RYpQTJeEdK4fKPuA7DjSGXiQkU0qlUqxySmFMEsYsNSU8zEmK4OwdEbmkKCclYoGmolfWCGyenh1O0EJE2gXNWpFC2S0IGrCQ29EbdPCPAmEHmXIxByf8hDAPD71yzAnXypatbSgoAN8Pyju5h4deMUrqJk1z+0uBN+/XX+gxfoFK2QafUJO2aRq//Q+/QIx2wr+Kwq0rusrP/QKf9MTCtbQLf9U1wNvYnz3qug45S68kSvVXgbPbx3nvYPXNOI7cRPWySukK+DcGCvA+urqZ3RmGAbmSXjFK5rpwW8nhWVJP04TYa9/3uO/goVciDiPlZhW8c8ZAHuRSeqIv32FK/GYGL8YAAAAASUVORK5CYII=';
+
+  var Mayhem_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA/ElEQVR4AZ3RUWqEMBSF4ftQZAihDCKKiAQJShERQx+6o662e2p/4TCEQF468BEm95yLovFr4PBEq9PjgTd5wBcZp6559AiIWDAq6KXV3aJMUMfDOsTf7Mf/XaFBAvYiE9W16b74/vl8UeBAlKOSmWAzUiXwcavMkrrFE9QXVJ+gx5q9XvUVivmqrr1jxIYLCacCs6y6S8psGNU1hw4Bu4JHuUB3pzJBHZcviLiKV9jkyO4vxHyBx1h+qlcY5b2Wj+raE0vlU33dKrNFXWsR/7EgqmtPBIXuIw+dt8osqGsOPaIGSeeGRbZiFtVxsAYeHSbMOgd0MhSzTp3mD4RaQX4aW3NMAAAAAElFTkSuQmCC';
+
+  var Mayhem_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABP0lEQVR4AYWS0UqFQBCGhziImNRBRImDmUgiIaF0kWSP4AMEXXXTE/QiPpL3UdR19Crb/PAvLEtyFj5mmfn/cdxd0RUokbJXEsZYCZUd4D72NBG8wkKmlEqtVMoFhTFJmKuoKelBTVIkjbNE5IainJTIeZqaXjkg8fp+Z7GCjiLQbWgOihTKsCFowUZtoNef4HgDf4JMuTbe8n/Br8NDr5zxhBul52i3FBQE+xflmzzTA69ESmpPmubunwZfztc/6IncBrXSe7/QkK5tW3f8H7dBjHH8q6Kwt033V6Hb4JeeWPgsq42rugfYZ92psWscRwMPvZIo9bEGD2+F2YUnBizLwpeoXnYpbQM34kAB9peP58aueZ4NPPRKxPusaRoYG6UizbquyH1O04T4RA+8EvAwUr6sgjFnDuReLaUn+ANygUa7+9SCWgAAAABJRU5ErkJggg==';
+
+  var fourChanJS_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAD1BMVEUBAAAAAAD/AABnZ2f///8nFk05AAAAAXRSTlMAQObYZgAAAEFJREFUeNqNjgEKACAMAjvX/98cAkkxgmSgO8Bt/Ai4ApJ6KKhzF3OiEMDASrGB/QWgPEHsUpN+Ng9xAETMYhDrWmeHAMcmvycWAAAAAElFTkSuQmCC';
+
+  var fourChanJS_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAAD/AABmZmYA/wBD99DBAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
+
+  var fourChanJS_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAD1BMVEUBAAAAAAAul8NnZ2f////82iC9AAAAAXRSTlMAQObYZgAAAEFJREFUeNqNjgEKACAMAjvX/98cAkkxgmSgO8Bt/Ai4ApJ6KKhzF3OiEMDASrGB/QWgPEHsUpN+Ng9xAETMYhDrWmeHAMcmvycWAAAAAElFTkSuQmCC';
+
+  var fourChanJS_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAAAul8NnZ2f/AAD7B+mqAAAAAXRSTlMAQObYZgAAAAlwSFlzAAALEgAACxIB0t1+/AAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
+
+  var fourChanJS_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAElBMVEUBAAAAAABmzDNlyjJnZ2f///+6o7dfAAAAAXRSTlMAQObYZgAAAERJREFUeF6NjkEKADEIA51o///lJZfQxUsHITogWi8AvwZJuxmYa25xDooBLEwOWFTYAsYVhdorLZt9Ng9xCUTCUCQ2H3F4ANrZ2WNiAAAAAElFTkSuQmCC';
+
+  var fourChanJS_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAABmzDNmZmb/AAC8/wCMAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
+
+  var Original_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX/////AAD///8AAABBZmS3AAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
+
+  var Original_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAhElEQVR42q1RwQnAMAjMu5M4guAKXa4j5dUROo5tipSDcrFChUONd0di2m/hEGVOHDyIPufgwAFASDkpoSzmBrkJ2UMyR9LsJ3rvrqo3Rt1YMIMhhNnOxLMnoMFBxHyJAr2IOBFzA8U+6pLBdmEJTA0aMVjpDd6Loks0s5HZNwYx8tfZCZ0kll7ORffZAAAAAElFTkSuQmCC';
+
+  var Original_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX///8ul8P///8AAACaqgkzAAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
+
+  var Original_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAALVBMVEUAAAAAAAAAAAAAAAABBQcHFx4KISoNLToaVW4oKCgul8M4ODg7OzvBwcH///8uS/CdAAAAA3RSTlMAx9dmesIgAAAAV0lEQVR42m2NWw6AIBAD1eILZO5/XI0UAgm7H9tOsu0yGWAQSOoFijHOxOANGqm/LczpOaXs4gISrPZ+gc2+hO5w2xdwgOjBFUIF+sEJrhUl9JFr+badFwR+BfqlmGUJAAAAAElFTkSuQmCC';
+
+  var Original_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX///9mzDP///8AAACT0n1lAAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
+
+  var Original_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAALVBMVEUAAAAAAAAAAAAAAAAECAIQIAgWLAsePA8oKCg4ODg6dB07OztmzDPBwcH///+rsf3XAAAAA3RSTlMAx9dmesIgAAAAV0lEQVR42m2NWw6AIBAD1eIDhbn/cTVSCCTsfmw7ybbLZIBBIKkXKKU0E4M3aKT+tjCn5xiziwuIsNr7BTb7ErrDZV/AAaIHdwgV6AcnuFaU0Eeu5dt2XiUyBjCQ2bIrAAAAAElFTkSuQmCC';
+
+  var Metro_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAAC/AABrZQDiAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
+
+  var Metro_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAAC/AAD///8dAAApAABsAAAHAAA4AACQAAAsAABMCpCvAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
+
+  var Metro_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAAAA1/GhpCidAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
+
+  var Metro_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAAAA1/H///8AISUALzQAeokACAkAQEcAorYAMTcE9WFNAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
+
+  var Metro_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAABV/wErM5hwAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
+
+  var Metro_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAABV/wH///8NKAASOAAwkQADCgAZTABAwQATOwC5e3VGAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
+
+  var dead = 'R0lGODlhEAAQAKECAAAAAP8AAP///////yH5BAEKAAIALAAAAAAQABAAAAIvlI+pq+D9DAgUoFkPDlbs7lFZKIJOJJ3MyraoB14jFpOcVMpzrnF3OKlZYsMWowAAOw==';
+
+  var empty = 'R0lGODlhEAAQAJEAAAAAAP///9vb2////yH5BAEAAAMALAAAAAAQABAAAAIvnI+pq+D9DBAUoFkPFnbs7lFZKIJOJJ3MyraoB14jFpOcVMpzrnF3OKlZYsMWowAAOw==';
+
+  const Favicon = {
+    el: null,
+    status: undefined,
+    isSFW: undefined,
+    default: undefined,
+    unreadDead: undefined,
+    unreadDeadY: undefined,
+    unreadSFW: undefined,
+    unreadSFWY: undefined,
+    unreadNSFW: undefined,
+    unreadNSFWY: undefined,
+    unread: undefined,
+    unreadY: undefined,
+    init() {
+      $.asap(() => d$1.head && (Favicon.el = $('link[rel="shortcut icon"]', d$1.head)), Favicon.initAsap);
+    },
+    set(status) {
+      Favicon.status = status;
+      if (Favicon.el) {
+        Favicon.el.href = Favicon[status] || Favicon.default || '';
+        // `favicon.href = href` doesn't work on Firefox.
+        $.add(d$1.head, Favicon.el);
+      }
+    },
+    initAsap() {
+      if (!Favicon.el) {
+        return;
+      }
+      Favicon.el.type = 'image/x-icon';
+      const { href } = Favicon.el;
+      Favicon.isSFW = /ws\.ico$/.test(href);
+      Favicon.default = href;
+      Favicon.switch();
+      if (Favicon.status) {
+        Favicon.set(Favicon.status);
+      }
+    },
+    switch() {
+      let itemsDict = {
+        ferongr: [
+          ferongr_unreadDead,
+          ferongr_unreadDeadY,
+          ferongr_unreadSFW,
+          ferongr_unreadSFWY,
+          ferongr_unreadNSFW,
+          ferongr_unreadNSFWY,
+        ],
+        'xat-': [
+          xat_unreadDead,
+          xat_unreadDeadY,
+          xat_unreadSFW,
+          xat_unreadSFWY,
+          xat_unreadNSFW,
+          xat_unreadNSFWY,
+        ],
+        Mayhem: [
+          Mayhem_unreadDead,
+          Mayhem_unreadDeadY,
+          Mayhem_unreadSFW,
+          Mayhem_unreadSFWY,
+          Mayhem_unreadNSFW,
+          Mayhem_unreadNSFWY,
+        ],
+        '4chanJS': [
+          fourChanJS_unreadDead,
+          fourChanJS_unreadDeadY,
+          fourChanJS_unreadSFW,
+          fourChanJS_unreadSFWY,
+          fourChanJS_unreadNSFW,
+          fourChanJS_unreadNSFWY,
+        ],
+        Original: [
+          Original_unreadDead,
+          Original_unreadDeadY,
+          Original_unreadSFW,
+          Original_unreadSFWY,
+          Original_unreadNSFW,
+          Original_unreadNSFWY,
+        ],
+        'Metro': [
+          Metro_unreadDead,
+          Metro_unreadDeadY,
+          Metro_unreadSFW,
+          Metro_unreadSFWY,
+          Metro_unreadNSFW,
+          Metro_unreadNSFWY,
+        ]
+      };
+      const items = $.getOwn(itemsDict, Conf['favicon']) || [];
+      const f = Favicon;
+      const t = 'data:image/png;base64,';
+      let i = 0;
+      while (items[i] !== undefined) {
+        items[i] = t + items[i];
+        i++;
+      }
+      [f.unreadDead, f.unreadDeadY, f.unreadSFW, f.unreadSFWY, f.unreadNSFW, f.unreadNSFWY] = items;
+      f.update();
+    },
+    update() {
+      if (this.isSFW) {
+        this.unread = this.unreadSFW;
+        this.unreadY = this.unreadSFWY;
+      } else {
+        this.unread = this.unreadNSFW;
+        this.unreadY = this.unreadNSFWY;
+      }
+    },
+    SFW: '//s.4cdn.org/image/favicon-ws.ico',
+    NSFW: '//s.4cdn.org/image/favicon.ico',
+    dead: `data:image/gif;base64,${dead}`,
+    logo: `data:image/png;base64,${empty}`,
+  };
+
+  const $$ = (selector, root = d$1.body) => Array.from(root.querySelectorAll(selector));
+
+  const CaptchaReplace = {
+    init() {
+      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) {
+        return;
+      }
+      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
+        $.ready(CaptchaReplace.noscript);
+        return;
+      }
+      if (Conf['captchaLanguage'].trim()) {
+        if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
+          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe));
+        } else {
+          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe);
+        }
+      }
+    },
+    noscript() {
+      let noscript, original, toggle;
+      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) {
+        return;
+      }
+      const span = $.el('span', { id: 'captcha-forced-noscript' });
+      $.replace(noscript, span);
+      $.rm(original);
+      const insert = () => {
+        span.innerHTML = noscript.textContent || '';
+        const iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', span);
+        if (iframe) {
+          CaptchaReplace.iframe(iframe);
+        }
+      };
+      if (toggle = $('#togglePostFormLink a, #form-link')) {
+        $.on(toggle, 'click', insert);
+      } else {
+        insert();
+      }
+    },
+    iframe(iframe) {
+      let lang;
+      if (lang = Conf['captchaLanguage'].trim()) {
+        const src = /[?&]hl=/.test(iframe.src) ?
+          iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
+          :
+            iframe.src + `&hl=${encodeURIComponent(lang)}`;
+        if (iframe.src !== src) {
+          iframe.src = src;
+        }
+      }
+    }
+  };
+
+  const CaptchaT = {
+    isEnabled: false,
+    isCapturing: false,
+    _isNotLikeOthers: false,
+    pollInterval: undefined,
+    observer: undefined,
+    iframeObserver: undefined,
+    keydownListener: undefined,
+    currentThread: undefined,
+    nodes: undefined,
+    init() {
+      if (isPassEnabled()) {
+        return;
+      }
+      if (!(this.isEnabled = !!$('#t-root') || !$.id('postForm'))) {
+        return;
+      }
+      const root = $.el('div', { className: 'captcha-root' });
+      this.nodes = { root };
+      $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
+      $.after(QR.nodes.com.parentNode, root);
+    },
+    moreNeeded() {
+    },
+    getThread() {
+      return {
+        boardID: g.BOARD.ID,
+        threadID: QR.posts[0].thread === 'new' ? '0' : ('' + QR.posts[0].thread),
+      };
+    },
+    setup(focus) {
+      if (!this.isEnabled) {
+        return;
+      }
+      if (!this.nodes.container) {
+        // Create a child element for TCaptcha to use. TCaptcha.init() will
+        // clear its className and set inline styles on it, but our JS reference
+        // (this.nodes.container) remains valid. We observe captcha-root (the
+        // parent) since it retains its class and stays stable.
+        this.nodes.container = $.el('div', { className: 'captcha-container' });
+        $.prepend(this.nodes.root, this.nodes.container);
+        CaptchaT.currentThread = CaptchaT.getThread();
+        CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
+        this.observer = new MutationObserver(() => {
+          this.createStrips();
+        });
+        // Observe captcha-root, NOT captcha-container, because TCaptcha clears
+        // the container's className making class-based queries fail.
+        this.observer.observe(this.nodes.root, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+        $.global('setupTCaptcha', CaptchaT.currentThread);
+        // Polling fallback for style changes that MutationObserver might miss.
+        if (!this.pollInterval) {
+          this.pollInterval = setInterval(() => {
+            if (!this.nodes.container) {
+              clearInterval(this.pollInterval);
+              delete this.pollInterval;
+              return;
+            }
+            this.createStrips();
+          }, 500);
+        }
+      }
+      if (focus)
+        $('#t-resp').focus();
+    },
+    createStrips() {
+      const mainDiv = this.nodes.container;
+      if (!mainDiv)
+        return;
+      const slider = $('#t-slider', mainDiv);
+      const taskEl = $('#t-task', mainDiv);
+      let customUiExists = !!$('.captcha-custom-ui', mainDiv);
+      // If there's no slider or it has no max attribute, it's not a real puzzle
+      // (e.g., "Verification not required", "Captcha expired", or initializing)
+      if (!slider || !slider.hasAttribute('max')) {
+        $.rmClass(this.nodes.root, 'is-challenge');
+        this._isNotLikeOthers = false;
+        return;
+      }
+      const imgEl = taskEl ? $('img', taskEl) : null;
+      // Now we know it's a real puzzle because it has a max attribute.
+      // If it has no image clue, it must be the odd one out!
+      if (!imgEl) {
+        this._isNotLikeOthers = true;
+      } else if (imgEl && imgEl.src) {
+        this._isNotLikeOthers = false;
+      }
+      const isNotLikeOthers = !!this._isNotLikeOthers;
+      const taskBg = taskEl ? taskEl.style.backgroundImage : '';
+      let clueUrl = '';
+      if (imgEl && imgEl.src) {
+        clueUrl = `url("${imgEl.src}")`;
+      } else if (taskBg && taskBg.includes('url(')) {
+        clueUrl = taskBg;
+      }
+      // Safety check, though the max attribute check above already guarantees it's a challenge
+      const isChallenge = !!clueUrl || isNotLikeOthers;
+      if (!customUiExists && !isChallenge) {
+        $.rmClass(this.nodes.root, 'is-challenge');
+        return;
+      }
+      // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
+      if (customUiExists) {
+        const customUi = $('.captcha-custom-ui', mainDiv);
+        const oldStep = customUi ? customUi.dataset.step : '';
+        const tNextNode = $('#t-next', mainDiv);
+        const newStep = tNextNode ? tNextNode.textContent : '';
+        let isNewChallenge = false;
+        if (oldStep && newStep && oldStep !== newStep) {
+          isNewChallenge = true;
+        } else if (imgEl && imgEl.src) {
+          const existingClueImage = $('.captcha-clue-image', mainDiv);
+          if (existingClueImage && existingClueImage.style.backgroundImage !== `url("${imgEl.src}")`) {
+            isNewChallenge = true;
+          }
+        }
+        if (isNewChallenge) {
+          if (customUi)
+            $.rm(customUi);
+          const existingClueImage = $('.captcha-clue-image', mainDiv);
+          if (existingClueImage)
+            $.rm(existingClueImage);
+          customUiExists = false;
+          this.isCapturing = false;
+        }
+      }
+      // If we've already built the custom UI for this challenge, or we're building it, do nothing.
+      // The custom UI will naturally be destroyed when TCaptcha wipes the container on reload.
+      if (customUiExists || this.isCapturing || !slider || !taskEl)
+        return;
+      // We are at the initial challenge state!
+      this.isCapturing = true;
+      // Create the clue image and insert it into #t-ctrl
+      const tCtrl = $('#t-ctrl', mainDiv);
+      if (tCtrl) {
+        const clueImage = $.el('div', { className: 'captcha-clue-image' });
+        if (isNotLikeOthers) {
+          clueImage.style.display = 'none';
+        } else {
+          clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
+        }
+        const tNextNode = $('#t-next', tCtrl);
+        if (tNextNode) {
+          $.before(tNextNode, clueImage);
+        } else {
+          $.add(tCtrl, clueImage);
+        }
+      }
+      // Create the strips container (acting as the custom UI marker)
+      const stripsContainer = $.el('div', {
+        className: `captcha-strips captcha-custom-ui${isNotLikeOthers ? ' is-odd-one-out' : ''}`
+      });
+      const tNextForStep = $('#t-next', mainDiv);
+      if (tNextForStep) {
+        stripsContainer.dataset.step = tNextForStep.textContent;
+      }
+      const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
+      const count = maxVal + 1;
+      const startIndex = isNotLikeOthers ? 1 : 0;
+      for (let i = startIndex; i < count; i++) {
+        const strip = $.el('div', { className: 'captcha-strip', tabIndex: 0 });
+        strip.dataset.index = '' + i;
+        $.on(strip, 'click', () => {
+          if (this.isCapturing)
+            return;
+          slider.value = '' + i;
+          slider.dispatchEvent(new Event('change', { bubbles: true }));
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
+          $.addClass(strip, 'selected');
+        });
+        $.add(stripsContainer, strip);
+      }
+      const tBox = $('#t-box', mainDiv);
+      if (tBox) {
+        $.add(tBox, stripsContainer);
+      } else {
+        $.add(mainDiv, stripsContainer);
+      }
+      // Now capture the 4 puzzle images by programmatically moving the slider
+      const originalSliderValue = slider.value;
+      const runCapture = async () => {
+        let lastBg = taskEl.style.backgroundImage; // Track the actual style property
+        for (let i = startIndex; i < count; i++) {
+          await new Promise(resolve => {
+            let isResolved = false;
+            const observer = new MutationObserver(() => {
+              const currentBg = taskEl.style.backgroundImage;
+              if (currentBg && currentBg.includes('url(') && currentBg !== lastBg) {
+                isResolved = true;
+                observer.disconnect();
+                resolve();
+              }
+            });
+            observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
+            slider.value = '' + i;
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            slider.dispatchEvent(new Event('change', { bubbles: true }));
+            // Failsafe timeout
+            setTimeout(() => {
+              if (!isResolved) {
+                observer.disconnect();
+                resolve();
+              }
+            }, 1000);
+          });
+          const stripIndex = i - startIndex;
+          const strip = stripsContainer.children[stripIndex];
+          if (strip) {
+            lastBg = taskEl.style.backgroundImage;
+            strip.style.backgroundImage = lastBg;
+            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
+            strip.style.backgroundSize = taskEl.style.backgroundSize;
+            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
+          }
+        }
+        // Done capturing!
+        this.isCapturing = false;
+        // Restore slider and visually select the active strip
+        slider.value = originalSliderValue;
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        const targetValue = parseInt(originalSliderValue, 10) || 0;
+        const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
+        if (targetStrip)
+          targetStrip.click();
+      };
+      runCapture();
+      if (!this.keydownListener) {
+        this.keydownListener = (e) => {
+          if (!this.nodes.container || this.isCapturing)
+            return;
+          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp')
+            return;
+          const key = e.key;
+          if (key === ' ') {
+            const tNext = $('#t-next', this.nodes.container);
+            if (tNext && !tNext.disabled) {
+              e.preventDefault();
+              tNext.click();
+            }
+          } else if (key >= '1' && key <= '9') {
+            const index = parseInt(key, 10) - 1;
+            const stripElements = $$('.captcha-strip', this.nodes.root);
+            if (stripElements[index]) {
+              e.preventDefault();
+              stripElements[index].click();
+              stripElements[index].focus();
+            }
+          }
+        };
+        $.on(document, 'keydown', this.keydownListener);
+      }
+      // Apply CSS class to hide native elements
+      $.addClass(this.nodes.root, 'is-challenge');
+    },
+    destroy() {
+      if (this.observer) {
+        this.observer.disconnect();
+        delete this.observer;
+      }
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+        delete this.pollInterval;
+      }
+      if (this.keydownListener) {
+        $.off(document, 'keydown', this.keydownListener);
+        delete this.keydownListener;
+      }
+      if (!this.isEnabled || !this.nodes.container) {
+        return;
+      }
+      $.global('destroyTCaptcha');
+      $.rm(this.nodes.container);
+      $.rmClass(this.nodes.root, 'is-challenge');
+      delete this.nodes.container;
+    },
+    updateThread() {
+      if (!this.isEnabled) {
+        return;
+      }
+      const { boardID, threadID } = (CaptchaT.currentThread || {});
+      const newThread = CaptchaT.getThread();
+      if ((newThread.boardID !== boardID) || (newThread.threadID !== threadID)) {
+        CaptchaT.destroy();
+        CaptchaT.setup();
+      }
+    },
+    getOne() {
+      let el;
+      let response = {};
+      if (this.nodes.container) {
+        for (var key of ['t-response', 't-challenge']) {
+          response[key] = $(`[name='${key}']`, this.nodes.container).value;
+        }
+      }
+      if (!response['t-response'] && !((el = $('#t-msg, #t-task')) && /Verification not required/i.test(el.textContent))) {
+        response = null;
+      }
+      return response;
+    },
+    setUsed() {
+      if (this.isEnabled && this.nodes.container) {
+        $.global('TCaptchaClearChallenge');
+      }
+    },
+    occupied() {
+      return !!this.nodes.container;
+    },
+    setupIframe() {
+      this.isEnabled = true;
+      const mainDiv = $('#t-slider')?.parentNode;
+      if (!mainDiv) {
+        this.iframeObserver = new MutationObserver(() => {
+          const md = $('#t-slider')?.parentNode;
+          if (md) {
+            this.iframeObserver.disconnect();
+            this.initIframeTransformation(md);
+          }
+        });
+        this.iframeObserver.observe(document.body, { childList: true, subtree: true });
+      } else {
+        this.initIframeTransformation(mainDiv);
+      }
+    },
+    initIframeTransformation(mainDiv) {
+      const slider = $('#t-slider', mainDiv);
+      if (!slider)
+        return;
+      this.observer = new MutationObserver(() => {
+        this.createIframeStrips(mainDiv, slider);
+      });
+      const taskEl = $('#t-task', mainDiv);
+      if (taskEl) {
+        this.observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
+      }
+      this.createIframeStrips(mainDiv, slider);
+      $.on(window, 'message', (e) => {
+        const me = e;
+        if (me.data && me.data.type === 'select-strip') {
+          const index = me.data.index;
+          const strips = $$('.captcha-strip', mainDiv);
+          if (strips[index]) {
+            strips[index].click();
+            strips[index].focus();
+          }
+        }
+      });
+      if (!this.keydownListener) {
+        this.keydownListener = (e) => {
+          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp')
+            return;
+          const key = e.key;
+          if (key >= '1' && key <= '9') {
+            const index = parseInt(key, 10) - 1;
+            const strips = $$('.captcha-strip', mainDiv);
+            if (strips[index]) {
+              e.preventDefault();
+              strips[index].click();
+              strips[index].focus();
+            }
+          }
+        };
+        $.on(document, 'keydown', this.keydownListener);
+      }
+    },
+    createIframeStrips(mainDiv, slider) {
+      let strips = $('.captcha-strips', mainDiv);
+      if (!strips) {
+        const maxStr = slider.getAttribute('max');
+        const max = maxStr ? parseInt(maxStr, 10) : 3;
+        const count = max + 1;
+        strips = $.el('div', { className: 'captcha-strips' });
+        for (let i = 0; i < count; i++) {
+          const strip = $.el('div', { className: 'captcha-strip', tabIndex: 0 });
+          strip.dataset.index = '' + i;
+          strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
+          $.on(strip, 'click', () => {
+            slider.value = i;
+            slider.dispatchEvent(new Event('change', { bubbles: true }));
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
+            $.addClass(strip, 'selected');
+          });
+          $.add(strips, strip);
+        }
+        $.add(mainDiv, strips);
+      }
+      const taskEl = $('#t-task', mainDiv);
+      if (!taskEl)
+        return;
+      const bg = taskEl.style.backgroundImage;
+      const isChallenge = bg && bg.includes('url(');
+      if (isChallenge) {
+        $$('.captcha-strip', strips).forEach(strip => {
+          strip.style.backgroundImage = bg;
+        });
+        taskEl.style.setProperty('background-image', 'none', 'important');
+        $.addClass(document.documentElement, 'is-challenge');
+        strips.style.display = '';
+      } else if (bg !== 'none') {
+        $.rmClass(document.documentElement, 'is-challenge');
+        strips.style.display = 'none';
+      }
+    }
+  };
 
   var userCss = `/* Board title rice */
 div.boardTitle {
@@ -1397,1193 +3321,7 @@ current-archive-text:"Archive"]
     beepVolume: 1,
   };
 
-  // This file was created because these functions on $ were sometimes not initialized yet because of circular
-  // dependencies, so try to keep this file without dependencies, so these functions don't have to wait for something else
-  /**
-   * @param wait Time to wait in milliseconds.
-   * @param fn The function to execute
-   * @param leading Wether to run immediately, otherwise it waits for timeout even if there is no older call.
-   */
-  const debounce = (wait, fn, leading = true) => {
-    let lastCall = 0;
-    let timeout = null;
-    let that = null;
-    let args = null;
-    const exec = function () {
-      lastCall = Date.now();
-      return fn.apply(that, args);
-    };
-    return function () {
-      args = arguments;
-      that = this;
-      if (leading && lastCall < (Date.now() - wait)) {
-        exec();
-        return;
-      }
-      // stop current reset
-      if (timeout !== null)
-        clearTimeout(timeout);
-      // after wait, let next invocation execute immediately
-      timeout = setTimeout(exec, wait);
-    };
-  };
-  const dict = () => Object.create(null);
-  dict.clone = function (obj) {
-    if ((typeof obj !== 'object') || (obj === null)) {
-      return obj;
-    } else if (obj instanceof Array) {
-      const arr = [];
-      for (let i = 0, end = obj.length; i < end; i++) {
-        arr.push(dict.clone(obj[i]));
-      }
-      return arr;
-    } else {
-      const map = Object.create(null);
-      for (var key in obj) {
-        var val = obj[key];
-        map[key] = dict.clone(val);
-      }
-      return map;
-    }
-  };
-  dict.json = (str) => dict.clone(JSON.parse(str));
-  const SECOND = 1000;
-  const MINUTE = SECOND * 60;
-  const HOUR = MINUTE * 60;
-  const DAY = HOUR * 24;
-  const platform = window.GM_xmlhttpRequest ? 'userscript' : 'crx';
-  const isPassEnabled = () => {
-    if (document.cookie.indexOf('pass_enabled=1') >= 0)
-      return true;
-    try {
-      if (localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'))
-        return true;
-    } catch (e) { }
-    return false;
-  };
-
-  // @ts-nocheck
-  /**
-   * Because of increased security in manifest v3, scripts can no longer just inject a script tag into the main page.
-   * Functions to be called in the main context must be predefined. Those functions should be in this file, and they will
-   * be loaded in the worker context in the extension version.
-   *
-   * These are the functions for `$.global`. They will be called by name.
-   *
-   * They are stringified, so don't use the short `fnName() {` notation.
-   */
-  const PageContextFunctions = {
-    stubCloneTopNav: () => { window.cloneTopNav = function () { }; },
-    disableNativeExtension: () => {
-      try {
-        const settings = JSON.parse(localStorage.getItem('4chan-settings')) || {};
-        if (settings.disableAll)
-          return;
-        settings.disableAll = true;
-        localStorage.setItem('4chan-settings', JSON.stringify(settings));
-      } catch (error) {
-        Object.defineProperty(window, 'Config', { value: { disableAll: true } });
-      }
-    },
-    disableNativeExtensionNoStorage: () => { Object.defineProperty(window, 'Config', { value: { disableAll: true } }); },
-    prettyPrint: ({ id }) => {
-      // @ts-ignore
-      window.prettyPrint?.((function () { }), document.getElementById(id).parentNode);
-    },
-    exposeVersion: ({ buildDate, version }) => {
-      const date = +buildDate;
-      Object.defineProperty(window, 'fourchanXT', {
-        value: Object.freeze({
-          version,
-          // Getter to prevent mutations.
-          get buildDate() { return new Date(date); },
-        }),
-        writable: false,
-      });
-    },
-    initMain: () => {
-      document.documentElement.classList.add('js-enabled');
-      window.FCX = {};
-    },
-    initFlash: () => {
-      if (JSON.parse(localStorage['4chan-settings'] || '{}').disableAll)
-        window.SWFEmbed.init();
-    },
-    initFlashNoStorage: () => { window.SWFEmbed.init(); },
-    setThreadId: () => { window.Main.tid = location.pathname.split(/\/+/)[3]; },
-    fourChanPrettyPrintListener: () => {
-      window.addEventListener('prettyprint', (e) => window.dispatchEvent(new CustomEvent('prettyprint:cb', {
-        detail: { ID: e.detail.ID, i: e.detail.i, html: window.prettyPrintOne(e.detail.html) }
-      })), false);
-    },
-    fourChanMathjaxListener: () => {
-      window.addEventListener('mathjax', function (e) {
-        if (window.MathJax) {
-          window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, e.target]);
-        } else {
-          if (!document.querySelector('script[src^="//cdn.mathjax.org/"]')) { // don't load MathJax if already loading
-            window.loadMathJax();
-            window.loadMathJax = function () { };
-          }
-          // 4chan only handles post comments on MathJax load; anything else (e.g. the QR preview) must be queued explicitly.
-          if (!e.target.classList.contains('postMessage')) {
-            document.querySelector('script[src^="//cdn.mathjax.org/"]').addEventListener('load', () => window.MathJax.Hub.Queue(['Typeset', window.MathJax.Hub, e.target]), false);
-          }
-        }
-      }, false);
-    },
-    disable4chanIdHl: () => {
-      window.clickable_ids = false;
-      for (var node of document.querySelectorAll('.posteruid, .capcode')) {
-        node.removeEventListener('click', window.idClick, false);
-      }
-    },
-    initTinyBoard: ({ boardID, threadID }) => {
-      threadID = +threadID;
-      const form = document.querySelector('form[name="post"]');
-      window.$(document).ajaxComplete(function (event, request, settings) {
-        let postID;
-        if (settings.url !== form.action)
-          return;
-        if (!(postID = +request.responseJSON?.id))
-          return;
-        const detail = { boardID, threadID, postID };
-        try {
-          const { redirect, noko } = request.responseJSON;
-          if (redirect && (originalNoko != null) && !originalNoko && !noko) {
-            detail.redirect = redirect;
-          }
-        } catch (error) { }
-        event = new CustomEvent('QRPostSuccessful', { bubbles: true, detail });
-        document.dispatchEvent(event);
-      });
-      var originalNoko = window.tb_settings?.ajax?.always_noko_replies;
-      let base;
-      (((base = window.tb_settings || (window.tb_settings = {}))).ajax || (base.ajax = {})).always_noko_replies = true;
-    },
-    setupCaptcha: ({ recaptchaKey }) => {
-      const render = function () {
-        const { classList } = document.documentElement;
-        const container = document.querySelector('#qr .captcha-container');
-        container.dataset.widgetID = window.grecaptcha.render(container, {
-          sitekey: recaptchaKey,
-          theme: classList.contains('tomorrow') || classList.contains('spooky') || classList.contains('dark-captcha') ? 'dark' : 'light',
-          callback(response) {
-            window.dispatchEvent(new CustomEvent('captcha:success', { detail: response }));
-          }
-        });
-      };
-      if (window.grecaptcha) {
-        render();
-      } else {
-        const cbNative = window.onRecaptchaLoaded;
-        window.onRecaptchaLoaded = function () {
-          render();
-          cbNative();
-        };
-        if (!document.head.querySelector('script[src^="https://www.google.com/recaptcha/api.js"]')) {
-          const script = document.createElement('script');
-          script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoaded&render=explicit';
-          document.head.appendChild(script);
-        }
-      }
-    },
-    resetCaptcha: () => {
-      window.grecaptcha.reset(document.querySelector('#qr .captcha-container').dataset.widgetID);
-    },
-    setupTCaptcha: ({ boardID, threadID, autoLoad }) => {
-      const { TCaptcha } = window;
-      TCaptcha.init(document.querySelector('#qr .captcha-container'), boardID, +threadID);
-      TCaptcha.setErrorCb(err => window.dispatchEvent(new CustomEvent('CreateNotification', {
-        detail: { type: 'warning', content: '' + err }
-      })));
-      if (autoLoad === '1')
-        TCaptcha.load(boardID, threadID);
-    },
-    captureTCaptchaStrips: () => {
-      const slider = document.querySelector('#qr #t-slider');
-      const task = document.querySelector('#qr #t-task');
-      const strips = document.querySelectorAll('#qr .captcha-strip');
-      if (!slider || !task || !strips.length)
-        return;
-      const max = parseInt(slider.getAttribute('max') || '3', 10);
-      const origVal = slider.value;
-      const step = (i) => {
-        if (i > max) {
-          slider.value = origVal;
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
-          return;
-        }
-        slider.value = '' + i;
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        setTimeout(() => {
-          const bg = task.style.backgroundImage;
-          if (strips[i] && bg) {
-            strips[i].style.backgroundImage = bg;
-            strips[i].style.backgroundSize = 'contain';
-            strips[i].style.backgroundPosition = 'center';
-          }
-          step(i + 1);
-        }, 100);
-      };
-      step(0);
-    },
-    destroyTCaptcha: () => { window.TCaptcha.destroy(); },
-    TCaptchaClearChallenge: () => { window.TCaptcha.clearChallenge(); },
-    setupQR: () => {
-      window.FCX.oekakiCB = () => window.Tegaki.flatten().toBlob(function (file) {
-        const source = `oekaki-${Date.now()}`;
-        window.FCX.oekakiLatest = source;
-        document.dispatchEvent(new CustomEvent('QRSetFile', {
-          bubbles: true,
-          detail: { file, name: window.FCX.oekakiName, source }
-        }));
-      });
-      if (window.Tegaki) {
-        document.querySelector('#qr .oekaki').hidden = false;
-      }
-    },
-    qrTegakiDraw: () => {
-      const { Tegaki, FCX } = window;
-      if (Tegaki.bg) {
-        Tegaki.destroy();
-      }
-      FCX.oekakiName = 'tegaki.png';
-      Tegaki.open({
-        onDone: FCX.oekakiCB,
-        onCancel() { Tegaki.bgColor = '#ffffff'; },
-        width: +document.querySelector('#qr [name=oekaki-width]').value,
-        height: +document.querySelector('#qr [name=oekaki-height]').value,
-        bgColor: document.querySelector('#qr [name=oekaki-bg]').checked ?
-          document.querySelector('#qr [name=oekaki-bgcolor]').value :
-          'transparent'
-      });
-    },
-    qrTegakiLoad: () => {
-      const { Tegaki, FCX } = window;
-      const name = document.getElementById('qr-filename').value.replace(/\.\w+$/, '') + '.png';
-      const { source } = document.getElementById('file-n-submit').dataset;
-      const error = content => document.dispatchEvent(new CustomEvent('CreateNotification', {
-        bubbles: true,
-        detail: { type: 'warning', content, lifetime: 20 }
-      }));
-      var cb = function (e) {
-        if (e) {
-          this.removeEventListener('QRMetadata', cb, false);
-        }
-        const selected = document.getElementById('selected');
-        if (!selected?.dataset.type)
-          return error('No file to edit.');
-        if (!/^(image|video)\//.test(selected.dataset.type)) {
-          return error('Not an image.');
-        }
-        if (!selected.dataset.height)
-          return error('Metadata not available.');
-        if (selected.dataset.height === 'loading') {
-          selected.addEventListener('QRMetadata', cb, false);
-          return;
-        }
-        if (Tegaki.bg) {
-          Tegaki.destroy();
-        }
-        FCX.oekakiName = name;
-        Tegaki.open({
-          onDone: FCX.oekakiCB,
-          onCancel() { Tegaki.bgColor = '#ffffff'; },
-          width: +selected.dataset.width,
-          height: +selected.dataset.height,
-          bgColor: 'transparent'
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = (canvas.naturalWidth = +selected.dataset.width);
-        canvas.height = (canvas.naturalHeight = +selected.dataset.height);
-        canvas.hidden = true;
-        document.body.appendChild(canvas);
-        canvas.addEventListener('QRImageDrawn', function () {
-          this.remove();
-          Tegaki.onOpenImageLoaded.call(this);
-        }, false);
-        canvas.dispatchEvent(new CustomEvent('QRDrawFile', { bubbles: true }));
-      };
-      if (Tegaki.bg && (Tegaki.onDoneCb === FCX.oekakiCB) && (source === FCX.oekakiLatest)) {
-        FCX.oekakiName = name;
-        Tegaki.resume();
-      } else {
-        cb();
-      }
-    },
-    testNativeExtension: (output = {}) => {
-      if (window.Parser?.postMenuIcon)
-        output.enabled = 'true';
-      return output;
-    },
-  };
-
-  // @ts-nocheck
-  // loosely follows the jquery api:
-  // http://api.jquery.com/
-  // not chainable
-  const $ = (selector, root = document.body) => root.querySelector(selector);
-  $.id = id => d.getElementById(id);
-  $.ready = function (fc) {
-    if (d.readyState !== 'loading') {
-      $.queueTask(fc);
-      return;
-    }
-    var cb = function () {
-      $.off(d, 'DOMContentLoaded', cb);
-      fc();
-    };
-    $.on(d, 'DOMContentLoaded', cb);
-  };
-  $.formData = function (form) {
-    if (form instanceof HTMLFormElement) {
-      return new FormData(form);
-    }
-    const fd = new FormData();
-    for (var key in form) {
-      var val = form[key];
-      if (val) {
-        if ((typeof val === 'object') && 'newName' in val) {
-          fd.append(key, val, val.newName);
-        } else {
-          fd.append(key, val);
-        }
-      }
-    }
-    return fd;
-  };
-  $.extend = function (object, properties) {
-    for (var key in properties) {
-      var val = properties[key];
-      object[key] = val;
-    }
-  };
-  $.hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-  $.getOwn = function (obj, key) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      return obj[key];
-    } else {
-      return undefined;
-    }
-  };
-  $.ajax = (function () {
-    let pageXHR = XMLHttpRequest;
-    if (window.wrappedJSObject && !XMLHttpRequest.wrappedJSObject) {
-      try {
-        pageXHR = XPCNativeWrapper(window.wrappedJSObject.XMLHttpRequest);
-      } catch (e) { }
-    }
-    return function (url, options = {}) {
-      if (options.responseType == null) {
-        options.responseType = 'json';
-      }
-      if (!options.type) {
-        options.type = (options.form && 'post') || 'get';
-      }
-      // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
-      url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      const { onloadend, timeout, responseType, withCredentials, type, onprogress, form, headers } = options;
-      const r = new pageXHR();
-      try {
-        r.open(type, url, true);
-        const object = headers || {};
-        for (var key in object) {
-          var value = object[key];
-          r.setRequestHeader(key, value);
-        }
-        $.extend(r, { onloadend, timeout, responseType, withCredentials });
-        $.extend(r.upload, { onprogress });
-        // connection error or content blocker
-        $.on(r, 'error', function () { if (!r.status) {
-          c.warn(`${meta.name} failed to load: ${url}`);
-        } });
-        r.send(form);
-      } catch (err) {
-        // XXX Some content blockers in Firefox (e.g. Adblock Plus and NoScript) throw an exception instead of simulating a connection error.
-        if (err.result !== 0x805e0006) {
-          throw err;
-        }
-        r.onloadend = onloadend;
-        $.queueTask($.event, 'error', null, r);
-        $.queueTask($.event, 'loadend', null, r);
-      }
-      return r;
-    };
-  })();
-  // Status Code 304: Not modified
-  // With the `If-Modified-Since` header we only receive the HTTP headers and no body for 304 responses.
-  // This saves a lot of bandwidth and CPU time for both the users and the servers.
-  $.lastModified = dict();
-  $.whenModified = function (url, bucket, cb, options = {}) {
-    let t;
-    const { timeout, ajax } = options;
-    const headers = dict();
-    if ((t = $.lastModified[bucket]?.[url]) != null) {
-      headers['If-Modified-Since'] = t;
-    }
-    const r = (ajax || $.ajax)(url, {
-      onloadend() {
-        ($.lastModified[bucket] || ($.lastModified[bucket] = dict()))[url] = this.getResponseHeader('Last-Modified');
-        return cb.call(this);
-      },
-      timeout,
-      headers
-    });
-    return r;
-  };
-  (function () {
-    const reqs = dict();
-    $.cache = function (url, cb, options = {}) {
-      let req;
-      const { ajax } = options;
-      if (req = reqs[url]) {
-        if (req.callbacks) {
-          req.callbacks.push(cb);
-        } else {
-          $.queueTask(() => cb.call(req, { isCached: true }));
-        }
-        return req;
-      }
-      const onloadend = function () {
-        if (!this.status) {
-          delete reqs[url];
-        }
-        for (cb of this.callbacks) {
-          (cb => $.queueTask(() => cb.call(this, { isCached: false })))(cb);
-        }
-        return delete this.callbacks;
-      };
-      req = (ajax || $.ajax)(url, { onloadend });
-      req.callbacks = [cb];
-      return reqs[url] = req;
-    };
-    return $.cleanCache = function (testf) {
-      for (var url in reqs) {
-        if (testf(url)) {
-          delete reqs[url];
-        }
-      }
-    };
-  })();
-  $.cb = {
-    checked() {
-      if ($.hasOwn(Conf, this.name)) {
-        $.set(this.name, this.checked);
-        return Conf[this.name] = this.checked;
-      }
-    },
-    value() {
-      if ($.hasOwn(Conf, this.name)) {
-        $.set(this.name, this.value.trim());
-        return Conf[this.name] = this.value;
-      }
-    }
-  };
-  $.asap = function (test, cb) {
-    if (test()) {
-      return cb();
-    } else {
-      return setTimeout($.asap, 25, test, cb);
-    }
-  };
-  $.onExists = function (root, selector, cb) {
-    let el;
-    if (el = $(selector, root)) {
-      cb(el);
-      return;
-    }
-    var observer = new MutationObserver(function () {
-      if (el = $(selector, root)) {
-        observer.disconnect();
-        cb(el);
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-  };
-  $.addStyle = function (css, id, test = 'head') {
-    const style = $.el('style', { textContent: css });
-    if (id != null) {
-      style.id = id;
-    }
-    $.onExists(doc, test, () => $.add(d.head, style));
-    return style;
-  };
-  $.addCSP = function (policy) {
-    const meta = $.el('meta', {
-      httpEquiv: 'Content-Security-Policy',
-      content: policy
-    });
-    if (d.head) {
-      $.add(d.head, meta);
-      return $.rm(meta);
-    } else {
-      const head = $.add((doc || d), $.el('head'));
-      $.add(head, meta);
-      return $.rm(head);
-    }
-  };
-  $.x = function (path, root) {
-    if (!root) {
-      root = d.body;
-    }
-    // XPathResult.ANY_UNORDERED_NODE_TYPE === 8
-    return d.evaluate(path, root, null, 8, null).singleNodeValue;
-  };
-  $.X = function (path, root) {
-    if (!root) {
-      root = d.body;
-    }
-    // XPathResult.ORDERED_NODE_SNAPSHOT_TYPE === 7
-    return d.evaluate(path, root, null, 7, null);
-  };
-  $.addClass = function (el, ...classNames) {
-    el.classList.add(...classNames);
-  };
-  $.rmClass = function (el, ...classNames) {
-    el.classList.remove(...classNames);
-  };
-  $.toggleClass = (el, className) => el.classList.toggle(className);
-  $.hasClass = (el, className) => el.classList.contains(className);
-  $.rm = el => el?.remove();
-  $.rmAll = root => root.textContent = null;
-  $.tn = s => d.createTextNode(s);
-  $.frag = () => d.createDocumentFragment();
-  $.nodes = function (nodes) {
-    if (!(nodes instanceof Array)) {
-      return nodes;
-    }
-    const frag = $.frag();
-    for (var node of nodes) {
-      frag.appendChild(node);
-    }
-    return frag;
-  };
-  $.add = (parent, el) => parent.appendChild($.nodes(el));
-  $.prepend = (parent, el) => parent.insertBefore($.nodes(el), parent.firstChild);
-  $.after = (root, el) => root.parentNode.insertBefore($.nodes(el), root.nextSibling);
-  $.before = (root, el) => root.parentNode.insertBefore($.nodes(el), root);
-  $.replace = (root, el) => root.parentNode.replaceChild($.nodes(el), root);
-  $.el = function (tag, properties, properties2) {
-    const el = d.createElement(tag);
-    if (properties)
-      $.extend(el, properties);
-    if (properties2)
-      $.extend(el, properties2);
-    return el;
-  };
-  $.on = function (el, events, handler) {
-    for (var event of events.split(' ')) {
-      el.addEventListener(event, handler, false);
-    }
-  };
-  $.off = function (el, events, handler) {
-    for (var event of events.split(' ')) {
-      el.removeEventListener(event, handler, false);
-    }
-  };
-  $.one = function (el, events, handler) {
-    var cb = function (e) {
-      $.off(el, events, cb);
-      return handler.call(this, e);
-    };
-    return $.on(el, events, cb);
-  };
-  $.event = function (event, detail, root = d) {
-    if (!globalThis.chrome?.extension) {
-      if ((detail != null) && (typeof cloneInto === 'function')) {
-        detail = cloneInto(detail, d.defaultView);
-      }
-    }
-    return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
-  };
-  if (platform === 'userscript') {
-    // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
-    (function () {
-      if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
-        return;
-      }
-      try {
-        return new CustomEvent('x', { detail: {} });
-      } catch (err) {
-        const unsafeConstructors = {
-          Object: unsafeWindow.Object,
-          Array: unsafeWindow.Array
-        };
-        var clone = function (obj) {
-          let constructor;
-          if ((obj != null) && (typeof obj === 'object') && (constructor = unsafeConstructors[obj.constructor.name])) {
-            const obj2 = new constructor();
-            for (var key in obj) {
-              var val = obj[key];
-              obj2[key] = clone(val);
-            }
-            return obj2;
-          } else {
-            return obj;
-          }
-        };
-        return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
-      }
-    })();
-  }
-  $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
-  if (!globalThis.chrome?.extension) {
-    $.open =
-      (GM?.openInTab != null) ?
-        GM.openInTab
-        : (typeof GM_openInTab !== 'undefined' && GM_openInTab !== null) ?
-          GM_openInTab
-          :
-            url => window.open(url, '_blank');
-  } else {
-    $.open =
-      url => window.open(url, '_blank');
-  }
-  $.debounce = function (wait, fn) {
-    let lastCall = 0;
-    let timeout = null;
-    let that = null;
-    let args = null;
-    const exec = function () {
-      lastCall = Date.now();
-      return fn.apply(that, args);
-    };
-    return function () {
-      args = arguments;
-      that = this;
-      if (lastCall < (Date.now() - wait)) {
-        return exec();
-      }
-      // stop current reset
-      clearTimeout(timeout);
-      // after wait, let next invocation execute immediately
-      return timeout = setTimeout(exec, wait);
-    };
-  };
-  $.queueTask = (function () {
-    const taskQueue = [];
-    const execTask = function () {
-      const [func, ...args] = taskQueue.shift();
-      func(...args);
-    };
-    return function () {
-      taskQueue.push(arguments);
-      // setTimeout is throttled in background tabs on firefox
-      Promise.resolve().then(execTask);
-    };
-  })();
-  if (platform === 'crx') {
-    const callbacks = new Map();
-    chrome.runtime.onMessage.addListener(({ id, data }) => {
-      callbacks.get(id)(data);
-      callbacks.delete(id);
-    });
-    $.eventPageRequest = (params) => new Promise(resolve => {
-      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
-    });
-  }
-  /**
-   * Runs a function on the page instead of the user script or extension context.
-   * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
-   * @param data Data to pass to the function. Will be passed as `this`.
-   * @returns A promise with the data object, which might be mutated by the function. If you're not using that, you can
-   * still await it to make sure the function is done.
-   */
-  $.global = async function (fn, data) {
-    if (platform === 'crx' && chrome.runtime.getManifest().manifest_version === 3) {
-      return $.eventPageRequest({ type: 'runInPageContext', fn, data });
-    } else {
-      if (doc) {
-        const script = $.el('script', { textContent: `(${PageContextFunctions[fn]})(document.currentScript.dataset);` });
-        if (data) {
-          $.extend(script.dataset, data);
-        }
-        $.add((d.head || doc), script);
-        $.rm(script);
-        return script.dataset;
-      } else {
-        // XXX dwb
-        try {
-          PageContextFunctions[fn](data);
-        } catch (error) {
-          console.error(error);
-        }
-        return data;
-      }
-    }
-  };
-  $.bytesToString = function (size) {
-    let unit = 0; // Bytes
-    while (size >= 1024) {
-      size /= 1024;
-      unit++;
-    }
-    // Remove trailing 0s.
-    size =
-      unit > 1 ?
-        // Keep the size as a float if the size is greater than 2^20 B.
-        // Round to hundredth.
-        Math.round(size * 100) / 100
-        :
-          // Round to an integer otherwise.
-          Math.round(size);
-    return `${size} ${['B', 'KB', 'MB', 'GB'][unit]}`;
-  };
-  $.minmax = (value, min, max) => value < min ?
-    min
-    :
-      value > max ?
-        max
-        :
-          value;
-  $.hasAudio = video => video.mozHasAudio || !!video.webkitAudioDecodedByteCount ||
-    video.nextElementSibling?.tagName === 'AUDIO'; // sound posts
-  $.luma = rgb => (rgb[0] * 0.299) + (rgb[1] * 0.587) + (rgb[2] * 0.114);
-  $.unescape = function (text) {
-    if (text == null) {
-      return text;
-    }
-    return text.replace(/<[^>]*>/g, '').replace(/&(amp|#039|quot|lt|gt|#44);/g, c => ({ '&amp;': '&', '&#039;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>', '&#44;': ',' })[c]);
-  };
-  $.isImage = url => /\.(jpe?g|jfif|png|gif|bmp|webp|avif|jxl)$/i.test(url);
-  $.isVideo = url => /\.(webm|mp4|ogv)$/i.test(url);
-  $.engine = (function () {
-    if (/Edge\//.test(navigator.userAgent)) {
-      return 'edge';
-    }
-    if (/Chrome\//.test(navigator.userAgent)) {
-      return 'blink';
-    }
-    if (/WebKit\//.test(navigator.userAgent)) {
-      return 'webkit';
-    }
-    if (/Gecko\/|Goanna/.test(navigator.userAgent)) {
-      return 'gecko';
-    } // Goanna = Pale Moon 26+
-  })();
-  $.hasStorage = (function () {
-    try {
-      if (localStorage.getItem(g.NAMESPACE + 'hasStorage') === 'true') {
-        return true;
-      }
-      localStorage.setItem(g.NAMESPACE + 'hasStorage', 'true');
-      return localStorage.getItem(g.NAMESPACE + 'hasStorage') === 'true';
-    } catch (error) {
-      return false;
-    }
-  })();
-  $.item = function (key, val) {
-    const item = dict();
-    item[key] = val;
-    return item;
-  };
-  $.oneItemSugar = fn => (function (key, val, cb) {
-    if (typeof key === 'string') {
-      return fn($.item(key, val), cb);
-    } else {
-      return fn(key, val);
-    }
-  });
-  $.syncing = dict();
-  $.securityCheck = function (data) {
-    if (location.protocol !== 'https:') {
-      return delete data['Redirect to HTTPS'];
-    }
-  };
-  if (platform === 'crx') {
-    // https://developer.chrome.com/extensions/storage.html
-    $.oldValue = {
-      local: dict(),
-      sync: dict()
-    };
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      for (var key in changes) {
-        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        $.oldValue[area][key] = dict.clone(changes[key].newValue);
-        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        var cb = $.syncing[key];
-        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
-          cb(newValue, key);
-        }
-      }
-    });
-    $.sync = (key, cb) => $.syncing[key] = cb;
-    $.forceSync = function () { };
-    $.crxWorking = function () {
-      try {
-        if (chrome.runtime.getManifest()) {
-          return true;
-        }
-      } catch (error) { }
-      if (!$.crxWarningShown) {
-        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
-        $.on($('a', msg), 'click', () => location.reload());
-        new Notice('warning', msg);
-        $.crxWarningShown = true;
-      }
-      return false;
-    };
-    $.get = $.oneItemSugar(function (data, cb) {
-      if (!$.crxWorking()) {
-        return;
-      }
-      const results = {};
-      const get = function (area) {
-        let keys = Object.keys(data);
-        // XXX slow performance in Firefox
-        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
-          keys = null;
-        }
-        return chrome.storage[area].get(keys, function (result) {
-          let key;
-          result = dict.clone(result);
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (keys === null) {
-            const result2 = dict();
-            for (key in result) {
-              var val = result[key];
-              if ($.hasOwn(data, key)) {
-                result2[key] = val;
-              }
-            }
-            result = result2;
-          }
-          for (key in data) {
-            $.oldValue[area][key] = result[key];
-          }
-          results[area] = result;
-          if (results.local && results.sync) {
-            $.extend(data, results.sync);
-            $.extend(data, results.local);
-            return cb(data);
-          }
-        });
-      };
-      get('local');
-      return get('sync');
-    });
-    (function () {
-      const items = {
-        local: dict(),
-        sync: dict()
-      };
-      const exceedsQuota = (key, value) => // bytes in UTF-8
-      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
-      $.delete = function (keys) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        if (typeof keys === 'string') {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          delete items.local[key];
-          delete items.sync[key];
-        }
-        chrome.storage.local.remove(keys);
-        return chrome.storage.sync.remove(keys);
-      };
-      const timeout = {};
-      var setArea = function (area, cb) {
-        const data = dict();
-        $.extend(data, items[area]);
-        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
-          return;
-        }
-        return chrome.storage[area].set(data, function () {
-          let err;
-          let key;
-          if (err = chrome.runtime.lastError) {
-            c.error(err.message);
-            setTimeout(setArea, MINUTE, area);
-            timeout[area] = Date.now() + MINUTE;
-            return cb?.(err);
-          }
-          delete timeout[area];
-          for (key in data) {
-            if (items[area][key] === data[key]) {
-              delete items[area][key];
-            }
-          }
-          if (area === 'local') {
-            for (key in data) {
-              var val = data[key];
-              if (!exceedsQuota(key, val)) {
-                items.sync[key] = val;
-              }
-            }
-            setSync();
-          } else {
-            chrome.storage.local.remove(((() => {
-              const result = [];
-              for (key in data) {
-                if (!(key in items.local)) {
-                  result.push(key);
-                }
-              }
-              return result;
-            })()));
-          }
-          return cb?.();
-        });
-      };
-      var setSync = debounce(SECOND, () => setArea('sync'));
-      $.set = $.oneItemSugar(function (data, cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        $.securityCheck(data);
-        $.extend(items.local, data);
-        return setArea('local', cb);
-      });
-      return $.clear = function (cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        items.local = dict();
-        items.sync = dict();
-        let count = 2;
-        let err = null;
-        const done = function () {
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (err == null) {
-            err = chrome.runtime.lastError;
-          }
-          if (!--count) {
-            return cb?.(err);
-          }
-        };
-        chrome.storage.local.clear(done);
-        return chrome.storage.sync.clear(done);
-      };
-    })();
-  } else {
-    // http://wiki.greasespot.net/Main_Page
-    // https://tampermonkey.net/documentation.php
-    if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
-      $.syncChannel = new BroadcastChannel(g.NAMESPACE + 'sync');
-      $.on($.syncChannel, 'message', e => (() => {
-        const result = [];
-        for (var key in e.data) {
-          var cb;
-          var val = e.data[key];
-          if (cb = $.syncing[key]) {
-            result.push(cb(dict.json(JSON.stringify(val)), key));
-          }
-        }
-        return result;
-      })());
-      $.sync = (key, cb) => $.syncing[key] = cb;
-      $.forceSync = function () { };
-      $.delete = function (keys, cb) {
-        let key;
-        if (!(keys instanceof Array)) {
-          keys = [keys];
-        }
-        Promise.all(keys.map(key => GM.deleteValue(g.NAMESPACE + key))).then(function () {
-          const items = dict();
-          for (key of keys)
-            items[key] = undefined;
-          $.syncChannel.postMessage(items);
-          cb?.();
-        });
-      };
-      $.get = $.oneItemSugar(function (items, cb) {
-        const keys = Object.keys(items);
-        return Promise.all(keys.map((key) => GM.getValue(g.NAMESPACE + key))).then(function (values) {
-          for (let i = 0; i < values.length; i++) {
-            var val = values[i];
-            if (val) {
-              items[keys[i]] = dict.json(val);
-            }
-          }
-          return cb(items);
-        });
-      });
-      $.set = $.oneItemSugar(function (items, cb) {
-        $.securityCheck(items);
-        return Promise.all((() => {
-          const result = [];
-          for (var key in items) {
-            var val = items[key];
-            result.push(GM.setValue(g.NAMESPACE + key, JSON.stringify(val)));
-          }
-          return result;
-        })()).then(function () {
-          $.syncChannel.postMessage(items);
-          return cb?.();
-        });
-      });
-      $.clear = cb => GM.listValues().then(keys => $.delete(keys.map(key => key.replace(g.NAMESPACE, '')), cb)).catch(() => $.delete(Object.keys(Conf).concat(['previousversion', 'QR Size', 'QR.persona']), cb));
-    } else {
-      if (typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) {
-        $.getValue = GM_getValue;
-        $.listValues = () => GM_listValues(); // error when called if missing
-      } else if ($.hasStorage) {
-        $.getValue = key => localStorage.getItem(key);
-        $.listValues = () => (() => {
-          const result = [];
-          for (var key in localStorage) {
-            if (key.slice(0, g.NAMESPACE.length) === g.NAMESPACE) {
-              result.push(key);
-            }
-          }
-          return result;
-        })();
-      } else {
-        $.getValue = function () { };
-        $.listValues = () => [];
-      }
-      if (typeof GM_addValueChangeListener !== 'undefined' && GM_addValueChangeListener !== null) {
-        $.setValue = GM_setValue;
-        $.deleteValue = GM_deleteValue;
-      } else if (typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) {
-        $.oldValue = dict();
-        $.setValue = function (key, val) {
-          GM_setValue(key, val);
-          if (key in $.syncing) {
-            $.oldValue[key] = val;
-            if ($.hasStorage) {
-              return localStorage.setItem(key, val);
-            } // for `storage` events
-          }
-        };
-        $.deleteValue = function (key) {
-          GM_deleteValue(key);
-          if (key in $.syncing) {
-            delete $.oldValue[key];
-            if ($.hasStorage) {
-              return localStorage.removeItem(key);
-            } // for `storage` events
-          }
-        };
-        if (!$.hasStorage) {
-          $.cantSync = true;
-        }
-      } else if ($.hasStorage) {
-        $.oldValue = dict();
-        $.setValue = function (key, val) {
-          if (key in $.syncing) {
-            $.oldValue[key] = val;
-          }
-          return localStorage.setItem(key, val);
-        };
-        $.deleteValue = function (key) {
-          if (key in $.syncing) {
-            delete $.oldValue[key];
-          }
-          return localStorage.removeItem(key);
-        };
-      } else {
-        $.setValue = function () { };
-        $.deleteValue = function () { };
-        $.cantSync = ($.cantSet = true);
-      }
-      if (typeof GM_addValueChangeListener !== 'undefined' && GM_addValueChangeListener !== null) {
-        $.sync = (key, cb) => $.syncing[key] = GM_addValueChangeListener(g.NAMESPACE + key, function (key2, oldValue, newValue, remote) {
-          if (remote) {
-            if (newValue !== undefined) {
-              newValue = dict.json(newValue);
-            }
-            return cb(newValue, key);
-          }
-        });
-        $.forceSync = function () { };
-      } else if ((typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) || $.hasStorage) {
-        $.sync = function (key, cb) {
-          key = g.NAMESPACE + key;
-          $.syncing[key] = cb;
-          return $.oldValue[key] = $.getValue(key);
-        };
-        (function () {
-          const onChange = function ({ key, newValue }) {
-            let cb;
-            if (!(cb = $.syncing[key])) {
-              return;
-            }
-            if (newValue != null) {
-              if (newValue === $.oldValue[key]) {
-                return;
-              }
-              $.oldValue[key] = newValue;
-              return cb(dict.json(newValue), key.slice(g.NAMESPACE.length));
-            } else {
-              if ($.oldValue[key] == null) {
-                return;
-              }
-              delete $.oldValue[key];
-              return cb(undefined, key.slice(g.NAMESPACE.length));
-            }
-          };
-          $.on(window, 'storage', onChange);
-          return $.forceSync = function (key) {
-            // Storage events don't work across origins
-            // e.g. http://boards.4chan.org and https://boards.4chan.org
-            // so force a check for changes to avoid lost data.
-            key = g.NAMESPACE + key;
-            return onChange({ key, newValue: $.getValue(key) });
-          };
-        })();
-      } else {
-        $.sync = function () { };
-        $.forceSync = function () { };
-      }
-      $.delete = function (keys) {
-        if (!(keys instanceof Array)) {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          $.deleteValue(g.NAMESPACE + key);
-        }
-      };
-      $.get = $.oneItemSugar((items, cb) => $.queueTask($.getSync, items, cb));
-      $.getSync = function (items, cb) {
-        for (var key in items) {
-          var val2;
-          if (val2 = $.getValue(g.NAMESPACE + key)) {
-            try {
-              items[key] = dict.json(val2);
-            } catch (err) {
-              // XXX https://github.com/ccd0/4chan-x/issues/2218
-              if (!/^(?:undefined)*$/.test(val2)) {
-                throw err;
-              }
-            }
-          }
-        }
-        return cb(items);
-      };
-      $.set = $.oneItemSugar(function (items, cb) {
-        $.securityCheck(items);
-        return $.queueTask(function () {
-          for (var key in items) {
-            var value = items[key];
-            $.setValue(g.NAMESPACE + key, JSON.stringify(value));
-          }
-          return cb?.();
-        });
-      });
-      $.clear = function (cb) {
-        // XXX https://github.com/greasemonkey/greasemonkey/issues/2033
-        // Also support case where GM_listValues is not defined.
-        $.delete(Object.keys(Conf));
-        $.delete(['previousversion', 'QR Size', 'QR.persona']);
-        try {
-          $.delete($.listValues().map(key => key.replace(g.NAMESPACE, '')));
-        } catch (error) { }
-        return cb?.();
-      };
-    }
-  }
-
-  // @ts-nocheck
-
-  var Get = {
+  const Get = {
     url(type, IDs, ...args) {
       let f, site;
       if ((site = g.sites[IDs.siteID]) && (f = $.getOwn(site.urls, type))) {
@@ -2593,28 +3331,40 @@ current-archive-text:"Archive"]
       }
     },
     threadExcerpt(thread) {
-      const {OP} = thread;
-      const excerpt = (`/${decodeURIComponent(thread.board.ID)}/ - `) + (
-        OP.info.subject?.trim() ||
+      const { OP } = thread;
+      const excerpt = (`/${decodeURIComponent(thread.board.ID)}/ - `) + (OP.info.subject?.trim() ||
         OP.commentDisplay().replace(/\n+/g, ' // ') ||
         OP.file?.name ||
         `No.${OP}`);
-      if (excerpt.length > 73) { return `${excerpt.slice(0, 70)}...`; }
+      if (excerpt.length > 73) {
+        return `${excerpt.slice(0, 70)}...`;
+      }
       return excerpt;
     },
     threadFromRoot(root) {
-      if (root == null) { return null; }
-      const {board} = root.dataset;
+      if (root == null) {
+        return null;
+      }
+      const { board } = root.dataset;
       return g.threads.get(`${board ? encodeURIComponent(board) : g.BOARD.ID}.${root.id.match(/\d*$/)[0]}`);
     },
     threadFromNode(node) {
       return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.thread}`, node));
     },
     postFromRoot(root) {
-      if (root == null) { return null; }
-      const post  = g.posts.get(root.dataset.fullID);
+      if (root == null) {
+        return null;
+      }
+      const post = g.posts.get(root.dataset.fullID);
+      if (!post) {
+        return null;
+      }
       const index = root.dataset.clone;
-      if (index) { return post.clones[+index]; } else { return post; }
+      if (index) {
+        return post.clones[+index];
+      } else {
+        return post;
+      }
     },
     postFromNode(root) {
       return Get.postFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.postContainer}[1]`, root));
@@ -2622,110 +3372,70 @@ current-archive-text:"Archive"]
     postDataFromLink(link) {
       let boardID, postID, threadID;
       if (link.dataset.postID) { // resurrected quote
-        ({boardID, threadID, postID} = link.dataset);
-        if (!threadID) { threadID = 0; }
+        ({ boardID, threadID, postID } = link.dataset);
+        if (!threadID) {
+          threadID = '0';
+        }
       } else {
         const match = link.href.match(g.SITE.regexp.quotelink);
-        [boardID, threadID, postID] = match.slice(1);
-        if (!postID) { postID = threadID; }
+        if (match) {
+          [boardID, threadID, postID] = match.slice(1);
+          if (!postID) {
+            postID = threadID;
+          }
+        } else {
+          boardID = '';
+          threadID = '0';
+          postID = '0';
+        }
       }
       return {
         boardID,
         threadID: +threadID,
-        postID:   +postID
+        postID: +postID
       };
     },
     allQuotelinksLinkingTo(post) {
       // Get quotelinks & backlinks linking to the given post.
       const quotelinks = [];
-      const {posts} = g;
-      const {fullID} = post;
-      const handleQuotes = function(qPost, type) {
+      const posts = g.posts;
+      const { fullID } = post;
+      const handleQuotes = function (qPost, type) {
         quotelinks.push(...(qPost.nodes[type] || []));
-        for (var clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
+        for (const clone of qPost.clones) {
+          quotelinks.push(...(clone.nodes[type] || []));
+        }
       };
       // First:
       //   In every posts,
       //   if it did quote this post,
       //   get all their backlinks.
-      posts.forEach(function(qPost) {
+      posts.forEach(function (qPost) {
         if (qPost.quotes.includes(fullID)) {
-          return handleQuotes(qPost, 'quotelinks');
+          handleQuotes(qPost, 'quotelinks');
         }
       });
-
       // Second:
       //   If we have quote backlinks:
       //   in all posts this post quoted
       //   and their clones,
       //   get all of their backlinks.
       if (Conf['Quote Backlinks']) {
-        for (var quote of post.quotes) { var qPost;
-        if ((qPost = posts.get(quote))) { handleQuotes(qPost, 'backlinks'); } }
+        for (const quote of post.quotes) {
+          let qPost;
+          if ((qPost = posts.get(quote))) {
+            handleQuotes(qPost, 'backlinks');
+          }
+        }
       }
-
       // Third:
       //   Filter out irrelevant quotelinks.
-      return quotelinks.filter(function(quotelink) {
-        const {boardID, postID} = Get.postDataFromLink(quotelink);
+      return quotelinks.filter(function (quotelink) {
+        const { boardID, postID } = Get.postDataFromLink(quotelink);
         return (boardID === post.board.ID) && (postID === post.ID);
       });
     }
   };
-
-  /*
-   * This file has the code for the jsx to { innerHTML: "safe string" }
-   *
-   * Usage: import h from this file.
-   * Attributes are stringified raw, so the names must be like html text: eg class and not className.
-   * Boolean values are stringified as followed: true will mean the attribute is there, false means it will be omitted.
-   * Strings bound to attributes and children will be escaped automatically.
-   * It returns interface EscapedHtml { innerHTML: "safe string", [isEscaped]: true }
-   *
-   * For strings that don't have a parent element you can use fragments: <></>.
-   * Note that you need to import hFragment, which for some reason isn't auto imported on "add all missing imports"
-   */
-  /**
-   * The symbol indicating that a string is safely escaped.
-   * This is a symbol so it can't be faked by a json blob from the internet.
-   */
-  const isEscaped = Symbol('isEscaped');
-  const voidElements = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr',]);
-  const hFragment = Symbol('hFragment');
-  /** Function that jsx/tsx will be compiled to. */
-  function h(tag, attributes, ...children) {
-    let innerHTML = tag === hFragment ? '' : `<${tag}`;
-    if (attributes) {
-      for (const [attribute, value] of Object.entries(attributes)) {
-        if (!value && value !== 0)
-          continue;
-        innerHTML += ` ${attribute}`;
-        if (value === true)
-          continue;
-        innerHTML += `="${E(value.toString())}"`;
-      }
-    }
-    if (tag !== hFragment)
-      innerHTML += '>';
-    const isVoid = tag !== hFragment && voidElements.has(tag);
-    if (isVoid) {
-      if (children.length)
-        throw new TypeError(`${tag} is a void html element and can't have child elements`);
-    } else {
-      for (const child of children) {
-        if (child === null || child === undefined || child === '')
-          continue;
-        if (child instanceof Object && "innerHTML" in child && child[isEscaped]) {
-          innerHTML += child.innerHTML;
-          continue;
-        }
-        innerHTML += E(child.toString());
-      }
-    }
-    if (!isVoid && tag !== hFragment)
-      innerHTML += `</${tag}>`;
-    return { innerHTML, [isEscaped]: true };
-  }
 
   // \u00A0 is non breaking space
   const separator = '\u00A0|\u00A0';
@@ -2751,359 +3461,721 @@ current-archive-text:"Archive"]
     h("div", { class: "section-container" },
       h("section", null)));
 
-  var FilterGuidePage = `<div class="warning"><code>Filter</code> is disabled.</div>
-<p>
-  Use <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions" target="_blank">regular expressions</a>, one per line.<br>
-  Lines starting with a <code>#</code> will be ignored.<br>
-  For example, <code>/weeaboo/i</code> will filter posts containing the string \`<code>weeaboo</code>\`, case-insensitive.<br>
-  MD5 and Unique ID filtering use exact string matching, not regular expressions.
-</p>
-<ul>You can use these settings with each regular expression, separate them with semicolons:
-  <li>
-    Per boards, separate them with commas. It is global if not specified. Use <code>sfw</code> and <code>nsfw</code> to reference all worksafe or not-worksafe boards.<br>
-    For example: <code>boards:a,jp;</code>.<br>
-    To specify boards on a particular site, put the beginning of the domain and a slash character before the list.<br>
-    Any initial <code>www.</code> should not be included, and all 4chan domains are considered <code>4chan.org</code>.<br>
-    For example: <code>boards:4:a,jp,sama:a,z;</code>.<br>
-    An asterisk can be used to specify all boards on a site.<br>
-    For example: <code>boards:4:*;</code>.<br>
-  </li>
-  <li>
-    Show a custom reason in the stub. If not given, the type and regex will be shown.<br>
-    For example: <code>reason:This is bait;</code>
-  </li>
-  <li>
-    Select boards to be excluded from the filter. The syntax is the same as for the <code>boards:</code> option above.<br>
-    For example: <code>exclude:vg,v;</code>.
-  </li>
-  <li>
-    Filter OPs only along with their threads (\`only\`) or replies only (\`no\`).<br>
-    For example: <code>op:only;</code> or <code>op:no;</code>.
-  </li>
-  <li>
-    Filter only posts with files (\`only\`) or only posts without files (\`no\`).<br>
-    For example: <code>file:only;</code> or <code>file:no;</code>.
-  </li>
-  <li>
-    Overrule the \`Show Stubs\` setting if specified: create a stub (\`yes\`) or not (\`no\`).<br>
-    For example: <code>stub:yes;</code> or <code>stub:no;</code>.
-  </li>
-  <li>
-    Highlight instead of hiding. You can specify a class name to use with a userstyle.<br>
-    For example: <code>highlight;</code> or <code>highlight:wallpaper;</code>.
-  </li>
-  <li>
-    Highlighted OPs will have their threads put on top of the board index by default.<br>
-    For example: <code>top:yes;</code> or <code>top:no;</code>.
-  </li>
-  <li>Show a desktop notification instead of hiding: <code>notify;</code>.</li>
-  <li>Hide all posts from this poster: <code>poster;</code>.</li>
-  <li>Recursively hide replies: <code>replies;</code>.</li>
-  <li>Hide anyway even if highlighting. The highlight class will be applied to the stub: <code>hide;</code>.</li>
-  <li>
-    Filters in the "General" section apply to multiple fields, by default <code>subject,name,filename,comment</code>.<br>
-    The fields can be specified with the <code>type</code> option, separated by commas.<br>
-    For example: <code id="filterTypes"></code>.<br>
-    Types can also be combined with a <code>+</code> sign; this indicates the filter applies to the given fields joined by newlines.<br>
-    For example: <code>type:filename+filesize+dimensions;</code>.<br>
-  </li>
-</ul>`;
+  const FilterGuideHtml = (h(hFragment, null,
+    h("div", { class: "warning" },
+      h("code", null, "Filter"),
+      " is disabled."),
+    h("p", null,
+      "Use ",
+      h("a", { href: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions", target: "_blank" }, "regular expressions"),
+      ", one per line.",
+      h("br", null),
+      "Lines starting with a ",
+      h("code", null, "#"),
+      " will be ignored.",
+      h("br", null),
+      "For example, ",
+      h("code", null, "/weeaboo/i"),
+      " will filter posts containing the string `",
+      h("code", null, "weeaboo"),
+      "`, case-insensitive.",
+      h("br", null),
+      "MD5 and Unique ID filtering use exact string matching, not regular expressions."),
+    h("ul", null,
+      "You can use these settings with each regular expression, separate them with semicolons:",
+      h("li", null,
+        "Per boards, separate them with commas. It is global if not specified. Use ",
+        h("code", null, "sfw"),
+        " and ",
+        h("code", null, "nsfw"),
+        " to reference all worksafe or not-worksafe boards.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "boards:a,jp;"),
+        ".",
+        h("br", null),
+        "To specify boards on a particular site, put the beginning of the domain and a slash character before the list.",
+        h("br", null),
+        "Any initial ",
+        h("code", null, "www."),
+        " should not be included, and all 4chan domains are considered ",
+        h("code", null, "4chan.org"),
+        ".",
+        h("br", null),
+        "For example: ",
+        h("code", null, "boards:4:a,jp,sama:a,z;"),
+        ".",
+        h("br", null),
+        "An asterisk can be used to specify all boards on a site.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "boards:4:*;"),
+        ".",
+        h("br", null)),
+      h("li", null,
+        "Show a custom reason in the stub. If not given, the type and regex will be shown.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "reason:This is bait;")),
+      h("li", null,
+        "Select boards to be excluded from the filter. The syntax is the same as for the ",
+        h("code", null, "boards:"),
+        " option above.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "exclude:vg,v;"),
+        "."),
+      h("li", null,
+        "Filter OPs only along with their threads (`only`) or replies only (`no`).",
+        h("br", null),
+        "For example: ",
+        h("code", null, "op:only;"),
+        " or ",
+        h("code", null, "op:no;"),
+        "."),
+      h("li", null,
+        "Filter only posts with files (`only`) or only posts without files (`no`).",
+        h("br", null),
+        "For example: ",
+        h("code", null, "file:only;"),
+        " or ",
+        h("code", null, "file:no;"),
+        "."),
+      h("li", null,
+        "Overrule the `Show Stubs` setting if specified: create a stub (`yes`) or not (`no`).",
+        h("br", null),
+        "For example: ",
+        h("code", null, "stub:yes;"),
+        " or ",
+        h("code", null, "stub:no;"),
+        "."),
+      h("li", null,
+        "Highlight instead of hiding. You can specify a class name to use with a userstyle.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "highlight;"),
+        " or ",
+        h("code", null, "highlight:wallpaper;"),
+        "."),
+      h("li", null,
+        "Highlighted OPs will have their threads put on top of the board index by default.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "top:yes;"),
+        " or ",
+        h("code", null, "top:no;"),
+        "."),
+      h("li", null,
+        "Show a desktop notification instead of hiding: ",
+        h("code", null, "notify;"),
+        "."),
+      h("li", null,
+        "Hide all posts from this poster: ",
+        h("code", null, "poster;"),
+        "."),
+      h("li", null,
+        "Recursively hide replies: ",
+        h("code", null, "replies;"),
+        "."),
+      h("li", null,
+        "Hide anyway even if highlighting. The highlight class will be applied to the stub: ",
+        h("code", null, "hide;"),
+        "."),
+      h("li", null,
+        "Filters in the \"General\" section apply to multiple fields, by default ",
+        h("code", null, "subject,name,filename,comment"),
+        ".",
+        h("br", null),
+        "The fields can be specified with the ",
+        h("code", null, "type"),
+        " option, separated by commas.",
+        h("br", null),
+        "For example: ",
+        h("code", { id: "filterTypes" }),
+        ".",
+        h("br", null),
+        "Types can also be combined with a ",
+        h("code", null, "+"),
+        " sign; this indicates the filter applies to the given fields joined by newlines.",
+        h("br", null),
+        "For example: ",
+        h("code", null, "type:filename+filesize+dimensions;"),
+        ".",
+        h("br", null)))));
 
-  var SaucePage = `<div class="warning"><code>Sauce</code> is disabled.</div>
-<input id="sauce-doc-expand" type="checkbox" hidden>
-<div id="sauce-doc">
-  <label for="sauce-doc-expand">[expand]</label>
-  <div>These parameters will be replaced by their corresponding values in the URL and displayed text:</div>
-  <ul>
-    <li><code>%IMG</code>: Full image URL for GIF, JPG, and PNG; thumbnail URL for other types.</li>
-    <li><code>%URL</code>: Full image URL.</li>
-    <li><code>%TURL</code>: Thumbnail URL.</li>
-    <li><code>%name</code>: Original file name.</li>
-    <li><code>%board</code>: Current board.</li>
-    <li><code>%MD5</code>: MD5 hash in base64.</li>
-    <li><code>%sMD5</code>: MD5 hash in base64 using <code>-</code> and <code>_</code>.</li>
-    <li><code>%hMD5</code>: MD5 hash in hexadecimal.</li>
-    <li><code>%$0</code>: Matched regular expression within the filename.</li>
-    <li><code>%$1</code>, <code>%$2</code>, <code>%$3</code>, ... : Subexpressions within the matched regular expression.</li>
-    <li><code>%%</code>, <code>%semi</code>: Literal <code>%</code> and <code>;</code>.</li>
-  </ul>
-  <div>Lines starting with a <code>#</code> will be ignored.</div>
-  <div>You can specify a display text by appending <code>;text:[text]</code> to the URL.</div>
-  <div>You can specify the applicable boards/sites by appending <code>;boards:[board1],[board2]</code>. See the Filter guide for details.</div>
-  <div>You can specify the applicable file types by appending <code>;types:[extension1],[extension2]</code>.</div>
-  <div>You can specify a regular expression the filename must match by appending <code>;regexp:[regular expression]</code>.</div>
-</div>
-<textarea hidden name="sauces" class="field" spellcheck="false"></textarea>`;
+  const SauceHtml = (h(hFragment, null,
+    h("div", { class: "warning" },
+      h("code", null, "Sauce"),
+      " is disabled."),
+    h("input", { id: "sauce-doc-expand", type: "checkbox", hidden: true }),
+    h("div", { id: "sauce-doc" },
+      h("label", { for: "sauce-doc-expand" }, "[expand]"),
+      h("div", null, "These parameters will be replaced by their corresponding values in the URL and displayed text:"),
+      h("ul", null,
+        h("li", null,
+          h("code", null, "%IMG"),
+          ": Full image URL for GIF, JPG, and PNG; thumbnail URL for other types."),
+        h("li", null,
+          h("code", null, "%URL"),
+          ": Full image URL."),
+        h("li", null,
+          h("code", null, "%TURL"),
+          ": Thumbnail URL."),
+        h("li", null,
+          h("code", null, "%name"),
+          ": Original file name."),
+        h("li", null,
+          h("code", null, "%board"),
+          ": Current board."),
+        h("li", null,
+          h("code", null, "%MD5"),
+          ": MD5 hash in base64."),
+        h("li", null,
+          h("code", null, "%sMD5"),
+          ": MD5 hash in base64 using ",
+          h("code", null, "-"),
+          " and ",
+          h("code", null, "_"),
+          "."),
+        h("li", null,
+          h("code", null, "%hMD5"),
+          ": MD5 hash in hexadecimal."),
+        h("li", null,
+          h("code", null, "%$0"),
+          ": Matched regular expression within the filename."),
+        h("li", null,
+          h("code", null, "%$1"),
+          ", ",
+          h("code", null, "%$2"),
+          ", ",
+          h("code", null, "%$3"),
+          ", ... : Subexpressions within the matched regular expression."),
+        h("li", null,
+          h("code", null, "%%"),
+          ", ",
+          h("code", null, "%semi"),
+          ": Literal ",
+          h("code", null, "%"),
+          " and ",
+          h("code", null, ";"),
+          ".")),
+      h("div", null,
+        "Lines starting with a ",
+        h("code", null, "#"),
+        " will be ignored."),
+      h("div", null,
+        "You can specify a display text by appending ",
+        h("code", null, ";text:[text]"),
+        " to the URL."),
+      h("div", null,
+        "You can specify the applicable boards/sites by appending ",
+        h("code", null, ";boards:[board1],[board2]"),
+        ". See the Filter guide for details."),
+      h("div", null,
+        "You can specify the applicable file types by appending ",
+        h("code", null, ";types:[extension1],[extension2]"),
+        "."),
+      h("div", null,
+        "You can specify a regular expression the filename must match by appending ",
+        h("code", null, ";regexp:[regular expression]"),
+        ".")),
+    h("textarea", { hidden: true, name: "sauces", class: "field", spellcheck: "false" })));
 
-  var AdvancedPage = `<fieldset>
-  <legend>Archives</legend>
-  <div class="warning" data-feature="404 Redirect"><code>404 Redirect</code> is disabled.</div>
-  <select id="archive-board-select"></select>
-  <table id="archive-table">
-    <thead>
-      <th>Thread redirection</th>
-      <th>Thread fetching</th>
-      <th>Post fetching</th>
-      <th>File redirection</th>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <br>
-  <div>
-    <b>Archive Lists</b>: Each line below should be an archive list in <a href="https://github.com/4chenz/archives.json/blob/gh-pages/CONTRIBUTING.md" target="_blank">this format</a> or a URL to load an archive list from.<br>
-    Archive properties can be overriden by another item with the same <code>uid</code> (or if absent, its <code>name</code>).
-  </div>
-  <textarea hidden name="archiveLists" class="field" spellcheck="false"></textarea>
-  <button id="update-archives">Update now</button> Last updated: <time id="lastarchivecheck"></time> <label><input type="checkbox" name="archiveAutoUpdate"> Auto-update</label>
-</fieldset>
+  const AdvancedHtml = (h(hFragment, null,
+    h("fieldset", null,
+      h("legend", null, "Archives"),
+      h("div", { class: "warning", "data-feature": "404 Redirect" },
+        h("code", null, "404 Redirect"),
+        " is disabled."),
+      h("select", { id: "archive-board-select" }),
+      h("table", { id: "archive-table" },
+        h("thead", null,
+          h("tr", null,
+            h("th", null, "Thread redirection"),
+            h("th", null, "Thread fetching"),
+            h("th", null, "Post fetching"),
+            h("th", null, "File redirection"))),
+        h("tbody", null)),
+      h("br", null),
+      h("div", null,
+        h("b", null, "Archive Lists"),
+        ": Each line below should be an archive list in ",
+        h("a", { href: "https://github.com/4chenz/archives.json/blob/gh-pages/CONTRIBUTING.md", target: "_blank" }, "this format"),
+        " or a URL to load an archive list from.",
+        h("br", null),
+        "Archive properties can be overriden by another item with the same ",
+        h("code", null, "uid"),
+        " (or if absent, its ",
+        h("code", null, "name"),
+        ")."),
+      h("textarea", { hidden: true, name: "archiveLists", class: "field", spellcheck: "false" }),
+      h("button", { id: "update-archives" }, "Update now"),
+      " Last updated: ",
+      h("time", { id: "lastarchivecheck" }),
+      " ",
+      h("label", null,
+        h("input", { type: "checkbox", name: "archiveAutoUpdate" }),
+        " Auto-update")),
+    h("fieldset", null,
+      h("legend", null, "External Catalog"),
+      h("div", { class: "warning", "data-feature": "External Catalog" },
+        h("code", null, "External Catalog"),
+        " is disabled. This will be used only as a fallback."),
+      h("div", null,
+        "URLs of external catalog sites, where ",
+        h("code", null, "%board"),
+        " is to be replaced by the board name.",
+        h("br", null),
+        "Each URL should be followed by ",
+        h("code", null, ";boards:"),
+        " and optionally ",
+        h("code", null, ";exclude:"),
+        " and a list of supported/excluded boards in the format explained in the Filter guide."),
+      h("textarea", { hidden: true, name: "externalCatalogURLs", class: "field", spellcheck: "false" })),
+    h("fieldset", null,
+      h("legend", null, "Override 4chan Image Host"),
+      h("div", null, "Change 4chan image links to this domain. Leave blank for no change."),
+      h("div", null,
+        h("input", { name: "fourchanImageHost", class: "field", spellcheck: "false", list: "list-fourchanImageHost" })),
+      h("datalist", { id: "list-fourchanImageHost" })),
+    h("fieldset", null,
+      h("legend", null, "Captcha Language"),
+      h("div", null,
+        "Choose from ",
+        h("a", { href: "https://developers.google.com/recaptcha/docs/language", target: "_blank" }, "list of language codes"),
+        ". Leave blank to autoselect."),
+      h("div", null,
+        h("input", { name: "captchaLanguage", class: "field", spellcheck: "false" }))),
+    h("fieldset", null,
+      h("legend", null, "Custom Board Navigation"),
+      h("div", null,
+        h("textarea", { hidden: true, name: "boardnav", class: "field", spellcheck: "false" })),
+      h("span", { class: "note" }, "New lines will be converted into spaces."),
+      h("br", null),
+      h("br", null),
+      h("div", { class: "note" },
+        "In the following examples for /g/, ",
+        h("code", null, "g"),
+        " can be changed to a different board ID (",
+        h("code", null, "a"),
+        ", ",
+        h("code", null, "b"),
+        ", etc...), the current board (",
+        h("code", null, "current"),
+        "), or the Twitter link (",
+        h("code", null, "@"),
+        ")."),
+      h("div", null,
+        "Board link: ",
+        h("code", null, "g")),
+      h("div", null,
+        "Archive link: ",
+        h("code", null, "g-archive")),
+      h("div", null,
+        "Internal archive link: ",
+        h("code", null, "g-expired")),
+      h("div", null,
+        "Title link: ",
+        h("code", null, "g-title")),
+      h("div", null,
+        "Board link (Replace with title when on that board): ",
+        h("code", null, "g-replace")),
+      h("div", null,
+        "Full text link: ",
+        h("code", null, "g-full")),
+      h("div", null,
+        "Custom text link: ",
+        h("code", null, "g-text:\"Install Gentoo\"")),
+      h("div", null,
+        "Index-only link: ",
+        h("code", null, "g-index")),
+      h("div", null,
+        "Catalog-only link: ",
+        h("code", null, "g-catalog")),
+      h("div", null,
+        "Index mode: ",
+        h("code", null, "g-mode:\"infinite scrolling\"")),
+      h("div", null,
+        "Index sort: ",
+        h("code", null, "g-sort:\"creation date rev\"")),
+      h("div", null,
+        "External link: ",
+        h("code", null, "external-text:\"Google\",\"http://www.google.com\"")),
+      h("div", null,
+        "Open in new tab: ",
+        h("code", null, "g-nt")),
+      h("div", null,
+        "Combinations are possible: ",
+        h("code", null, "g-index-text:\"Technology Index\"")),
+      h("div", null,
+        "Full board list toggle: ",
+        h("code", null, "toggle-all")),
+      h("br", null),
+      h("div", { class: "note" },
+        h("code", null, "[ toggle-all ] [current-title] [g-title / a-title / jp-title] [x / wsg / h] [t-text:\"Piracy\"]"),
+        h("br", null),
+        "will give you",
+        h("br", null),
+        h("code", null, "[ + ] [Technology] [Technology / Anime & Manga / Otaku Culture] [x / wsg / h] [Piracy]"),
+        h("br", null),
+        "if you are on /g/."),
+      h("div", { class: "note" },
+        "For custom styling, you can wrap groups or individual links in ",
+        h("code", null, "{"),
+        " and ",
+        h("code", null, "}"),
+        ", to wrap them in a span. You can also add classes in double quotes right after the ",
+        "{",
+        ". For example: ",
+        h("br", null),
+        h("code", null,
+          "[g-title] ",
+          "{{",
+          "\"favorites\"[a-title / jp-title]",
+          "}}"),
+        h("br", null),
+        "Results in:",
+        h("br", null),
+        h("code", null, "[<a [...] >Technology</a>] <span class=\"favorites\">[<a [...] >Anime &amp; Manga</a> / <a [...] >Otaku Culture</a>]</span>"))),
+    h("fieldset", null,
+      h("legend", null,
+        "Time Formatting",
+        h("span", { class: "warning", "data-feature": "Time Formatting" }, "is disabled, relative time setting still applies.")),
+      h("div", null,
+        h("input", { name: "time", class: "field", spellcheck: "false" }),
+        ": ",
+        h("span", { class: "time-preview" })),
+      h("div", null,
+        "Supported ",
+        h("a", { href: "http://man7.org/linux/man-pages/man1/date.1.html", target: "_blank" }, "format specifiers"),
+        ":"),
+      h("div", null,
+        "Day: ",
+        h("code", null, "%a"),
+        ", ",
+        h("code", null, "%A"),
+        ", ",
+        h("code", null, "%d"),
+        ", ",
+        h("code", null, "%e")),
+      h("div", null,
+        "Month: ",
+        h("code", null, "%m"),
+        ", ",
+        h("code", null, "%b"),
+        ", ",
+        h("code", null, "%B"),
+        ", ",
+        h("code", null, "%n"),
+        " (Not zero padded)"),
+      h("div", null,
+        "Year: ",
+        h("code", null, "%y"),
+        ", ",
+        h("code", null, "%Y")),
+      h("div", null,
+        "Hour: ",
+        h("code", null, "%k"),
+        ", ",
+        h("code", null, "%H"),
+        ", ",
+        h("code", null, "%l"),
+        ", ",
+        h("code", null, "%I"),
+        ", ",
+        h("code", null, "%p"),
+        ", ",
+        h("code", null, "%P")),
+      h("div", null,
+        "Minute: ",
+        h("code", null, "%M")),
+      h("div", null,
+        "Second: ",
+        h("code", null, "%S")),
+      h("div", null,
+        "Literal ",
+        h("code", null, "%"),
+        ": ",
+        h("code", null, "%%")),
+      h("div", null,
+        h("a", { href: "https://www.w3.org/International/articles/language-tags/", target: "_blank" }, "Language tag"),
+        ": ",
+        h("input", { name: "timeLocale", class: "field", spellcheck: "false" })),
+      h("div", null,
+        "Relative time, like \"3 minutes ago\":",
+        h("select", { name: "RelativeTime" },
+          h("option", { value: "No" }, "Disabled"),
+          h("option", { value: "Hover" }, "Show when hovering on the date"),
+          h("option", { value: "Show" }, "Show relative time, and time and date on hover"),
+          h("option", { value: "Both" }, "Show both timestamp and relative date"),
+          h("option", { value: "BothRelativeFirst" }, "Show both relative date and timestamp")))),
+    h("fieldset", null,
+      h("legend", null,
+        "Quote Backlinks formatting ",
+        h("span", { class: "warning", "data-feature": "Quote Backlinks" }, "is disabled.")),
+      h("div", null,
+        h("input", { name: "backlink", class: "field", spellcheck: "false" }),
+        ": ",
+        h("span", { class: "backlink-preview" }))),
+    h("fieldset", null,
+      h("legend", null, "Default pasted content filename"),
+      h("div", null,
+        h("input", { name: "pastedname", class: "field", spellcheck: "false" }),
+        ".png")),
+    h("fieldset", null,
+      h("legend", null,
+        "File Info Formatting ",
+        h("span", { class: "warning", "data-feature": "File Info Formatting" }, "is disabled.")),
+      h("div", null,
+        h("input", { name: "fileInfo", class: "field", spellcheck: "false" }),
+        ": ",
+        h("span", { class: "file-info file-info-preview" })),
+      h("div", null,
+        "Link: ",
+        h("code", null, "%l"),
+        " (truncated), ",
+        h("code", null, "%L"),
+        " (untruncated), ",
+        h("code", null, "%T"),
+        " (4chan filename)"),
+      h("div", null,
+        "Filename: ",
+        h("code", null, "%n"),
+        " (truncated), ",
+        h("code", null, "%N"),
+        " (untruncated), ",
+        h("code", null, "%t"),
+        " (4chan filename)"),
+      h("div", null,
+        "Download button: ",
+        h("code", null, "%d")),
+      h("div", null,
+        "Quick filter MD5: ",
+        h("code", null, "%f")),
+      h("div", null,
+        "Spoiler indicator: ",
+        h("code", null, "%p")),
+      h("div", null,
+        "Size: ",
+        h("code", null, "%B"),
+        " (Bytes), ",
+        h("code", null, "%K"),
+        " (KB), ",
+        h("code", null, "%M"),
+        " (MB), ",
+        h("code", null, "%s"),
+        " (4chan default)"),
+      h("div", null,
+        "Resolution: ",
+        h("code", null, "%r"),
+        " (Displays 'PDF' for PDF files)"),
+      h("div", null,
+        "Tag: ",
+        h("code", null, "%g")),
+      h("div", null,
+        "Literal ",
+        h("code", null, "%"),
+        ": ",
+        h("code", null, "%%"))),
+    h("fieldset", null,
+      h("legend", null, "Quick Reply Personas"),
+      h("textarea", { hidden: true, class: "personafield field", name: "QR.personas", spellcheck: "false" }),
+      h("p", null,
+        "One item per line.",
+        h("br", null),
+        "Items will be added in the relevant input's auto-completion list.",
+        h("br", null),
+        "Password items will always be used, since there is no password input.",
+        h("br", null),
+        "Lines starting with a ",
+        h("code", null, "#"),
+        " will be ignored."),
+      h("ul", null,
+        "You can use these settings with each item, separate them with semicolons:",
+        h("li", null,
+          "Possible items are: ",
+          h("code", null, "name"),
+          ", ",
+          h("code", null, "options"),
+          " (or equivalently ",
+          h("code", null, "email"),
+          "), ",
+          h("code", null, "subject"),
+          " and ",
+          h("code", null, "password"),
+          "."),
+        h("li", null,
+          "Wrap values of items with quotes, like this: ",
+          h("code", null, "options:\"sage\""),
+          "."),
+        h("li", null,
+          "Force values as defaults with the ",
+          h("code", null, "always"),
+          " keyword, for example: ",
+          h("code", null, "options:\"sage\";always"),
+          "."),
+        h("li", null,
+          "Select specific boards for an item, separated with commas, for example: ",
+          h("code", null, "options:\"sage\";boards:jp;always"),
+          "."))),
+    h("fieldset", null,
+      h("legend", null,
+        "Unread Favicon ",
+        h("span", { class: "warning", "data-feature": "Unread Favicon" }, "is disabled.")),
+      h("select", { name: "favicon" },
+        h("option", { value: "ferongr" }, "ferongr"),
+        h("option", { value: "xat-" }, "xat-"),
+        h("option", { value: "4chanJS" }, "4chanJS"),
+        h("option", { value: "Mayhem" }, "Mayhem"),
+        h("option", { value: "Original" }, "Original"),
+        h("option", { value: "Metro" }, "Metro")),
+      h("span", { class: "favicon-preview" })),
+    h("fieldset", null,
+      h("legend", null,
+        "Thread Updater ",
+        h("span", { class: "warning", "data-feature": "Thread Updater" }, "is disabled.")),
+      h("div", null,
+        "Interval: ",
+        h("input", { type: "number", name: "Interval", class: "field", min: "1" }),
+        " seconds")),
+    h("fieldset", null,
+      h("legend", null, "Custom Cooldown Time"),
+      h("div", null,
+        "Seconds: ",
+        h("input", { type: "number", name: "customCooldown", class: "field", min: "0" }))),
+    h("fieldset", null,
+      h("legend", null,
+        h("label", null,
+          h("input", { type: "checkbox", name: "Custom CSS" }),
+          " Custom CSS")),
+      h("div", null,
+        "For more information about customizing 4chan X's CSS, see the ",
+        h("a", { href: meta.cssGuide, target: "_blank" }, "styling guide"),
+        "."),
+      h("button", { id: "apply-css" }, "Apply CSS"),
+      h("textarea", { hidden: true, name: "usercss", class: "field", spellcheck: "false" })),
+    h("fieldset", null,
+      h("legend", null, "Javascript Whitelist"),
+      h("div", null,
+        "Sources from which Javascript is allowed to be loaded by ",
+        h("a", { href: "http://content-security-policy.com/#source_list", target: "_blank" }, "Content Security Policy"),
+        ".",
+        h("br", null),
+        "Lines starting with a ",
+        h("code", null, "#"),
+        " will be ignored. Remove or comment out all lines to allow everything."),
+      h("textarea", { hidden: true, name: "jsWhitelist", class: "field", spellcheck: "false" })),
+    h("fieldset", null,
+      h("legend", null, "Known Banners"),
+      h("div", null, "List of known banners, used for click-to-change feature."),
+      h("textarea", { hidden: true, name: "knownBanners", class: "field", spellcheck: "false" })),
+    h("fieldset", null,
+      h("legend", null, "X (formerly Twitter) embeds"),
+      h("div", null, "Only applies if embeds are enabled in the main settings"),
+      h("label", null,
+        "Service to use for embeds",
+        h("select", { name: "XEmbedder" },
+          h("option", { value: "fxt" }, "FxTwitter"),
+          h("option", { value: "tf" }, "Twitframe"))),
+      h("br", null),
+      h("label", null,
+        "Language to translate FxTwitter embeds to, as a two character ISO code, like ",
+        h("code", null, "en"),
+        ". Leave empty for no translation.",
+        h("input", { name: "fxtLang", maxlength: "2", class: "field" })),
+      h("br", null),
+      h("label", null,
+        "FxTwitter endpoint ",
+        h("input", { name: "fxtUrl", type: "url", class: "field" })),
+      h("br", null),
+      h("label", null,
+        "FxTwitter maximum amount of replies include",
+        h("input", { name: "fxtMaxReplies", type: "number", min: "0", step: "1", max: "100", class: "field" }))),
+    h("fieldset", null,
+      h("legend", null, "Thread updater sound"),
+      h("label", null,
+        "Sound volume, between 0 and 1:",
+        h("input", { name: "beepVolume", type: "number", min: ".01", max: "1", step: ".01", class: "field" })),
+      h("br", null),
+      h("label", null,
+        "Sound url. Can be a base64 one starting with ",
+        h("code", null, "data:"),
+        ". Leave empty for the default beep.",
+        h("input", { type: "string", name: "beepSource", class: "field wide" })))));
 
-<fieldset>
-  <legend>External Catalog</legend>
-  <div class="warning" data-feature="External Catalog"><code>External Catalog</code> is disabled. This will be used only as a fallback.</div>
-  <div>
-    URLs of external catalog sites, where <code>%board</code> is to be replaced by the board name.<br>
-    Each URL should be followed by <code>;boards:</code> and optionally <code>;exclude:</code> and a list of supported/excluded boards in the format explained in the Filter guide.
-  </div>
-  <textarea hidden name="externalCatalogURLs" class="field" spellcheck="false"></textarea>
-</fieldset>
+  const KeybindsHtml = (h(hFragment, null,
+    h("div", { class: "warning" },
+      h("code", null, "Keybinds"),
+      " are disabled."),
+    h("div", null,
+      "Allowed keys: ",
+      h("kbd", null, "a-z"),
+      ", ",
+      h("kbd", null, "0-9"),
+      ", ",
+      h("kbd", null, "Ctrl"),
+      ", ",
+      h("kbd", null, "Shift"),
+      ", ",
+      h("kbd", null, "Alt"),
+      ", ",
+      h("kbd", null, "Meta"),
+      ", ",
+      h("kbd", null, "Enter"),
+      ", ",
+      h("kbd", null, "Esc"),
+      ", ",
+      h("kbd", null, "Up"),
+      ", ",
+      h("kbd", null, "Down"),
+      ", ",
+      h("kbd", null, "Right"),
+      ", ",
+      h("kbd", null, "Left"),
+      "."),
+    h("div", null,
+      "Press ",
+      h("kbd", null, "Backspace"),
+      " to disable a keybind."),
+    h("table", null,
+      h("tbody", null,
+        h("tr", null,
+          h("th", null, "Actions"),
+          h("th", null, "Keybinds")))),
+    h("button", { type: "button", id: "reset-keys" }, "Reset keybinds")));
 
-<fieldset>
-  <legend>Override 4chan Image Host</legend>
-  <div>Change 4chan image links to this domain. Leave blank for no change.</div>
-  <div><input name="fourchanImageHost" class="field" spellcheck="false" list="list-fourchanImageHost"></div>
-  <datalist id="list-fourchanImageHost"></datalist>
-</fieldset>
+  const FilterSelectHtml = (h(hFragment, null,
+    h("select", { name: "filter" },
+      h("option", { value: "guide" }, "Guide"),
+      h("option", { value: "general" }, "General"),
+      h("option", { value: "postID" }, "Post number"),
+      h("option", { value: "name" }, "Name"),
+      h("option", { value: "uniqueID" }, "Unique ID"),
+      h("option", { value: "tripcode" }, "Tripcode"),
+      h("option", { value: "capcode" }, "Capcode"),
+      h("option", { value: "pass" }, "Pass Date"),
+      h("option", { value: "email" }, "Email"),
+      h("option", { value: "subject" }, "Subject"),
+      h("option", { value: "comment" }, "Comment"),
+      h("option", { value: "flag" }, "Flag"),
+      h("option", { value: "filename" }, "Filename"),
+      h("option", { value: "dimensions" }, "Image dimensions"),
+      h("option", { value: "filesize" }, "Filesize"),
+      h("option", { value: "MD5" }, "Image MD5")),
+    h("div", null)));
 
-<fieldset>
-  <legend>Captcha Language</legend>
-  <div>Choose from <a href="https://developers.google.com/recaptcha/docs/language" target="_blank">list of language codes</a>. Leave blank to autoselect.</div>
-  <div><input name="captchaLanguage" class="field" spellcheck="false"></div>
-</fieldset>
-
-<fieldset>
-  <legend>Custom Board Navigation</legend>
-  <div><textarea hidden name="boardnav" class="field" spellcheck="false"></textarea></div>
-  <span class="note">New lines will be converted into spaces.</span><br><br>
-  <div class="note">In the following examples for /g/, <code>g</code> can be changed to a different board ID (<code>a</code>, <code>b</code>, etc...), the current board (<code>current</code>), or the Twitter link (<code>@</code>).</div>
-  <div>Board link: <code>g</code></div>
-  <div>Archive link: <code>g-archive</code></div>
-  <div>Internal archive link: <code>g-expired</code></div>
-  <div>Title link: <code>g-title</code></div>
-  <div>Board link (Replace with title when on that board): <code>g-replace</code></div>
-  <div>Full text link: <code>g-full</code></div>
-  <div>Custom text link: <code>g-text:&quot;Install Gentoo&quot;</code></div>
-  <div>Index-only link: <code>g-index</code></div>
-  <div>Catalog-only link: <code>g-catalog</code></div>
-  <div>Index mode: <code>g-mode:&quot;infinite scrolling&quot;</code></div>
-  <div>Index sort: <code>g-sort:&quot;creation date rev&quot;</code></div>
-  <div>External link: <code>external-text:&quot;Google&quot;,&quot;http://www.google.com&quot;</code></div>
-  <div>Open in new tab: <code>g-nt</code></div>
-  <div>Combinations are possible: <code>g-index-text:&quot;Technology Index&quot;</code></div>
-  <div>Full board list toggle: <code>toggle-all</code></div>
-  <br>
-  <div class="note">
-    <code>[ toggle-all ] [current-title] [g-title / a-title / jp-title] [x / wsg / h] [t-text:&quot;Piracy&quot;]</code><br>
-    will give you<br>
-    <code>[ + ] [Technology] [Technology / Anime & Manga / Otaku Culture] [x / wsg / h] [Piracy]</code><br>
-    if you are on /g/.
-  </div>
-  <div class="note">
-    For custom styling, you can wrap groups or individual links in <code>{{</code> and <code>}}</code>, to wrap them in
-    a span. You can also add classes in double quotes right after the {{. For example: <br />
-    <code>[g-title] {{"favorites"[a-title / jp-title]}}</code><br />
-    Results in:<br />
-    <code>[&lt;a [...] &gt;Technology&lt;/a&gt;] &lt;span class="favorites"&gt;[&lt;a [...] &gt;Anime &amp;amp;
-      Manga&lt;/a&gt; / &lt;a [...] &gt;Otaku Culture&lt;/a&gt;]&lt;/span&gt;</code>
-  </div>
-</fieldset>
-
-<fieldset>
-  <legend>
-    Time Formatting
-    <span class="warning" data-feature="Time Formatting">is disabled, relative time setting still applies.</span>
-  </legend>
-  <div><input name="time" class="field" spellcheck="false">: <span class="time-preview"></span></div>
-  <div>Supported <a href="http://man7.org/linux/man-pages/man1/date.1.html" target="_blank">format specifiers</a>:</div>
-  <div>Day: <code>%a</code>, <code>%A</code>, <code>%d</code>, <code>%e</code></div>
-  <div>Month: <code>%m</code>, <code>%b</code>, <code>%B</code>, <code>%n</code> (Not zero padded)</div>
-  <div>Year: <code>%y</code>, <code>%Y</code></div>
-  <div>Hour: <code>%k</code>, <code>%H</code>, <code>%l</code>, <code>%I</code>, <code>%p</code>, <code>%P</code></div>
-  <div>Minute: <code>%M</code></div>
-  <div>Second: <code>%S</code></div>
-  <div>Literal <code>%</code>: <code>%%</code></div>
-  <div><a href="https://www.w3.org/International/articles/language-tags/" target="_blank">Language tag</a>: <input name="timeLocale" class="field" spellcheck="false"></div>
-  <div>Relative time, like "3 minutes ago":
-    <select name="RelativeTime">
-      <option value="No">Disabled</option>
-      <option value="Hover">Show when hovering on the date</option>
-      <option value="Show">Show relative time, and time and date on hover</option>
-      <option value="Both">Show both timestamp and relative date</option>
-      <option value="BothRelativeFirst">Show both relative date and timestamp</option>
-    </select>
-  </div>
-</fieldset>
-
-<fieldset>
-  <legend>Quote Backlinks formatting <span class="warning" data-feature="Quote Backlinks">is disabled.</span></legend>
-  <div><input name="backlink" class="field" spellcheck="false">: <span class="backlink-preview"></span></div>
-</fieldset>
-
-<fieldset>
-  <legend>Default pasted content filename</legend>
-  <div><input name="pastedname" class="field" spellcheck="false">.png</div>
-</fieldset>
-
-<fieldset>
-  <legend>File Info Formatting <span class="warning" data-feature="File Info Formatting">is disabled.</span></legend>
-  <div><input name="fileInfo" class="field" spellcheck="false">: <span class="file-info file-info-preview"></span></div>
-  <div>Link: <code>%l</code> (truncated), <code>%L</code> (untruncated), <code>%T</code> (4chan filename)</div>
-  <div>Filename: <code>%n</code> (truncated), <code>%N</code> (untruncated), <code>%t</code> (4chan filename)</div>
-  <div>Download button: <code>%d</code></div>
-  <div>Quick filter MD5: <code>%f</code></div>
-  <div>Spoiler indicator: <code>%p</code></div>
-  <div>Size: <code>%B</code> (Bytes), <code>%K</code> (KB), <code>%M</code> (MB), <code>%s</code> (4chan default)</div>
-  <div>Resolution: <code>%r</code> (Displays &#039;PDF&#039; for PDF files)</div>
-  <div>Tag: <code>%g</code>
-  <div>Literal <code>%</code>: <code>%%</code></div>
-</fieldset>
-
-<fieldset>
-  <legend>Quick Reply Personas</legend>
-  <textarea hidden class="personafield field" name="QR.personas" spellcheck="false"></textarea>
-  <p>
-    One item per line.<br>
-    Items will be added in the relevant input&#039;s auto-completion list.<br>
-    Password items will always be used, since there is no password input.<br>
-    Lines starting with a <code>#</code> will be ignored.
-  </p>
-  <ul>You can use these settings with each item, separate them with semicolons:
-    <li>Possible items are: <code>name</code>, <code>options</code> (or equivalently <code>email</code>), <code>subject</code> and <code>password</code>.</li>
-    <li>Wrap values of items with quotes, like this: <code>options:&quot;sage&quot;</code>.</li>
-    <li>Force values as defaults with the <code>always</code> keyword, for example: <code>options:&quot;sage&quot;;always</code>.</li>
-    <li>Select specific boards for an item, separated with commas, for example: <code>options:&quot;sage&quot;;boards:jp;always</code>.</li>
-  </ul>
-</fieldset>
-
-<fieldset>
-  <legend>Unread Favicon <span class="warning" data-feature="Unread Favicon">is disabled.</span></legend>
-  <select name="favicon">
-    <option value="ferongr">ferongr</option>
-    <option value="xat-">xat-</option>
-    <option value="4chanJS">4chanJS</option>
-    <option value="Mayhem">Mayhem</option>
-    <option value="Original">Original</option>
-    <option value="Metro">Metro</option>
-  </select>
-  <span class="favicon-preview"></span>
-</fieldset>
-
-<fieldset>
-  <legend>Thread Updater <span class="warning" data-feature="Thread Updater">is disabled.</span></legend>
-  <div>
-    Interval: <input type="number" name="Interval" class="field" min="1"> seconds
-  </div>
-</fieldset>
-
-<fieldset>
-    <legend>Custom Cooldown Time</legend>
-    <div>
-        Seconds: <input type="number" name="customCooldown" class="field" min="0">
-    </div>
-</fieldset>
-
-<fieldset>
-  <legend>
-    <label><input type="checkbox" name="Custom CSS"> Custom CSS</label>
-  </legend>
-  <div>For more information about customizing 4chan X&#039;s CSS, see the <a href="https://github.com/ccd0/4chan-x/wiki/Styling-Guide" target="_blank">styling guide</a>.</div>
-  <button id="apply-css">Apply CSS</button>
-  <textarea hidden name="usercss" class="field" spellcheck="false"></textarea>
-</fieldset>
-
-<fieldset>
-  <legend>Javascript Whitelist</legend>
-  <div>
-    Sources from which Javascript is allowed to be loaded by <a href="http://content-security-policy.com/#source_list" target="_blank">Content Security Policy</a>.<br>
-    Lines starting with a <code>#</code> will be ignored. Remove or comment out all lines to allow everything.
-  </div>
-  <textarea hidden name="jsWhitelist" class="field" spellcheck="false"></textarea>
-</fieldset>
-
-<fieldset>
-  <legend>Known Banners</legend>
-  <div>List of known banners, used for click-to-change feature.</div>
-  <textarea hidden name="knownBanners" class="field" spellcheck="false"></textarea>
-</fieldset>
-
-<fieldset>
-  <legend>X (formerly Twitter) embeds</legend>
-  <div>Only applies if embeds are enabled in the main settings</div>
-  <label>Service to use for embeds
-    <select name="XEmbedder">
-      <option value="fxt">FxTwitter</option>
-      <option value="tf">Twitframe</option>
-    </select>
-  </label><br />
-  <label>
-    Language to translate FxTwitter embeds to, as a two character ISO code, like <code>en</code>.
-    Leave empty for no translation.
-    <input name="fxtLang" maxlength="2" class="field" />
-  </label><br />
-  <label>FxTwitter endpoint <input name="fxtUrl" type="url" class="field" /></label><br />
-  <label>FxTwitter maximum amount of replies include
-    <input name="fxtMaxReplies" type="number" min="0" step="1" max="100" class="field" />
-  </label>
-</fieldset>
-
-<fieldset>
-  <legend>Thread updater sound</legend>
-  <label>
-    Sound volume, between 0 and 1:
-    <input name="beepVolume" type="number" min=".01" max="1" step=".01" class="field" />
-  </label><br />
-  <label>
-    Sound url. Can be a base64 one starting with <code>data:</code>. Leave empty for the default beep.
-    <input type="string" name="beepSource" class="field wide" />
-  </label>
-</fieldset>`;
-
-  var KeybindsPage = `<div class="warning"><code>Keybinds</code> are disabled.</div>
-<div>Allowed keys: <kbd>a-z</kbd>, <kbd>0-9</kbd>, <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, <kbd>Alt</kbd>, <kbd>Meta</kbd>, <kbd>Enter</kbd>, <kbd>Esc</kbd>, <kbd>Up</kbd>, <kbd>Down</kbd>, <kbd>Right</kbd>, <kbd>Left</kbd>.</div>
-<div>Press <kbd>Backspace</kbd> to disable a keybind.</div>
-<table><tbody>
-  <tr><th>Actions</th><th>Keybinds</th></tr>
-</tbody></table>
-<button type="button" id="reset-keys">Reset keybinds</button>`;
-
-  var FilterSelectPage = `<select name="filter">
-  <option value="guide">Guide</option>
-  <option value="general">General</option>
-  <option value="postID">Post number</option>
-  <option value="name">Name</option>
-  <option value="uniqueID">Unique ID</option>
-  <option value="tripcode">Tripcode</option>
-  <option value="capcode">Capcode</option>
-  <option value="pass">Pass Date</option>
-  <option value="email">Email</option>
-  <option value="subject">Subject</option>
-  <option value="comment">Comment</option>
-  <option value="flag">Flag</option>
-  <option value="filename">Filename</option>
-  <option value="dimensions">Image dimensions</option>
-  <option value="filesize">Filesize</option>
-  <option value="MD5">Image MD5</option>
-  </select>
-<div></div>`;
-
-  var ExportDialog = `<form id="export-form">
-  <div class="move">Export settings</div>
-  <label><input name="history" type="checkbox" />Export history (last read, your posts, etc)</label><br />
-  <label><input name="ask" type="checkbox" checked />Ask every time.</label><br />
-  <button type="submit">Export</button>
-  <button type="button" id="cancel-export">Cancel</button>
-</form>`;
-
-  const $$ = (selector, root = d.body) => Array.from(root.querySelectorAll(selector));
+  const ExportHtml = (h("form", { id: "export-form" },
+    h("div", { class: "move" }, "Export settings"),
+    h("label", null,
+      h("input", { name: "history", type: "checkbox" }),
+      "Export history (last read, your posts, etc)"),
+    h("br", null),
+    h("label", null,
+      h("input", { name: "ask", type: "checkbox", checked: true }),
+      "Ask every time."),
+    h("br", null),
+    h("button", { type: "submit" }, "Export"),
+    h("button", { type: "button", id: "cancel-export" }, "Cancel")));
 
   const ImageHost = {
     useFaster: undefined,
@@ -5971,7 +7043,7 @@ div.post {
 }`;
 
   // == Create CSS for Link Title Favicons == //
-  const icons$1 = (data) => ('/* Link Title Favicons */\n' +
+  const icons = (data) => ('/* Link Title Favicons */\n' +
     data.map(({ name, data }) => `.linkify.${name}::before {
   content: "";
   background: transparent url('data:image/png;base64,${data}') center left no-repeat!important;
@@ -6279,7 +7351,7 @@ svg.icon {
     { name: "youtube", data: linkifyYoutube },
   ];
   const CSS = {
-    boards: mainCSS + icons$1(faIcons),
+    boards: mainCSS + icons(faIcons),
     report,
     www,
     sub: function (css) {
@@ -6301,1339 +7373,30 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
   const CustomCSS = {
     init() {
-      if (!Conf['Custom CSS']) { return; }
-      return this.addStyle();
+      if (!Conf['Custom CSS']) {
+        return;
+      }
+      this.addStyle();
     },
-
     addStyle() {
-      return this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
+      this.style = $.addStyle(CSS.sub(Conf['usercss']), 'custom-css', '#fourchanx-css');
     },
-
     rmStyle() {
       if (this.style) {
         $.rm(this.style);
-        return delete this.style;
+        delete this.style;
       }
     },
-
     update() {
       if (!this.style) {
-        return this.addStyle();
+        this.addStyle();
+        return;
       }
-      return this.style.textContent = CSS.sub(Conf['usercss']);
+      this.style.textContent = CSS.sub(Conf['usercss']);
     }
   };
-
-  const ImageSvg = 'M448 80c8.8 0 16 7.2 16 16V415.8l-5-6.5-136-176c-4.5-5.9-11.6-9.3-19-9.3s-14.4 3.4-19 9.3L202 340.7l-30.5-42.7C167 291.7 159.8 288 152 288s-15 3.7-19.5 10.1l-80 112L48 416.3l0-.3V96c0-8.8 7.2-16 16-16H448zM64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V96c0-35.3-28.7-64-64-64H64zm80 192a48 48 0 1 0 0-96 48 48 0 1 0 0 96z';
-  const ImageW = 512, ImageH = 512;
-
-  const EyeSvg = 'M288 80c-65.2 0-118.8 29.6-159.9 67.7C89.6 183.5 63 226 49.4 256c13.6 30 40.2 72.5 78.6 108.3C169.2 402.4 222.8 432 288 432s118.8-29.6 159.9-67.7C486.4 328.5 513 286 526.6 256c-13.6-30-40.2-72.5-78.6-108.3C406.8 109.6 353.2 80 288 80zM95.4 112.6C142.5 68.8 207.2 32 288 32s145.5 36.8 192.6 80.6c46.8 43.5 78.1 95.4 93 131.1c3.3 7.9 3.3 16.7 0 24.6c-14.9 35.7-46.2 87.7-93 131.1C433.5 443.2 368.8 480 288 480s-145.5-36.8-192.6-80.6C48.6 356 17.3 304 2.5 268.3c-3.3-7.9-3.3-16.7 0-24.6C17.3 208 48.6 156 95.4 112.6zM288 336c44.2 0 80-35.8 80-80s-35.8-80-80-80c-.7 0-1.3 0-2 0c1.3 5.1 2 10.5 2 16c0 35.3-28.7 64-64 64c-5.5 0-10.9-.7-16-2c0 .7 0 1.3 0 2c0 44.2 35.8 80 80 80zm0-208a128 128 0 1 1 0 256 128 128 0 1 1 0-256z';
-  const EyeW = 576, EyeH = 512;
-
-  const UpRightAndDownLeftFromCenterSvg = 'M344 0H488c13.3 0 24 10.7 24 24V168c0 9.7-5.8 18.5-14.8 22.2s-19.3 1.7-26.2-5.2l-39-39-87 87c-9.4 9.4-24.6 9.4-33.9 0l-32-32c-9.4-9.4-9.4-24.6 0-33.9l87-87L327 41c-6.9-6.9-8.9-17.2-5.2-26.2S334.3 0 344 0zM168 512H24c-13.3 0-24-10.7-24-24V344c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2l39 39 87-87c9.4-9.4 24.6-9.4 33.9 0l32 32c9.4 9.4 9.4 24.6 0 33.9l-87 87 39 39c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8z';
-  const UpRightAndDownLeftFromCenterW = 512, UpRightAndDownLeftFromCenterH = 512;
-
-  const CommentSvg = 'M123.6 391.3c12.9-9.4 29.6-11.8 44.6-6.4c26.5 9.6 56.2 15.1 87.8 15.1c124.7 0 208-80.5 208-160s-83.3-160-208-160S48 160.5 48 240c0 32 12.4 62.8 35.7 89.2c8.6 9.7 12.8 22.5 11.8 35.5c-1.4 18.1-5.7 34.7-11.3 49.4c17-7.9 31.1-16.7 39.4-22.7zM21.2 431.9c1.8-2.7 3.5-5.4 5.1-8.1c10-16.6 19.5-38.4 21.4-62.9C17.7 326.8 0 285.1 0 240C0 125.1 114.6 32 256 32s256 93.1 256 208s-114.6 208-256 208c-37.1 0-72.3-6.4-104.1-17.9c-11.9 8.7-31.3 20.6-54.3 30.6c-15.1 6.6-32.3 12.6-50.1 16.1c-.8 .2-1.6 .3-2.4 .5c-4.4 .8-8.7 1.5-13.2 1.9c-.2 0-.5 .1-.7 .1c-5.1 .5-10.2 .8-15.3 .8c-6.5 0-12.3-3.9-14.8-9.9c-2.5-6-1.1-12.8 3.4-17.4c4.1-4.2 7.8-8.7 11.3-13.5c1.7-2.3 3.3-4.6 4.8-6.9c.1-.2 .2-.3 .3-.5z';
-  const CommentW = 512, CommentH = 512;
-
-  const RotateSvg = 'M142.9 142.9c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8H463.5c0 0 0 0 0 0H472c13.3 0 24-10.7 24-24V72c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5c7.7-21.8 20.2-42.3 37.8-59.8zM16 312v7.6 .7V440c0 9.7 5.8 18.5 14.8 22.2s19.3 1.7 26.2-5.2l41.6-41.6c87.6 86.5 228.7 86.2 315.8-1c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.2 62.2-162.7 62.5-225.3 1L185 329c6.9-6.9 8.9-17.2 5.2-26.2s-12.5-14.8-22.2-14.8H48.4h-.7H40c-13.3 0-24 10.7-24 24z';
-  const RotateW = 512, RotateH = 512;
-
-  const WrenchSvg = 'M352 320c88.4 0 160-71.6 160-160c0-15.3-2.2-30.1-6.2-44.2c-3.1-10.8-16.4-13.2-24.3-5.3l-76.8 76.8c-3 3-7.1 4.7-11.3 4.7H336c-8.8 0-16-7.2-16-16V118.6c0-4.2 1.7-8.3 4.7-11.3l76.8-76.8c7.9-7.9 5.4-21.2-5.3-24.3C382.1 2.2 367.3 0 352 0C263.6 0 192 71.6 192 160c0 19.1 3.4 37.5 9.5 54.5L19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L297.5 310.5c17 6.2 35.4 9.5 54.5 9.5zM80 408a24 24 0 1 1 0 48 24 24 0 1 1 0-48z';
-  const WrenchW = 512, WrenchH = 512;
-
-  const BoltSvg = 'M349.4 44.6c5.9-13.7 1.5-29.7-10.6-38.5s-28.6-8-39.9 1.8l-256 224c-10 8.8-13.6 22.9-8.9 35.3S50.7 288 64 288H175.5L98.6 467.4c-5.9 13.7-1.5 29.7 10.6 38.5s28.6 8 39.9-1.8l256-224c10-8.8 13.6-22.9 8.9-35.3s-16.6-20.7-30-20.7H272.5L349.4 44.6z';
-  const BoltW = 448, BoltH = 512;
-
-  const PencilSvg = 'M410.3 231l11.3-11.3-33.9-33.9-62.1-62.1L291.7 89.8l-11.3 11.3-22.6 22.6L58.6 322.9c-10.4 10.4-18 23.3-22.2 37.4L1 480.7c-2.5 8.4-.2 17.5 6.1 23.7s15.3 8.5 23.7 6.1l120.3-35.4c14.1-4.2 27-11.8 37.4-22.2L387.7 253.7 410.3 231zM160 399.4l-9.1 22.7c-4 3.1-8.5 5.4-13.3 6.9L59.4 452l23-78.1c1.4-4.9 3.8-9.4 6.9-13.3l22.7-9.1v32c0 8.8 7.2 16 16 16h32zM362.7 18.7L348.3 33.2 325.7 55.8 314.3 67.1l33.9 33.9 62.1 62.1 33.9 33.9 11.3-11.3 22.6-22.6 14.5-14.5c25-25 25-65.5 0-90.5L453.3 18.7c-25-25-65.5-25-90.5 0zm-47.4 168l-144 144c-6.2 6.2-16.4 6.2-22.6 0s-6.2-16.4 0-22.6l144-144c6.2-6.2 16.4-6.2 22.6 0s6.2 16.4 0 22.6z';
-  const PencilW = 512, PencilH = 512;
-
-  const ClipboardSvg = 'M192 0c-41.8 0-77.4 26.7-90.5 64H64C28.7 64 0 92.7 0 128V448c0 35.3 28.7 64 64 64H320c35.3 0 64-28.7 64-64V128c0-35.3-28.7-64-64-64H282.5C269.4 26.7 233.8 0 192 0zm0 64a32 32 0 1 1 0 64 32 32 0 1 1 0-64zM112 192H272c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z';
-  const ClipboardW = 384, ClipboardH = 512;
-
-  const ClockSvg = 'M464 256A208 208 0 1 1 48 256a208 208 0 1 1 416 0zM0 256a256 256 0 1 0 512 0A256 256 0 1 0 0 256zM232 120V256c0 8 4 15.5 10.7 20l96 64c11 7.4 25.9 4.4 33.3-6.7s4.4-25.9-6.7-33.3L280 243.2V120c0-13.3-10.7-24-24-24s-24 10.7-24 24z';
-  const ClockW = 512, ClockH = 512;
-
-  const LinkSvg = 'M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-56.5-186.3-15.4l-1.6 1.1c-14.4 10.3-17.7 30.3-7.4 44.6s30.3 17.7 44.6 7.4l1.6-1.1c32.1-22.9 76-19.3 103.8 8.6c31.5 31.5 31.5 82.5 0 114L422.3 334.8c-31.5 31.5-82.5 31.5-114 0c-27.9-27.9-31.5-71.8-8.6-103.8l1.1-1.6c10.3-14.4 6.9-34.4-7.4-44.6s-34.4-6.9-44.6 7.4l-1.1 1.6C206.5 251.2 213 330 263 380c56.5 56.5 148 56.5 204.5 0L579.8 267.7zM60.2 244.3c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 56.5 186.3 15.4l1.6-1.1c14.4-10.3 17.7-30.3 7.4-44.6s-30.3-17.7-44.6-7.4l-1.6 1.1c-32.1 22.9-76 19.3-103.8-8.6C74 372 74 321 105.5 289.5L217.7 177.2c31.5-31.5 82.5-31.5 114 0c27.9 27.9 31.5 71.8 8.6 103.9l-1.1 1.6c-10.3 14.4-6.9 34.4 7.4 44.6s34.4 6.9 44.6-7.4l1.1-1.6C433.5 260.8 427 182 377 132c-56.5-56.5-148-56.5-204.5 0L60.2 244.3z';
-  const LinkW = 640, LinkH = 512;
-
-  const ShuffleSvg = 'M403.8 34.4c12-5 25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V160H352c-10.1 0-19.6 4.7-25.6 12.8L284 229.3 244 176l31.2-41.6C293.3 110.2 321.8 96 352 96h32V64c0-12.9 7.8-24.6 19.8-29.6zM164 282.7L204 336l-31.2 41.6C154.7 401.8 126.2 416 96 416H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c10.1 0 19.6-4.7 25.6-12.8L164 282.7zm274.6 188c-9.2 9.2-22.9 11.9-34.9 6.9s-19.8-16.6-19.8-29.6V416H352c-30.2 0-58.7-14.2-76.8-38.4L121.6 172.8c-6-8.1-15.5-12.8-25.6-12.8H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H96c30.2 0 58.7 14.2 76.8 38.4L326.4 339.2c6 8.1 15.5 12.8 25.6 12.8h32V320c0-12.9 7.8-24.6 19.8-29.6s25.7-2.2 34.9 6.9l64 64c6 6 9.4 14.1 9.4 22.6s-3.4 16.6-9.4 22.6l-64 64z';
-  const ShuffleW = 512, ShuffleH = 512;
-
-  const RotateLeftSvg = 'M48.5 224H40c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2L98.6 96.6c87.6-86.5 228.7-86.2 315.8 1c87.5 87.5 87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3c-62.2-62.2-162.7-62.5-225.3-1L185 183c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H48.5z';
-  const RotateLeftW = 512, RotateLeftH = 512;
-
-  const DownloadSvg = 'M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32V274.7l-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7V32zM64 352c-35.3 0-64 28.7-64 64v32c0 35.3 28.7 64 64 64H448c35.3 0 64-28.7 64-64V416c0-35.3-28.7-64-64-64H346.5l-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352H64zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z';
-  const DownloadW = 512, DownloadH = 512;
-
-  const BookOpenSvg = 'M249.6 471.5c10.8 3.8 22.4-4.1 22.4-15.5V78.6c0-4.2-1.6-8.4-5-11C247.4 52 202.4 32 144 32C93.5 32 46.3 45.3 18.1 56.1C6.8 60.5 0 71.7 0 83.8V454.1c0 11.9 12.8 20.2 24.1 16.5C55.6 460.1 105.5 448 144 448c33.9 0 79 14 105.6 23.5zm76.8 0C353 462 398.1 448 432 448c38.5 0 88.4 12.1 119.9 22.6c11.3 3.8 24.1-4.6 24.1-16.5V83.8c0-12.1-6.8-23.3-18.1-27.6C529.7 45.3 482.5 32 432 32c-58.4 0-103.4 20-123 35.6c-3.3 2.6-5 6.8-5 11V456c0 11.4 11.7 19.3 22.4 15.5z';
-  const BookOpenW = 576, BookOpenH = 512;
-
-  const DownLeftAndUpRightToCenterSvg = 'M439 7c9.4-9.4 24.6-9.4 33.9 0l32 32c9.4 9.4 9.4 24.6 0 33.9l-87 87 39 39c6.9 6.9 8.9 17.2 5.2 26.2s-12.5 14.8-22.2 14.8H296c-13.3 0-24-10.7-24-24V72c0-9.7 5.8-18.5 14.8-22.2s19.3-1.7 26.2 5.2l39 39L439 7zM72 272H216c13.3 0 24 10.7 24 24V440c0 9.7-5.8 18.5-14.8 22.2s-19.3 1.7-26.2-5.2l-39-39L73 505c-9.4 9.4-24.6 9.4-33.9 0L7 473c-9.4-9.4-9.4-24.6 0-33.9l87-87L55 313c-6.9-6.9-8.9-17.2-5.2-26.2s12.5-14.8 22.2-14.8z';
-  const DownLeftAndUpRightToCenterW = 512, DownLeftAndUpRightToCenterH = 512;
-
-  const HeartSvg = 'M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z';
-  const HeartW = 512, HeartH = 512;
-
-  const CaretRightSvg = 'M246.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-9.2-9.2-22.9-11.9-34.9-6.9s-19.8 16.6-19.8 29.6l0 256c0 12.9 7.8 24.6 19.8 29.6s25.7 2.2 34.9-6.9l128-128z';
-  const CaretRightW = 256, CaretRightH = 512;
-
-  const CaretLeftSvg = 'M9.4 278.6c-12.5-12.5-12.5-32.8 0-45.3l128-128c9.2-9.2 22.9-11.9 34.9-6.9s19.8 16.6 19.8 29.6l0 256c0 12.9-7.8 24.6-19.8 29.6s-25.7 2.2-34.9-6.9l-128-128z';
-  const CaretLeftW = 256, CaretLeftH = 512;
-
-  const CaretDownSvg = 'M137.4 374.6c12.5 12.5 32.8 12.5 45.3 0l128-128c9.2-9.2 11.9-22.9 6.9-34.9s-16.6-19.8-29.6-19.8L32 192c-12.9 0-24.6 7.8-29.6 19.8s-2.2 25.7 6.9 34.9l128 128z';
-  const CaretDownW = 320, CaretDownH = 512;
-
-  const ScissorsSvg = 'M256 192l-39.5-39.5c4.9-12.6 7.5-26.2 7.5-40.5C224 50.1 173.9 0 112 0S0 50.1 0 112s50.1 112 112 112c14.3 0 27.9-2.7 40.5-7.5L192 256l-39.5 39.5c-12.6-4.9-26.2-7.5-40.5-7.5C50.1 288 0 338.1 0 400s50.1 112 112 112s112-50.1 112-112c0-14.3-2.7-27.9-7.5-40.5L499.2 76.8c7.1-7.1 7.1-18.5 0-25.6c-28.3-28.3-74.1-28.3-102.4 0L256 192zm22.6 150.6L396.8 460.8c28.3 28.3 74.1 28.3 102.4 0c7.1-7.1 7.1-18.5 0-25.6L342.6 278.6l-64 64zM64 112a48 48 0 1 1 96 0 48 48 0 1 1 -96 0zm48 240a48 48 0 1 1 0 96 48 48 0 1 1 0-96z';
-  const ScissorsW = 512, ScissorsH = 512;
-
-  const XmarkSvg = 'M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z';
-  const XmarkW = 384, XmarkH = 512;
-
-  const ArrowRightLongSvg = 'M502.6 278.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L402.7 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l370.7 0-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l128-128z';
-  const ArrowRightLongW = 512, ArrowRightLongH = 512;
-
-  const PlusSvg = 'M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32V224H48c-17.7 0-32 14.3-32 32s14.3 32 32 32H192V432c0 17.7 14.3 32 32 32s32-14.3 32-32V288H400c17.7 0 32-14.3 32-32s-14.3-32-32-32H256V80z';
-  const PlusW = 448, PlusH = 512;
-
-  const SquarePlusSvg = 'M64 80c-8.8 0-16 7.2-16 16V416c0 8.8 7.2 16 16 16H384c8.8 0 16-7.2 16-16V96c0-8.8-7.2-16-16-16H64zM0 96C0 60.7 28.7 32 64 32H384c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM200 344V280H136c-13.3 0-24-10.7-24-24s10.7-24 24-24h64V168c0-13.3 10.7-24 24-24s24 10.7 24 24v64h64c13.3 0 24 10.7 24 24s-10.7 24-24 24H248v64c0 13.3-10.7 24-24 24s-24-10.7-24-24z';
-  const SquarePlusW = 448, SquarePlusH = 512;
-
-  const SquareMinusSvg = 'M64 80c-8.8 0-16 7.2-16 16V416c0 8.8 7.2 16 16 16H384c8.8 0 16-7.2 16-16V96c0-8.8-7.2-16-16-16H64zM0 96C0 60.7 28.7 32 64 32H384c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM152 232H296c13.3 0 24 10.7 24 24s-10.7 24-24 24H152c-13.3 0-24-10.7-24-24s10.7-24 24-24z';
-  const SquareMinusW = 448, SquareMinusH = 512;
-
-  const PlaySvg = 'M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z';
-  const PlayW = 384, PlayH = 512;
-
-  const StopSvg = 'M0 128C0 92.7 28.7 64 64 64H320c35.3 0 64 28.7 64 64V384c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128z';
-  const StopW = 384, StopH = 512;
-
-  const ArrowUpLongSvg = 'M214.6 9.4c-12.5-12.5-32.8-12.5-45.3 0l-128 128c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 109.3V480c0 17.7 14.3 32 32 32s32-14.3 32-32V109.3l73.4 73.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-128-128z';
-  const ArrowUpLongW = 384, ArrowUpLongH = 512;
-
-  const ArrowDownLongSvg = 'M169.4 502.6c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L224 402.7 224 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 370.7L86.6 329.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128z';
-  const ArrowDownLongW = 384, ArrowDownLongH = 512;
-
-  const toSvg = (svgPathData, width, height) => {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 ${width} ${height}">` +
-      `<path d="${svgPathData}" fill="currentColor" /></svg>`;
-  };
-  const icons = {
-    image: toSvg(ImageSvg, ImageW, ImageH),
-    eye: toSvg(EyeSvg, EyeW, EyeH),
-    expand: toSvg(UpRightAndDownLeftFromCenterSvg, UpRightAndDownLeftFromCenterW, UpRightAndDownLeftFromCenterH),
-    comment: toSvg(CommentSvg, CommentW, CommentH),
-    refresh: toSvg(RotateSvg, RotateW, RotateH),
-    wrench: toSvg(WrenchSvg, WrenchW, WrenchH),
-    bolt: toSvg(BoltSvg, BoltW, BoltH),
-    link: toSvg(LinkSvg, LinkW, LinkH),
-    pencil: toSvg(PencilSvg, PencilW, PencilH),
-    clipboard: toSvg(ClipboardSvg, ClipboardW, ClipboardH),
-    clock: toSvg(ClockSvg, ClockW, ClockH),
-    shuffle: toSvg(ShuffleSvg, ShuffleW, ShuffleH),
-    undo: toSvg(RotateLeftSvg, RotateLeftW, RotateLeftH),
-    download: toSvg(DownloadSvg, DownloadW, DownloadH),
-    bookOpen: toSvg(BookOpenSvg, BookOpenW, BookOpenH),
-    shrink: toSvg(DownLeftAndUpRightToCenterSvg, DownLeftAndUpRightToCenterW, DownLeftAndUpRightToCenterH),
-    heart: toSvg(HeartSvg, HeartW, HeartH),
-    caretRight: toSvg(CaretRightSvg, CaretRightW, CaretRightH),
-    caretLeft: toSvg(CaretLeftSvg, CaretLeftW, CaretLeftH),
-    caretDown: toSvg(CaretDownSvg, CaretDownW, CaretDownH),
-    scissors: toSvg(ScissorsSvg, ScissorsW, ScissorsH),
-    xmark: toSvg(XmarkSvg, XmarkW, XmarkH),
-    arrowRightLong: toSvg(ArrowRightLongSvg, ArrowRightLongW, ArrowRightLongH),
-    plus: toSvg(PlusSvg, PlusW, PlusH),
-    squarePlus: toSvg(SquarePlusSvg, SquarePlusW, SquarePlusH),
-    squareMinus: toSvg(SquareMinusSvg, SquareMinusW, SquareMinusH),
-    play: toSvg(PlaySvg, PlayW, PlayH),
-    stop: toSvg(StopSvg, StopW, StopH),
-    arrowUpLong: toSvg(ArrowUpLongSvg, ArrowUpLongW, ArrowUpLongH),
-    arrowDownLong: toSvg(ArrowDownLongSvg, ArrowDownLongW, ArrowDownLongH)
-  };
-  var Icon = {
-    /** Sets an icon in an HTML element */
-    set(node, name, altText) {
-      const html = icons[name];
-      if (!html)
-        throw new Error(`Icon "${name}" not found.`);
-      if (altText) {
-        node.innerHTML = `<span class="icon--alt-text">${E(altText)}</span>${html}`;
-      } else {
-        node.innerHTML = html;
-      }
-    },
-    /** Get the raw SVG string for an icon. */
-    get(name) {
-      return icons[name];
-    },
-    /** Get the raw SVG string for an icon wrapped for use in JSX. */
-    raw(name) {
-      return { innerHTML: icons[name], [isEscaped]: true };
-    },
-  };
-
-  var QuickReplyPage = `<div class="move">
-  <label>
-    <input type="checkbox" id="autohide" title="Auto-hide">
-    Quick Reply
-  </label>
-  <a href="javascript:;" class="close" title="Close">✕</a>
-  <select data-name="thread" title="Create a new thread / Reply">
-    <option value="new">New thread</option>
-  </select>
-</div>
-<form>
-  <div class="persona">
-    <button type="button" id="sjis-toggle" class="qr-button" title="Toggle Mona font">∀</button>
-    <button type="button" id="tex-preview-button" class="qr-button" title="Preview TeX">T<sub>E</sub>X</button>
-    <input name="name" data-name="name" list="list-name" placeholder="Name" class="field" size="1">
-    <input name="email" data-name="email" list="list-email" placeholder="Options" class="field" size="1">
-    <input name="sub" data-name="sub" list="list-sub" placeholder="Subject" class="field" size="1" maxlength="100">
-  </div>
-  <div class="textarea">
-    <textarea data-name="com" placeholder="Comment" class="field"></textarea>
-    <span id="char-count"></span>
-    <div id="tex-preview"></div>
-  </div>
-  <div id="dump-list-container">
-    <div id="dump-list"></div>
-    <a id="add-post" href="javascript:;" title="Add a post">+</a>
-  </div>
-  <div class="oekaki" hidden>
-    <input type="button" id="qr-draw-button" class="qr-button" value="Draw">
-    <label><span>Width:</span><input name="oekaki-width" value="400" type="number" class="field" size="1"></label>
-    <label><span>Height:</span><input name="oekaki-height" value="400" type="number" class="field" size="1"></label>
-    <span class="oekaki-bg" title="Background Color"><input name="oekaki-bg" type="checkbox" checked><input name="oekaki-bgcolor" type="color" value="#ffffff"></span>
-  </div>
-  <div id="file-n-submit">
-    <span id="qr-file" class="row">
-      <input type="button" id="qr-file-button" class="qr-button" value="Files">
-      <span id="qr-filename-container" class="field">
-        <span id="qr-no-file">No selected file</span>
-        <input id="qr-filename" data-name="filename" spellcheck="false">
-        <label id="qr-spoiler-label">
-          <input type="checkbox" id="qr-file-spoiler" title="Spoiler image">
-          <a class="checkbox-letter">S</a>
-        </label>
-      </span>
-    </span>
-    <span id="qr-actions-container" class="row space">
-      <span id="qr-actions" class="row">
-        <a href="javascript:;" id="qr-oekaki-button" class="qr-action-button" title="Edit in Tegaki">✎︎</a>
-        <a href="javascript:;" id="qr-jpg" class="qr-action-button" title="Compress to jpg">C</a>
-        <a href="javascript:;" id="qr-view" class="qr-action-button" title="Preview">V</a>
-        <a href="javascript:;" id="qr-randomize" class="qr-action-button" title="Randomize filename">R</a>
-        <a href="javascript:;" id="qr-restore-name" class="qr-action-button" title="Reset filename">U</a>
-        <a href="javascript:;" id="qr-filerm" class="qr-action-button" title="Remove file">✕</a>
-        <a href="javascript:;" id="url-button" class="qr-action-button" title="Post from URL">🔗︎</a>
-        <a href="javascript:;" hidden id="paste-area" class="qr-action-button" title="Select to paste images" tabindex="-1" contentEditable="true">📋︎</a>
-        <a href="javascript:;" id="custom-cooldown-button" class="qr-action-button" title="Toggle custom cooldown" class="disabled">🕒︎</a>
-        <a href="javascript:;" id="split-post" class="qr-action-button" title="Split into multiple posts" hidden>✂️</a>
-        <a href="javascript:;" id="dump-button" class="qr-action-button" title="Dump list">➕︎</a>
-      </span>
-      <input class="qr-button" type="submit">
-    </span>
-  </div>
-  <select data-default="4" name="filetag">
-    <option value="0">Hentai</option>
-    <option value="6">Porn</option>
-    <option value="1">Japanese</option>
-    <option value="2">Anime</option>
-    <option value="3">Game</option>
-    <option value="5">Loop</option>
-    <option value="4" selected>Other</option>
-  </select>
-  <input type="file" multiple>
-</form>
-<datalist id="list-name"></datalist>
-<datalist id="list-email"></datalist>
-<datalist id="list-sub"></datalist>`;
-
-  var ferongr_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///9zBQC/AADpDAP/gID/q6voCwJJTwpOAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
-
-  var ferongr_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxUlEQVR42q1TOwrCQBB9s0FRtJI0WoqFtSLYegoP4gVSeJsUHsHSI3iFeIqRXXgwrhlXwYHHhLwPTB7B36abBCV+0pA4DUBQUNZYQptGtW3jtoKyxgoe0yrBCoyZfL/5ioQ3URZOXW9I341l3oo+NXEZiW4CEuIzvPECopED4OaZ3RNmeAm4u+a8Jr5f17VyVoL8fr8qcltzwlyyj2iqcgPOQ9ExkHAITgD75bYBe0A5S4H/P9htuWMF3QXoQpwaKeT+lnsC6JE5I6aq6fEAAAAASUVORK5CYII=';
-
-  var ferongr_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///8AcH4AtswA2PJ55fKi6fIA1/FtpPADAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
-
-  var ferongr_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxElEQVQ4y2NgoBq4/vE/HJOsBiRQUIfA2AzBqQYqUfn00/9FLz+BaQxDCKqBmX7jExijKEDSDJPHrnnbGQhGV4RmOFwdVkNwhQMheYwQxhaIi7b9Z9A3gWAQm2BUoQOgRhgA8o7j1ozLC4LCyAZcx6kZI5qg4kLKqggDFFWxJySsUQVzlb4pwgAJaTRvokcVNgOqOv8zcHBCsL07DgNg8YsczzA5MxtUL+DMD8g0slxI/H8GQ/P/DJKyeKIRpglXZsIiBwBhP5O+VbI/JgAAAABJRU5ErkJggg==';
-
-  var ferongr_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEX///8oeQBJ3ABV/wHM/7Lu/+ZU/gAqUP3dAAAAAXRSTlMAQObYZgAAAGJJREFUeF5Fi7ENg0AQBCfa/AFdDh2gdwPIogMK2E2+/xLslwOvdqRJhv+GQQPUCtJM7svankLrq/I+TY5e6Ueh1jyBMX7AFJi9vwfyVO4CbbO6jNYpp9GyVPbdkFhVgAQ2H0NOE5jk9DT8AAAAAElFTkSuQmCC';
-
-  var ferongr_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAx0lEQVQ4y2NgoBYI+cfwH4ZJVgMS0KhEYGyG4FQDkzjzf9P/d/+fgWl0QwiqgSkI/c8IxsgKkDXD5LFq9rwDweiK0A2HqcNqCK5wICSPEcLYAtH+AMN/IXMIBrEJRie6OEgjDAC5x3FqxuUFNiEUA67j1IweTTBxBQ1puAG86jgSEraogskJWSBcwCGF5k30qMJmgMFEhv/MXBAs5oLDAFj8IsczTE7UEeECbhU8+QGZRpaTi2b4L2zF8J9TGk80wjThykzY5AAW/2O1C2mIbgAAAABJRU5ErkJggg==';
-
-  var xat_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAG1BMVEX+AACLkZFub2yfaF3zZGIAAAD/AAD/iYr/zs8IPcF6AAAABXRSTlMAeprJ7xzg6IEAAABZSURBVAjXY2DABKGBSkqioQwMrGmpxsZhaQEMDGFpIa5pqSCRtPDSNJBIaGh5eShQDYOye0V7iREKAyQFYoiCFAcyILQDGcGmEEZYkGoqiMHKysAQEICwGwAAjBmBqhYlagAAAABJRU5ErkJggg==';
-
-  var xat_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAPFBMVEUAAACEgoBva2ilamDxcG7IaWYgFBNOSEf//f0PDQwBAAA7LCwAAAD/AAD+hIX+m5z+zc5HAADPAAAGAADl032uAAAADHRSTlMAzNv0/vz+6v3+7ALrmfyXAAAAaUlEQVQY042PyxKAIAhFAc1eV7T6/3/N8VXOtAgWwBm4ANEPA8AswpySXHvvYZLlpBNrh9pDtcSqAQ1BUTVIjNUQY5icmwfglmXNgE0d6QBF9GigrU0A9LoM53U1kFzk6SBQuWfD/vHqDUCpBmVKTTM4AAAAAElFTkSuQmCC';
-
-  var xat_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAIVBMVEUAAACRjop4dXVpZ2tdcI9dfKdisfMAAAAumMN9xv+s2/+PADT2AAAAB3RSTlMAepGdv83v3HIc4QAAAFxJREFUCNdjYMAE5YXKRuLlDAzsHe2uIRUdBQwMFR1l6R3tIJGOyukdIJHy8lkry4FqGEwzV62aFozMUAFJOQEZ4iDFhQwI7UBGaTiEUVFs3g5isLMzMBQUIOwGAJRlIu9hk08QAAAAAElFTkSuQmCC';
-
-  var xat_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAMFBMVEUAAACAgYVlc4ljsu4AAAAAAAAAAAAumMODyP6b1P6e1f/g8v89msgSIiwNFxwbPU3tQYj5AAAABnRSTlMAxej+9VTmD9ciAAAAZElEQVQI12NgwARpiUKKYmkMDGzlZUpK6eUJDAzp5clm5WUgkfKMtnKQSFpa54o0oBoGJYvZO88+gjJu7wMyhIBS2SCGGFDxaxADpP32NjAjSe0bSFd6epIaWISNjYEhJRVhNwAGlyJpYtcvcAAAAABJRU5ErkJggg==';
-
-  var xat_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAHlBMVEUfJSCRi5Frbm9dn19082KR/30AAABmzDOq/5vZ/9Gt/vt2AAAABnRSTlMAe5rJ7/4vxEp4AAAAWUlEQVQI12NgwARpiUpKYmkMDGzlZcbG6eUJDAzp5Slu5WUgkfLUsHKQSFpaRGsaUA2DsmvnjBAjFAZICsQQAylOZEBoBzKSzSCM9CS1MhCDjY2BISEBYTcAtgAcKSK2vuIAAAAASUVORK5CYII=';
-
-  var xat_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAM1BMVEUAAACBj39tfm1qj2RepFlu2VQAAQAAAAAAAABmyzOX/oSr/pus/pzk/98PGgtatC4CBAI1ENblAAAACHRSTlMA09/p9v77ig0SBcQAAABnSURBVBjTjY9LDsAgCEQRsR2xWu9/2hK/adJFYQG8wABEPwyAYzNnSatjjPAiviWLhPCqI1R7HBrQdCmGBrEETTmnUAq/QMm5dODHyAQOXXR1zLUGsIEI7lonMGfeHQTq9xw4P159AIxSBSC53km7AAAAAElFTkSuQmCC';
-
-  var Mayhem_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABFklEQVR4AZ2R4WqEMBCEFy1yiJQQ14gcIhIuFBFR+qPQ93+v66QMksrlTwMfkZ2ZZbMKTgVqYIDl3YAbeCM31lJP/Zul4MAEPJjBQGNDLGsz8PQ6aqLAP5PTdd1WlmU09mSKtdTDRgrkzspJPKq6RxMahfj9yhOzQEZwZAwfzrk1ox3MXibIN8hO4MAjeV72CemJGWblnRsOYOdoGw0jebB20BPAwKzUQPlrFhrXFw1Wagu9yuzZwINzVAZCURRL+gRr7Wd8Vtqg4Th/lsUmewyk9WQ/A7NiwJz5VV/GmO+MNjMrFvh/NPDMigHTaeJN09a27ZHRJmalBg54CgfvAGYSLpoHjlmpuAwFdzDy7oGS/qIpM9UPFGg1b1kUlssAAAAASUVORK5CYII=';
-
-  var Mayhem_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABR0lEQVR4AYWSQWq0QBCFCw0SRIK0PQ4hiIhEZBhEySLyewUPEMgqR/JIXiDhzz7kKKYePIZajEzDRxfV9dWU3SO6IiVWUsVxT5R75Y4gTmwNnUh4kCulUiuV8sjChDjmKtaUcHgmHsnNrMPh0IVhiMIjKZGzNXDoyhMzF7C89z2KtFGD+FoNXEUKZdgpaPM8P++cDXTtBDca7EyQK8+bXTufYBccuvLAG26UnqN1LCgI4g/lm7zTgSux4vk0J8rnKw3+m1//pBPbBrVyGZVNmiAITviEtm3t+D+2QcJx7GUxlN4594K4ZY75Xzh0JVWqnad6TdP0H+LRNBjHcYNDV5xS32qwaC4my7Lwn6guu5QoomgbdFmWDYhnM8E8zxscuhLzPWtKA/dGqUizrityX9M0YX+DQ1ciXobnP6vgfmTOM7Znnk70B58pPaEvx+epAAAAAElFTkSuQmCC';
-
-  var Mayhem_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA/ElEQVR4AZ3RUWqEMBSF4ftQZAhSREQJIiIXpQwi+tSldkFdWPsLhyEE0ocKH2Fyzg1mNJ4KAQ1arTUeeJMH6qwTUJmCHjMcC6KKtbSIylzdXpl18J/k4fdTpUFmPLOOa9bGe+P4+n5RYYfLXuiMsAlXofBxK2QXpvwN/jqg+AY91vR+pStk+apZe0fEhhMXDhUmWXEoO9WNmrWAzvRPq7jnB2jvUGfWTEgPcJzZFTbZk/0Tnh5QI+af6lVGvq/Do2atwVL4VJ+3QrZo1lr4Pw5wzVqDWaV7SUvHrZDNmrWAHq7g0rphkS3LXDMBVqFGhxGT1gGdDFnWaab6BRmXRvbxDmYiAAAAAElFTkSuQmCC';
-
-  var Mayhem_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABQElEQVR4AY2SQUrEQBBFS9CMNFEkhAQdYmiCIUgcZlYGc4VsBcGVF/AuWXme4F7RtXiVWF9+Y9MYtOHRTdX/NZWaEj2RYpQTJeEdK4fKPuA7DjSGXiQkU0qlUqxySmFMEsYsNSU8zEmK4OwdEbmkKCclYoGmolfWCGyenh1O0EJE2gXNWpFC2S0IGrCQ29EbdPCPAmEHmXIxByf8hDAPD71yzAnXypatbSgoAN8Pyju5h4deMUrqJk1z+0uBN+/XX+gxfoFK2QafUJO2aRq//Q+/QIx2wr+Kwq0rusrP/QKf9MTCtbQLf9U1wNvYnz3qug45S68kSvVXgbPbx3nvYPXNOI7cRPWySukK+DcGCvA+urqZ3RmGAbmSXjFK5rpwW8nhWVJP04TYa9/3uO/goVciDiPlZhW8c8ZAHuRSeqIv32FK/GYGL8YAAAAASUVORK5CYII=';
-
-  var Mayhem_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA/ElEQVR4AZ3RUWqEMBSF4ftQZAihDCKKiAQJShERQx+6o662e2p/4TCEQF468BEm95yLovFr4PBEq9PjgTd5wBcZp6559AiIWDAq6KXV3aJMUMfDOsTf7Mf/XaFBAvYiE9W16b74/vl8UeBAlKOSmWAzUiXwcavMkrrFE9QXVJ+gx5q9XvUVivmqrr1jxIYLCacCs6y6S8psGNU1hw4Bu4JHuUB3pzJBHZcviLiKV9jkyO4vxHyBx1h+qlcY5b2Wj+raE0vlU33dKrNFXWsR/7EgqmtPBIXuIw+dt8osqGsOPaIGSeeGRbZiFtVxsAYeHSbMOgd0MhSzTp3mD4RaQX4aW3NMAAAAAElFTkSuQmCC';
-
-  var Mayhem_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABP0lEQVR4AYWS0UqFQBCGhziImNRBRImDmUgiIaF0kWSP4AMEXXXTE/QiPpL3UdR19Crb/PAvLEtyFj5mmfn/cdxd0RUokbJXEsZYCZUd4D72NBG8wkKmlEqtVMoFhTFJmKuoKelBTVIkjbNE5IainJTIeZqaXjkg8fp+Z7GCjiLQbWgOihTKsCFowUZtoNef4HgDf4JMuTbe8n/Br8NDr5zxhBul52i3FBQE+xflmzzTA69ESmpPmubunwZfztc/6IncBrXSe7/QkK5tW3f8H7dBjHH8q6Kwt033V6Hb4JeeWPgsq42rugfYZ92psWscRwMPvZIo9bEGD2+F2YUnBizLwpeoXnYpbQM34kAB9peP58aueZ4NPPRKxPusaRoYG6UizbquyH1O04T4RA+8EvAwUr6sgjFnDuReLaUn+ANygUa7+9SCWgAAAABJRU5ErkJggg==';
-
-  var fourChanJS_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAD1BMVEUBAAAAAAD/AABnZ2f///8nFk05AAAAAXRSTlMAQObYZgAAAEFJREFUeNqNjgEKACAMAjvX/98cAkkxgmSgO8Bt/Ai4ApJ6KKhzF3OiEMDASrGB/QWgPEHsUpN+Ng9xAETMYhDrWmeHAMcmvycWAAAAAElFTkSuQmCC';
-
-  var fourChanJS_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAAD/AABmZmYA/wBD99DBAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
-
-  var fourChanJS_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAD1BMVEUBAAAAAAAul8NnZ2f////82iC9AAAAAXRSTlMAQObYZgAAAEFJREFUeNqNjgEKACAMAjvX/98cAkkxgmSgO8Bt/Ai4ApJ6KKhzF3OiEMDASrGB/QWgPEHsUpN+Ng9xAETMYhDrWmeHAMcmvycWAAAAAElFTkSuQmCC';
-
-  var fourChanJS_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAAAul8NnZ2f/AAD7B+mqAAAAAXRSTlMAQObYZgAAAAlwSFlzAAALEgAACxIB0t1+/AAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
-
-  var fourChanJS_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAElBMVEUBAAAAAABmzDNlyjJnZ2f///+6o7dfAAAAAXRSTlMAQObYZgAAAERJREFUeF6NjkEKADEIA51o///lJZfQxUsHITogWi8AvwZJuxmYa25xDooBLEwOWFTYAsYVhdorLZt9Ng9xCUTCUCQ2H3F4ANrZ2WNiAAAAAElFTkSuQmCC';
-
-  var fourChanJS_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEUAAAAAAABmzDNmZmb/AAC8/wCMAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAE9JREFUCNdljcsRACEIQ5MOiNKAdGAJ9N/Uiu7nsMzABHgB4B8ygFoZA2hhVWavhhGeURPJU9q45+17hGbfGxa82Ndex3hEM44SJGD2/b4AzDgGlHbl388AAAAASUVORK5CYII=';
-
-  var Original_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX/////AAD///8AAABBZmS3AAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
-
-  var Original_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAhElEQVR42q1RwQnAMAjMu5M4guAKXa4j5dUROo5tipSDcrFChUONd0di2m/hEGVOHDyIPufgwAFASDkpoSzmBrkJ2UMyR9LsJ3rvrqo3Rt1YMIMhhNnOxLMnoMFBxHyJAr2IOBFzA8U+6pLBdmEJTA0aMVjpDd6Loks0s5HZNwYx8tfZCZ0kll7ORffZAAAAAElFTkSuQmCC';
-
-  var Original_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX///8ul8P///8AAACaqgkzAAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
-
-  var Original_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAALVBMVEUAAAAAAAAAAAAAAAABBQcHFx4KISoNLToaVW4oKCgul8M4ODg7OzvBwcH///8uS/CdAAAAA3RSTlMAx9dmesIgAAAAV0lEQVR42m2NWw6AIBAD1eILZO5/XI0UAgm7H9tOsu0yGWAQSOoFijHOxOANGqm/LczpOaXs4gISrPZ+gc2+hO5w2xdwgOjBFUIF+sEJrhUl9JFr+badFwR+BfqlmGUJAAAAAElFTkSuQmCC';
-
-  var Original_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAgMAAABinRfyAAAADFBMVEX///9mzDP///8AAACT0n1lAAAAAXRSTlMAQObYZgAAAExJREFUeF4tyrENgDAMAMFXKuQswQLBG3mOlBnFS1gwDfIYLpEivvjq2MlqjmYvYg5jWEzCwtDSQlwcXKCVLrpFbvLvvSf9uZJ2HusDtJAY7Tkn1oYAAAAASUVORK5CYII=';
-
-  var Original_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAALVBMVEUAAAAAAAAAAAAAAAAECAIQIAgWLAsePA8oKCg4ODg6dB07OztmzDPBwcH///+rsf3XAAAAA3RSTlMAx9dmesIgAAAAV0lEQVR42m2NWw6AIBAD1eIDhbn/cTVSCCTsfmw7ybbLZIBBIKkXKKU0E4M3aKT+tjCn5xiziwuIsNr7BTb7ErrDZV/AAaIHdwgV6AcnuFaU0Eeu5dt2XiUyBjCQ2bIrAAAAAElFTkSuQmCC';
-
-  var Metro_unreadDead = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAAC/AABrZQDiAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
-
-  var Metro_unreadDeadY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAAC/AAD///8dAAApAABsAAAHAAA4AACQAAAsAABMCpCvAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
-
-  var Metro_unreadSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAAAA1/GhpCidAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
-
-  var Metro_unreadSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAAAA1/H///8AISUALzQAeokACAkAQEcAorYAMTcE9WFNAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
-
-  var Metro_unreadNSFW = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAABlBMVEUAAABV/wErM5hwAAAAAXRSTlMAQObYZgAAABJJREFUCB1jZGBgrMNAQEEc4gCSfAX5bRw/NQAAAABJRU5ErkJggg==';
-
-  var Metro_unreadNSFWY = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAJFBMVEUAAAAAAAAAAABV/wH///8NKAASOAAwkQADCgAZTABAwQATOwC5e3VGAAAAA3RSTlMAPse+s4iwAAAAMklEQVQI12NggAFmY2MDECaNAQZCilAzVJyg5oS4GqAxUtygjIp2KGOKJ5SxepcB3BUAcdYRqxAtgFoAAAAASUVORK5CYII=';
-
-  var dead = 'R0lGODlhEAAQAKECAAAAAP8AAP///////yH5BAEKAAIALAAAAAAQABAAAAIvlI+pq+D9DAgUoFkPDlbs7lFZKIJOJJ3MyraoB14jFpOcVMpzrnF3OKlZYsMWowAAOw==';
-
-  var empty = 'R0lGODlhEAAQAJEAAAAAAP///9vb2////yH5BAEAAAMALAAAAAAQABAAAAIvnI+pq+D9DBAUoFkPFnbs7lFZKIJOJJ3MyraoB14jFpOcVMpzrnF3OKlZYsMWowAAOw==';
-
-  const Favicon = {
-    el: null,
-    status: undefined,
-    isSFW: undefined,
-    default: undefined,
-    unreadDead: undefined,
-    unreadDeadY: undefined,
-    unreadSFW: undefined,
-    unreadSFWY: undefined,
-    unreadNSFW: undefined,
-    unreadNSFWY: undefined,
-    unread: undefined,
-    unreadY: undefined,
-    init() {
-      $.asap(() => d.head && (Favicon.el = $('link[rel="shortcut icon"]', d.head)), Favicon.initAsap);
-    },
-    set(status) {
-      Favicon.status = status;
-      if (Favicon.el) {
-        Favicon.el.href = Favicon[status] || Favicon.default || '';
-        // `favicon.href = href` doesn't work on Firefox.
-        $.add(d.head, Favicon.el);
-      }
-    },
-    initAsap() {
-      if (!Favicon.el) {
-        return;
-      }
-      Favicon.el.type = 'image/x-icon';
-      const { href } = Favicon.el;
-      Favicon.isSFW = /ws\.ico$/.test(href);
-      Favicon.default = href;
-      Favicon.switch();
-      if (Favicon.status) {
-        Favicon.set(Favicon.status);
-      }
-    },
-    switch() {
-      let itemsDict = {
-        ferongr: [
-          ferongr_unreadDead,
-          ferongr_unreadDeadY,
-          ferongr_unreadSFW,
-          ferongr_unreadSFWY,
-          ferongr_unreadNSFW,
-          ferongr_unreadNSFWY,
-        ],
-        'xat-': [
-          xat_unreadDead,
-          xat_unreadDeadY,
-          xat_unreadSFW,
-          xat_unreadSFWY,
-          xat_unreadNSFW,
-          xat_unreadNSFWY,
-        ],
-        Mayhem: [
-          Mayhem_unreadDead,
-          Mayhem_unreadDeadY,
-          Mayhem_unreadSFW,
-          Mayhem_unreadSFWY,
-          Mayhem_unreadNSFW,
-          Mayhem_unreadNSFWY,
-        ],
-        '4chanJS': [
-          fourChanJS_unreadDead,
-          fourChanJS_unreadDeadY,
-          fourChanJS_unreadSFW,
-          fourChanJS_unreadSFWY,
-          fourChanJS_unreadNSFW,
-          fourChanJS_unreadNSFWY,
-        ],
-        Original: [
-          Original_unreadDead,
-          Original_unreadDeadY,
-          Original_unreadSFW,
-          Original_unreadSFWY,
-          Original_unreadNSFW,
-          Original_unreadNSFWY,
-        ],
-        'Metro': [
-          Metro_unreadDead,
-          Metro_unreadDeadY,
-          Metro_unreadSFW,
-          Metro_unreadSFWY,
-          Metro_unreadNSFW,
-          Metro_unreadNSFWY,
-        ]
-      };
-      const items = $.getOwn(itemsDict, Conf['favicon']) || [];
-      const f = Favicon;
-      const t = 'data:image/png;base64,';
-      let i = 0;
-      while (items[i] !== undefined) {
-        items[i] = t + items[i];
-        i++;
-      }
-      [f.unreadDead, f.unreadDeadY, f.unreadSFW, f.unreadSFWY, f.unreadNSFW, f.unreadNSFWY] = items;
-      f.update();
-    },
-    update() {
-      if (this.isSFW) {
-        this.unread = this.unreadSFW;
-        this.unreadY = this.unreadSFWY;
-      } else {
-        this.unread = this.unreadNSFW;
-        this.unreadY = this.unreadNSFWY;
-      }
-    },
-    SFW: '//s.4cdn.org/image/favicon-ws.ico',
-    NSFW: '//s.4cdn.org/image/favicon.ico',
-    dead: `data:image/gif;base64,${dead}`,
-    logo: `data:image/png;base64,${empty}`,
-  };
-
-  const CaptchaReplace = {
-    init() {
-      if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) {
-        return;
-      }
-      if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
-        $.ready(CaptchaReplace.noscript);
-        return;
-      }
-      if (Conf['captchaLanguage'].trim()) {
-        if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-          $.onExists(doc, '#captchaFormPart', node => $.onExists(node, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe));
-        } else {
-          $.onExists(doc, 'iframe[src^="https://www.google.com/recaptcha/"]', CaptchaReplace.iframe);
-        }
-      }
-    },
-    noscript() {
-      let noscript, original, toggle;
-      if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) {
-        return;
-      }
-      const span = $.el('span', { id: 'captcha-forced-noscript' });
-      $.replace(noscript, span);
-      $.rm(original);
-      const insert = () => {
-        span.innerHTML = noscript.textContent || '';
-        const iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', span);
-        if (iframe) {
-          CaptchaReplace.iframe(iframe);
-        }
-      };
-      if (toggle = $('#togglePostFormLink a, #form-link')) {
-        $.on(toggle, 'click', insert);
-      } else {
-        insert();
-      }
-    },
-    iframe(iframe) {
-      let lang;
-      if (lang = Conf['captchaLanguage'].trim()) {
-        const src = /[?&]hl=/.test(iframe.src) ?
-          iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
-          :
-            iframe.src + `&hl=${encodeURIComponent(lang)}`;
-        if (iframe.src !== src) {
-          iframe.src = src;
-        }
-      }
-    }
-  };
-
-  const CaptchaT = {
-    isEnabled: false,
-    isCapturing: false,
-    _isNotLikeOthers: false,
-    pollInterval: undefined,
-    observer: undefined,
-    iframeObserver: undefined,
-    keydownListener: undefined,
-    currentThread: undefined,
-    nodes: undefined,
-    init() {
-      if (isPassEnabled()) {
-        return;
-      }
-      if (!(this.isEnabled = !!$('#t-root') || !$.id('postForm'))) {
-        return;
-      }
-      const root = $.el('div', { className: 'captcha-root' });
-      this.nodes = { root };
-      $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
-      $.after(QR.nodes.com.parentNode, root);
-    },
-    moreNeeded() {
-    },
-    getThread() {
-      return {
-        boardID: g.BOARD.ID,
-        threadID: QR.posts[0].thread === 'new' ? '0' : ('' + QR.posts[0].thread),
-      };
-    },
-    setup(focus) {
-      if (!this.isEnabled) {
-        return;
-      }
-      if (!this.nodes.container) {
-        // Create a child element for TCaptcha to use. TCaptcha.init() will
-        // clear its className and set inline styles on it, but our JS reference
-        // (this.nodes.container) remains valid. We observe captcha-root (the
-        // parent) since it retains its class and stays stable.
-        this.nodes.container = $.el('div', { className: 'captcha-container' });
-        $.prepend(this.nodes.root, this.nodes.container);
-        CaptchaT.currentThread = CaptchaT.getThread();
-        CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
-        this.observer = new MutationObserver(() => {
-          this.createStrips();
-        });
-        // Observe captcha-root, NOT captcha-container, because TCaptcha clears
-        // the container's className making class-based queries fail.
-        this.observer.observe(this.nodes.root, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
-        $.global('setupTCaptcha', CaptchaT.currentThread);
-        // Polling fallback for style changes that MutationObserver might miss.
-        if (!this.pollInterval) {
-          this.pollInterval = setInterval(() => {
-            if (!this.nodes.container) {
-              clearInterval(this.pollInterval);
-              delete this.pollInterval;
-              return;
-            }
-            this.createStrips();
-          }, 500);
-        }
-      }
-      if (focus)
-        $('#t-resp').focus();
-    },
-    createStrips() {
-      const mainDiv = this.nodes.container;
-      if (!mainDiv)
-        return;
-      const slider = $('#t-slider', mainDiv);
-      const taskEl = $('#t-task', mainDiv);
-      let customUiExists = !!$('.captcha-custom-ui', mainDiv);
-      // If there's no slider or it has no max attribute, it's not a real puzzle
-      // (e.g., "Verification not required", "Captcha expired", or initializing)
-      if (!slider || !slider.hasAttribute('max')) {
-        $.rmClass(this.nodes.root, 'is-challenge');
-        this._isNotLikeOthers = false;
-        return;
-      }
-      const imgEl = taskEl ? $('img', taskEl) : null;
-      // Now we know it's a real puzzle because it has a max attribute.
-      // If it has no image clue, it must be the odd one out!
-      if (!imgEl) {
-        this._isNotLikeOthers = true;
-      } else if (imgEl && imgEl.src) {
-        this._isNotLikeOthers = false;
-      }
-      const isNotLikeOthers = !!this._isNotLikeOthers;
-      const taskBg = taskEl ? taskEl.style.backgroundImage : '';
-      let clueUrl = '';
-      if (imgEl && imgEl.src) {
-        clueUrl = `url("${imgEl.src}")`;
-      } else if (taskBg && taskBg.includes('url(')) {
-        clueUrl = taskBg;
-      }
-      // Safety check, though the max attribute check above already guarantees it's a challenge
-      const isChallenge = !!clueUrl || isNotLikeOthers;
-      if (!customUiExists && !isChallenge) {
-        $.rmClass(this.nodes.root, 'is-challenge');
-        return;
-      }
-      // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
-      if (customUiExists) {
-        const customUi = $('.captcha-custom-ui', mainDiv);
-        const oldStep = customUi ? customUi.dataset.step : '';
-        const tNextNode = $('#t-next', mainDiv);
-        const newStep = tNextNode ? tNextNode.textContent : '';
-        let isNewChallenge = false;
-        if (oldStep && newStep && oldStep !== newStep) {
-          isNewChallenge = true;
-        } else if (imgEl && imgEl.src) {
-          const existingClueImage = $('.captcha-clue-image', mainDiv);
-          if (existingClueImage && existingClueImage.style.backgroundImage !== `url("${imgEl.src}")`) {
-            isNewChallenge = true;
-          }
-        }
-        if (isNewChallenge) {
-          if (customUi)
-            $.rm(customUi);
-          const existingClueImage = $('.captcha-clue-image', mainDiv);
-          if (existingClueImage)
-            $.rm(existingClueImage);
-          customUiExists = false;
-          this.isCapturing = false;
-        }
-      }
-      // If we've already built the custom UI for this challenge, or we're building it, do nothing.
-      // The custom UI will naturally be destroyed when TCaptcha wipes the container on reload.
-      if (customUiExists || this.isCapturing || !slider || !taskEl)
-        return;
-      // We are at the initial challenge state!
-      this.isCapturing = true;
-      // Create the clue image and insert it into #t-ctrl
-      const tCtrl = $('#t-ctrl', mainDiv);
-      if (tCtrl) {
-        const clueImage = $.el('div', { className: 'captcha-clue-image' });
-        if (isNotLikeOthers) {
-          clueImage.style.display = 'none';
-        } else {
-          clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
-        }
-        const tNextNode = $('#t-next', tCtrl);
-        if (tNextNode) {
-          $.before(tNextNode, clueImage);
-        } else {
-          $.add(tCtrl, clueImage);
-        }
-      }
-      // Create the strips container (acting as the custom UI marker)
-      const stripsContainer = $.el('div', {
-        className: `captcha-strips captcha-custom-ui${isNotLikeOthers ? ' is-odd-one-out' : ''}`
-      });
-      const tNextForStep = $('#t-next', mainDiv);
-      if (tNextForStep) {
-        stripsContainer.dataset.step = tNextForStep.textContent;
-      }
-      const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
-      const count = maxVal + 1;
-      const startIndex = isNotLikeOthers ? 1 : 0;
-      for (let i = startIndex; i < count; i++) {
-        const strip = $.el('div', { className: 'captcha-strip', tabIndex: 0 });
-        strip.dataset.index = '' + i;
-        $.on(strip, 'click', () => {
-          if (this.isCapturing)
-            return;
-          slider.value = '' + i;
-          slider.dispatchEvent(new Event('change', { bubbles: true }));
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
-          $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
-          $.addClass(strip, 'selected');
-        });
-        $.add(stripsContainer, strip);
-      }
-      const tBox = $('#t-box', mainDiv);
-      if (tBox) {
-        $.add(tBox, stripsContainer);
-      } else {
-        $.add(mainDiv, stripsContainer);
-      }
-      // Now capture the 4 puzzle images by programmatically moving the slider
-      const originalSliderValue = slider.value;
-      const runCapture = async () => {
-        let lastBg = taskEl.style.backgroundImage; // Track the actual style property
-        for (let i = startIndex; i < count; i++) {
-          await new Promise(resolve => {
-            let isResolved = false;
-            const observer = new MutationObserver(() => {
-              const currentBg = taskEl.style.backgroundImage;
-              if (currentBg && currentBg.includes('url(') && currentBg !== lastBg) {
-                isResolved = true;
-                observer.disconnect();
-                resolve();
-              }
-            });
-            observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
-            slider.value = '' + i;
-            slider.dispatchEvent(new Event('input', { bubbles: true }));
-            slider.dispatchEvent(new Event('change', { bubbles: true }));
-            // Failsafe timeout
-            setTimeout(() => {
-              if (!isResolved) {
-                observer.disconnect();
-                resolve();
-              }
-            }, 1000);
-          });
-          const stripIndex = i - startIndex;
-          const strip = stripsContainer.children[stripIndex];
-          if (strip) {
-            lastBg = taskEl.style.backgroundImage;
-            strip.style.backgroundImage = lastBg;
-            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
-            strip.style.backgroundSize = taskEl.style.backgroundSize;
-            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
-          }
-        }
-        // Done capturing!
-        this.isCapturing = false;
-        // Restore slider and visually select the active strip
-        slider.value = originalSliderValue;
-        slider.dispatchEvent(new Event('change', { bubbles: true }));
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        const targetValue = parseInt(originalSliderValue, 10) || 0;
-        const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
-        if (targetStrip)
-          targetStrip.click();
-      };
-      runCapture();
-      if (!this.keydownListener) {
-        this.keydownListener = (e) => {
-          if (!this.nodes.container || this.isCapturing)
-            return;
-          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp')
-            return;
-          const key = e.key;
-          if (key === ' ') {
-            const tNext = $('#t-next', this.nodes.container);
-            if (tNext && !tNext.disabled) {
-              e.preventDefault();
-              tNext.click();
-            }
-          } else if (key >= '1' && key <= '9') {
-            const index = parseInt(key, 10) - 1;
-            const stripElements = $$('.captcha-strip', this.nodes.root);
-            if (stripElements[index]) {
-              e.preventDefault();
-              stripElements[index].click();
-              stripElements[index].focus();
-            }
-          }
-        };
-        $.on(document, 'keydown', this.keydownListener);
-      }
-      // Apply CSS class to hide native elements
-      $.addClass(this.nodes.root, 'is-challenge');
-    },
-    destroy() {
-      if (this.observer) {
-        this.observer.disconnect();
-        delete this.observer;
-      }
-      if (this.pollInterval) {
-        clearInterval(this.pollInterval);
-        delete this.pollInterval;
-      }
-      if (this.keydownListener) {
-        $.off(document, 'keydown', this.keydownListener);
-        delete this.keydownListener;
-      }
-      if (!this.isEnabled || !this.nodes.container) {
-        return;
-      }
-      $.global('destroyTCaptcha');
-      $.rm(this.nodes.container);
-      $.rmClass(this.nodes.root, 'is-challenge');
-      delete this.nodes.container;
-    },
-    updateThread() {
-      if (!this.isEnabled) {
-        return;
-      }
-      const { boardID, threadID } = (CaptchaT.currentThread || {});
-      const newThread = CaptchaT.getThread();
-      if ((newThread.boardID !== boardID) || (newThread.threadID !== threadID)) {
-        CaptchaT.destroy();
-        CaptchaT.setup();
-      }
-    },
-    getOne() {
-      let el;
-      let response = {};
-      if (this.nodes.container) {
-        for (var key of ['t-response', 't-challenge']) {
-          response[key] = $(`[name='${key}']`, this.nodes.container).value;
-        }
-      }
-      if (!response['t-response'] && !((el = $('#t-msg, #t-task')) && /Verification not required/i.test(el.textContent))) {
-        response = null;
-      }
-      return response;
-    },
-    setUsed() {
-      if (this.isEnabled && this.nodes.container) {
-        $.global('TCaptchaClearChallenge');
-      }
-    },
-    occupied() {
-      return !!this.nodes.container;
-    },
-    setupIframe() {
-      this.isEnabled = true;
-      const mainDiv = $('#t-slider')?.parentNode;
-      if (!mainDiv) {
-        this.iframeObserver = new MutationObserver(() => {
-          const md = $('#t-slider')?.parentNode;
-          if (md) {
-            this.iframeObserver.disconnect();
-            this.initIframeTransformation(md);
-          }
-        });
-        this.iframeObserver.observe(document.body, { childList: true, subtree: true });
-      } else {
-        this.initIframeTransformation(mainDiv);
-      }
-    },
-    initIframeTransformation(mainDiv) {
-      const slider = $('#t-slider', mainDiv);
-      if (!slider)
-        return;
-      this.observer = new MutationObserver(() => {
-        this.createIframeStrips(mainDiv, slider);
-      });
-      const taskEl = $('#t-task', mainDiv);
-      if (taskEl) {
-        this.observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
-      }
-      this.createIframeStrips(mainDiv, slider);
-      $.on(window, 'message', (e) => {
-        const me = e;
-        if (me.data && me.data.type === 'select-strip') {
-          const index = me.data.index;
-          const strips = $$('.captcha-strip', mainDiv);
-          if (strips[index]) {
-            strips[index].click();
-            strips[index].focus();
-          }
-        }
-      });
-      if (!this.keydownListener) {
-        this.keydownListener = (e) => {
-          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp')
-            return;
-          const key = e.key;
-          if (key >= '1' && key <= '9') {
-            const index = parseInt(key, 10) - 1;
-            const strips = $$('.captcha-strip', mainDiv);
-            if (strips[index]) {
-              e.preventDefault();
-              strips[index].click();
-              strips[index].focus();
-            }
-          }
-        };
-        $.on(document, 'keydown', this.keydownListener);
-      }
-    },
-    createIframeStrips(mainDiv, slider) {
-      let strips = $('.captcha-strips', mainDiv);
-      if (!strips) {
-        const maxStr = slider.getAttribute('max');
-        const max = maxStr ? parseInt(maxStr, 10) : 3;
-        const count = max + 1;
-        strips = $.el('div', { className: 'captcha-strips' });
-        for (let i = 0; i < count; i++) {
-          const strip = $.el('div', { className: 'captcha-strip', tabIndex: 0 });
-          strip.dataset.index = '' + i;
-          strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
-          $.on(strip, 'click', () => {
-            slider.value = i;
-            slider.dispatchEvent(new Event('change', { bubbles: true }));
-            slider.dispatchEvent(new Event('input', { bubbles: true }));
-            $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
-            $.addClass(strip, 'selected');
-          });
-          $.add(strips, strip);
-        }
-        $.add(mainDiv, strips);
-      }
-      const taskEl = $('#t-task', mainDiv);
-      if (!taskEl)
-        return;
-      const bg = taskEl.style.backgroundImage;
-      const isChallenge = bg && bg.includes('url(');
-      if (isChallenge) {
-        $$('.captcha-strip', strips).forEach(strip => {
-          strip.style.backgroundImage = bg;
-        });
-        taskEl.style.setProperty('background-image', 'none', 'important');
-        $.addClass(document.documentElement, 'is-challenge');
-        strips.style.display = '';
-      } else if (bg !== 'none') {
-        $.rmClass(document.documentElement, 'is-challenge');
-        strips.style.display = 'none';
-      }
-    }
-  };
-
-  ;
-  /**
-   * This class handles data related to specific threads or posts. This data is automatically cleaned up when the thread
-   * ages out.
-   * TODO At this moment, .get and .set aren't fully typed yet.
-   */
-  class DataBoard {
-    constructor(key, sync, dontClean = false) {
-      this.changes = [];
-      this.onSync = this.onSync.bind(this);
-      this.key = key;
-      this.initData(Conf[this.key]);
-      $.sync(this.key, this.onSync);
-      if (!dontClean)
-        this.clean();
-      if (!sync)
-        return;
-      // Chrome also fires the onChanged callback on the current tab,
-      // so we only start syncing when we're ready.
-      var init = () => {
-        $.off(d, '4chanXInitFinished', init);
-        this.sync = sync;
-      };
-      $.on(d, '4chanXInitFinished', init);
-    }
-    initData(data) {
-      let boards;
-      this.data = data;
-      if (this.data.boards) {
-        let lastChecked;
-        ({ boards, lastChecked } = this.data);
-        this.data['4chan.org'] = { boards, lastChecked };
-        delete this.data.boards;
-        delete this.data.lastChecked;
-      }
-      return this.data[g.SITE.ID] || (this.data[g.SITE.ID] = { boards: dict() });
-    }
-    save(change, cb) {
-      change();
-      this.changes.push(change);
-      return $.get(this.key, { boards: dict() }, (items) => {
-        if (!this.changes.length) {
-          return;
-        }
-        const needSync = ((items[this.key].version || 0) > (this.data.version || 0));
-        if (needSync) {
-          this.initData(items[this.key]);
-          for (change of this.changes) {
-            change();
-          }
-        }
-        this.changes = [];
-        this.data.version = (this.data.version || 0) + 1;
-        return $.set(this.key, this.data, () => {
-          if (needSync) {
-            this.sync?.();
-          }
-          return cb?.();
-        });
-      });
-    }
-    forceSync(cb) {
-      return $.get(this.key, { boards: dict() }, (items) => {
-        if ((items[this.key].version || 0) > (this.data.version || 0)) {
-          this.initData(items[this.key]);
-          for (var change of this.changes) {
-            change();
-          }
-          this.sync?.();
-        }
-        return cb?.();
-      });
-    }
-    delete({ siteID, boardID, threadID, postID }, cb) {
-      if (!siteID) {
-        siteID = g.SITE.ID;
-      }
-      if (!this.data[siteID]) {
-        return;
-      }
-      this.save(() => {
-        if (postID) {
-          if (!this.data[siteID].boards[boardID]?.[threadID]) {
-            return;
-          }
-          delete this.data[siteID].boards[boardID][threadID][postID];
-          this.deleteIfEmpty({ siteID, boardID, threadID });
-        } else if (threadID) {
-          if (!this.data[siteID].boards[boardID]) {
-            return;
-          }
-          delete this.data[siteID].boards[boardID][threadID];
-          this.deleteIfEmpty({ siteID, boardID });
-        } else {
-          delete this.data[siteID].boards[boardID];
-        }
-      }, cb);
-    }
-    deleteIfEmpty({ siteID, boardID, threadID }) {
-      if (!this.data[siteID]) {
-        return;
-      }
-      if (threadID) {
-        if (!Object.keys(this.data[siteID].boards[boardID][threadID]).length) {
-          delete this.data[siteID].boards[boardID][threadID];
-          this.deleteIfEmpty({ siteID, boardID });
-        }
-      } else if (!Object.keys(this.data[siteID].boards[boardID]).length) {
-        delete this.data[siteID].boards[boardID];
-      }
-    }
-    set(data, cb) {
-      this.save(() => {
-        this.setUnsafe(data);
-      }, cb);
-    }
-    setUnsafe({ siteID, boardID, threadID, postID, val }) {
-      if (!siteID) {
-        siteID = g.SITE.ID;
-      }
-      if (!this.data[siteID])
-        this.data[siteID] = { boards: dict() };
-      const boards = this.data[siteID].boards;
-      if (postID !== undefined) {
-        let base;
-        (((base = boards[boardID] || (boards[boardID] = dict())))[threadID] || (base[threadID] = dict()))[postID] = val;
-      } else if (threadID !== undefined) {
-        (boards[boardID] || (boards[boardID] = dict()))[threadID] = val;
-      } else {
-        boards[boardID] = val;
-      }
-    }
-    extend({ siteID, boardID, threadID, postID, val }, cb) {
-      this.save(() => {
-        const oldVal = this.get({ siteID, boardID, threadID, postID, defaultValue: dict() });
-        for (var key in val) {
-          var subVal = val[key];
-          if (typeof subVal === 'undefined') {
-            delete oldVal[key];
-          } else {
-            oldVal[key] = subVal;
-          }
-        }
-        this.setUnsafe({ siteID, boardID, threadID, postID, val: oldVal });
-      }, cb);
-    }
-    setLastChecked(key = 'lastChecked') {
-      this.save(() => {
-        this.data[key] = Date.now();
-      });
-    }
-    get({ siteID, boardID, threadID, postID, defaultValue }) {
-      let board, val;
-      if (!siteID) {
-        siteID = g.SITE.ID;
-      }
-      if (board = this.data[siteID]?.boards[boardID]) {
-        let thread;
-        if (threadID == null) {
-          if (postID != null) {
-            for (thread = 0; thread < board.length; thread++) {
-              if (postID in thread) {
-                val = thread[postID];
-                break;
-              }
-            }
-          } else {
-            val = board;
-          }
-        } else if (thread = board[threadID]) {
-          val = (postID != null) ? thread[postID] : thread;
-        }
-      }
-      return val || defaultValue;
-    }
-    clean() {
-      let boardID, middle;
-      const siteID = g.SITE.ID;
-      for (boardID in this.data[siteID].boards) {
-        this.deleteIfEmpty({ siteID, boardID });
-      }
-      const now = Date.now();
-      if (now - (2 * HOUR) >= ((middle = this.data[siteID].lastChecked || 0)) || middle > now) {
-        this.data[siteID].lastChecked = now;
-        for (boardID in this.data[siteID].boards) {
-          this.ajaxClean(boardID);
-        }
-      }
-    }
-    ajaxClean(boardID) {
-      const that = this;
-      const siteID = g.SITE.ID;
-      const threadsList = g.SITE.urls.threadsListJSON?.({ siteID, boardID });
-      if (!threadsList) {
-        return;
-      }
-      $.cache(threadsList, function () {
-        if (this.status !== 200) {
-          return;
-        }
-        const archiveList = g.SITE.urls.archiveListJSON?.({ siteID, boardID });
-        if (!archiveList)
-          return that.ajaxCleanParse(boardID, this.response);
-        const response1 = this.response;
-        $.cache(archiveList, function () {
-          if ((this.status !== 200) && (!!g.SITE.archivedBoardsKnown || (this.status !== 404))) {
-            return;
-          }
-          that.ajaxCleanParse(boardID, response1, this.response);
-        });
-      });
-    }
-    ajaxCleanParse(boardID, response1, response2) {
-      let board, ID;
-      const siteID = g.SITE.ID;
-      if (!(board = this.data[siteID].boards[boardID]))
-        return;
-      const threads = dict();
-      if (response1) {
-        for (var page of response1) {
-          for (var thread of page.threads) {
-            ID = thread.no;
-            if (ID in board) {
-              threads[ID] = board[ID];
-            }
-          }
-        }
-      }
-      if (response2) {
-        for (ID of response2) {
-          if (ID in board)
-            threads[ID] = board[ID];
-        }
-      }
-      this.data[siteID].boards[boardID] = threads;
-      this.deleteIfEmpty({ siteID, boardID });
-      $.set(this.key, this.data);
-    }
-    onSync(data) {
-      if ((data.version || 0) <= (this.data.version || 0)) {
-        return;
-      }
-      this.initData(data);
-      this.sync?.();
-    }
-  }
-  DataBoard.keys = [
-    'hiddenThreads',
-    'hiddenPosts',
-    'hiddenPosterIds',
-    'lastReadPosts',
-    'yourPosts',
-    'watchedThreads',
-    'watcherLastModified',
-    'customTitles',
-  ];
-
-  class SimpleDict {
-    constructor() {
-      this.keys = [];
-    }
-    push(key, data) {
-      key = `${key}`;
-      if (!this[key]) {
-        this.keys.push(key);
-      }
-      this[key] = data;
-    }
-    insert(key, data, compare = (lastKey, key) => (+lastKey) < (+key)) {
-      const keyString = key.toString();
-      if (keyString in this) {
-        this[keyString] = data;
-        return this.keys.indexOf(keyString);
-      }
-      const length = this.keys.length;
-      if (!length || compare(this.lastKey(), key)) {
-        this.push(key, data);
-        return length;
-      }
-      let indexOfNext = this.keys.findIndex(k => !compare(k, key));
-      if (indexOfNext === -1) {
-        this.push(key, data);
-      } else {
-        this[keyString] = data;
-        this.keys.splice(indexOfNext, 0, keyString);
-      }
-      return indexOfNext;
-    }
-    insertAt(key, index, data) {
-      this[key] = data;
-      this.keys.splice(index, 0, key);
-    }
-    rm(key) {
-      let i;
-      key = `${key}`;
-      if ((i = this.keys.indexOf(key)) !== -1) {
-        this.keys.splice(i, 1);
-        delete this[key];
-      }
-    }
-    forEach(fn) {
-      for (var key of this.keys) {
-        fn(this[key]);
-      }
-    }
-    get(key) {
-      if (key === 'keys') {
-        return undefined;
-      } else {
-        return $.getOwn(this, key);
-      }
-    }
-    lastKey() {
-      return this.keys[this.keys.length - 1];
-    }
-    last() {
-      return this.keys.length ? this[this.keys.length - 1] : undefined;
-    }
-  }
-
-  class Thread {
-    toString() { return this.ID; }
-    constructor(ID, board) {
-      this.board = board;
-      this.ID = +ID;
-      this.threadID = this.ID;
-      this.boardID = this.board.ID;
-      this.siteID = g.SITE.ID;
-      this.fullID = `${this.board}.${this.ID}`;
-      this.posts = new SimpleDict();
-      this.isDead = false;
-      this.isHidden = false;
-      this.isSticky = false;
-      this.isClosed = false;
-      this.isArchived = false;
-      this.postLimit = false;
-      this.fileLimit = false;
-      this.lastPost = 0;
-      this.ipCount = undefined;
-      this.json = null;
-      this.OP = null;
-      this.catalogView = null;
-      this.nodes =
-        { root: null };
-      this.board.threads.push(this.ID, this);
-      g.threads.push(this.fullID, this);
-    }
-    setPage(pageNum) {
-      let icon;
-      const { info, reply } = this.OP.nodes;
-      if (!(icon = $('.page-num', info))) {
-        icon = $.el('span', { className: 'page-num' });
-        $.replace(reply.parentNode.previousSibling, [$.tn(' '), icon, $.tn(' ')]);
-      }
-      icon.title = `This thread is on page ${pageNum} in the original index.`;
-      icon.textContent = `[${pageNum}]`;
-      if (this.catalogView) {
-        return this.catalogView.nodes.pageCount.textContent = pageNum;
-      }
-    }
-    setCount(type, count, reachedLimit) {
-      if (!this.catalogView) {
-        return;
-      }
-      const el = this.catalogView.nodes[`${type}Count`];
-      el.textContent = count;
-      return (reachedLimit ? $.addClass : $.rmClass)(el, 'warning');
-    }
-    setStatus(type, status) {
-      const name = `is${type}`;
-      if (this[name] === status) {
-        return;
-      }
-      this[name] = status;
-      if (!this.OP) {
-        return;
-      }
-      this.setIcon('Sticky', this.isSticky);
-      this.setIcon('Closed', this.isClosed && !this.isArchived);
-      return this.setIcon('Archived', this.isArchived);
-    }
-    setIcon(type, status) {
-      const typeLC = type.toLowerCase();
-      let icon = $(`.${typeLC}Icon`, this.OP.nodes.info);
-      if (!!icon === status) {
-        return;
-      }
-      if (!status) {
-        $.rm(icon.previousSibling);
-        $.rm(icon);
-        if (this.catalogView) {
-          $.rm($(`.${typeLC}Icon`, this.catalogView.nodes.icons));
-        }
-        return;
-      }
-      icon = $.el('img', {
-        src: `${g.SITE.Build.staticPath}${typeLC}${g.SITE.Build.gifIcon}`,
-        alt: type,
-        title: type,
-        className: `${typeLC}Icon retina`
-      });
-      if (g.BOARD.ID === 'f') {
-        icon.style.cssText = 'height: 18px; width: 18px;';
-      }
-      const root = (type !== 'Sticky') && this.isSticky ?
-        $('.stickyIcon', this.OP.nodes.info)
-        :
-          $('.page-num', this.OP.nodes.info) || this.OP.nodes.quote;
-      $.after(root, [$.tn(' '), icon]);
-      if (!this.catalogView) {
-        return;
-      }
-      return ((type === 'Sticky') && this.isClosed ? $.prepend : $.add)(this.catalogView.nodes.icons, icon.cloneNode());
-    }
-    kill() {
-      return this.isDead = true;
-    }
-    collect() {
-      let n = 0;
-      this.posts.forEach(function (post) {
-        if (post.clones.length) {
-          return n++;
-        } else {
-          return post.collect();
-        }
-      });
-      if (!n) {
-        g.threads.rm(this.fullID);
-        return this.board.threads.rm(this);
-      }
-    }
-  }
 
   class CatalogThread {
     toString() {
@@ -7657,404 +7420,446 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
+  const reads = [];
+  const writes = [];
+  let scheduled = false;
+  function runTasks() {
+    scheduled = false;
+    // Run all reads first
+    const currentReads = reads.slice();
+    reads.length = 0;
+    for (let i = 0; i < currentReads.length; i++) {
+      try {
+        currentReads[i]();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    // Run all writes next
+    const currentWrites = writes.slice();
+    writes.length = 0;
+    for (let i = 0; i < currentWrites.length; i++) {
+      try {
+        currentWrites[i]();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+  function scheduleFrame() {
+    if (!scheduled) {
+      scheduled = true;
+      requestAnimationFrame(runTasks);
+    }
+  }
+  const FastDOM = {
+    read(cb) {
+      reads.push(cb);
+      scheduleFrame();
+    },
+    write(cb) {
+      writes.push(cb);
+      scheduleFrame();
+    },
+    clear(cb) {
+      const readIndex = reads.indexOf(cb);
+      if (readIndex !== -1) {
+        reads.splice(readIndex, 1);
+        return;
+      }
+      const writeIndex = writes.indexOf(cb);
+      if (writeIndex !== -1) {
+        writes.splice(writeIndex, 1);
+      }
+    }
+  };
 
-  const dialog = function(id, properties) {
+  const dialog = function (id, properties) {
     const el = $.el('div', {
       className: 'dialog',
       id
+    });
+    if (properties) {
+      $.extend(el, properties);
     }
-    );
-    $.extend(el, properties);
     el.style.cssText = Conf[`${id}.position`];
-
     const move = $('.move', el);
     $.on(move, 'touchstart mousedown', dragstart);
-    for (var child of move.children) {
-      if (!child.tagName) { continue; }
-      $.on(child, 'touchstart mousedown', e => e.stopPropagation());
+    for (const child of move.children) {
+      if (!child.tagName) {
+        continue;
+      }
+      $.on(child, 'touchstart mousedown', (e) => e.stopPropagation());
     }
-
     return el;
   };
-
-  var Menu$1 = (function() {
-    let currentMenu = undefined;
-    let lastToggledButton = undefined;
-    Menu$1 = class Menu {
-      static initClass() {
-        currentMenu       = null;
-        lastToggledButton = null;
-      }
-
-      constructor(type) {
-        // XXX AddMenuEntry event is deprecated
-        this.setPosition = this.setPosition.bind(this);
-        this.close = this.close.bind(this);
-        this.keybinds = this.keybinds.bind(this);
-        this.onFocus = this.onFocus.bind(this);
-        this.addEntry = this.addEntry.bind(this);
-        this.type = type;
-        $.on(d, 'AddMenuEntry', ({detail}) => {
-          if (detail.type !== this.type) { return; }
-          delete detail.open;
-          return this.addEntry(detail);
-        });
-        this.entries = [];
-      }
-
-      makeMenu() {
-        const menu = $.el('div', {
-          className: 'dialog',
-          id:        'menu',
-          tabIndex:  0
+  class MenuClass {
+    constructor(type) {
+      this.setPosition = this.setPosition.bind(this);
+      this.close = this.close.bind(this);
+      this.keybinds = this.keybinds.bind(this);
+      this.onFocus = this.onFocus.bind(this);
+      this.addEntry = this.addEntry.bind(this);
+      this.type = type;
+      $.on(d$1, 'AddMenuEntry', ({ detail }) => {
+        if (detail.type !== this.type) {
+          return;
         }
-        );
-        menu.dataset.type = this.type;
-        $.on(menu, 'click', e => e.stopPropagation());
-        $.on(menu, 'keydown', this.keybinds);
-        return menu;
-      }
-
-      toggle(e, button, data) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (currentMenu) {
-          // Close if it's already opened.
-          // Reopen if we clicked on another button.
-          const previousButton = lastToggledButton;
-          currentMenu.close();
-          if (previousButton === button) { return; }
+        delete detail.open;
+        this.addEntry(detail);
+      });
+      this.entries = [];
+    }
+    makeMenu() {
+      const menu = $.el('div', {
+        className: 'dialog',
+        id: 'menu',
+        tabIndex: 0
+      });
+      menu.dataset.type = this.type;
+      $.on(menu, 'click', e => e.stopPropagation());
+      $.on(menu, 'keydown', this.keybinds);
+      return menu;
+    }
+    toggle(e, button, data) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (Menu$1.currentMenu) {
+        const previousButton = Menu$1.lastToggledButton;
+        Menu$1.currentMenu.close();
+        if (previousButton === button) {
+          return;
         }
-
-        if (!this.entries.length) { return; }
-        return this.open(button, data);
       }
-
-      open(button, data) {
-        let entry;
-        const menu = (this.menu = this.makeMenu());
-        currentMenu       = this;
-        lastToggledButton = button;
-
-        this.entries.sort((first, second) => first.order - second.order);
-
-        for (entry of this.entries) {
-          this.insertEntry(entry, menu, data);
+      if (!this.entries.length) {
+        return;
+      }
+      this.open(button, data);
+    }
+    open(button, data) {
+      let entry;
+      const menu = (this.menu = this.makeMenu());
+      Menu$1.currentMenu = this;
+      Menu$1.lastToggledButton = button;
+      this.entries.sort((first, second) => first.order - second.order);
+      for (entry of this.entries) {
+        this.insertEntry(entry, menu, data);
+      }
+      $.addClass(Menu$1.lastToggledButton, 'active');
+      $.on(d$1, 'click CloseMenu', this.close);
+      $.on(d$1, 'scroll', this.setPosition);
+      $.on(window, 'resize', this.setPosition);
+      $.after(button, menu);
+      this.setPosition();
+      entry = $('.entry', menu);
+      this.focus(entry);
+      menu.focus();
+    }
+    setPosition() {
+      if (!this.menu || !Menu$1.lastToggledButton) {
+        return;
+      }
+      const menuEl = this.menu;
+      const buttonEl = Menu$1.lastToggledButton;
+      FastDOM.read(() => {
+        if (!this.menu || !Menu$1.lastToggledButton) {
+          return;
         }
-
-        $.addClass(lastToggledButton, 'active');
-
-        $.on(d, 'click CloseMenu', this.close);
-        $.on(d, 'scroll', this.setPosition);
-        $.on(window, 'resize', this.setPosition);
-        $.after(button, menu);
-
-        this.setPosition();
-
-        entry = $('.entry', menu);
-        // We've removed flexbox, so we don't use order anymore.
-        // while prevEntry = @findNextEntry entry, -1
-        //   entry = prevEntry
-        this.focus(entry);
-
-        return menu.focus();
-      }
-
-      setPosition() {
-        const mRect   = this.menu.getBoundingClientRect();
-        const bRect   = lastToggledButton.getBoundingClientRect();
+        const mRect = menuEl.getBoundingClientRect();
+        const bRect = buttonEl.getBoundingClientRect();
         const cHeight = doc.clientHeight;
-        const cWidth  = doc.clientWidth;
+        const cWidth = doc.clientWidth;
         const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
           [`${bRect.bottom}px`, '']
-        :
-          ['', `${cHeight - bRect.top}px`];
+          :
+            ['', `${cHeight - bRect.top}px`];
         const [left, right] = (bRect.left + mRect.width) < cWidth ?
           [`${bRect.left}px`, '']
-        :
-          ['', `${cWidth - bRect.right}px`];
-        $.extend(this.menu.style, {top, right, bottom, left});
-        return this.menu.classList.toggle('left', right);
-      }
-
-      insertEntry(entry, parent, data) {
-        let submenu;
-        if (typeof entry.open === 'function') {
-          try {
-            if (!entry.open(data)) { return; }
-          } catch (err) {
-            Callbacks.errorHandler?.({
-              message: `Error in building the ${this.type} menu.`,
-              error: err
-            });
+          :
+            ['', `${cWidth - bRect.right}px`];
+        FastDOM.write(() => {
+          if (!this.menu || !Menu$1.lastToggledButton) {
             return;
           }
-        }
-        $.add(parent, entry.el);
-
-        if (!entry.subEntries) { return; }
-        if (submenu = $('.submenu', entry.el)) {
-          // Reset sub menu, remove irrelevant entries.
-          $.rm(submenu);
-        }
-        submenu = $.el('div',
-          {className: 'dialog submenu'});
-        for (var subEntry of entry.subEntries) {
-          this.insertEntry(subEntry, submenu, data);
-        }
-        $.add(entry.el, submenu);
-      }
-
-      close() {
-        $.rm(this.menu);
-        delete this.menu;
-        $.rmClass(lastToggledButton, 'active');
-        currentMenu       = null;
-        lastToggledButton = null;
-        $.off(d, 'click scroll CloseMenu', this.close);
-        $.off(d, 'scroll', this.setPosition);
-        return $.off(window, 'resize', this.setPosition);
-      }
-
-      findNextEntry(entry, direction) {
-        const entries = [...entry.parentNode.children];
-        entries.sort((first, second) => first.style.order - second.style.order);
-        return entries[entries.indexOf(entry) + direction];
-      }
-
-      keybinds(e) {
-        let subEntry;
-        let next, submenu;
-        let entry = $('.focused', this.menu);
-        while ((subEntry = $('.focused', entry))) {
-          entry = subEntry;
-        }
-
-        switch (e.keyCode) {
-          case 27: // Esc
-            lastToggledButton.focus();
-            this.close();
-            break;
-          case 13: case 32: // Enter, Space
-            entry.click();
-            break;
-          case 38: // Up
-            if (next = this.findNextEntry(entry, -1)) {
-              this.focus(next);
-            }
-            break;
-          case 40: // Down
-            if (next = this.findNextEntry(entry, +1)) {
-              this.focus(next);
-            }
-            break;
-          case 39: // Right
-            if ((submenu = $('.submenu', entry)) && (next = submenu.firstElementChild)) {
-              let nextPrev;
-              while ((nextPrev = this.findNextEntry(next, -1))) {
-                next = nextPrev;
-              }
-              this.focus(next);
-            }
-            break;
-          case 37: // Left
-            if (next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry)) {
-              this.focus(next);
-            }
-            break;
-          default:
+          $.extend(menuEl.style, { top, right, bottom, left });
+          menuEl.classList.toggle('left', !!right);
+        });
+      });
+    }
+    insertEntry(entry, parent, data) {
+      let submenu;
+      if (typeof entry.open === 'function') {
+        try {
+          if (!entry.open(data)) {
             return;
+          }
+        } catch (err) {
+          Callbacks.errorHandler?.({
+            message: `Error in building the ${this.type} menu.`,
+            error: err
+          });
+          return;
         }
-
-        e.preventDefault();
-        return e.stopPropagation();
       }
-
-      onFocus(e) {
-        e.stopPropagation();
-        return this.focus(e.target);
+      $.add(parent, entry.el);
+      if (!entry.subEntries) {
+        return;
       }
-
-      focus(entry) {
-        let focused, submenu;
-        while ((focused = $.x('parent::*/child::*[contains(@class,"focused")]', entry))) {
-          $.rmClass(focused, 'focused');
-        }
-        for (focused of $$('.focused', entry)) {
-          $.rmClass(focused, 'focused');
-        }
-        $.addClass(entry, 'focused');
-
-        // Submenu positioning.
-        if (!(submenu = $('.submenu', entry))) { return; }
-        const sRect   = submenu.getBoundingClientRect();
-        const eRect   = entry.getBoundingClientRect();
+      if (submenu = $('.submenu', entry.el)) {
+        $.rm(submenu);
+      }
+      submenu = $.el('div', { className: 'dialog submenu' });
+      for (const subEntry of entry.subEntries) {
+        this.insertEntry(subEntry, submenu, data);
+      }
+      $.add(entry.el, submenu);
+    }
+    close() {
+      if (!this.menu) {
+        return;
+      }
+      $.rm(this.menu);
+      delete this.menu;
+      if (Menu$1.lastToggledButton) {
+        $.rmClass(Menu$1.lastToggledButton, 'active');
+      }
+      Menu$1.currentMenu = null;
+      Menu$1.lastToggledButton = null;
+      $.off(d$1, 'click scroll CloseMenu', this.close);
+      $.off(d$1, 'scroll', this.setPosition);
+      $.off(window, 'resize', this.setPosition);
+    }
+    findNextEntry(entry, direction) {
+      const entries = [...entry.parentNode.children];
+      entries.sort((first, second) => Number(first.style.order || 0) - Number(second.style.order || 0));
+      return entries[entries.indexOf(entry) + direction];
+    }
+    keybinds(e) {
+      if (!this.menu || !Menu$1.lastToggledButton) {
+        return;
+      }
+      let subEntry;
+      let next, submenu;
+      let entry = $('.focused', this.menu);
+      while ((subEntry = $('.focused', entry))) {
+        entry = subEntry;
+      }
+      switch (e.keyCode) {
+        case 27: // Esc
+          Menu$1.lastToggledButton.focus();
+          this.close();
+          break;
+        case 13:
+        case 32: // Enter, Space
+          entry.click();
+          break;
+        case 38: // Up
+          if (next = this.findNextEntry(entry, -1)) {
+            this.focus(next);
+          }
+          break;
+        case 40: // Down
+          if (next = this.findNextEntry(entry, +1)) {
+            this.focus(next);
+          }
+          break;
+        case 39: // Right
+          if ((submenu = $('.submenu', entry)) && (next = submenu.firstElementChild)) {
+            let nextPrev;
+            while ((nextPrev = this.findNextEntry(next, -1))) {
+              next = nextPrev;
+            }
+            this.focus(next);
+          }
+          break;
+        case 37: // Left
+          if (next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry)) {
+            this.focus(next);
+          }
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    onFocus(e) {
+      e.stopPropagation();
+      this.focus(e.target);
+    }
+    focus(entry) {
+      let focused, submenu;
+      while ((focused = $.x('parent::*/child::*[contains(@class,"focused")]', entry))) {
+        $.rmClass(focused, 'focused');
+      }
+      for (const el of $$('.focused', entry)) {
+        $.rmClass(el, 'focused');
+      }
+      $.addClass(entry, 'focused');
+      if (!(submenu = $('.submenu', entry))) {
+        return;
+      }
+      const submenuEl = submenu;
+      const entryEl = entry;
+      FastDOM.read(() => {
+        const sRect = submenuEl.getBoundingClientRect();
+        const eRect = entryEl.getBoundingClientRect();
         const cHeight = doc.clientHeight;
-        const cWidth  = doc.clientWidth;
+        const cWidth = doc.clientWidth;
         const [top, bottom] = (eRect.top + sRect.height) < cHeight ?
           ['0px', 'auto']
-        :
-          ['auto', '0px'];
+          :
+            ['auto', '0px'];
         const [left, right] = (eRect.right + sRect.width) < (cWidth - 150) ?
           ['100%', 'auto']
-        :
-          ['auto', '100%'];
-        const {style} = submenu;
-        style.top    = top;
-        style.bottom = bottom;
-        style.left   = left;
-        return style.right  = right;
+          :
+            ['auto', '100%'];
+        FastDOM.write(() => {
+          const { style } = submenuEl;
+          style.top = top;
+          style.bottom = bottom;
+          style.left = left;
+          style.right = right;
+        });
+      });
+    }
+    addEntry(entry) {
+      this.parseEntry(entry);
+      this.entries.push(entry);
+    }
+    parseEntry(entry) {
+      const { el, subEntries } = entry;
+      $.addClass(el, 'entry');
+      $.on(el, 'focus mouseover', this.onFocus);
+      el.style.order = String(entry.order || 100);
+      if (!subEntries) {
+        return;
       }
-
-      addEntry(entry) {
-        this.parseEntry(entry);
-        return this.entries.push(entry);
+      $.addClass(el, 'has-submenu');
+      for (const subEntry of subEntries) {
+        this.parseEntry(subEntry);
       }
-
-      parseEntry(entry) {
-        const {el, subEntries} = entry;
-        $.addClass(el, 'entry');
-        $.on(el, 'focus mouseover', this.onFocus);
-        el.style.order = entry.order || 100;
-        if (!subEntries) { return; }
-        $.addClass(el, 'has-submenu');
-        for (var subEntry of subEntries) {
-          this.parseEntry(subEntry);
-        }
-        const span = $.el('span',
-          {className: 'menu-indicator'}
-        );
-        Icon.set(span, 'caretRight');
-        $.add(el, span);
-      }
-    };
-    Menu$1.initClass();
-    return Menu$1;
-  })();
-
+      const span = $.el('span', { className: 'menu-indicator' });
+      Icon.set(span, 'caretRight');
+      $.add(el, span);
+    }
+  }
+  const Menu$1 = MenuClass;
+  Menu$1.currentMenu = null;
+  Menu$1.lastToggledButton = null;
   var dragstart = function (e) {
     let isTouching;
-    if ((e.type === 'mousedown') && (e.button !== 0)) { return; } // not LMB
-    // prevent text selection
+    if ((e.type === 'mousedown') && (e.button !== 0)) {
+      return;
+    } // not LMB
     e.preventDefault();
     if (isTouching = e.type === 'touchstart') {
       e = e.changedTouches[e.changedTouches.length - 1];
     }
-    // distance from pointer to el edge is constant; calculate it here.
     const el = $.x('ancestor::div[contains(@class,"dialog")][1]', this);
     const rect = el.getBoundingClientRect();
     const screenHeight = doc.clientHeight;
-    const screenWidth  = doc.clientWidth;
+    const screenWidth = doc.clientWidth;
     const o = {
-      id:     el.id,
-      style:  el.style,
-      dx:     e.clientX - rect.left,
-      dy:     e.clientY - rect.top,
+      id: el.id,
+      style: el.style,
+      dx: e.clientX - rect.left,
+      dy: e.clientY - rect.top,
       height: screenHeight - rect.height,
-      width:  screenWidth  - rect.width,
+      width: screenWidth - rect.width,
       screenHeight,
       screenWidth,
       isTouching
     };
-
     [o.topBorder, o.bottomBorder] = Conf['Header auto-hide'] || !Conf['Fixed Header'] ?
       [0, 0]
-    : Conf['Bottom Header'] ?
-      [0, Header.bar.getBoundingClientRect().height]
-    :
-      [Header.bar.getBoundingClientRect().height, 0];
-
+      : Conf['Bottom Header'] ?
+        [0, Header.bar.getBoundingClientRect().height]
+        :
+          [Header.bar.getBoundingClientRect().height, 0];
     if (isTouching) {
       o.identifier = e.identifier;
       o.move = touchmove.bind(o);
-      o.up   = touchend.bind(o);
-      $.on(d, 'touchmove', o.move);
-      return $.on(d, 'touchend touchcancel', o.up);
+      o.up = touchend.bind(o);
+      $.on(d$1, 'touchmove', o.move);
+      $.on(d$1, 'touchend touchcancel', o.up);
     } else { // mousedown
       o.move = drag.bind(o);
-      o.up   = dragend.bind(o);
-      $.on(d, 'mousemove', o.move);
-      return $.on(d, 'mouseup',   o.up);
+      o.up = dragend.bind(o);
+      $.on(d$1, 'mousemove', o.move);
+      $.on(d$1, 'mouseup', o.up);
     }
   };
-
   var touchmove = function (e) {
-    for (var touch of e.changedTouches) {
+    for (const touch of e.changedTouches) {
       if (touch.identifier === this.identifier) {
         drag.call(this, touch);
         return;
       }
     }
   };
-
   var drag = function (e) {
-    const {clientX, clientY} = e;
-
+    const { clientX, clientY } = e;
     let left = clientX - this.dx;
     left = left < 10 ?
       0
-    : (this.width - left) < 10 ?
-      ''
-    :
-      ((left / this.screenWidth) * 100) + '%';
-
+      : (this.width - left) < 10 ?
+        ''
+        :
+          ((left / this.screenWidth) * 100) + '%';
     let top = clientY - this.dy;
     top = top < (10 + this.topBorder) ?
       this.topBorder + 'px'
-    : (this.height - top) < (10 + this.bottomBorder) ?
-      ''
-    :
-      ((top / this.screenHeight) * 100) + '%';
-
+      : (this.height - top) < (10 + this.bottomBorder) ?
+        ''
+        :
+          ((top / this.screenHeight) * 100) + '%';
     const right = left === '' ?
       0
-    :
-      '';
-
+      :
+        '';
     const bottom = top === '' ?
       this.bottomBorder + 'px'
-    :
-      '';
-
-    const {style} = this;
-    style.left   = left;
-    style.right  = right;
-    style.top    = top;
+      :
+        '';
+    const { style } = this;
+    style.left = left;
+    style.right = right;
+    style.top = top;
     style.bottom = bottom;
   };
-
   var touchend = function (e) {
-    for (var touch of e.changedTouches) {
+    for (const touch of e.changedTouches) {
       if (touch.identifier === this.identifier) {
         dragend.call(this);
         return;
       }
     }
   };
-
   var dragend = function () {
     if (this.isTouching) {
-      $.off(d, 'touchmove', this.move);
-      $.off(d, 'touchend touchcancel', this.up);
+      $.off(d$1, 'touchmove', this.move);
+      $.off(d$1, 'touchend touchcancel', this.up);
     } else { // mouseup
-      $.off(d, 'mousemove', this.move);
-      $.off(d, 'mouseup',   this.up);
+      $.off(d$1, 'mousemove', this.move);
+      $.off(d$1, 'mouseup', this.up);
     }
     if (this.style.length === 2) { // assume only left or right and top or bottom
       $.set(`${this.id}.position`, this.style.cssText);
     } else { // only include position data.
       const { left, right, top, bottom } = this.style;
       let position = '';
-      if (left) position += `left:${left};`;
-      if (right) position += `right:${right};`;
-      if (top) position += `top:${top};`;
-      if (bottom) position += `bottom:${bottom};`;
+      if (left)
+        position += `left:${left};`;
+      if (right)
+        position += `right:${right};`;
+      if (top)
+        position += `top:${top};`;
+      if (bottom)
+        position += `bottom:${bottom};`;
       $.set(`${this.id}.position`, position);
     }
   };
-
   const hoverstart = function ({ root, el, latestEvent, endEvents, height, width, cb, noRemove }) {
     const rect = root.getBoundingClientRect();
     const o = {
@@ -8066,307 +7871,193 @@ svg.icon {
       endEvents,
       latestEvent,
       clientHeight: doc.clientHeight,
-      clientWidth:  doc.clientWidth,
+      clientWidth: doc.clientWidth,
       height,
       width,
       noRemove,
       clientX: (rect.left + rect.right) / 2,
       clientY: (rect.top + rect.bottom) / 2
     };
-    o.hover    = hover.bind(o);
+    o.hover = hover.bind(o);
     o.hoverend = hoverend.bind(o);
-
     o.hover(o.latestEvent);
-    new MutationObserver(function() {
-      if (el.parentNode) { return o.hover(o.latestEvent); }
-    }).observe(el, {childList: true});
-
-    $.on(root, endEvents,   o.hoverend);
+    new MutationObserver(function () {
+      if (el.parentNode) {
+        o.hover(o.latestEvent);
+      }
+    }).observe(el, { childList: true });
+    $.on(root, endEvents, o.hoverend);
     if ($.x('ancestor::div[contains(@class,"inline")][1]', root)) {
-      $.on(d,    'keydown',   o.hoverend);
+      $.on(d$1, 'keydown', o.hoverend);
     }
     $.on(root, 'mousemove', o.hover);
-
-    // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=674955
-    o.workaround = function(e) { if (!root.contains(e.target)) { return o.hoverend(e); } };
-    return $.on(doc,  'mousemove', o.workaround);
+    o.workaround = function (e) { if (!root.contains(e.target)) {
+      o.hoverend(e);
+    } };
+    $.on(doc, 'mousemove', o.workaround);
   };
-
   hoverstart.padding = 25;
-
   var hover = function (e) {
     this.latestEvent = e;
     const height = (this.height || this.el.offsetHeight) + hoverstart.padding;
-    const width  = (this.width  || this.el.offsetWidth);
-    const {clientX, clientY} = Conf['Follow Cursor'] ? e : this;
-
+    const width = (this.width || this.el.offsetWidth);
+    const { clientX, clientY } = Conf['Follow Cursor'] ? e : this;
     const top = this.isImage ?
       Math.max(0, (clientY * (this.clientHeight - height)) / this.clientHeight)
-    :
-      Math.max(0, Math.min(this.clientHeight - height, clientY - 120));
-
+      :
+        Math.max(0, Math.min(this.clientHeight - height, clientY - 120));
     let threshold = this.clientWidth / 2;
-    if (!this.isImage) { threshold = Math.max(threshold, this.clientWidth - 400); }
+    if (!this.isImage) {
+      threshold = Math.max(threshold, this.clientWidth - 400);
+    }
     let marginX = (clientX <= threshold ? clientX : this.clientWidth - clientX) + 45;
-    if (this.isImage) { marginX = Math.min(marginX, this.clientWidth - width); }
+    if (this.isImage) {
+      marginX = Math.min(marginX, this.clientWidth - width);
+    }
     marginX += 'px';
     const [left, right] = clientX <= threshold ? [marginX, ''] : ['', marginX];
-
-    const {style} = this;
-    style.top   = top + 'px';
-    style.left  = left;
-    return style.right = right;
+    const { style } = this;
+    style.top = top + 'px';
+    style.left = left;
+    style.right = right;
   };
-
   var hoverend = function (e) {
-    if (((e.type === 'keydown') && (e.keyCode !== 13)) || (e.target.nodeName === "TEXTAREA")) { return; }
-    if (!this.noRemove) { $.rm(this.el); }
-    $.off(this.root, this.endEvents,  this.hoverend);
-    $.off(d,     'keydown',   this.hoverend);
+    if (((e.type === 'keydown') && (e.keyCode !== 13)) || (e.target.nodeName === "TEXTAREA")) {
+      return;
+    }
+    if (!this.noRemove) {
+      $.rm(this.el);
+    }
+    $.off(this.root, this.endEvents, this.hoverend);
+    $.off(d$1, 'keydown', this.hoverend);
     $.off(this.root, 'mousemove', this.hover);
-    // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=674955
-    $.off(doc,   'mousemove', this.workaround);
-    if (this.cb) { return this.cb.call(this); }
+    $.off(doc, 'mousemove', this.workaround);
+    if (this.cb) {
+      this.cb.call(this);
+    }
   };
-
   const checkbox = function (name, text, checked) {
-    if (checked == null) { checked = Conf[name]; }
+    if (checked == null) {
+      checked = Conf[name];
+    }
     const label = $.el('label');
-    const input = $.el('input', {type: 'checkbox', name, checked});
+    const input = $.el('input', { type: 'checkbox', name, checked });
     $.add(label, [input, $.tn(` ${text}`)]);
     return label;
   };
-
   const UI = {
     dialog,
     Menu: Menu$1,
-    hover:    hoverstart,
+    hover: hoverstart,
     checkbox
   };
 
-  // @ts-nocheck
-
-  var Nav = {
+  const Nav = {
     init() {
       switch (g.VIEW) {
         case 'index':
-          if (!Conf['Index Navigation']) { return; }
+          if (!Conf['Index Navigation']) {
+            return;
+          }
           break;
         case 'thread':
-          if (!Conf['Reply Navigation']) { return; }
+          if (!Conf['Reply Navigation']) {
+            return;
+          }
           break;
         default:
           return;
       }
-
-      const span = $.el('span',
-        {id: 'navlinks'});
+      const span = $.el('span', { id: 'navlinks' });
       const prev = $.el('a', {
-        textContent: 'â–²',
+        textContent: '▲',
         className: 'navlinks-navlink navlink-prev',
         href: 'javascript:;'
-      }
-      );
+      });
       const next = $.el('a', {
-        textContent: 'â–¼',
+        textContent: '▼',
         className: 'navlinks-navlink navlink-next',
         href: 'javascript:;'
-      }
-      );
-
+      });
       Icon.set(prev, 'arrowUpLong');
       Icon.set(next, 'arrowDownLong');
-
       $.on(prev, 'click', this.prev);
       $.on(next, 'click', this.next);
-
       $.add(span, [prev, $.tn(' '), next]);
-      var append = function() {
-        $.off(d, '4chanXInitFinished', append);
-        return $.add(d.body, span);
+      const append = function () {
+        $.off(d$1, '4chanXInitFinished', append);
+        $.add(d$1.body, span);
       };
-      return $.on(d, '4chanXInitFinished', append);
+      $.on(d$1, '4chanXInitFinished', append);
     },
-
     prev() {
       if (g.VIEW === 'thread') {
-        return window.scrollTo(0, 0);
+        window.scrollTo(0, 0);
       } else {
-        return Nav.scroll(-1);
+        Nav.scroll(-1);
       }
     },
-
     next() {
       if (g.VIEW === 'thread') {
-        return window.scrollTo(0, d.body.scrollHeight);
+        window.scrollTo(0, d$1.body.scrollHeight);
       } else {
-        return Nav.scroll(+1);
+        Nav.scroll(+1);
       }
     },
-
     getThread() {
-      if (g.VIEW === 'thread') { return g.threads.get(`${g.BOARD}.${g.THREADID}`).nodes.root; }
-      if ($.hasClass(doc, 'catalog-mode')) { return; }
-      for (var threadRoot of $$(g.SITE.selectors.thread)) {
-        var thread = Get.threadFromRoot(threadRoot);
-        if (thread.isHidden && !thread.stub) { continue; }
+      if (g.VIEW === 'thread') {
+        return g.threads.get(`${g.BOARD.ID}.${g.THREADID}`).nodes.root;
+      }
+      if ($.hasClass(doc, 'catalog-mode')) {
+        return;
+      }
+      for (const threadRoot of $$(g.SITE.selectors.thread, d$1)) {
+        const thread = Get.threadFromRoot(threadRoot);
+        if (thread.isHidden && !thread.stub) {
+          continue;
+        }
         if (Header.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
           return threadRoot;
         }
       }
+      return null;
     },
-
     scroll(delta) {
       let next;
-      d.activeElement?.blur();
+      d$1.activeElement?.blur();
       let thread = Nav.getThread();
-      if (!thread) { return; }
+      if (!thread) {
+        return;
+      }
       const axis = delta === +1 ?
         'following'
-      :
-        'preceding';
+        :
+          'preceding';
       if (next = $.x(`${axis}-sibling::${g.SITE.xpath.thread}[not(@hidden)][1]`, thread)) {
-        // Unless we're not at the beginning of the current thread,
-        // and thus wanting to move to beginning,
-        // or we're above the first thread and don't want to skip it.
         const top = Header.getTopOf(thread);
-        if (((delta === +1) && (top < 5)) || ((delta === -1) && (top > -5))) { thread = next; }
+        if (((delta === +1) && (top < 5)) || ((delta === -1) && (top > -5))) {
+          thread = next;
+        }
       }
-      // Add extra space to the end of the page if necessary so that all threads can be selected by keybinds.
-      const extra = (Header.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
-      if (extra > 0) { d.body.style.marginBottom = `${extra}px`; }
-
+      const extra = (Header.getTopOf(thread) + doc.clientHeight) - d$1.body.getBoundingClientRect().bottom;
+      if (extra > 0) {
+        d$1.body.style.marginBottom = `${extra}px`;
+      }
       Header.scrollTo(thread);
-
       if ((extra > 0) && !Nav.haveExtra) {
         Nav.haveExtra = true;
-        return $.on(d, 'scroll', Nav.removeExtra);
+        $.on(d$1, 'scroll', Nav.removeExtra);
       }
     },
-
     removeExtra() {
-      const extra = doc.clientHeight - d.body.getBoundingClientRect().bottom;
+      const extra = doc.clientHeight - d$1.body.getBoundingClientRect().bottom;
       if (extra > 0) {
-        return d.body.style.marginBottom = `${extra}px`;
+        d$1.body.style.marginBottom = `${extra}px`;
       } else {
-        d.body.style.marginBottom = '';
+        d$1.body.style.marginBottom = '';
         delete Nav.haveExtra;
-        return $.off(d, 'scroll', Nav.removeExtra);
+        $.off(d$1, 'scroll', Nav.removeExtra);
       }
-    }
-  };
-
-  const Volume = {
-    inputs: undefined,
-    init() {
-      if (!['index', 'thread'].includes(g.VIEW) ||
-        (!Conf['Image Expansion'] && !Conf['Image Hover'] && !Conf['Image Hover in Catalog'] && !Conf['Gallery'])) {
-        return;
-      }
-      $.sync('Allow Sound', (x) => {
-        Conf['Allow Sound'] = x;
-        if (Volume.inputs)
-          Volume.inputs.unmute.checked = x;
-      });
-      $.sync('Default Volume', (x) => {
-        Conf['Default Volume'] = x;
-        if (Volume.inputs)
-          Volume.inputs.volume.value = String(x);
-      });
-      if (Conf['Mouse Wheel Volume']) {
-        Callbacks.Post.push({
-          name: 'Mouse Wheel Volume',
-          cb: this.node
-        });
-      }
-      if (g.SITE.noAudio?.(g.BOARD)) {
-        return;
-      }
-      if (Conf['Mouse Wheel Volume']) {
-        Callbacks.CatalogThread.push({
-          name: 'Mouse Wheel Volume',
-          cb: this.catalogNode
-        });
-      }
-      const unmuteEntry = UI.checkbox('Allow Sound', 'Allow Sound');
-      unmuteEntry.title = Config.main['Images and Videos']['Allow Sound'][1];
-      const volumeEntry = $.el('label', { title: 'Default volume for videos.' });
-      $.extend(volumeEntry, {
-        innerHTML: `<input name="Default Volume" type="range" min="0" max="1" step="0.01" value="${E(Conf["Default Volume"])}"> Volume`
-      });
-      this.inputs = {
-        unmute: unmuteEntry.firstElementChild,
-        volume: volumeEntry.firstElementChild
-      };
-      $.on(this.inputs.unmute, 'change', $.cb.checked);
-      $.on(this.inputs.volume, 'change', $.cb.value);
-      Header.menu.addEntry({ el: unmuteEntry, order: 200 });
-      Header.menu.addEntry({ el: volumeEntry, order: 201 });
-    },
-    setup(video) {
-      video.muted = !Conf['Allow Sound'];
-      video.volume = Conf['Default Volume'];
-      $.on(video, 'volumechange', Volume.change);
-    },
-    change() {
-      const { muted, volume } = this;
-      const items = {
-        'Allow Sound': !muted,
-        'Default Volume': volume
-      };
-      for (const key in items) {
-        const val = items[key];
-        if (Conf[key] === val) {
-          delete items[key];
-        }
-      }
-      $.set(items);
-      $.extend(Conf, items);
-      if (Volume.inputs) {
-        Volume.inputs.unmute.checked = !muted;
-        Volume.inputs.volume.value = String(volume);
-      }
-    },
-    node() {
-      if (g.SITE.noAudio?.(this.board)) {
-        return;
-      }
-      for (const file of this.files) {
-        if (file.isVideo) {
-          if (file.thumb) {
-            $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover));
-          }
-          $.on(($('.file-info', file.text) || file.link), 'wheel', Volume.wheel.bind(file.thumbLink));
-        }
-      }
-    },
-    catalogNode() {
-      const file = this.thread.OP.files[0];
-      if (!file?.isVideo) {
-        return;
-      }
-      $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
-    },
-    wheel(e) {
-      let el;
-      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
-        return;
-      }
-      if (!(el = $('video:not([data-md5])', this))) {
-        return;
-      }
-      if (el.muted || !$.hasAudio(el)) {
-        return;
-      }
-      let volume = el.volume + 0.1;
-      if (e.deltaY < 0) {
-        volume *= 1.1;
-      }
-      if (e.deltaY > 0) {
-        volume /= 1.1;
-      }
-      el.volume = $.minmax(volume - 0.1, 0, 1);
-      e.preventDefault();
     }
   };
 
@@ -8416,7 +8107,7 @@ svg.icon {
       Icon.set(this.EAI, 'expand', 'Expand All Images');
       $.on(this.EAI, 'click', this.cb.toggleAll);
       Header.addShortcut('expand-all', this.EAI, 520);
-      $.on(d, 'scroll visibilitychange', this.cb.playVideos);
+      $.on(d$1, 'scroll visibilitychange', this.cb.playVideos);
       this.videoControls = $.el('span', { className: 'video-controls' });
       $.extend(this.videoControls, { innerHTML: " <a href=\"javascript:;\" title=\"You can also contract the video by dragging it to the left.\">contract</a>" });
       return Callbacks.Post.push({
@@ -8546,7 +8237,7 @@ svg.icon {
       if (el = file.fullImage) {
         const top = Header.getTopOf(el);
         bottom = top + el.getBoundingClientRect().height;
-        oldHeight = d.body.clientHeight;
+        oldHeight = d$1.body.clientHeight;
         ({ scrollY } = window);
       }
       $.rmClass(post.nodes.root, 'expanded-image');
@@ -8563,7 +8254,7 @@ svg.icon {
       if (doc.contains(el)) {
         if (bottom <= 0) {
           // For images entirely above us, scroll to remain in place.
-          window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
+          window.scrollBy(0, ((scrollY - window.scrollY) + d$1.body.clientHeight) - oldHeight);
         } else {
           // For images not above us that would be moved above us, scroll to the thumbnail.
           Header.scrollToIfNeeded(post.nodes.root);
@@ -8679,7 +8370,7 @@ svg.icon {
         return;
       } // contracted before the image loaded
       const bottom = Header.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
-      const oldHeight = d.body.clientHeight;
+      const oldHeight = d$1.body.clientHeight;
       const { scrollY } = window;
       $.addClass(post.nodes.root, 'expanded-image');
       $.rmClass(file.thumb, 'expanding');
@@ -8687,7 +8378,7 @@ svg.icon {
       delete file.isExpanding;
       // Scroll to keep our place in the thread when images are expanded above us.
       if (doc.contains(post.nodes.root) && (bottom <= 0)) {
-        window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
+        window.scrollBy(0, ((scrollY - window.scrollY) + d$1.body.clientHeight) - oldHeight);
       }
       // Scroll to display full image.
       if (file.scrollIntoView) {
@@ -8710,7 +8401,7 @@ svg.icon {
       }
       fullImage.controls = false;
       $.asap((() => doc.contains(fullImage)), function () {
-        if (!d.hidden && Header.isNodeVisible(fullImage)) {
+        if (!d$1.hidden && Header.isNodeVisible(fullImage)) {
           fullImage.play();
         } else {
           post.file.wasPlaying = true;
@@ -9250,155 +8941,579 @@ svg.icon {
   PostClone.suffix = 0;
   ;
 
-  // @ts-nocheck
+  class SimpleDict {
+    constructor() {
+      this.keys = [];
+    }
+    push(key, data) {
+      key = `${key}`;
+      if (!this[key]) {
+        this.keys.push(key);
+      }
+      this[key] = data;
+    }
+    insert(key, data, compare = (lastKey, key) => (+lastKey) < (+key)) {
+      const keyString = key.toString();
+      if (keyString in this) {
+        this[keyString] = data;
+        return this.keys.indexOf(keyString);
+      }
+      const length = this.keys.length;
+      if (!length || compare(this.lastKey(), key)) {
+        this.push(key, data);
+        return length;
+      }
+      let indexOfNext = this.keys.findIndex(k => !compare(k, key));
+      if (indexOfNext === -1) {
+        this.push(key, data);
+      } else {
+        this[keyString] = data;
+        this.keys.splice(indexOfNext, 0, keyString);
+      }
+      return indexOfNext;
+    }
+    insertAt(key, index, data) {
+      this[key] = data;
+      this.keys.splice(index, 0, key);
+    }
+    rm(key) {
+      let i;
+      key = `${key}`;
+      if ((i = this.keys.indexOf(key)) !== -1) {
+        this.keys.splice(i, 1);
+        delete this[key];
+      }
+    }
+    forEach(fn) {
+      for (var key of this.keys) {
+        fn(this[key]);
+      }
+    }
+    get(key) {
+      if (key === 'keys') {
+        return undefined;
+      } else {
+        return $.getOwn(this, key);
+      }
+    }
+    lastKey() {
+      return this.keys[this.keys.length - 1];
+    }
+    last() {
+      return this.keys.length ? this[this.keys.length - 1] : undefined;
+    }
+  }
 
-  var BoardConfig = {
+  class Thread {
+    toString() { return this.ID; }
+    constructor(ID, board) {
+      this.board = board;
+      this.ID = +ID;
+      this.threadID = this.ID;
+      this.boardID = this.board.ID;
+      this.siteID = g.SITE.ID;
+      this.fullID = `${this.board}.${this.ID}`;
+      this.posts = new SimpleDict();
+      this.isDead = false;
+      this.isHidden = false;
+      this.isSticky = false;
+      this.isClosed = false;
+      this.isArchived = false;
+      this.postLimit = false;
+      this.fileLimit = false;
+      this.lastPost = 0;
+      this.ipCount = undefined;
+      this.json = null;
+      this.OP = null;
+      this.catalogView = null;
+      this.nodes =
+        { root: null };
+      this.board.threads.push(this.ID, this);
+      g.threads.push(this.fullID, this);
+    }
+    setPage(pageNum) {
+      let icon;
+      const { info, reply } = this.OP.nodes;
+      if (!(icon = $('.page-num', info))) {
+        icon = $.el('span', { className: 'page-num' });
+        $.replace(reply.parentNode.previousSibling, [$.tn(' '), icon, $.tn(' ')]);
+      }
+      icon.title = `This thread is on page ${pageNum} in the original index.`;
+      icon.textContent = `[${pageNum}]`;
+      if (this.catalogView) {
+        return this.catalogView.nodes.pageCount.textContent = pageNum;
+      }
+    }
+    setCount(type, count, reachedLimit) {
+      if (!this.catalogView) {
+        return;
+      }
+      const el = this.catalogView.nodes[`${type}Count`];
+      el.textContent = count;
+      return (reachedLimit ? $.addClass : $.rmClass)(el, 'warning');
+    }
+    setStatus(type, status) {
+      const name = `is${type}`;
+      if (this[name] === status) {
+        return;
+      }
+      this[name] = status;
+      if (!this.OP) {
+        return;
+      }
+      this.setIcon('Sticky', this.isSticky);
+      this.setIcon('Closed', this.isClosed && !this.isArchived);
+      return this.setIcon('Archived', this.isArchived);
+    }
+    setIcon(type, status) {
+      const typeLC = type.toLowerCase();
+      let icon = $(`.${typeLC}Icon`, this.OP.nodes.info);
+      if (!!icon === status) {
+        return;
+      }
+      if (!status) {
+        $.rm(icon.previousSibling);
+        $.rm(icon);
+        if (this.catalogView) {
+          $.rm($(`.${typeLC}Icon`, this.catalogView.nodes.icons));
+        }
+        return;
+      }
+      icon = $.el('img', {
+        src: `${g.SITE.Build.staticPath}${typeLC}${g.SITE.Build.gifIcon}`,
+        alt: type,
+        title: type,
+        className: `${typeLC}Icon retina`
+      });
+      if (g.BOARD.ID === 'f') {
+        icon.style.cssText = 'height: 18px; width: 18px;';
+      }
+      const root = (type !== 'Sticky') && this.isSticky ?
+        $('.stickyIcon', this.OP.nodes.info)
+        :
+          $('.page-num', this.OP.nodes.info) || this.OP.nodes.quote;
+      $.after(root, [$.tn(' '), icon]);
+      if (!this.catalogView) {
+        return;
+      }
+      return ((type === 'Sticky') && this.isClosed ? $.prepend : $.add)(this.catalogView.nodes.icons, icon.cloneNode());
+    }
+    kill() {
+      return this.isDead = true;
+    }
+    collect() {
+      let n = 0;
+      this.posts.forEach(function (post) {
+        if (post.clones.length) {
+          return n++;
+        } else {
+          return post.collect();
+        }
+      });
+      if (!n) {
+        g.threads.rm(this.fullID);
+        return this.board.threads.rm(this);
+      }
+    }
+  }
+
+  ;
+  /**
+   * This class handles data related to specific threads or posts. This data is automatically cleaned up when the thread
+   * ages out.
+   * TODO At this moment, .get and .set aren't fully typed yet.
+   */
+  class DataBoard {
+    constructor(key, sync, dontClean = false) {
+      this.changes = [];
+      this.onSync = this.onSync.bind(this);
+      this.key = key;
+      this.initData(Conf[this.key]);
+      $.sync(this.key, this.onSync);
+      if (!dontClean)
+        this.clean();
+      if (!sync)
+        return;
+      // Chrome also fires the onChanged callback on the current tab,
+      // so we only start syncing when we're ready.
+      var init = () => {
+        $.off(d$1, '4chanXInitFinished', init);
+        this.sync = sync;
+      };
+      $.on(d$1, '4chanXInitFinished', init);
+    }
+    initData(data) {
+      let boards;
+      this.data = data;
+      if (this.data.boards) {
+        let lastChecked;
+        ({ boards, lastChecked } = this.data);
+        this.data['4chan.org'] = { boards, lastChecked };
+        delete this.data.boards;
+        delete this.data.lastChecked;
+      }
+      return this.data[g.SITE.ID] || (this.data[g.SITE.ID] = { boards: dict() });
+    }
+    save(change, cb) {
+      change();
+      this.changes.push(change);
+      return $.get(this.key, { boards: dict() }, (items) => {
+        if (!this.changes.length) {
+          return;
+        }
+        const needSync = ((items[this.key].version || 0) > (this.data.version || 0));
+        if (needSync) {
+          this.initData(items[this.key]);
+          for (change of this.changes) {
+            change();
+          }
+        }
+        this.changes = [];
+        this.data.version = (this.data.version || 0) + 1;
+        return $.set(this.key, this.data, () => {
+          if (needSync) {
+            this.sync?.();
+          }
+          return cb?.();
+        });
+      });
+    }
+    forceSync(cb) {
+      return $.get(this.key, { boards: dict() }, (items) => {
+        if ((items[this.key].version || 0) > (this.data.version || 0)) {
+          this.initData(items[this.key]);
+          for (var change of this.changes) {
+            change();
+          }
+          this.sync?.();
+        }
+        return cb?.();
+      });
+    }
+    delete({ siteID, boardID, threadID, postID }, cb) {
+      if (!siteID) {
+        siteID = g.SITE.ID;
+      }
+      if (!this.data[siteID]) {
+        return;
+      }
+      this.save(() => {
+        if (postID) {
+          if (!this.data[siteID].boards[boardID]?.[threadID]) {
+            return;
+          }
+          delete this.data[siteID].boards[boardID][threadID][postID];
+          this.deleteIfEmpty({ siteID, boardID, threadID });
+        } else if (threadID) {
+          if (!this.data[siteID].boards[boardID]) {
+            return;
+          }
+          delete this.data[siteID].boards[boardID][threadID];
+          this.deleteIfEmpty({ siteID, boardID });
+        } else {
+          delete this.data[siteID].boards[boardID];
+        }
+      }, cb);
+    }
+    deleteIfEmpty({ siteID, boardID, threadID }) {
+      if (!this.data[siteID]) {
+        return;
+      }
+      if (threadID) {
+        if (!Object.keys(this.data[siteID].boards[boardID][threadID]).length) {
+          delete this.data[siteID].boards[boardID][threadID];
+          this.deleteIfEmpty({ siteID, boardID });
+        }
+      } else if (!Object.keys(this.data[siteID].boards[boardID]).length) {
+        delete this.data[siteID].boards[boardID];
+      }
+    }
+    set(data, cb) {
+      this.save(() => {
+        this.setUnsafe(data);
+      }, cb);
+    }
+    setUnsafe({ siteID, boardID, threadID, postID, val }) {
+      if (!siteID) {
+        siteID = g.SITE.ID;
+      }
+      if (!this.data[siteID])
+        this.data[siteID] = { boards: dict() };
+      const boards = this.data[siteID].boards;
+      if (postID !== undefined) {
+        let base;
+        (((base = boards[boardID] || (boards[boardID] = dict())))[threadID] || (base[threadID] = dict()))[postID] = val;
+      } else if (threadID !== undefined) {
+        (boards[boardID] || (boards[boardID] = dict()))[threadID] = val;
+      } else {
+        boards[boardID] = val;
+      }
+    }
+    extend({ siteID, boardID, threadID, postID, val }, cb) {
+      this.save(() => {
+        const oldVal = this.get({ siteID, boardID, threadID, postID, defaultValue: dict() });
+        for (var key in val) {
+          var subVal = val[key];
+          if (typeof subVal === 'undefined') {
+            delete oldVal[key];
+          } else {
+            oldVal[key] = subVal;
+          }
+        }
+        this.setUnsafe({ siteID, boardID, threadID, postID, val: oldVal });
+      }, cb);
+    }
+    setLastChecked(key = 'lastChecked') {
+      this.save(() => {
+        this.data[key] = Date.now();
+      });
+    }
+    get({ siteID, boardID, threadID, postID, defaultValue }) {
+      let board, val;
+      if (!siteID) {
+        siteID = g.SITE.ID;
+      }
+      if (board = this.data[siteID]?.boards[boardID]) {
+        let thread;
+        if (threadID == null) {
+          if (postID != null) {
+            for (thread = 0; thread < board.length; thread++) {
+              if (postID in thread) {
+                val = thread[postID];
+                break;
+              }
+            }
+          } else {
+            val = board;
+          }
+        } else if (thread = board[threadID]) {
+          val = (postID != null) ? thread[postID] : thread;
+        }
+      }
+      return val || defaultValue;
+    }
+    clean() {
+      let boardID, middle;
+      const siteID = g.SITE.ID;
+      for (boardID in this.data[siteID].boards) {
+        this.deleteIfEmpty({ siteID, boardID });
+      }
+      const now = Date.now();
+      if (now - (2 * HOUR) >= ((middle = this.data[siteID].lastChecked || 0)) || middle > now) {
+        this.data[siteID].lastChecked = now;
+        for (boardID in this.data[siteID].boards) {
+          this.ajaxClean(boardID);
+        }
+      }
+    }
+    ajaxClean(boardID) {
+      const that = this;
+      const siteID = g.SITE.ID;
+      const threadsList = g.SITE.urls.threadsListJSON?.({ siteID, boardID });
+      if (!threadsList) {
+        return;
+      }
+      $.cache(threadsList, function () {
+        if (this.status !== 200) {
+          return;
+        }
+        const archiveList = g.SITE.urls.archiveListJSON?.({ siteID, boardID });
+        if (!archiveList)
+          return that.ajaxCleanParse(boardID, this.response);
+        const response1 = this.response;
+        $.cache(archiveList, function () {
+          if ((this.status !== 200) && (!!g.SITE.archivedBoardsKnown || (this.status !== 404))) {
+            return;
+          }
+          that.ajaxCleanParse(boardID, response1, this.response);
+        });
+      });
+    }
+    ajaxCleanParse(boardID, response1, response2) {
+      let board, ID;
+      const siteID = g.SITE.ID;
+      if (!(board = this.data[siteID].boards[boardID]))
+        return;
+      const threads = dict();
+      if (response1) {
+        for (var page of response1) {
+          for (var thread of page.threads) {
+            ID = thread.no;
+            if (ID in board) {
+              threads[ID] = board[ID];
+            }
+          }
+        }
+      }
+      if (response2) {
+        for (ID of response2) {
+          if (ID in board)
+            threads[ID] = board[ID];
+        }
+      }
+      this.data[siteID].boards[boardID] = threads;
+      this.deleteIfEmpty({ siteID, boardID });
+      $.set(this.key, this.data);
+    }
+    onSync(data) {
+      if ((data.version || 0) <= (this.data.version || 0)) {
+        return;
+      }
+      this.initData(data);
+      this.sync?.();
+    }
+  }
+  DataBoard.keys = [
+    'hiddenThreads',
+    'hiddenPosts',
+    'hiddenPosterIds',
+    'lastReadPosts',
+    'yourPosts',
+    'watchedThreads',
+    'watcherLastModified',
+    'customTitles',
+  ];
+
+  const BoardConfig = {
     cbs: [],
-
+    boards: undefined,
     init() {
       let middle;
-      if (g.SITE.software !== 'yotsuba') { return; }
+      if (g.SITE.software !== 'yotsuba') {
+        return;
+      }
       const now = Date.now();
       if (now - (2 * HOUR) >= ((middle = Conf['boardConfig'].lastChecked || 0)) || middle > now) {
-        return $.ajax(`${location.protocol}//a.4cdn.org/boards.json`,
-          {onloadend: this.load});
+        $.ajax(`${location.protocol}//a.4cdn.org/boards.json`, {
+          onloadend: this.load
+        });
       } else {
-        const {boards} = Conf['boardConfig'];
-        return this.set(boards);
+        const { boards } = Conf['boardConfig'];
+        this.set(boards);
       }
     },
-
     load() {
       let boards;
       if ((this.status === 200) && this.response && this.response.boards) {
         boards = dict();
-        for (var board of this.response.boards) {
+        for (const board of this.response.boards) {
           boards[board.board] = board;
         }
-        $.set('boardConfig', {boards, lastChecked: Date.now()});
+        $.set('boardConfig', { boards, lastChecked: Date.now() });
       } else {
-        ({boards} = Conf['boardConfig']);
-        const err = (() => { switch (this.status) {
-          case 0:   return 'Connection Error';
-          case 200: return 'Invalid Data';
-          default:          return `Error ${this.statusText} (${this.status})`;
-        } })();
+        boards = Conf['boardConfig'].boards;
+        const err = (() => {
+          switch (this.status) {
+            case 0: return 'Connection Error';
+            case 200: return 'Invalid Data';
+            default: return `Error ${this.statusText} (${this.status})`;
+          }
+        })();
         new Notice('warning', `Failed to load board configuration. ${err}`, 20);
       }
-      return BoardConfig.set(boards);
+      BoardConfig.set(boards);
     },
-
     set(boards) {
       this.boards = boards;
-      for (var ID in g.boards) {
-        var board = g.boards[ID];
+      for (const ID in g.boards) {
+        const board = g.boards[ID];
         board.config = this.boards[ID] || {};
       }
-      for (var cb of this.cbs) {
+      for (const cb of this.cbs) {
         $.queueTask(cb);
       }
     },
-
     ready(cb) {
       if (this.boards) {
-        return cb();
+        cb();
       } else {
-        return this.cbs.push(cb);
+        this.cbs.push(cb);
       }
     },
-
     sfwBoards(sfw) {
-      return (() => {
-        const result = [];
-        const object = this.boards || Conf['boardConfig'].boards;
-        for (var board in object) {
-          var data = object[board];
-          if (!!data.ws_board === sfw) {
-            result.push(board);
-          }
+      const result = [];
+      const object = this.boards || Conf['boardConfig'].boards;
+      for (const board in object) {
+        const data = object[board];
+        if (!!data.ws_board === sfw) {
+          result.push(board);
         }
-        return result;
-      })();
+      }
+      return result;
     },
-
     isSFW(board) {
       return !!(this.boards || Conf['boardConfig'].boards)[board]?.ws_board;
     },
-
     domain(board) {
-      // return `boards.${BoardConfig.isSFW(board) ? '4channel' : '4chan'}.org`;
       return 'boards.4chan.org';
     },
-
     isArchived(board) {
       // assume archive exists if no data available to prevent cleaning of archived threads
       const data = (this.boards || Conf['boardConfig'].boards)[board];
       return !data || data.is_archived;
     },
-
     noAudio(boardID) {
-      if (g.SITE.software !== 'yotsuba') { return false; }
+      if (g.SITE.software !== 'yotsuba') {
+        return false;
+      }
       const boards = this.boards || Conf['boardConfig'].boards;
       return boards && boards[boardID] && !boards[boardID].webm_audio;
     },
-
     title(boardID) {
       return (this.boards || Conf['boardConfig'].boards)?.[boardID]?.title || '';
     }
   };
 
-  // @ts-nocheck
-
-  var Menu = {
+  const Menu = {
+    button: null,
+    menu: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) {
+        return;
+      }
       this.button = $.el('a', {
         className: 'menu-button',
-        href:      'javascript:;'
-      }
-      );
-
+        href: 'javascript:;'
+      });
       Icon.set(this.button, 'caretDown');
-
       this.menu = new UI.Menu('post');
       Callbacks.Post.push({
         name: 'Menu',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Callbacks.CatalogThread.push({
+      Callbacks.CatalogThread.push({
         name: 'Menu',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
     },
-
     node() {
       if (this.isClone) {
         const button = $('.menu-button', this.nodes.info);
-        $.rmClass(button, 'active');
-        $.rm($('.dialog', this.nodes.info));
-        Menu.makeButton(this, button);
+        if (button) {
+          $.rmClass(button, 'active');
+          $.rm($('.dialog', this.nodes.info));
+          Menu.makeButton(this, button);
+        }
         return;
       }
-      return $.add(this.nodes.info, Menu.makeButton(this));
+      $.add(this.nodes.info, Menu.makeButton(this));
     },
-
     catalogNode() {
-      return $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
+      $.after(this.nodes.icons, Menu.makeButton(this.thread.OP));
     },
-
     makeButton(post, button) {
-      if (!button) { button = Menu.button.cloneNode(true); }
-      $.on(button, 'click', function(e) {
-        return Menu.menu.toggle(e, this, post);
+      if (!button) {
+        button = Menu.button.cloneNode(true);
+      }
+      $.on(button, 'click', function (e) {
+        Menu.menu.toggle(e, this, post);
       });
       return button;
     }
   };
 
   var Recursive = {
-    recursives: new Map(),
+    recursives: new WeakMap(),
     init() {
       if (!['index', 'thread'].includes(g.VIEW))
         return;
@@ -9411,25 +9526,28 @@ svg.icon {
       if (this.isClone || this.isFetchedQuote)
         return;
       for (var quote of this.quotes) {
-        const obj = Recursive.recursives.get(quote);
-        if (obj) {
-          for (var i = 0; i < obj.recursives.length; i++) {
-            obj.recursives[i](this, ...obj.args[i]);
+        const qPost = g.posts?.get(quote);
+        if (qPost) {
+          const obj = Recursive.recursives.get(qPost);
+          if (obj) {
+            for (var i = 0; i < obj.recursives.length; i++) {
+              obj.recursives[i](this, ...obj.args[i]);
+            }
           }
         }
       }
     },
     add(recursive, post, ...args) {
-      let obj = Recursive.recursives.get(post.fullID);
+      let obj = Recursive.recursives.get(post);
       if (!obj) {
         obj = { recursives: [], args: [] };
-        Recursive.recursives.set(post.fullID, obj);
+        Recursive.recursives.set(post, obj);
       }
       obj.recursives.push(recursive);
       obj.args.push(args);
     },
     rm(recursive, post) {
-      const obj = Recursive.recursives.get(post.fullID);
+      const obj = Recursive.recursives.get(post);
       if (!obj)
         return;
       for (let i = obj.recursives.length - 1; i >= 0; --i) {
@@ -9441,7 +9559,7 @@ svg.icon {
     },
     apply(recursive, post, ...args) {
       const { fullID } = post;
-      g.posts.forEach(function (post) {
+      g.posts?.forEach(function (post) {
         if (post.quotes.includes(fullID)) {
           recursive(post, ...args);
         }
@@ -9772,6 +9890,314 @@ svg.icon {
     }
   };
 
+  const ThreadHiding = {
+    db: null,
+    hiddenThreads: {},
+    init() {
+      if (!['index', 'catalog'].includes(g.VIEW) || !Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index']) {
+        return;
+      }
+      this.db = new DataBoard('hiddenThreads');
+      if (g.VIEW === 'catalog') {
+        this.catalogWatch();
+        return;
+      }
+      this.catalogSet(g.BOARD);
+      $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
+      if (Conf['Thread Hiding Buttons']) {
+        $.addClass(doc, 'thread-hide');
+      }
+      Callbacks.Post.push({
+        name: 'Thread Hiding',
+        cb: this.node
+      });
+    },
+    catalogSet(board) {
+      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) {
+        return;
+      }
+      const hiddenThreads = this.db.get({
+        boardID: board.ID,
+        defaultValue: dict()
+      });
+      for (const threadID in hiddenThreads) {
+        hiddenThreads[threadID] = true;
+      }
+      localStorage.setItem(`4chan-hide-t-${board}`, JSON.stringify(hiddenThreads));
+    },
+    catalogWatch() {
+      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) {
+        return;
+      }
+      this.hiddenThreads = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
+      $.on(d$1, '4chanXInitFinished', () => // 4chan's catalog sets the style to "display: none;" when hiding or unhiding a thread.
+      new MutationObserver(this.catalogSave.bind(this)).observe($.id('threads'), {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['style']
+      }));
+    },
+    catalogSave() {
+      let threadID;
+      const hiddenThreads2 = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
+      for (threadID in hiddenThreads2) {
+        if (!$.hasOwn(this.hiddenThreads, threadID)) {
+          this.db.set({
+            boardID: g.BOARD.ID,
+            threadID,
+            val: { makeStub: Conf['Stubs'] }
+          });
+        }
+      }
+      for (threadID in this.hiddenThreads) {
+        if (!$.hasOwn(hiddenThreads2, threadID)) {
+          this.db.delete({
+            boardID: g.BOARD.ID,
+            threadID
+          });
+        }
+      }
+      this.hiddenThreads = hiddenThreads2;
+    },
+    isHidden(boardID, threadID) {
+      return !!(this.db && this.db.get({ boardID, threadID }));
+    },
+    node() {
+      let data;
+      if (this.isReply || this.isClone || this.isFetchedQuote) {
+        return;
+      }
+      if (Conf['Thread Hiding Buttons']) {
+        $.prepend(this.nodes.root, ThreadHiding.makeButton(this.thread, 'hide'));
+      }
+      if (data = ThreadHiding.db.get({ boardID: this.board.ID, threadID: this.ID })) {
+        ThreadHiding.hide(this.thread, data.makeStub, 'Hidden manually');
+      }
+    },
+    onIndexRefresh() {
+      g.BOARD.threads.forEach(function (thread) {
+        const { root } = thread.nodes;
+        if (thread.isHidden && thread.stub && !root.contains(thread.stub)) {
+          ThreadHiding.makeStub(thread, root);
+        }
+      });
+    },
+    menu: {
+      init() {
+        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link']) {
+          return;
+        }
+        const hideDiv = $.el('div', {
+          className: 'hide-thread-link',
+          textContent: 'Hide'
+        });
+        const apply = $.el('a', {
+          textContent: 'Apply',
+          href: 'javascript:;'
+        });
+        $.on(apply, 'click', this.hide);
+        const makeStub = UI.checkbox('Stubs', 'Make stub');
+        Menu.menu.addEntry({
+          el: hideDiv,
+          order: 20,
+          open({ thread, isReply }) {
+            if (isReply || thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
+              return false;
+            }
+            ThreadHiding.menu.thread = thread;
+            return true;
+          },
+          subEntries: [{ el: apply }, { el: makeStub }]
+        });
+        const showLink = $.el('a', {
+          className: 'show-thread-link',
+          textContent: 'Show',
+          href: 'javascript:;'
+        });
+        $.on(showLink, 'click', this.show);
+        Menu.menu.addEntry({
+          el: showLink,
+          order: 20,
+          open({ thread, isReply }) {
+            if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
+              return false;
+            }
+            ThreadHiding.menu.thread = thread;
+            return true;
+          }
+        });
+        const hideStubLink = $.el('a', {
+          textContent: 'Hide stub',
+          href: 'javascript:;'
+        });
+        $.on(hideStubLink, 'click', this.hideStub);
+        Menu.menu.addEntry({
+          el: hideStubLink,
+          order: 15,
+          open({ thread, isReply }) {
+            if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
+              return false;
+            }
+            ThreadHiding.menu.thread = thread;
+            return true;
+          }
+        });
+      },
+      hide() {
+        const makeStub = $('input', this.parentNode).checked;
+        const thread = ThreadHiding.menu.thread;
+        ThreadHiding.hide(thread, makeStub, 'Hidden manually');
+        ThreadHiding.saveHiddenState(thread, makeStub);
+        return $.event('CloseMenu', undefined);
+      },
+      show() {
+        const thread = ThreadHiding.menu.thread;
+        ThreadHiding.show(thread);
+        ThreadHiding.saveHiddenState(thread);
+        return $.event('CloseMenu', undefined);
+      },
+      hideStub() {
+        const thread = ThreadHiding.menu.thread;
+        ThreadHiding.show(thread);
+        ThreadHiding.hide(thread, false);
+        ThreadHiding.saveHiddenState(thread, false);
+        $.event('CloseMenu', undefined);
+      }
+    },
+    makeButton(thread, type) {
+      const span = $.el('span', {
+        className: 'stub-icon',
+      });
+      const a = $.el('a', {
+        className: `${type}-post-button ${type}-thread-button`,
+        href: 'javascript:;'
+      });
+      Icon.set(span, type === 'hide' ? 'squareMinus' : 'squarePlus');
+      $.add(a, span);
+      a.dataset.fullID = thread.fullID;
+      $.on(a, 'click', this.toggle);
+      return a;
+    },
+    makeStub(thread, root, reason) {
+      let summary, threadDivider;
+      let numReplies = $$(g.SITE.selectors.replyOriginal, root).length;
+      if (summary = $(g.SITE.selectors.summary, root)) {
+        numReplies += +(summary.textContent.match(/\d+/) || [0])[0];
+      }
+      const a = this.makeButton(thread, 'show');
+      const { nameBlock, subject } = thread.OP.info;
+      if (subject) {
+        $.add(a, $.el('span', {
+          className: 'stub-subject',
+          textContent: subject
+        }));
+      }
+      $.add(a, $.el('span', {
+        className: 'stub-name',
+        textContent: nameBlock
+      }));
+      $.add(a, $.el('span', {
+        className: 'stub-replies',
+        textContent: `(${numReplies} repl${numReplies === 1 ? 'y' : 'ies'})`
+      }));
+      let reasons = thread.OP.filterResults?.reasons || [];
+      if (reason)
+        reasons = [...reasons, reason];
+      if (Conf['Filter Reason'] && reasons.length) {
+        const reasonsSpan = $.el('span', { className: 'stub-reasons' });
+        $.add(reasonsSpan, reasons.map(re => $.el('span', { className: 'stub-reason', textContent: re })));
+        a.appendChild(reasonsSpan);
+      }
+      thread.stub = $.el('div', { className: 'stub' });
+      if (Conf['Menu']) {
+        $.add(thread.stub, [a, Menu.makeButton(thread.OP)]);
+      } else {
+        $.add(thread.stub, a);
+      }
+      if (!Conf['Filter Reason'] && reasons.length)
+        thread.stub.title = reasons.join(' & ');
+      $.prepend(root, thread.stub);
+      // Prevent hiding of thread divider on sites that put it inside the thread
+      if (threadDivider = $(g.SITE.selectors.threadDivider, root)) {
+        $.addClass(threadDivider, 'threadDivider');
+      }
+    },
+    saveHiddenState(thread, makeStub) {
+      if (thread.isHidden) {
+        this.db.set({
+          boardID: thread.board.ID,
+          threadID: thread.ID,
+          val: { makeStub }
+        });
+      } else {
+        this.db.delete({
+          boardID: thread.board.ID,
+          threadID: thread.ID
+        });
+      }
+      this.catalogSet(thread.board);
+    },
+    toggle(thread) {
+      if (!(thread instanceof Thread)) {
+        thread = g.threads.get(thread.dataset.fullID);
+      }
+      if (thread.isHidden) {
+        ThreadHiding.show(thread);
+      } else {
+        ThreadHiding.hide(thread, undefined, 'Hidden manually');
+      }
+      ThreadHiding.saveHiddenState(thread);
+    },
+    hide(thread, makeStub = Conf['Stubs'], reason) {
+      if (thread.isHidden) {
+        return;
+      }
+      const threadRoot = thread.nodes.root;
+      thread.isHidden = true;
+      Index.updateHideLabel();
+      if (thread.catalogView && !Index.showHiddenThreads) {
+        $.rm(thread.catalogView.nodes.root);
+        $.event('PostsRemoved', null, Index.root);
+      }
+      if (!makeStub) {
+        threadRoot.hidden = true;
+        return;
+      }
+      this.makeStub(thread, threadRoot, reason);
+    },
+    show(thread) {
+      if (thread.stub) {
+        $.rm(thread.stub);
+        delete thread.stub;
+      }
+      const threadRoot = thread.nodes.root;
+      threadRoot.hidden = (thread.isHidden = false);
+      Index.updateHideLabel();
+      if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
+        const { root } = thread.catalogView.nodes;
+        if (Index.showHiddenThreads) {
+          $.rm(root);
+          $.event('PostsRemoved', null, Index.root);
+        } else {
+          let i = Index.sortedThreadIDs.indexOf(thread.ID) - 1;
+          while (true) {
+            if (i < 0) {
+              $('.board').insertAdjacentElement('afterbegin', root);
+              break;
+            }
+            const rootPrevious = d$1.getElementById(`t${Index.sortedThreadIDs[i]}`);
+            if (rootPrevious) {
+              rootPrevious.insertAdjacentElement('afterend', root);
+              break;
+            }
+            --i;
+          }
+          $.event('PostsInserted', null, Index.root);
+        }
+      }
+    }
+  };
+
   // @ts-nocheck
   var RelativeDates = {
     INTERVAL: 30000,
@@ -9780,7 +10206,7 @@ svg.icon {
         ['Show', 'Both', 'BothRelativeFirst'].includes(Conf.RelativeTime)) ||
         Index.enabled) {
         this.flush();
-        $.on(d, 'visibilitychange PostsInserted', this.flush);
+        $.on(d$1, 'visibilitychange PostsInserted', this.flush);
       }
       if (Conf.RelativeTime !== 'No') {
         return Callbacks.Post.push({
@@ -9868,7 +10294,7 @@ svg.icon {
     timeout: undefined,
     flush() {
       // No point in changing the dates until the user sees them.
-      if (d.hidden) {
+      if (d$1.hidden) {
         return;
       }
       const now = new Date();
@@ -9985,7 +10411,7 @@ svg.icon {
     event: null,
     delays: 0,
     init() {
-      $.on(d, 'QRPostSuccessful', (e) => {
+      $.on(d$1, 'QRPostSuccessful', (e) => {
         const customEvent = e;
         if (!customEvent.detail.redirect) {
           return;
@@ -10017,32 +10443,27 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
-  var ExpandComment = {
+  const ExpandComment = {
+    callbacks: [],
     init() {
-      if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) { return; }
-
-      return Callbacks.Post.push({
+      if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) {
+        return;
+      }
+      Callbacks.Post.push({
         name: 'Comment Expansion',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       let a;
       if (a = $('.abbr > a:not([onclick])', this.nodes.comment)) {
-        return $.on(a, 'click', ExpandComment.cb);
+        $.on(a, 'click', ExpandComment.cb);
       }
     },
-
-    callbacks: [],
-
     cb(e) {
       e.preventDefault();
-      return ExpandComment.expand(Get.postFromNode(this));
+      ExpandComment.expand(Get.postFromNode(this));
     },
-
     expand(post) {
       let a;
       if (post.nodes.longComment && !post.nodes.longComment.parentNode) {
@@ -10050,53 +10471,56 @@ svg.icon {
         post.nodes.comment = post.nodes.longComment;
         return;
       }
-      if (!(a = $('.abbr > a', post.nodes.comment))) { return; }
+      if (!(a = $('.abbr > a', post.nodes.comment))) {
+        return;
+      }
       a.textContent = `Post No.${post} Loading...`;
-      return $.cache(g.SITE.urls.threadJSON({boardID: post.boardID, threadID: post.threadID}), function() { return ExpandComment.parse(this, a, post); });
+      $.cache(g.SITE.urls.threadJSON({ boardID: post.boardID, threadID: post.threadID }), function () {
+        ExpandComment.parse(this, a, post);
+      });
     },
-
     contract(post) {
-      if (!post.nodes.shortComment) { return; }
+      if (!post.nodes.shortComment) {
+        return;
+      }
       const a = $('.abbr > a', post.nodes.shortComment);
       a.textContent = 'here';
       $.replace(post.nodes.longComment, post.nodes.shortComment);
-      return post.nodes.comment = post.nodes.shortComment;
+      post.nodes.comment = post.nodes.shortComment;
     },
-
     parse(req, a, post) {
       let postObj, spoilerRange;
-      const {status} = req;
+      const { status } = req;
       if (![200, 304].includes(status)) {
         a.textContent = status ? `Error ${req.statusText} (${status})` : 'Connection Error';
         return;
       }
-
-      const {
-        posts
-      } = req.response;
+      const { posts } = req.response;
       if (spoilerRange = posts[0].custom_spoiler) {
-        g.SITE.Build.spoilerRange[g.BOARD] = spoilerRange;
+        g.SITE.Build.spoilerRange[g.BOARD.ID] = spoilerRange;
       }
-
       for (postObj of posts) {
-        if (postObj.no === post.ID) { break; }
+        if (postObj.no === post.ID) {
+          break;
+        }
       }
       if (postObj.no !== post.ID) {
         a.textContent = `Post No.${post} not found.`;
         return;
       }
-
-      const {comment} = post.nodes;
+      const { comment } = post.nodes;
       const clone = comment.cloneNode(false);
       clone.innerHTML = postObj.com;
       // Fix pathnames
-      for (var quote of $$('.quotelink', clone)) {
-        var href = quote.getAttribute('href');
-        if (href[0] === '/') { continue; } // Cross-board quote, or board link
+      for (const quote of $$('.quotelink', clone)) {
+        const href = quote.getAttribute('href') || '';
+        if (href[0] === '/') {
+          continue;
+        } // Cross-board quote, or board link
         if (href[0] === '#') {
-          quote.href = `${a.pathname.split(/\/+/).splice(0,4).join('/')}${href}`;
+          quote.href = `${a.pathname.split(/\/+/).slice(0, 4).join('/')}${href}`;
         } else {
-          quote.href = `${a.pathname.split(/\/+/).splice(0,3).join('/')}/${href}`;
+          quote.href = `${a.pathname.split(/\/+/).slice(0, 3).join('/')}/${href}`;
         }
       }
       post.nodes.shortComment = comment;
@@ -10104,13 +10528,11 @@ svg.icon {
       post.nodes.comment = (post.nodes.longComment = clone);
       post.parseComment();
       post.parseQuotes();
-
-      for (var callback of ExpandComment.callbacks) {
+      for (const callback of ExpandComment.callbacks) {
         callback.call(post);
       }
     }
   };
-  ;
 
   // @ts-nocheck
   const ScrollMarkers = {
@@ -10191,7 +10613,7 @@ svg.icon {
       }
       this.db = new DataBoard('yourPosts');
       $.sync('Remember Your Posts', (enabled) => Conf['Remember Your Posts'] = enabled);
-      $.on(d, 'QRPostSuccessful', (e) => {
+      $.on(d$1, 'QRPostSuccessful', (e) => {
         const cb = PostRedirect.delay();
         $.get('Remember Your Posts', Conf['Remember Your Posts'], (items) => {
           if (!items['Remember Your Posts']) {
@@ -10508,7 +10930,7 @@ svg.icon {
     },
     node() {
       Unread.thread = this;
-      Unread.title = d.title;
+      Unread.title = d$1.title;
       Unread.lastReadPost = Unread.db?.get({
         boardID: this.board.ID,
         threadID: this.ID
@@ -10519,9 +10941,9 @@ svg.icon {
           Unread.readCount++;
         }
       }
-      $.one(d, '4chanXInitFinished', Unread.ready);
-      $.on(d, 'PostsInserted', Unread.onUpdate);
-      $.on(d, 'ThreadUpdate', (e) => {
+      $.one(d$1, '4chanXInitFinished', Unread.ready);
+      $.on(d$1, 'PostsInserted', Unread.onUpdate);
+      $.on(d$1, 'ThreadUpdate', (e) => {
         if (e.detail?.[404]) {
           Unread.update();
         }
@@ -10544,9 +10966,9 @@ svg.icon {
       Unread.setLine(true);
       Unread.read();
       Unread.update();
-      $.on(d, 'scroll visibilitychange', Unread.read);
+      $.on(d$1, 'scroll visibilitychange', Unread.read);
       if (Conf['Unread Line']) {
-        $.on(d, 'visibilitychange', Unread.setLine);
+        $.on(d$1, 'visibilitychange', Unread.setLine);
       }
     },
     positionPrev() {
@@ -10683,7 +11105,7 @@ svg.icon {
       if (!Unread.posts.size && (Unread.readCount !== Unread.thread.posts.keys.length)) {
         Unread.saveLastReadPost();
       }
-      if (d.hidden || !Unread.posts.size) {
+      if (d$1.hidden || !Unread.posts.size) {
         return;
       }
       let count = 0;
@@ -10743,7 +11165,7 @@ svg.icon {
       if (!Conf['Unread Line']) {
         return;
       }
-      if (Unread.hr.hidden || d.hidden || (force === true)) {
+      if (Unread.hr.hidden || d$1.hidden || (force === true)) {
         const oldPosition = Unread.linePosition;
         if ((Unread.linePosition = Unread.positionPrev())) {
           if (Unread.linePosition !== oldPosition) {
@@ -10769,7 +11191,7 @@ svg.icon {
           Unread.title.replace('-', (Unread.thread.isArchived ? '- Archived -' : '- 404 -'))
           :
             Unread.title;
-        d.title = `${titleQuotingYou}${titleCount}${titleDead}`;
+        d$1.title = `${titleQuotingYou}${titleCount}${titleDead}`;
       }
       Unread.saveThreadWatcherCount();
       if (Conf['Unread Favicon'] && (g.SITE.software === 'yotsuba')) {
@@ -10810,14 +11232,14 @@ svg.icon {
     })
   };
 
-  // @ts-nocheck
-
-  var ExpandThread = {
+  const ExpandThread = {
     statuses: dict(),
     init() {
-      if (!((g.VIEW === 'index') && Conf['Thread Expansion'])) { return; }
+      if (!((g.VIEW === 'index') && Conf['Thread Expansion'])) {
+        return;
+      }
       if (Conf['JSON Index']) {
-        $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
+        $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
       } else {
         Callbacks.Thread.push({
           name: 'Expand Thread',
@@ -10825,139 +11247,157 @@ svg.icon {
         });
       }
     },
-
     setButton(thread) {
-      if (!thread.nodes.root) return;
+      if (!thread.nodes.root)
+        return;
       const a = $('a.summary', thread.nodes.root);
-      if (!a) return;
-      a.textContent = g.SITE.Build.summaryText('+', ...a.textContent.match(/\d+/g));
+      if (!a)
+        return;
+      a.textContent = g.SITE.Build.summaryText('+', ...(a.textContent.match(/\d+/g) || []));
       a.style.cursor = 'pointer';
       $.on(a, 'click', ExpandThread.cbToggle);
     },
-
     disconnect(refresh) {
-      if ((g.VIEW === 'thread') || !Conf['Thread Expansion']) { return; }
-      for (var threadID in ExpandThread.statuses) {
-        var oldReq;
-        var status = ExpandThread.statuses[threadID];
+      if ((g.VIEW === 'thread') || !Conf['Thread Expansion']) {
+        return;
+      }
+      for (const threadID in ExpandThread.statuses) {
+        let oldReq;
+        const status = ExpandThread.statuses[threadID];
         if (oldReq = status.req) {
           delete status.req;
           oldReq.abort();
         }
         delete ExpandThread.statuses[threadID];
       }
-
-      if (!refresh) $.off(d, 'IndexRefreshInternal', this.onIndexRefresh);
+      if (!refresh)
+        $.off(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
     },
-
     onIndexRefresh() {
       ExpandThread.disconnect(true);
       g.BOARD.threads.forEach(thread => ExpandThread.setButton(thread));
     },
-
     cbToggle(e) {
-      if ($.modifiedClick(e)) { return; }
+      if ($.modifiedClick(e)) {
+        return;
+      }
       e.preventDefault();
       ExpandThread.toggle(Get.threadFromNode(this));
     },
-
     cbToggleBottom(e) {
-      if ($.modifiedClick(e)) { return; }
+      if ($.modifiedClick(e)) {
+        return;
+      }
       e.preventDefault();
       const thread = Get.threadFromNode(this);
       $.rm(this); // remove before fixing bottom of thread position
-      const {bottom} = thread.nodes.root.getBoundingClientRect();
+      const { bottom } = thread.nodes.root.getBoundingClientRect();
       ExpandThread.toggle(thread);
-      return window.scrollBy(0, (thread.nodes.root.getBoundingClientRect().bottom - bottom));
+      window.scrollBy(0, (thread.nodes.root.getBoundingClientRect().bottom - bottom));
     },
-
     toggle(thread) {
-      if (!thread.nodes.root) return;
+      if (!thread.nodes.root)
+        return;
       const a = $('a.summary', thread.nodes.root);
-      if (!a) return;
+      if (!a)
+        return;
       if (thread.ID in ExpandThread.statuses) {
         ExpandThread.contract(thread, a, thread.nodes.root);
       } else {
         ExpandThread.expand(thread, a);
       }
     },
-
     expand(thread, a) {
       let status;
-      ExpandThread.statuses[thread] = (status = {});
-      a.textContent = g.SITE.Build.summaryText('...', ...a.textContent.match(/\d+/g));
-      status.req = $.cache(g.SITE.urls.threadJSON({boardID: thread.board.ID, threadID: thread.ID}), function() {
-        if (this !== status.req) { return; } // aborted
+      ExpandThread.statuses[thread.ID] = (status = {});
+      a.textContent = g.SITE.Build.summaryText('...', ...(a.textContent.match(/\d+/g) || []));
+      status.req = $.cache(g.SITE.urls.threadJSON({ boardID: thread.board.ID, threadID: thread.ID }), function () {
+        if (this !== status.req) {
+          return;
+        } // aborted
         delete status.req;
         ExpandThread.parse(this, thread, a);
       });
       status.numReplies = $$(g.SITE.selectors.replyOriginal, thread.nodes.root).length;
     },
-
     contract(thread, a, threadRoot) {
       let oldReq;
-      const status = ExpandThread.statuses[thread];
-      delete ExpandThread.statuses[thread];
+      const status = ExpandThread.statuses[thread.ID];
+      delete ExpandThread.statuses[thread.ID];
       if (oldReq = status.req) {
         delete status.req;
         oldReq.abort();
-        if (a) { a.textContent = g.SITE.Build.summaryText('+', ...a.textContent.match(/\d+/g)); }
+        if (a) {
+          a.textContent = g.SITE.Build.summaryText('+', ...(a.textContent.match(/\d+/g) || []));
+        }
         return;
       }
-
       let replies = $$('.thread > .replyContainer', threadRoot);
-      if (status.numReplies) { replies = replies.slice(0, (-status.numReplies)); }
+      if (status.numReplies) {
+        replies = replies.slice(0, (-status.numReplies));
+      }
       let postsCount = 0;
       let filesCount = 0;
-      for (var reply of replies) {
-        // rm clones
-        if (Conf['Quote Inlining']) { var inlined;
-        while ((inlined = $('.inlined', reply))) { inlined.click(); } }
+      for (const reply of replies) {
+        if (Conf['Quote Inlining']) {
+          let inlined;
+          while ((inlined = $('.inlined', reply))) {
+            inlined.click();
+          }
+        }
         postsCount++;
-        if ('file' in Get.postFromRoot(reply)) { filesCount++; }
+        if ('file' in Get.postFromRoot(reply)) {
+          filesCount++;
+        }
         $.rm(reply);
       }
-      if (Index.enabled) { // otherwise handled by Main.addPosts
+      if (Index.enabled) {
         $.event('PostsRemoved', null, a.parentNode);
       }
       a.textContent = g.SITE.Build.summaryText('+', postsCount, filesCount);
-      $.rm($('.summary-bottom', threadRoot));
+      const summaryBottom = $('.summary-bottom', threadRoot);
+      if (summaryBottom) {
+        $.rm(summaryBottom);
+      }
     },
-
     parse(req, thread, a) {
-      let root;
+      let root = null;
       if (![200, 304].includes(req.status)) {
         a.textContent = req.status ? `Error ${req.statusText} (${req.status})` : 'Connection Error';
         return;
       }
-
-      g.SITE.Build.spoilerRange[thread.board] = req.response.posts[0].custom_spoiler;
-
-      const posts      = [];
-      const postsRoot  = [];
+      g.SITE.Build.spoilerRange[thread.board.ID] = req.response.posts[0].custom_spoiler;
+      const posts = [];
+      const postsRoot = [];
       let filesCount = 0;
-      for (var postData of req.response.posts) {
-        var post;
-        if (postData.no === thread.ID) { continue; }
+      for (const postData of req.response.posts) {
+        let post;
+        if (postData.no === thread.ID) {
+          continue;
+        }
         if ((post = thread.posts.get(postData.no)) && !post.isFetchedQuote) {
-          if ('file' in post) { filesCount++; }
-          ({root} = post.nodes);
+          if ('file' in post) {
+            filesCount++;
+          }
+          root = post.nodes.root;
           postsRoot.push(root);
           continue;
         }
         root = g.SITE.Build.postFromObject(postData, thread.board.ID);
         post = new Post(root, thread, thread.board);
-        if ('file' in post) { filesCount++; }
+        if ('file' in post) {
+          filesCount++;
+        }
         posts.push(post);
         postsRoot.push(root);
       }
-      for (const post of posts) { Callbacks.Post.execute(post); }
+      for (const post of posts) {
+        Callbacks.Post.execute(post);
+      }
       $.after(a, postsRoot);
       $.event('PostsInserted', null, a.parentNode);
-
-      const postsCount    = postsRoot.length;
+      const postsCount = postsRoot.length;
       a.textContent = g.SITE.Build.summaryText('-', postsCount, filesCount);
-
       if (root) {
         const a2 = a.cloneNode(true);
         a2.classList.add('summary-bottom');
@@ -10982,8 +11422,8 @@ svg.icon {
         name: 'Unread Line in Index',
         cb: this.node
       });
-      $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
-      $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
+      $.on(d$1, 'IndexRefreshInternal', this.onIndexRefresh);
+      $.on(d$1, 'PostsInserted PostsRemoved', this.onPostsInserted);
     },
     node() {
       UnreadIndex.lastReadPost[this.fullID] = UnreadIndex.db.get({
@@ -11141,7 +11581,7 @@ svg.icon {
       Icon.set(this.refreshButton, 'refresh');
       Icon.set(this.menuButton, 'caretDown');
       Icon.set(this.closeButton, 'xmark');
-      $.on(d, 'QRPostSuccessful', this.cb.post);
+      $.on(d$1, 'QRPostSuccessful', this.cb.post);
       $.on(sc, 'click', this.toggleWatcher);
       $.on(this.refreshButton, 'click', this.buttonFetchAll);
       $.on(this.closeButton, 'click', this.toggleWatcher);
@@ -11149,10 +11589,10 @@ svg.icon {
       $.onExists(doc, 'body', this.addDialog);
       switch (g.VIEW) {
         case 'index':
-          $.on(d, 'IndexUpdate', this.cb.onIndexUpdate);
+          $.on(d$1, 'IndexUpdate', this.cb.onIndexUpdate);
           break;
         case 'thread':
-          $.on(d, 'ThreadUpdate', this.cb.onThreadRefresh);
+          $.on(d$1, 'ThreadUpdate', this.cb.onThreadRefresh);
           break;
       }
       if (Conf['Fixed Thread Watcher']) {
@@ -11260,7 +11700,7 @@ svg.icon {
         return;
       }
       ThreadWatcher.build();
-      $.prepend(d.body, ThreadWatcher.dialog);
+      $.prepend(d$1.body, ThreadWatcher.dialog);
     },
     toggleWatcher() {
       $.toggleClass(ThreadWatcher.shortcut, 'disabled');
@@ -11461,7 +11901,7 @@ svg.icon {
       const { db } = ThreadWatcher;
       const interval = Conf['Show Page'] || (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) ? 5 * MINUTE : 2 * HOUR;
       const now = Date.now();
-      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d.hidden && d.hasFocus()) {
+      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d$1.hidden && d$1.hasFocus()) {
         ThreadWatcher.fetchAllStatus(interval);
       }
       ThreadWatcher.timeout = setTimeout(ThreadWatcher.fetchAuto, interval);
@@ -12266,8 +12706,8 @@ svg.icon {
       $.after(this.OP.nodes.root, ReplyPruning.summary);
       $.on(ReplyPruning.inputs.enabled, 'change', ReplyPruning.update);
       $.on(ReplyPruning.inputs.replies, 'change', ReplyPruning.update);
-      $.on(d, 'ThreadUpdate', ReplyPruning.updateCount);
-      $.on(d, 'ThreadUpdate', ReplyPruning.update);
+      $.on(d$1, 'ThreadUpdate', ReplyPruning.updateCount);
+      $.on(d$1, 'ThreadUpdate', ReplyPruning.update);
       ReplyPruning.update();
     },
     updateCount(e) {
@@ -12290,7 +12730,7 @@ svg.icon {
         :
           0;
       // Record position from bottom of document
-      const oldPos = d.body.clientHeight - window.scrollY;
+      const oldPos = d$1.body.clientHeight - window.scrollY;
       const { posts } = ReplyPruning.thread;
       if (ReplyPruning.hidden < hidden2) {
         while ((ReplyPruning.hidden < hidden2) && (ReplyPruning.position < posts.keys.length)) {
@@ -12331,7 +12771,7 @@ svg.icon {
       ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
       // Maintain position in thread when posts are added/removed above
       if ((hidden1 !== hidden2) && ((boardTop = Header.getTopOf($('.board'))) < 0)) {
-        window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
+        window.scrollBy(0, Math.max(d$1.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
       }
     }
   };
@@ -12356,7 +12796,7 @@ svg.icon {
       $.on(this.input, 'change', this.setEnabled);
       $.on(this.input, 'change', this.rethread);
       $.on(this.threadNewLink.firstElementChild, 'click', this.rethread);
-      $.on(d, '4chanXInitFinished', () => { this.ready = true; });
+      $.on(d$1, '4chanXInitFinished', () => { this.ready = true; });
       Header.menu.addEntry(this.entry = {
         el: this.controls,
         order: 99
@@ -12683,7 +13123,7 @@ svg.icon {
           rel: 'stylesheet',
           href: `//s.4cdn.org/css/flags.${cssVersion}.css`
         });
-        $.add(d.head, Fetcher.flagCSS);
+        $.add(d$1.head, Fetcher.flagCSS);
       }
       $.rmAll(this.root);
       $.add(this.root, nodes.root);
@@ -12829,7 +13269,7 @@ svg.icon {
         return;
       }
       if (g.VIEW === 'archive') {
-        $.on(d, 'mouseover', function (e) {
+        $.on(d$1, 'mouseover', function (e) {
           const target = e.target;
           if ((target.nodeName === 'A') && $.hasClass(target, 'quotelink')) {
             QuotePreview.mouseover.call(target, e);
@@ -12854,7 +13294,7 @@ svg.icon {
     },
     mouseover(e) {
       let origin;
-      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d.contains(this)) {
+      if (($.hasClass(this, 'inlined') && !$.hasClass(doc, 'catalog-mode')) || !d$1.contains(this)) {
         return;
       }
       const { boardID, threadID, postID } = Get.postDataFromLink(this);
@@ -12952,55 +13392,50 @@ svg.icon {
   <a href="./catalog">Catalog</a>
 </div>`;
 
-  // @ts-nocheck
-
-  var Index = {
+  const Index = {
     showHiddenThreads: false,
     changed: {},
-
-    enabledOn({siteID, boardID}) {
+    search: '',
+    currentSort: '',
+    currentPage: 1,
+    root: $.el('div', { className: 'board json-index' }),
+    enabledOn({ siteID, boardID }) {
       return Conf['JSON Index'] && (g.sites[siteID].software === 'yotsuba') && (boardID !== 'f');
     },
-
     init() {
-      let input, inputs, name;
-      if (g.VIEW !== 'index') { return; }
-
+      let input, name;
+      if (g.VIEW !== 'index') {
+        return;
+      }
       // For IndexRefresh events
-      $.one(d, '4chanXInitFinished', this.cb.initFinished);
-      $.on(d, 'PostsInserted', this.cb.postsInserted);
-
-      if (!this.enabledOn(g.BOARD)) { return; }
-
+      $.one(d$1, '4chanXInitFinished', this.cb.initFinished);
+      $.on(d$1, 'PostsInserted', this.cb.postsInserted);
+      if (!this.enabledOn(g.BOARD)) {
+        return;
+      }
       this.enabled = true;
-
       Callbacks.Post.push({
         name: 'Index Page Numbers',
-        cb:   this.node
+        cb: this.node
       });
       Callbacks.CatalogThread.push({
         name: 'Catalog Features',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
-
       this.search = history.state?.searched || '';
       if (history.state?.mode) {
         Conf['Index Mode'] = history.state?.mode;
       }
       this.currentSort = history.state?.sort;
-      if (!this.currentSort) { this.currentSort = typeof Conf['Index Sort'] === 'object' ? (
-          Conf['Index Sort'][g.BOARD.ID] || 'bump'
-        ) : (
-          Conf['Index Sort']
-        ); }
+      if (!this.currentSort) {
+        this.currentSort = typeof Conf['Index Sort'] === 'object' ? (Conf['Index Sort'][g.BOARD.ID] || 'bump') : (Conf['Index Sort']);
+      }
       this.currentPage = this.getCurrentPage();
       this.processHash();
-
       $.addClass(doc, 'index-loading', `${Conf['Index Mode'].replace(/\ /g, '-')}-mode`);
       $.on(window, 'popstate', this.cb.popstate);
-      $.on(d, 'scroll', this.scroll);
-      $.on(d, 'SortIndex', this.cb.resort);
-
+      $.on(d$1, 'scroll', this.scroll.bind(this));
+      $.on(d$1, 'SortIndex', this.cb.resort);
       // Header refresh button
       this.button = $.el('a', {
         title: 'Refresh',
@@ -13009,16 +13444,16 @@ svg.icon {
       Icon.set(this.button, 'refresh', 'Refresh');
       $.on(this.button, 'click', () => Index.update());
       Header.addShortcut('index-refresh', this.button, 590);
-
       // Header "Index Navigation" submenu
       const entries = [];
-      this.inputs = (inputs = dict());
+      const inputs = dict();
+      this.inputs = inputs;
       for (name in Config.Index) {
-        var arr = Config.Index[name];
+        const arr = Config.Index[name];
         if (arr instanceof Array) {
-          var label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
+          const label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
           label.title = arr[1];
-          entries.push({el: label});
+          entries.push({ el: label });
           input = label.firstChild;
           $.on(input, 'change', $.cb.checked);
           inputs[name] = input;
@@ -13028,61 +13463,54 @@ svg.icon {
       $.on(inputs['Catalog Hover Expand'], 'change', this.cb.hover);
       $.on(inputs['Pin Watched Threads'], 'change', this.cb.resort);
       $.on(inputs['Anchor Hidden Threads'], 'change', this.cb.resort);
-
-      const watchSettings = function(e) {
+      const watchSettings = function (e) {
         if (input = $.getOwn(inputs, e.target.name)) {
           input.checked = e.target.checked;
-          return $.event('change', null, input);
+          $.event('change', null, input);
         }
       };
-      $.on(d, 'OpenSettings', () => $.on($.id('fourchanx-settings'), 'change', watchSettings));
-
+      $.on(d$1, 'OpenSettings', () => $.on($.id('fourchanx-settings'), 'change', watchSettings));
       const sortEntry = UI.checkbox('Per-Board Sort Type', 'Per-board sort type', (typeof Conf['Index Sort'] === 'object'));
       sortEntry.title = 'Set the sorting order of each board independently.';
       $.on(sortEntry.firstChild, 'change', this.cb.perBoardSort);
-      entries.splice(3, 0, {el: sortEntry});
-
+      entries.splice(3, 0, { el: sortEntry });
       Header.menu.addEntry({
-        el: $.el('span',
-          {textContent: 'Index Navigation'}),
+        el: $.el('span', { textContent: 'Index Navigation' }),
         order: 100,
         subEntries: entries
       });
-
       // Navigation links at top of index
-      this.navLinks = $.el('div', {className: 'navLinks json-index'});
-      $.extend(this.navLinks, {innerHTML: NavLinksPage});
+      this.navLinks = $.el('div', { className: 'navLinks json-index' });
+      $.extend(this.navLinks, { innerHTML: NavLinksPage });
       $('.cataloglink a', this.navLinks).href = CatalogLinks.catalog();
-      if (!BoardConfig.isArchived(g.BOARD.ID)) { $('.archlistlink', this.navLinks).hidden = true; }
+      if (!BoardConfig.isArchived(g.BOARD.ID)) {
+        $('.archlistlink', this.navLinks).hidden = true;
+      }
       $.on($('#index-last-refresh a', this.navLinks), 'click', this.cb.refreshFront);
-
       // Search field
       this.searchInput = $('#index-search', this.navLinks);
       this.setupSearch();
-      $.on(this.searchInput, 'input', this.onSearchInput);
-      $.on($('#index-search-clear', this.navLinks), 'click', this.clearSearch);
+      $.on(this.searchInput, 'input', this.onSearchInput.bind(this));
+      $.on($('#index-search-clear', this.navLinks), 'click', this.clearSearch.bind(this));
       Icon.set($('#index-search-clear', this.navLinks), 'xmark');
-
       // Hidden threads toggle
       this.hideLabel = $('#hidden-label', this.navLinks);
       $.on($('#hidden-toggle a', this.navLinks), 'click', this.cb.toggleHiddenThreads);
-
       // Drop-down menus and reverse sort toggle
-      this.selectRev   = $('#index-rev',  this.navLinks);
-      this.selectMode  = $('#index-mode', this.navLinks);
-      this.selectSort  = $('#index-sort', this.navLinks);
-      this.selectSize  = $('#index-size', this.navLinks);
-      $.on(this.selectRev,  'change', this.cb.sort);
+      this.selectRev = $('#index-rev', this.navLinks);
+      this.selectMode = $('#index-mode', this.navLinks);
+      this.selectSort = $('#index-sort', this.navLinks);
+      this.selectSize = $('#index-size', this.navLinks);
+      $.on(this.selectRev, 'change', this.cb.sort);
       $.on(this.selectMode, 'change', this.cb.mode);
       $.on(this.selectSort, 'change', this.cb.sort);
       $.on(this.selectSize, 'change', $.cb.value);
       $.on(this.selectSize, 'change', this.cb.size);
-      for (var select of [this.selectMode, this.selectSize]) {
+      for (const select of [this.selectMode, this.selectSize]) {
         select.value = Conf[select.name];
       }
       this.selectRev.checked = /-rev$/.test(Index.currentSort);
-      this.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
-
+      this.selectSort.value = Index.currentSort.replace(/-rev$/, '');
       // Last Long Reply options
       this.lastLongOptions = $('#lastlong-options', this.navLinks);
       this.lastLongInputs = $$('input', this.lastLongOptions);
@@ -13091,117 +13519,108 @@ svg.icon {
       for (let i = 0; i < this.lastLongInputs.length; i++) {
         input = this.lastLongInputs[i];
         $.on(input, 'change', this.cb.lastLongThresholds);
-        var tRaw = Conf[`Last Long Reply Thresholds ${i}`];
-        input.value = (this.lastLongThresholds[i] =
+        const tRaw = Conf[`Last Long Reply Thresholds ${i}`];
+        input.value = String(this.lastLongThresholds[i] =
           typeof tRaw === 'object' ? (tRaw[g.BOARD.ID] ?? 100) : tRaw);
       }
-
       // Thread container
-      this.root = $.el('div', {className: 'board json-index'});
       $.on(this.root, 'click', this.cb.hoverToggle);
       this.cb.size();
       this.cb.hover();
-
       // Page list
-      this.pagelist = $.el('div', {className: 'pagelist json-index'});
-      $.extend(this.pagelist, {innerHTML: PageList});
+      this.pagelist = $.el('div', { className: 'pagelist json-index' });
+      $.extend(this.pagelist, { innerHTML: PageList });
       $('.cataloglink a', this.pagelist).href = CatalogLinks.catalog();
       $.on(this.pagelist, 'click', this.cb.pageNav);
-
       this.update(true);
-
-      $.onExists(doc, 'title + *', () => d.title = d.title.replace(/\ -\ Page\ \d+/, ''));
-
-      $.onExists(doc, '.board > .thread > .postContainer, .board + *', function() {
-        let el;
+      $.onExists(doc, 'title + *', () => d$1.title = d$1.title.replace(/\ -\ Page\ \d+/, ''));
+      $.onExists(doc, '.board > .thread > .postContainer, .board + *', function () {
         g.SITE.Build.hat = $('.board > .thread > img:first-child');
         if (g.SITE.Build.hat) {
-          g.BOARD.threads.forEach(function(thread) {
+          g.BOARD.threads.forEach(function (thread) {
             if (thread.nodes.root) {
-              return $.prepend(thread.nodes.root, g.SITE.Build.hat.cloneNode(false));
+              $.prepend(thread.nodes.root, g.SITE.Build.hat.cloneNode(false));
             }
           });
           $.addClass(doc, 'hats-enabled');
           $.addStyle(`.catalog-thread::after {background-image: url(${g.SITE.Build.hat.src});}`);
         }
-
         const board = $('.board');
         $.replace(board, Index.root);
         if (Index.loaded) {
           $.event('PostsInserted', null, Index.root);
         }
-        // Hacks:
-        // - When removing an element from the document during page load,
-        //   its ancestors will still be correctly created inside of it.
-        // - Creating loadable elements inside of an origin-less document
-        //   will not download them.
-        // - Combine the two and you get a download canceller!
-        //   Does not work on Firefox unfortunately. bugzil.la/939713
         try {
-          d.implementation.createDocument(null, null, null).appendChild(board);
-        } catch (error) {}
-
-        for (el of $$('.navLinks')) { $.rm(el); }
+          d$1.implementation.createDocument(null, null, null).appendChild(board);
+        } catch (error) { }
+        for (const el of $$('.navLinks')) {
+          $.rm(el);
+        }
         $.rm($.id('ctrl-top'));
         const topNavPos = $.id('delform').previousElementSibling;
         $.before(topNavPos, $.el('hr'));
         $.before(topNavPos, Index.navLinks);
         const timeEl = $('#index-last-refresh time', Index.navLinks);
-        if (timeEl.dataset.utc) { return RelativeDates.update(timeEl); }
+        if (timeEl.dataset.utc) {
+          RelativeDates.update(timeEl);
+        }
       });
-
-      return $.on(d, '4chanXInitFinished', function() {
+      $.on(d$1, '4chanXInitFinished', function () {
         let pagelist;
         if (pagelist = $('.pagelist')) {
           $.replace(pagelist, Index.pagelist);
         }
-        return $.rmClass(doc, 'index-loading');
+        $.rmClass(doc, 'index-loading');
       });
     },
-
     scroll() {
-      if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) { return; }
-      if (Index.pageNum == null) { Index.pageNum = Index.currentPage; } // Avoid having to pushState to keep track of the current page
-
+      if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) {
+        return;
+      }
+      if (Index.pageNum == null) {
+        Index.pageNum = Index.currentPage;
+      } // Avoid having to pushState to keep track of the current page
       const pageNum = ++Index.pageNum;
-      if (pageNum > Index.pagesNum) { return Index.endNotice(); }
-
+      if (pageNum > Index.pagesNum) {
+        return Index.endNotice();
+      }
       const threadIDs = Index.threadsOnPage(pageNum);
-      return Index.buildStructure(threadIDs);
+      Index.buildStructure(threadIDs);
     },
-
-    endNotice: (function() {
+    endNotice: (function () {
       let notify = false;
       const reset = () => notify = false;
-      return function() {
-        if (notify) { return; }
+      return function () {
+        if (notify) {
+          return;
+        }
         notify = true;
         new Notice('info', "Last page reached.", 2);
-        return setTimeout(reset, 3 * SECOND);
+        setTimeout(reset, 3 * SECOND);
       };
     })(),
-
     menu: {
       init() {
-        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link'] || !Index.enabledOn(g.BOARD)) { return; }
-
-        return Menu.menu.addEntry({
+        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link'] || !Index.enabledOn(g.BOARD)) {
+          return;
+        }
+        Menu.menu.addEntry({
           el: $.el('a', {
-            href:      'javascript:;',
+            href: 'javascript:;',
             className: 'has-shortcut-text'
-          }
-          , {innerHTML: "<span></span><span class=\"shortcut-text\">Shift+click</span>"}),
+          }, { innerHTML: "<span></span><span class=\"shortcut-text\">Shift+click</span>" }),
           order: 20,
-          open({thread}) {
-            if (Conf['Index Mode'] !== 'catalog') { return false; }
-            this.el.firstElementChild.textContent = thread.isHidden ?
-              'Unhide'
-            :
-              'Hide';
-            if (this.cb) { $.off(this.el, 'click', this.cb); }
-            this.cb = function() {
-              $.event('CloseMenu');
-              return Index.toggleHide(thread);
+          open({ thread }) {
+            if (Conf['Index Mode'] !== 'catalog') {
+              return false;
+            }
+            this.el.firstElementChild.textContent = thread.isHidden ? 'Unhide' : 'Hide';
+            if (this.cb) {
+              $.off(this.el, 'click', this.cb);
+            }
+            this.cb = function () {
+              $.event('CloseMenu', undefined);
+              Index.toggleHide(thread);
             };
             $.on(this.el, 'click', this.cb);
             return true;
@@ -13209,15 +13628,16 @@ svg.icon {
         });
       }
     },
-
     node() {
-      if (this.isReply || this.isClone || (Index.threadPosition[this.ID] == null)) { return; }
-      return this.thread.setPage(Math.floor(Index.threadPosition[this.ID] / Index.threadsNumPerPage) + 1);
+      if (this.isReply || this.isClone || (Index.threadPosition[this.ID] == null)) {
+        return;
+      }
+      this.thread.setPage(Math.floor(Index.threadPosition[this.ID] / Index.threadsNumPerPage) + 1);
     },
-
     catalogNode() {
-      return $.on(this.nodes.root, 'click', e => {
-        if ((e.button !== 0) || !e.shiftKey) return;
+      $.on(this.nodes.root, 'click', e => {
+        if ((e.button !== 0) || !e.shiftKey)
+          return;
         e.preventDefault();
         getSelection().removeAllRanges();
         if (Conf['MD5 Quick Filter in the Catalog'] && e.target.classList.contains('catalog-thumb')) {
@@ -13227,72 +13647,69 @@ svg.icon {
         }
       });
     },
-
     toggleHide(thread) {
       if (Index.showHiddenThreads) {
         ThreadHiding.show(thread);
-        if (!ThreadHiding.db.get({boardID: thread.board.ID, threadID: thread.ID})) { return; }
-        // Don't save when un-hiding filtered threads.
+        if (!ThreadHiding.db.get({ boardID: thread.board.ID, threadID: thread.ID })) {
+          return;
+        }
       } else {
         ThreadHiding.hide(thread);
       }
-      return ThreadHiding.saveHiddenState(thread);
+      ThreadHiding.saveHiddenState(thread);
     },
-
     cycleSortType() {
       let i;
-      const types = Index.selectSort.options.filter(option => !option.disabled);
+      const types = Index.selectSort.options.filter((option) => !option.disabled);
       for (i = 0; i < types.length; i++) {
-        var type = types[i];
-        if (type.selected) { break; }
+        const type = types[i];
+        if (type.selected) {
+          break;
+        }
       }
       types[(i + 1) % types.length].selected = true;
-      return $.event('change', null, Index.selectSort);
+      $.event('change', null, Index.selectSort);
     },
-
     cb: {
       initFinished() {
         Index.initFinishedFired = true;
-        return $.queueTask(() => Index.cb.postsInserted());
+        $.queueTask(() => Index.cb.postsInserted());
       },
-
       postsInserted() {
-        if (!Index.initFinishedFired) { return; }
+        if (!Index.initFinishedFired) {
+          return;
+        }
         let n = 0;
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (!post.isFetchedQuote && !post.indexRefreshSeen && doc.contains(post.nodes.root)) {
             post.indexRefreshSeen = true;
-            return n++;
+            n++;
           }
         });
-        if (n) { return $.event('IndexRefresh'); }
+        if (n) {
+          $.event('IndexRefresh', undefined);
+        }
       },
-
       toggleHiddenThreads() {
-        $('#hidden-toggle a', Index.navLinks).textContent = (Index.showHiddenThreads = !Index.showHiddenThreads) ?
-          'Hide'
-        :
-          'Show';
+        $('#hidden-toggle a', Index.navLinks).textContent = (Index.showHiddenThreads = !Index.showHiddenThreads) ? 'Hide' : 'Show';
         Index.sort();
-        return Index.buildIndex();
+        Index.buildIndex();
       },
-
       mode() {
-        Index.pushState({mode: this.value});
-        return Index.pageLoad(false);
+        Index.pushState({ mode: this.value });
+        Index.pageLoad(false);
       },
-
       sort() {
         const value = Index.selectRev.checked ? Index.selectSort.value + "-rev" : Index.selectSort.value;
-        Index.pushState({sort: value});
-        return Index.pageLoad(false);
+        Index.pushState({ sort: value });
+        Index.pageLoad(false);
       },
-
       resort(e) {
         Index.changed.order = true;
-        if (!e?.detail?.deferred) { return Index.pageLoad(false); }
+        if (!e?.detail?.deferred) {
+          Index.pageLoad(false);
+        }
       },
-
       perBoardSort() {
         Conf['Index Sort'] = this.checked ? dict() : '';
         Index.saveSort();
@@ -13301,42 +13718,39 @@ svg.icon {
           Index.saveLastLongThresholds(i);
         }
       },
-
       lastLongThresholds() {
         const i = [...this.parentNode.children].indexOf(this);
         const value = +this.value;
         if (!Number.isFinite(value)) {
-          this.value = Index.lastLongThresholds[i];
+          this.value = String(Index.lastLongThresholds[i]);
           return;
         }
         Index.lastLongThresholds[i] = value;
         Index.saveLastLongThresholds(i);
         Index.changed.order = true;
-        return Index.pageLoad(false);
+        Index.pageLoad(false);
       },
-
       size(e) {
         if (Conf['Index Mode'] !== 'catalog') {
           $.rmClass(Index.root, 'catalog-small');
           $.rmClass(Index.root, 'catalog-large');
         } else if (Conf['Index Size'] === 'small') {
           $.addClass(Index.root, 'catalog-small');
-          $.rmClass(Index.root,  'catalog-large');
+          $.rmClass(Index.root, 'catalog-large');
         } else {
           $.addClass(Index.root, 'catalog-large');
-          $.rmClass(Index.root,  'catalog-small');
+          $.rmClass(Index.root, 'catalog-small');
         }
-        if (e) { return Index.buildIndex(); }
+        if (e) {
+          Index.buildIndex();
+        }
       },
-
       replies() {
-        return Index.buildIndex();
+        Index.buildIndex();
       },
-
       hover() {
-        return doc.classList.toggle('catalog-hover-expand', Conf['Catalog Hover Expand']);
+        doc.classList.toggle('catalog-hover-expand', Conf['Catalog Hover Expand']);
       },
-
       hoverToggle(e) {
         if (Conf['Catalog Hover Toggle'] && $.hasClass(doc, 'catalog-mode') && !$.modifiedClick(e) && !$.x('ancestor-or-self::a', e.target)) {
           let thread;
@@ -13345,31 +13759,31 @@ svg.icon {
           $.event('change', null, input);
           if (thread = Get.threadFromNode(e.target)) {
             Index.cb.catalogReplies.call(thread);
-            return Index.cb.hoverAdjust.call(thread.OP.nodes);
+            Index.cb.hoverAdjust.call(thread.OP.nodes);
           }
         }
       },
-
       popstate(e) {
         if (e?.state) {
-          const {searched, mode, sort} = e.state;
+          const { searched, mode, sort } = e.state;
           const page = Index.getCurrentPage();
-          Index.setState({search: searched, mode, sort, page});
-          return Index.pageLoad(false);
+          Index.setState({ search: searched, mode, sort, page });
+          Index.pageLoad(false);
         } else {
           // page load or hash change
           const nCommands = Index.processHash();
           if (Conf['Refreshed Navigation'] && nCommands) {
-            return Index.update();
+            Index.update();
           } else {
-            return Index.pageLoad();
+            Index.pageLoad();
           }
         }
       },
-
       pageNav(e) {
         let a;
-        if ($.modifiedClick(e)) { return; }
+        if ($.modifiedClick(e)) {
+          return;
+        }
         switch (e.target.nodeName) {
           case 'BUTTON':
             e.target.blur();
@@ -13381,83 +13795,77 @@ svg.icon {
           default:
             return;
         }
-        if (a.textContent === 'Catalog') { return; }
+        if (a.textContent === 'Catalog') {
+          return;
+        }
         e.preventDefault();
-        return Index.userPageNav(+a.pathname.split(/\/+/)[2] || 1);
+        Index.userPageNav(+a.pathname.split(/\/+/)[2] || 1);
       },
-
       refreshFront() {
-        Index.pushState({page: 1});
-        return Index.update();
+        Index.pushState({ page: 1 });
+        Index.update();
       },
-
       catalogReplies() {
         if (Conf['Show Replies'] && $.hasClass(doc, 'catalog-hover-expand') && !this.catalogView.nodes.replies) {
-          return Index.buildCatalogReplies(this);
+          Index.buildCatalogReplies(this);
         }
       },
-
       hoverAdjust() {
         // Prevent hovered catalog threads from going offscreen.
         let x;
-        if (!$.hasClass(doc, 'catalog-hover-expand')) { return; }
+        if (!$.hasClass(doc, 'catalog-hover-expand')) {
+          return;
+        }
         const rect = this.post.getBoundingClientRect();
         if (x = $.minmax(0, -rect.left, doc.clientWidth - rect.right)) {
-          const {style} = this.post;
+          const { style } = this.post;
           style.left = `${x}px`;
           style.right = `${-x}px`;
-          return $.one(this.root, 'mouseleave', () => style.left = (style.right = null));
+          $.one(this.root, 'mouseleave', () => style.left = (style.right = null));
         }
       }
     },
-
     scrollToIndex() {
       // Scroll to navlinks, or top of board if navlinks are hidden.
-      return Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
+      Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
     },
-
     getCurrentPage() {
       return +window.location.pathname.split(/\/+/)[2] || 1;
     },
-
     userPageNav(page) {
-      Index.pushState({page});
+      Index.pushState({ page });
       if (Conf['Refreshed Navigation']) {
-        return Index.update();
+        Index.update();
       } else {
-        return Index.pageLoad();
+        Index.pageLoad();
       }
     },
-
     hashCommands: {
       mode: {
-        'paged':         'paged',
+        'paged': 'paged',
         'infinite-scrolling': 'infinite',
-        'infinite':      'infinite',
-        'all-threads':   'all pages',
-        'all-pages':     'all pages',
-        'catalog':       'catalog'
+        'infinite': 'infinite',
+        'all-threads': 'all pages',
+        'all-pages': 'all pages',
+        'catalog': 'catalog'
       },
       sort: {
-        'bump-order':        'bump',
-        'last-reply':        'lastreply',
-        'last-long-reply':   'lastlong',
-        'creation-date':     'birth',
-        'reply-count':       'replycount',
-        'file-count':        'filecount',
-        'posts-per-minute':  'activity'
+        'bump-order': 'bump',
+        'last-reply': 'lastreply',
+        'last-long-reply': 'lastlong',
+        'creation-date': 'birth',
+        'reply-count': 'replycount',
+        'file-count': 'filecount',
+        'posts-per-minute': 'activity'
       }
     },
-
     processHash() {
-      // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=483304
       let hash = location.href.match(/#.*/)?.[0] || '';
-      const state =
-        {replace: true};
+      const state = { replace: true };
       const commands = hash.slice(1).split('/');
       const leftover = [];
-      for (var command of commands) {
-        var mode, sort;
+      for (const command of commands) {
+        let mode, sort;
         if (mode = $.getOwn(Index.hashCommands.mode, command)) {
           state.mode = mode;
         } else if (command === 'index') {
@@ -13465,7 +13873,9 @@ svg.icon {
           state.page = 1;
         } else if (sort = $.getOwn(Index.hashCommands.sort, command.replace(/-rev$/, ''))) {
           state.sort = sort;
-          if (/-rev$/.test(command)) { state.sort += '-rev'; }
+          if (/-rev$/.test(command)) {
+            state.sort += '-rev';
+          }
         } else if (/^s=/.test(command)) {
           state.search = decodeURIComponent(command.slice(2)).replace(/\+/g, ' ').trim();
         } else {
@@ -13473,13 +13883,14 @@ svg.icon {
         }
       }
       hash = leftover.join('/');
-      if (hash) { state.hash = `#${hash}`; }
+      if (hash) {
+        state.hash = `#${hash}`;
+      }
       Index.pushState(state);
       return commands.length - leftover.length;
     },
-
     pushState(state) {
-      let {search, hash, replace} = state;
+      let { search, hash, replace } = state;
       let pageBeforeSearch = history.state?.oldpage;
       if ((search != null) && (search !== Index.search)) {
         state.page = search ? 1 : (pageBeforeSearch || 1);
@@ -13491,17 +13902,17 @@ svg.icon {
       }
       Index.setState(state);
       const pathname = Index.currentPage === 1 ? `/${g.BOARD}/` : `/${g.BOARD}/${Index.currentPage}`;
-      if (!hash) { hash = ''; }
-      return history[replace ? 'replaceState' : 'pushState']({
-        mode:     Conf['Index Mode'],
-        sort:     Index.currentSort,
-        searched: Index.search,
-        oldpage:  pageBeforeSearch
+      if (!hash) {
+        hash = '';
       }
-      , '', `${location.protocol}//${location.host}${pathname}${hash}`);
+      history[replace ? 'replaceState' : 'pushState']({
+        mode: Conf['Index Mode'],
+        sort: Index.currentSort,
+        searched: Index.search,
+        oldpage: pageBeforeSearch
+      }, '', `${location.protocol}//${location.host}${pathname}${hash}`);
     },
-
-    setState({search, mode, sort, page, hash}) {
+    setState({ search, mode, sort, page, hash }) {
       if ((search != null) && (search !== Index.search)) {
         Index.changed.search = true;
         Index.search = search;
@@ -13520,65 +13931,82 @@ svg.icon {
         Index.currentSort = sort;
         Index.saveSort();
       }
-      if (['all pages', 'catalog'].includes(Conf['Index Mode'])) { page = 1; }
+      if (['all pages', 'catalog'].includes(Conf['Index Mode'])) {
+        page = 1;
+      }
       if ((page != null) && (page !== Index.currentPage)) {
         Index.changed.page = true;
         Index.currentPage = page;
       }
       if (hash != null) {
-        return Index.changed.hash = true;
+        Index.changed.hash = true;
       }
     },
-
     savePerBoard(key, value) {
       if (typeof Conf[key] === 'object') {
         Conf[key][g.BOARD.ID] = value;
       } else {
         Conf[key] = value;
       }
-      return $.set(key, Conf[key]);
+      $.set(key, Conf[key]);
     },
-
     saveSort() {
-      return Index.savePerBoard('Index Sort', Index.currentSort);
+      Index.savePerBoard('Index Sort', Index.currentSort);
     },
-
     saveLastLongThresholds(i) {
-      return Index.savePerBoard(`Last Long Reply Thresholds ${i}`, Index.lastLongThresholds[i]);
+      Index.savePerBoard(`Last Long Reply Thresholds ${i}`, Index.lastLongThresholds[i]);
     },
-
-    pageLoad(scroll=true) {
-      if (!Index.liveThreadData) { return; }
-      let {threads, order, search, mode, sort, page, hash} = Index.changed;
-      if (!threads) { threads = search; }
-      if (!order) { order = sort; }
-      if (threads || order) { Index.sort(); }
-      if (threads) { Index.buildPagelist(); }
-      if (search) { Index.setupSearch(); }
-      if (mode) { Index.setupMode(); }
-      if (sort) { Index.setupSort(); }
-      if (threads || mode || page || order) { Index.buildIndex(); }
-      if (threads || page) { Index.setPage(); }
-      if (scroll && !hash) { Index.scrollToIndex(); }
-      return Index.changed = {};
+    pageLoad(scroll = true) {
+      if (!Index.liveThreadData) {
+        return;
+      }
+      let { threads, order, search, mode, sort, page, hash } = Index.changed;
+      if (!threads) {
+        threads = search;
+      }
+      if (!order) {
+        order = sort;
+      }
+      if (threads || order) {
+        Index.sort();
+      }
+      if (threads) {
+        Index.buildPagelist();
+      }
+      if (search) {
+        Index.setupSearch();
+      }
+      if (mode) {
+        Index.setupMode();
+      }
+      if (sort) {
+        Index.setupSort();
+      }
+      if (threads || mode || page || order) {
+        Index.buildIndex();
+      }
+      if (threads || page) {
+        Index.setPage();
+      }
+      if (scroll && !hash) {
+        Index.scrollToIndex();
+      }
+      Index.changed = {};
     },
-
     setupMode() {
-      for (var mode of ['paged', 'infinite', 'all pages', 'catalog']) {
+      for (const mode of ['paged', 'infinite', 'all pages', 'catalog']) {
         $[mode === Conf['Index Mode'] ? 'addClass' : 'rmClass'](doc, `${mode.replace(/\ /g, '-')}-mode`);
       }
       Index.selectMode.value = Conf['Index Mode'];
       Index.cb.size();
       Index.showHiddenThreads = false;
-      return $('#hidden-toggle a', Index.navLinks).textContent = 'Show';
+      $('#hidden-toggle a', Index.navLinks).textContent = 'Show';
     },
-
     setupSort() {
       Index.selectRev.checked = /-rev$/.test(Index.currentSort);
-      Index.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
-      return Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong');
+      Index.selectSort.value = Index.currentSort.replace(/-rev$/, '');
+      Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong');
     },
-
     getPagesNum() {
       if (Index.search) {
         return Math.ceil(Index.sortedThreadIDs.length / Index.threadsNumPerPage);
@@ -13586,126 +14014,118 @@ svg.icon {
         return Index.pagesNum;
       }
     },
-
     getMaxPageNum() {
       return Math.max(1, Index.getPagesNum());
     },
-
     buildPagelist() {
       const pagesRoot = $('.pages', Index.pagelist);
       const maxPageNum = Index.getMaxPageNum();
       if (pagesRoot.childElementCount !== maxPageNum) {
         const nodes = [];
         for (let i = 1, end = maxPageNum; i <= end; i++) {
-          var a = $.el('a', {
-            textContent: i,
-            href: i === 1 ? './' : i
-          }
-          );
+          const a = $.el('a', {
+            textContent: String(i),
+            href: i === 1 ? './' : String(i)
+          });
           nodes.push($.tn('['), a, $.tn('] '));
         }
         $.rmAll(pagesRoot);
-        return $.add(pagesRoot, nodes);
+        $.add(pagesRoot, nodes);
       }
     },
-
     setPage() {
       let a, strong;
-      const pageNum    = Index.currentPage;
+      const pageNum = Index.currentPage;
       const maxPageNum = Index.getMaxPageNum();
-      const pagesRoot  = $('.pages', Index.pagelist);
-
+      const pagesRoot = $('.pages', Index.pagelist);
       // Previous/Next buttons
       const prev = pagesRoot.previousElementSibling.firstElementChild;
       const next = pagesRoot.nextElementSibling.firstElementChild;
       let href = Math.max(pageNum - 1, 1);
-      prev.href = href === 1 ? './' : href;
+      prev.href = href === 1 ? './' : String(href);
       prev.firstElementChild.disabled = href === pageNum;
       href = Math.min(pageNum + 1, maxPageNum);
-      next.href = href === 1 ? './' : href;
+      next.href = href === 1 ? './' : String(href);
       next.firstElementChild.disabled = href === pageNum;
-
       // <strong> current page
       if (strong = $('strong', pagesRoot)) {
-        if (+strong.textContent === pageNum) { return; }
+        if (+strong.textContent === pageNum) {
+          return;
+        }
         $.replace(strong, strong.firstChild);
       } else {
         strong = $.el('strong');
       }
-
       if (a = pagesRoot.children[pageNum - 1]) {
         $.before(a, strong);
-        return $.add(strong, a);
+        $.add(strong, a);
       }
     },
-
     updateHideLabel() {
-      if (!Index.hideLabel) { return; }
+      if (!Index.hideLabel) {
+        return;
+      }
       let hiddenCount = 0;
-      for (var threadID of Index.liveThreadIDs) {
+      for (const threadID of Index.liveThreadIDs) {
         if (Index.isHidden(threadID)) {
           hiddenCount++;
         }
       }
       if (!hiddenCount) {
         Index.hideLabel.hidden = true;
-        if (Index.showHiddenThreads) { Index.cb.toggleHiddenThreads(); }
+        if (Index.showHiddenThreads) {
+          Index.cb.toggleHiddenThreads();
+        }
         return;
       }
       Index.hideLabel.hidden = false;
-      return $('#hidden-count', Index.navLinks).textContent = hiddenCount === 1 ?
+      $('#hidden-count', Index.navLinks).textContent = hiddenCount === 1 ?
         '1 hidden thread'
-      :
-        `${hiddenCount} hidden threads`;
+        :
+          `${hiddenCount} hidden threads`;
     },
-
     update(firstTime) {
       let oldReq;
       if (oldReq = Index.req) {
         delete Index.req;
         oldReq.abort();
       }
-
       if (Conf['Index Refresh Notifications']) {
-        // Optional notification for manual refreshes
-        if (!Index.notice) { Index.notice = new Notice('info', 'Refreshing index...'); }
-        if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => {
+        if (!Index.notice) {
+          Index.notice = new Notice('info', 'Refreshing index...');
+        }
+        if (!Index.nTimeout) {
+          Index.nTimeout = setTimeout(() => {
             if (Index.notice) {
               Index.notice.el.lastElementChild.textContent += ' (disable JSON Index if this takes too long)';
             }
-          }
-          , 3 * SECOND); }
+          }, 3 * SECOND);
+        }
       } else {
-        // Also display notice if Index Refresh is taking too long
-        if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)'))
-        , 3 * SECOND); }
+        if (!Index.nTimeout) {
+          Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)')), 3 * SECOND);
+        }
       }
-
-      // Hard refresh in case of incomplete page load.
-      if (!firstTime && (d.readyState !== 'loading') && !$('.board + *')) {
+      if (!firstTime && (d$1.readyState !== 'loading') && !$('.board + *')) {
         location.reload();
         return;
       }
-
-      Index.req = $.whenModified(
-        g.SITE.urls.catalogJSON({boardID: g.BOARD.ID}),
-        'Index',
-        Index.load
-      );
-      return $.addClass(Index.button, 'spin');
+      Index.req = $.whenModified(g.SITE.urls.catalogJSON({ boardID: g.BOARD.ID }), 'Index', Index.load);
+      $.addClass(Index.button, 'spin');
     },
-
     load() {
       let err;
-      if (this !== Index.req) { return; } // aborted
-
+      if (this !== Index.req) {
+        return;
+      } // aborted
       $.rmClass(Index.button, 'spin');
-      const {notice, nTimeout} = Index;
-      if (nTimeout) { clearTimeout(nTimeout); }
+      const { notice, nTimeout } = Index;
+      if (nTimeout) {
+        clearTimeout(nTimeout);
+      }
       delete Index.nTimeout;
       delete Index.req;
       delete Index.notice;
-
       if (![200, 304].includes(this.status)) {
         err = `Index refresh failed. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`;
         if (notice) {
@@ -13717,7 +14137,6 @@ svg.icon {
         }
         return;
       }
-
       try {
         if (this.status === 200) {
           Index.parse(this.response);
@@ -13736,7 +14155,6 @@ svg.icon {
         }
         return;
       }
-
       if (notice) {
         if (Conf['Index Refresh Notifications']) {
           notice.setType('success');
@@ -13746,53 +14164,50 @@ svg.icon {
           notice.close();
         }
       }
-
       const timeEl = $('#index-last-refresh time', Index.navLinks);
-      timeEl.dataset.utc = Date.parse(this.getResponseHeader('Last-Modified'));
-      return RelativeDates.update(timeEl);
+      timeEl.dataset.utc = String(Date.parse(this.getResponseHeader('Last-Modified') || ''));
+      RelativeDates.update(timeEl);
     },
-
     parse(pages) {
       $.cleanCache(url => /^https?:\/\/a\.4cdn\.org\//.test(url));
       Index.parseThreadList(pages);
       Index.changed.threads = true;
-      return Index.pageLoad();
+      Index.pageLoad();
     },
-
     parseThreadList(pages) {
-      Index.pagesNum          = pages.length;
+      Index.pagesNum = pages.length;
       Index.threadsNumPerPage = pages[0]?.threads.length || 1;
-      Index.liveThreadData    = pages.reduce(((arr, next) => arr.concat(next.threads)), []);
-      Index.liveThreadIDs     = Index.liveThreadData.map(data => data.no);
-      Index.liveThreadDict    = dict();
-      Index.threadPosition    = dict();
-      Index.parsedThreads     = dict();
-      Index.replyData         = dict();
+      Index.liveThreadData = pages.reduce(((arr, next) => arr.concat(next.threads)), []);
+      Index.liveThreadIDs = Index.liveThreadData.map(data => data.no);
+      Index.liveThreadDict = dict();
+      Index.threadPosition = dict();
+      Index.parsedThreads = dict();
+      Index.replyData = dict();
       for (let i = 0; i < Index.liveThreadData.length; i++) {
-        var obj, results;
-        var data = Index.liveThreadData[i];
+        let obj;
+        const data = Index.liveThreadData[i];
         Index.liveThreadDict[data.no] = data;
         Index.threadPosition[data.no] = i;
         Index.parsedThreads[data.no] = (obj = g.SITE.Build.parseJSON(data, g.BOARD));
-        results = Filter.test(obj);
-        obj.isOnTop  = results.top;
+        const results = Filter.test(obj);
+        obj.isOnTop = results.top;
         obj.isHidden = results.hide || ThreadHiding.isHidden(obj.boardID, obj.threadID);
         if (data.last_replies) {
-          for (var reply of data.last_replies) {
-            Index.replyData[`${g.BOARD}.${reply.no}`] = reply;
+          for (const reply of data.last_replies) {
+            Index.replyData[`${g.BOARD.ID}.${reply.no}`] = reply;
           }
         }
       }
       if (Index.liveThreadData[0]) {
         g.SITE.Build.spoilerRange[g.BOARD.ID] = Index.liveThreadData[0].custom_spoiler;
       }
-      g.BOARD.threads.forEach(function(thread) {
-        if (!Index.liveThreadIDs.includes(thread.ID)) { return thread.collect(); }
+      g.BOARD.threads.forEach(function (thread) {
+        if (!Index.liveThreadIDs.includes(thread.ID)) {
+          thread.collect();
+        }
       });
-      $.event('IndexUpdate',
-        {threads: ((Index.liveThreadIDs.map((ID) => `${g.BOARD}.${ID}`)))});
+      $.event('IndexUpdate', { threads: ((Index.liveThreadIDs.map((ID) => `${g.BOARD.ID}.${ID}`))) });
     },
-
     isHidden(threadID) {
       let thread;
       if ((thread = g.BOARD.threads.get(threadID)) && thread.OP && !thread.OP.isFetchedQuote) {
@@ -13801,27 +14216,24 @@ svg.icon {
         return Index.parsedThreads[threadID].isHidden;
       }
     },
-
     isHiddenReply(threadID, replyData) {
       return PostHiding.isHidden(g.BOARD.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD));
     },
-
     buildThreads(threadIDs, isCatalog, withReplies) {
       let errors;
-      const threads    = [];
+      const threads = [];
       const newThreads = [];
-      let newPosts   = [];
-      for (var ID of threadIDs) {
-        var opRoot, thread;
+      let newPosts = [];
+      for (const ID of threadIDs) {
+        let opRoot, thread;
         try {
-          var OP;
-          var threadData = Index.liveThreadDict[ID];
-
+          let OP;
+          const threadData = Index.liveThreadDict[ID];
           if (thread = g.BOARD.threads.get(ID)) {
-            var isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
+            const isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
             if (isStale) {
-              thread.setCount('post', threadData.replies + 1,                threadData.bumplimit);
-              thread.setCount('file', threadData.images  + !!threadData.ext, threadData.imagelimit);
+              thread.setCount('post', threadData.replies + 1, threadData.bumplimit);
+              thread.setCount('file', threadData.images + !!threadData.ext, threadData.imagelimit);
               thread.setStatus('Sticky', !!threadData.sticky);
               thread.setStatus('Closed', !!threadData.closed);
             }
@@ -13833,28 +14245,29 @@ svg.icon {
             thread = new Thread(ID, g.BOARD);
             newThreads.push(thread);
           }
-          var lastPost = threadData.last_replies && threadData.last_replies.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
-          if (lastPost > thread.lastPost) { thread.lastPost = lastPost; }
+          const lastPost = threadData.last_replies && threadData.last_replies.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
+          if (lastPost > thread.lastPost) {
+            thread.lastPost = lastPost;
+          }
           thread.json = threadData;
           threads.push(thread);
-
           if ((OP = thread.OP) && !OP.isFetchedQuote) {
             OP.setCatalogOP(isCatalog);
             thread.setPage(Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1);
           } else {
-            var obj = Index.parsedThreads[ID];
+            const obj = Index.parsedThreads[ID];
             opRoot = g.SITE.Build.post(obj);
             OP = new Post(opRoot, thread, g.BOARD);
             OP.filterResults = obj.filterResults;
             newPosts.push(OP);
           }
-
           if (!isCatalog || !thread.nodes.root) {
             g.SITE.Build.thread(thread, threadData, withReplies);
           }
         } catch (err) {
-          // Skip posts that we failed to parse.
-          if (!errors) { errors = []; }
+          if (!errors) {
+            errors = [];
+          }
           errors.push({
             message: `Parsing of Thread No.${thread} failed. Thread will be skipped.`,
             error: err,
@@ -13862,29 +14275,33 @@ svg.icon {
           });
         }
       }
-      if (errors) { Callbacks.errorHandler?.(errors); }
-
+      if (errors) {
+        Callbacks.errorHandler?.(errors);
+      }
       if (withReplies) {
         newPosts = newPosts.concat(Index.buildReplies(threads));
       }
-
-      for (const thread of newThreads) { Callbacks.Thread.execute(thread); }
-      for (const post of newPosts) { Callbacks.Post.execute(post); }
+      for (const thread of newThreads) {
+        Callbacks.Thread.execute(thread);
+      }
+      for (const post of newPosts) {
+        Callbacks.Post.execute(post);
+      }
       Index.updateHideLabel();
-      $.event('IndexRefreshInternal', {threadIDs: (threads.map((t) => t.fullID)), isCatalog});
-
+      $.event('IndexRefreshInternal', { threadIDs: (threads.map((t) => t.fullID)), isCatalog });
       return threads;
     },
-
     buildReplies(threads) {
       let errors;
       const posts = [];
-      for (var thread of threads) {
-        var lastReplies;
-        if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { continue; }
-        var nodes = [];
-        for (var data of lastReplies) {
-          var node, post;
+      for (const thread of threads) {
+        let lastReplies;
+        if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) {
+          continue;
+        }
+        const nodes = [];
+        for (const data of lastReplies) {
+          let node, post;
           if ((post = thread.posts.get(data.no)) && !post.isFetchedQuote) {
             nodes.push(post.nodes.root);
             continue;
@@ -13893,8 +14310,9 @@ svg.icon {
           try {
             posts.push(new Post(node, thread, thread.board));
           } catch (err) {
-            // Skip posts that we failed to parse.
-            if (!errors) { errors = []; }
+            if (!errors) {
+              errors = [];
+            }
             errors.push({
               message: `Parsing of Post No.${data.no} failed. Post will be skipped.`,
               error: err,
@@ -13904,95 +14322,108 @@ svg.icon {
         }
         $.add(thread.nodes.root, nodes);
       }
-
-      if (errors) { Callbacks.errorHandler?.(errors); }
+      if (errors) {
+        Callbacks.errorHandler?.(errors);
+      }
       return posts;
     },
-
     buildCatalogViews(threads) {
       const catalogThreads = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         if (!thread.catalogView) {
-          var {ID} = thread;
-          var page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
-          var root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
+          const { ID } = thread;
+          const page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
+          const root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
           catalogThreads.push(new CatalogThread(root, thread));
         }
       }
-      for (const catalogThread of catalogThreads) { Callbacks.CatalogThread.execute(catalogThread); }
-    },
-
-    sizeCatalogViews(threads) {
-      // XXX When browsers support CSS3 attr(), use it instead.
-      const size = Conf['Index Size'] === 'small' ? 150 : 250;
-      for (var thread of threads) {
-        var {thumb} = thread.catalogView.nodes;
-        var {width, height} = thumb.dataset;
-        if (!width) { continue; }
-        var ratio = size / Math.max(width, height);
-        thumb.style.width  = (width  * ratio) + 'px';
-        thumb.style.height = (height * ratio) + 'px';
+      for (const catalogThread of catalogThreads) {
+        Callbacks.CatalogThread.execute(catalogThread);
       }
     },
-
+    sizeCatalogViews(threads) {
+      const size = Conf['Index Size'] === 'small' ? 150 : 250;
+      for (const thread of threads) {
+        const { thumb } = thread.catalogView.nodes;
+        const { width, height } = thumb.dataset;
+        if (!width) {
+          continue;
+        }
+        const ratio = size / Math.max(width, height);
+        thumb.style.width = (Number(width) * ratio) + 'px';
+        thumb.style.height = (Number(height) * ratio) + 'px';
+      }
+    },
     buildCatalogReplies(thread) {
       let lastReplies;
-      const {nodes} = thread.catalogView;
-      if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { return; }
-
+      const { nodes } = thread.catalogView;
+      if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) {
+        return;
+      }
       const replies = [];
-      for (var data of lastReplies) {
-        if (Index.isHiddenReply(thread.ID, data)) { continue; }
-        var reply = g.SITE.Build.catalogReply(thread, data);
+      for (const data of lastReplies) {
+        if (Index.isHiddenReply(thread.ID, data)) {
+          continue;
+        }
+        const reply = g.SITE.Build.catalogReply(thread, data);
         RelativeDates.update($('time', reply));
         $.on($('.catalog-reply-preview', reply), 'mouseover', QuotePreview.mouseover);
         replies.push(reply);
       }
-
-      nodes.replies = $.el('div', {className: 'catalog-replies'});
+      nodes.replies = $.el('div', { className: 'catalog-replies' });
       $.add(nodes.replies, replies);
       $.add(thread.OP.nodes.post, nodes.replies);
     },
-
     sort() {
       let threadIDs;
-      const {liveThreadIDs, liveThreadData} = Index;
-      if (!liveThreadData) { return; }
-      const tmp_time = new Date().getTime()/1000;
+      const { liveThreadIDs, liveThreadData } = Index;
+      if (!liveThreadData) {
+        return;
+      }
+      const tmp_time = new Date().getTime() / 1000;
       const sortType = Index.currentSort.replace(/-rev$/, '');
-      Index.sortedThreadIDs = (() => { switch (sortType) {
-        case 'lastreply': case 'lastlong':
-          var repliesAvailable = liveThreadData.some(thread => thread.last_replies?.length);
-          var lastlong = function(thread) {
-            if (!repliesAvailable) {
-              return thread.last_modified;
-            }
-            const iterable = thread.last_replies || [];
-            for (let i = iterable.length - 1; i >= 0; i--) {
-              var r = iterable[i];
-              if (Index.isHiddenReply(thread.no, r)) { continue; }
-              if (sortType === 'lastreply') {
-                return r;
+      Index.sortedThreadIDs = (() => {
+        switch (sortType) {
+          case 'lastreply':
+          case 'lastlong':
+            const repliesAvailable = liveThreadData.some(thread => thread.last_replies?.length);
+            const lastlong = function (thread) {
+              if (!repliesAvailable) {
+                return thread.last_modified;
               }
-              var len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
-              if (len >= Index.lastLongThresholds[+!!r.ext]) {
-                return r;
+              const iterable = thread.last_replies || [];
+              for (let i = iterable.length - 1; i >= 0; i--) {
+                const r = iterable[i];
+                if (Index.isHiddenReply(thread.no, r)) {
+                  continue;
+                }
+                if (sortType === 'lastreply') {
+                  return r;
+                }
+                const len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
+                if (len >= Index.lastLongThresholds[+!!r.ext]) {
+                  return r;
+                }
               }
+              if (thread.omitted_posts && thread.last_replies?.length) {
+                return thread.last_replies[0];
+              } else {
+                return thread;
+              }
+            };
+            const lastlongD = dict();
+            for (const thread of liveThreadData) {
+              lastlongD[thread.no] = lastlong(thread).no;
             }
-            if (thread.omitted_posts && thread.last_replies?.length) { return thread.last_replies[0]; } else { return thread; }
-          };
-          var lastlongD = dict();
-          for (var thread of liveThreadData) {
-            lastlongD[thread.no] = lastlong(thread).no;
-          }
-          return [...liveThreadData].sort((a, b) => lastlongD[b.no] - lastlongD[a.no]).map(post => post.no);
-        case 'bump':       return liveThreadIDs;
-        case 'birth':      return [...liveThreadIDs ].sort((a, b) => b - a);
-        case 'replycount': return [...liveThreadData].sort((a, b) => b.replies - a.replies).map(post => post.no);
-        case 'filecount':  return [...liveThreadData].sort((a, b) => b.images  - a.images).map(post => post.no);
-        case 'activity':   return [...liveThreadData].sort((a, b) => ((tmp_time-a.time)/(a.replies+1)) - ((tmp_time-b.time)/(b.replies+1))).map(post => post.no);
-        default: return liveThreadIDs;
-      } })();
+            return [...liveThreadData].sort((a, b) => lastlongD[b.no] - lastlongD[a.no]).map(post => post.no);
+          case 'bump': return liveThreadIDs;
+          case 'birth': return [...liveThreadIDs].sort((a, b) => b - a);
+          case 'replycount': return [...liveThreadData].sort((a, b) => b.replies - a.replies).map(post => post.no);
+          case 'filecount': return [...liveThreadData].sort((a, b) => b.images - a.images).map(post => post.no);
+          case 'activity': return [...liveThreadData].sort((a, b) => ((tmp_time - a.time) / (a.replies + 1)) - ((tmp_time - b.time) / (b.replies + 1))).map(post => post.no);
+          default: return liveThreadIDs;
+        }
+      })();
       if (/-rev$/.test(Index.currentSort)) {
         Index.sortedThreadIDs.reverse();
       }
@@ -14004,21 +14435,23 @@ svg.icon {
       // Highlighted threads
       Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && ThreadWatcher.isWatchedRaw(obj.boardID, obj.threadID)));
       // Non-hidden threads
-      if (Conf['Anchor Hidden Threads']) { return Index.sortOnTop(obj => !Index.isHidden(obj.threadID)); }
+      if (Conf['Anchor Hidden Threads']) {
+        Index.sortOnTop(obj => !Index.isHidden(obj.threadID));
+      }
     },
-
     sortOnTop(match) {
-      const topThreads    = [];
+      const topThreads = [];
       const bottomThreads = [];
-      for (var ID of Index.sortedThreadIDs) {
+      for (const ID of Index.sortedThreadIDs) {
         (match(Index.parsedThreads[ID]) ? topThreads : bottomThreads).push(ID);
       }
-      return Index.sortedThreadIDs = topThreads.concat(bottomThreads);
+      Index.sortedThreadIDs = topThreads.concat(bottomThreads);
     },
-
     buildIndex() {
       let threadIDs;
-      if (!Index.liveThreadData) { return; }
+      if (!Index.liveThreadData) {
+        return;
+      }
       switch (Conf['Index Mode']) {
         case 'all pages':
           threadIDs = Index.sortedThreadIDs;
@@ -14041,17 +14474,15 @@ svg.icon {
         Index.buildStructure(threadIDs);
       }
     },
-
     threadsOnPage(pageNum) {
       const nodesPerPage = Index.threadsNumPerPage;
       const offset = nodesPerPage * (pageNum - 1);
-      return Index.sortedThreadIDs.slice(offset ,  offset + nodesPerPage);
+      return Index.sortedThreadIDs.slice(offset, offset + nodesPerPage);
     },
-
     buildStructure(threadIDs) {
       const threads = Index.buildThreads(threadIDs, false, Conf['Show Replies']);
       const nodes = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         nodes.push(thread.nodes.root, $.el('hr'));
       }
       $.add(Index.root, nodes);
@@ -14060,34 +14491,34 @@ svg.icon {
       }
       Index.loaded = true;
     },
-
     buildCatalog(threadIDs) {
       let i = 0;
       const n = threadIDs.length;
       let node0 = null;
-      var fn = function() {
-        if (node0 && !node0.parentNode) { return; } // Index.root cleared
+      const fn = function () {
+        if (node0 && !node0.parentNode) {
+          return;
+        } // Index.root cleared
         const j = (i > 0) && Index.root.parentNode ? n : i + 30;
         node0 = Index.buildCatalogPart(threadIDs.slice(i, j))[0];
         i = j;
         if (i < n) {
-          return $.queueTask(fn);
+          $.queueTask(fn);
         } else {
           if (Index.root.parentNode) {
             $.event('PostsInserted', null, Index.root);
           }
-          return Index.loaded = true;
+          Index.loaded = true;
         }
       };
       fn();
     },
-
     buildCatalogPart(threadIDs) {
       const threads = Index.buildThreads(threadIDs, true);
       Index.buildCatalogViews(threads);
       Index.sizeCatalogViews(threads);
       const nodes = [];
-      for (var thread of threads) {
+      for (const thread of threads) {
         thread.OP.setCatalogOP(true);
         $.add(thread.catalogView.nodes.root, thread.OP.nodes.root);
         nodes.push(thread.catalogView.nodes.root);
@@ -14097,33 +14528,30 @@ svg.icon {
       $.add(Index.root, nodes);
       return nodes;
     },
-
     clearSearch() {
       Index.searchInput.value = '';
       Index.onSearchInput();
-      return Index.searchInput.focus();
+      Index.searchInput.focus();
     },
-
     setupSearch() {
       Index.searchInput.value = Index.search;
       if (Index.search) {
-        return Index.searchInput.dataset.searching = 1;
+        Index.searchInput.dataset.searching = '1';
       } else {
-        // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1021289
-        return Index.searchInput.removeAttribute('data-searching');
+        Index.searchInput.removeAttribute('data-searching');
       }
     },
-
     onSearchInput() {
       const search = Index.searchInput.value.trim();
-      if (search === Index.search) { return; }
+      if (search === Index.search) {
+        return;
+      }
       Index.pushState({
         search,
-        replace: !!search === !!Index.search
+        replace: !search === !Index.search
       });
-      return Index.pageLoad(false);
+      Index.pageLoad(false);
     },
-
     querySearch(query) {
       let keywords, match;
       if (match = query.match(/^([\w+]+):\/(.*)\/(\w*)$/)) {
@@ -14135,344 +14563,4388 @@ svg.icon {
         }
         return Index.sortedThreadIDs.filter(ID => regexp.test(Filter.values(match[1], Index.parsedThreads[ID]).join('\n')));
       }
-      if (!(keywords = query.toLowerCase().match(/\S+/g))) { return; }
+      if (!(keywords = query.toLowerCase().match(/\S+/g))) {
+        return;
+      }
       return Index.sortedThreadIDs.filter(ID => Index.searchMatch(Index.parsedThreads[ID], keywords));
     },
-
     searchMatch(obj, keywords) {
-      const {info, file} = obj;
-      if (info.comment == null) { info.comment = g.SITE.Build.parseComment(info.commentHTML.innerHTML); }
-      let text = [];
-      for (var key of ['comment', 'subject', 'name', 'tripcode']) {
-        if (key in info) { text.push(info[key]); }
+      const { info, file } = obj;
+      if (info.comment == null) {
+        info.comment = g.SITE.Build.parseComment(info.commentHTML.innerHTML);
       }
-      if (file) { text.push(file.name); }
-      text = text.join(' ').toLowerCase();
-      for (var keyword of keywords) {
-        if (-1 === text.indexOf(keyword)) { return false; }
+      const text = [];
+      for (const key of ['comment', 'subject', 'name', 'tripcode']) {
+        if (key in info) {
+          text.push(info[key]);
+        }
+      }
+      if (file) {
+        text.push(file.name);
+      }
+      const textJoined = text.join(' ').toLowerCase();
+      for (const keyword of keywords) {
+        if (-1 === textJoined.indexOf(keyword)) {
+          return false;
+        }
       }
       return true;
     }
   };
 
-  // @ts-nocheck
+  const passMessagePage = h("div", { class: "box-inner" },
+    h("div", { class: "boxbar" },
+      h("h2", null,
+        "Trouble buying a 4chan Pass? (a message from 4chan X)",
+        h("a", { href: "javascript:;", style: "text-decoration: none; float: right; margin-right: 4px;", title: "Close" }, "\u00D7"))),
+    h("div", { class: "boxcontent" },
+      "Check the 4chan X wiki for ",
+      h("a", { href: `${meta.captchaFAQ}#alternatives`, target: "_blank", rel: "noopener" }, "alternative solutions"),
+      "."));
 
-  var ThreadHiding = {
+  const PassMessage = {
     init() {
-      if (!['index', 'catalog'].includes(g.VIEW) || (!Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index'])) { return; }
-      this.db = new DataBoard('hiddenThreads');
-      if (g.VIEW === 'catalog') { return this.catalogWatch(); }
-      this.catalogSet(g.BOARD);
-      $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
-      if (Conf['Thread Hiding Buttons']) {
-        $.addClass(doc, 'thread-hide');
+      if (Conf['passMessageClosed']) {
+        return;
       }
-      return Callbacks.Post.push({
-        name: 'Thread Hiding',
-        cb:   this.node
+      const msg = $.el('div', { className: 'box-outer top-box' });
+      $.extend(msg, passMessagePage);
+      msg.style.cssText = 'padding-bottom: 0;';
+      const close = $('a', msg);
+      $.on(close, 'click', function () {
+        $.rm(msg);
+        $.set('passMessageClosed', true);
       });
-    },
-
-    catalogSet(board) {
-      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) { return; }
-      const hiddenThreads = ThreadHiding.db.get({
-        boardID: board.ID,
-        defaultValue: dict()
+      $.ready(function () {
+        let hd;
+        if (hd = $.id('hd')) {
+          $.after(hd, msg);
+        } else {
+          $.prepend(d$1.body, msg);
+        }
       });
-      for (var threadID in hiddenThreads) { hiddenThreads[threadID] = true; }
-      return localStorage.setItem(`4chan-hide-t-${board}`, JSON.stringify(hiddenThreads));
-    },
+    }
+  };
 
-    catalogWatch() {
-      if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) { return; }
-      this.hiddenThreads = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
-      return $.on(d, '4chanXInitFinished', () => // 4chan's catalog sets the style to "display: none;" when hiding or unhiding a thread.
-      new MutationObserver(ThreadHiding.catalogSave).observe($.id('threads'), {
+  const ArchiveReportHTML = (h(hFragment, null,
+    h("legend", null,
+      h("label", null,
+        h("input", { id: "archive-report-enabled", type: "checkbox" }),
+        "Report illegal content to archives")),
+    h("label", { for: "archive-report-reason" }, "Details"),
+    h("textarea", { id: "archive-report-reason", disabled: true }, "Illegal content"),
+    h("button", { id: "archive-report-submit", hidden: true }, "Submit")));
+
+  const Report = {
+    init() {
+      let match;
+      if (!(match = location.search.match(/\bno=(\d+)/))) {
+        return;
+      }
+      Captcha.replace.init();
+      this.postID = +match[1];
+      $.ready(this.ready);
+    },
+    ready() {
+      $.addStyle(CSS.report);
+      if (Conf['Archive Report']) {
+        Report.archive();
+      }
+      new MutationObserver(function () {
+        Report.fit('iframe[src^="https://www.google.com/recaptcha/api2/frame"]');
+        Report.fit('body');
+      }).observe(d$1.body, {
+        childList: true,
         attributes: true,
-        subtree: true,
-        attributeFilter: ['style']
-      }));
+        subtree: true
+      });
+      Report.fit('body');
     },
-
-    catalogSave() {
-      let threadID;
-      const hiddenThreads2 = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
-      for (threadID in hiddenThreads2) {
-        if (!$.hasOwn(ThreadHiding.hiddenThreads, threadID)) {
-          ThreadHiding.db.set({
-            boardID:  g.BOARD.ID,
-            threadID,
-            val:      {makeStub: Conf['Stubs']}});
+    fit(selector) {
+      let el;
+      if (!((el = $(selector, doc)) && (getComputedStyle(el).visibility !== 'hidden'))) {
+        return;
+      }
+      const dy = (el.getBoundingClientRect().bottom - doc.clientHeight) + 8;
+      if (dy > 0) {
+        window.resizeBy(0, dy);
+      }
+    },
+    archive() {
+      let match, urls;
+      if (!(urls = Redirect.report(g.BOARD.ID)).length) {
+        return;
+      }
+      const form = $('form');
+      const types = $.id('reportTypes');
+      const message = $('h3');
+      const fieldset = $.el('fieldset', {
+        id: 'archive-report',
+        hidden: true
+      });
+      $.extend(fieldset, ArchiveReportHTML);
+      const enabled = $('#archive-report-enabled', fieldset);
+      const reason = $('#archive-report-reason', fieldset);
+      const submit = $('#archive-report-submit', fieldset);
+      $.on(enabled, 'change', function () {
+        reason.disabled = !this.checked;
+      });
+      if (form && types) {
+        fieldset.hidden = !$('[value="31"]', types).checked;
+        $.on(types, 'change', function (e) {
+          fieldset.hidden = (e.target.value !== '31');
+          Report.fit('body');
+        });
+        $.after(types, fieldset);
+        Report.fit('body');
+        $.one(form, 'submit', function (e) {
+          if (!fieldset.hidden && enabled.checked) {
+            e.preventDefault();
+            Report.archiveSubmit(urls, reason.value, results => {
+              this.action = '#archiveresults=' + encodeURIComponent(JSON.stringify(results));
+              this.submit();
+            });
+          }
+        });
+      } else if (message) {
+        fieldset.hidden = /Report submitted!/.test(message.textContent || '');
+        $.on(enabled, 'change', function () {
+          submit.hidden = !this.checked;
+        });
+        $.after(message, fieldset);
+        $.on(submit, 'click', () => Report.archiveSubmit(urls, reason.value, Report.archiveResults));
+      }
+      if (match = location.hash.match(/^#archiveresults=(.*)$/)) {
+        try {
+          Report.archiveResults(JSON.parse(decodeURIComponent(match[1])));
+        } catch (error) { }
+      }
+    },
+    archiveSubmit(urls, reason, cb) {
+      const form = $.formData({
+        board: g.BOARD.ID,
+        num: Report.postID,
+        reason
+      });
+      const results = [];
+      for (const [name, url] of urls) {
+        (function (name, url) {
+          $.ajax(url, {
+            onloadend() {
+              results.push([name, this.response || { error: '' }]);
+              if (results.length === urls.length) {
+                cb(results);
+              }
+            },
+            form
+          });
+        })(name, url);
+      }
+    },
+    archiveResults(results) {
+      const fieldset = $.id('archive-report');
+      for (const [name, response] of results) {
+        const line = $.el('h3', { className: 'archive-report-response' });
+        if (response && 'success' in response) {
+          $.addClass(line, 'archive-report-success');
+          line.textContent = `${name}: ${response.success}`;
+        } else {
+          $.addClass(line, 'archive-report-error');
+          line.textContent = `${name}: ${response.error || 'Error reporting post.'}`;
+        }
+        if (fieldset) {
+          $.before(fieldset, line);
+        } else {
+          $.add(d$1.body, line);
         }
       }
-      for (threadID in ThreadHiding.hiddenThreads) {
-        if (!$.hasOwn(hiddenThreads2, threadID)) {
-          ThreadHiding.db.delete({
-            boardID:  g.BOARD.ID,
-            threadID
+    }
+  };
+
+  const PostSuccessful = {
+    init() {
+      if (!Conf['Remember Your Posts']) {
+        return;
+      }
+      $.ready(PostSuccessful.ready);
+    },
+    ready() {
+      if (d$1.title !== 'Post successful!') {
+        return;
+      }
+      const h1 = $('h1');
+      if (!h1 || !h1.nextSibling) {
+        return;
+      }
+      const textContent = h1.nextSibling.textContent;
+      if (!textContent) {
+        return;
+      }
+      const match = textContent.match(/thread:(\d+),no:(\d+)/);
+      if (!match) {
+        return;
+      }
+      const postID = +match[2];
+      const threadID = +match[1] || postID;
+      const db = new DataBoard('yourPosts');
+      db.set({
+        boardID: g.BOARD.ID,
+        threadID,
+        postID,
+        val: true
+      });
+    }
+  };
+
+  function generatePostInfoHtml(ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon, capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID, threadID) {
+    const nameHtml = [h("span", { class: `name${capcode ? ' capcode' : ''}` }, name)];
+    if (tripcode)
+      nameHtml.push(' ', h("span", { class: "postertrip" }, tripcode));
+    if (pass)
+      nameHtml.push(' ', h("span", { title: `Pass user since ${pass}`, class: "n-pu" }));
+    if (capcode) {
+      nameHtml.push(' ', h("strong", { class: `capcode hand id_${capcodeLC}`, title: `Highlight posts by ${capcodePlural}` },
+        "## ",
+        capcode));
+    }
+    const nameBlockContent = email ? [' ', h("a", { href: `mailto:${email}`, class: "useremail" }, ...nameHtml)] : nameHtml;
+    if (!(boardID === "f" && !o.isReply || capcodeDescription))
+      nameBlockContent.push(' ');
+    if (capcodeDescription) {
+      nameBlockContent.push(h("img", { src: `${staticPath}${capcodeLC}icon${gifIcon}`, alt: `${capcode} Icon`, title: `This user is ${capcodeDescription}.`, class: "identityIcon retina" }));
+    }
+    if (uniqueID && !capcode) {
+      nameBlockContent.push(h("span", { class: `posteruid id_${uniqueID}` },
+        "(ID: ",
+        h("span", { class: "hand", title: "Highlight posts by this ID" }, uniqueID),
+        ")"));
+    }
+    if (flagCode)
+      nameBlockContent.push(' ', h("span", { title: flag, class: `flag flag-${flagCode.toLowerCase()}` }));
+    if (flagCodeTroll)
+      nameBlockContent.push(' ', h("span", { title: flag, class: `bfl bfl-${flagCodeTroll.toLowerCase()}` }));
+    const postNumContent = [
+      h("a", { href: postLink, title: "Link to this post" }, "No."),
+      h("a", { href: quoteLink, title: "Reply to this post" }, ID),
+    ];
+    if (o.isSticky) {
+      const src = `${staticPath}sticky${gifIcon}`;
+      postNumContent.push(' ');
+      if (boardID === "f") {
+        postNumContent.push(h("img", { src: src, alt: "Sticky", title: "Sticky", style: "height: 18px; width: 18px;" }));
+      } else {
+        postNumContent.push(h("img", { src: src, alt: "Sticky", title: "Sticky", class: "stickyIcon retina" }));
+      }
+    }
+    if (o.isClosed && !o.isArchived) {
+      postNumContent.push(' ');
+      const src = `${staticPath}closed${gifIcon}`;
+      if (boardID === "f") {
+        postNumContent.push(h("img", { src: src, alt: "Closed", title: "Closed", style: "height: 18px; width: 18px;" }));
+      } else {
+        postNumContent.push(h("img", { src: src, alt: "Closed", title: "Closed", class: "closedIcon retina" }));
+      }
+    }
+    if (o.isArchived) {
+      postNumContent.push(' ', h("img", { src: `${staticPath}archived${gifIcon}`, alt: "Archived", title: "Archived", class: "archivedIcon retina" }));
+    }
+    if (!o.isReply && g.VIEW === "index") {
+      postNumContent.push(' \u00A0 ', // \u00A0 is nbsp
+      h("span", null,
+        "[",
+        h("a", { href: `/${boardID}/thread/${threadID}`, class: "replylink" }, "Reply"),
+        "]"));
+    }
+    return h("div", { class: "postInfo desktop", id: `pi${ID}` },
+      h("input", { type: "checkbox", name: ID, value: "delete" }),
+      ' ',
+      ...((!o.isReply || boardID === "f" || subject) ? [h("span", { class: "subject" }, subject), ' '] : []),
+      h("span", { class: `nameBlock${capcode ? ` capcode${capcode}` : ''}` }, ...nameBlockContent),
+      ' ',
+      h("span", { class: "dateTime", "data-utc": dateUTC }, dateText),
+      ' ',
+      h("span", { class: `postNum${!(boardID === " f" && !o.isReply) ? ' desktop' : ''}` }, ...postNumContent));
+  }
+
+  function generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon) {
+    if (file) {
+      const fileContent = [];
+      if (boardID === "f") {
+        fileContent.push(h("div", { class: "fileInfo", "data-md5": file.MD5 },
+          h("span", { class: "fileText", id: `fT${ID}` },
+            'File: ',
+            h("a", { "data-width": file.width, "data-height": file.height, href: fileURL, target: "_blank" }, file.name),
+            "-(",
+            file.size,
+            ", ",
+            file.dimensions,
+            file.tag ? ', ' + file.tag : '',
+            ")")));
+      } else {
+        fileContent.push(h("div", { class: "fileText", id: `fT${ID}`, title: file.isSpoiler ? file.name : null },
+          'File: ',
+          h("a", { title: file.name === shortFilename || file.isSpoiler ? null : file.name, href: fileURL, target: "_blank" }, file.isSpoiler ? 'Spoiler Image' : shortFilename),
+          ` (${file.size}, ${file.dimensions || "PDF"})`), h("a", { class: `fileThumb${file.isSpoiler ? ' imgspoiler' : ''}`, href: fileURL, target: "_blank", "data-m": file.hasDownscale ? '' : null },
+          h("img", { src: fileThumb, alt: file.size, "data-md5": file.MD5, style: `height: ${file.isSpoiler ? '100' : file.theight}px; width: ${file.isSpoiler ? '100' : file.twidth}px;`, loading: "lazy" })));
+      }
+      return h("div", { class: "file", id: `f${ID}` }, ...fileContent);
+    } else if (o.fileDeleted) {
+      return h("div", { class: "file", id: `f${ID}` },
+        h("span", { class: "fileThumb" },
+          h("img", { src: `${staticPath}filedeleted-res${gifIcon}`, alt: "File deleted.", class: "fileDeletedRes retina" })));
+    }
+    return { innerHTML: '', [isEscaped]: true };
+  }
+
+  function generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon) {
+    return h(hFragment, null,
+      h("a", { class: "catalog-link", href: `/${thread.board}/thread/${thread.ID}` }, imgClass ?
+        h("img", { src: src, class: `catalog-thumb ${imgClass}` }) :
+        h("img", { src: src, class: "catalog-thumb", "data-width": data.tn_w, "data-height": data.tn_h })),
+      h("div", { class: "catalog-stats" },
+        h("span", { title: "Posts / Files / Page" },
+          h("span", { class: `post-count${data.bumplimit ? ' warning' : ''}` }, postCount),
+          ' / ',
+          h("span", { class: `file-count${data.imagelimit ? ' warning' : ''}` }, fileCount),
+          ' / ',
+          h("span", { class: "page-count" }, pageCount)),
+        h("span", { class: "catalog-icons" },
+          thread.isSticky ? h("img", { src: `${staticPath}sticky${gifIcon}`, class: "stickyIcon", title: "Sticky" }) : '',
+          thread.isClosed ? h("img", { src: `${staticPath}closed${gifIcon}`, class: "closedIcon", title: "Closed" }) : '')));
+  }
+
+  // @ts-nocheck
+  const SWYotsuba = {
+    isOPContainerThread: false,
+    hasIPCount: true,
+    archivedBoardsKnown: true,
+    urls: {
+      thread({ boardID, threadID }) { return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/thread/${threadID}`; },
+      post({ postID }) { return `#p${postID}`; },
+      index({ boardID }) { return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/`; },
+      catalog({ boardID }) { if (boardID === 'f') {
+        return undefined;
+      } else {
+        return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/catalog`;
+      } },
+      archive({ boardID }) { if (BoardConfig.isArchived(boardID)) {
+        return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/archive`;
+      } else {
+        return undefined;
+      } },
+      threadJSON({ boardID, threadID }) { return `${location.protocol}//a.4cdn.org/${boardID}/thread/${threadID}.json`; },
+      threadsListJSON({ boardID }) { return `${location.protocol}//a.4cdn.org/${boardID}/threads.json`; },
+      archiveListJSON({ boardID }) { if (BoardConfig.isArchived(boardID)) {
+        return `${location.protocol}//a.4cdn.org/${boardID}/archive.json`;
+      } else {
+        return '';
+      } },
+      catalogJSON({ boardID }) { return `${location.protocol}//a.4cdn.org/${boardID}/catalog.json`; },
+      file({ boardID }, filename) {
+        const hostname = boardID === 'f' ? ImageHost.flashHost() : ImageHost.host();
+        return `${location.protocol}//${hostname}/${boardID}/${filename}`;
+      },
+      thumb({ boardID }, filename) {
+        return `${location.protocol}//${ImageHost.thumbHost()}/${boardID}/${filename}`;
+      }
+    },
+    isPrunedByAge({ boardID }) { return boardID === 'f'; },
+    areMD5sDeferred({ boardID }) { return boardID === 'f'; },
+    isOnePage({ boardID }) { return boardID === 'f'; },
+    noAudio({ boardID }) { return BoardConfig.noAudio(boardID); },
+    selectors: {
+      board: '.board',
+      thread: '.thread',
+      threadDivider: '.board > hr',
+      summary: 'a.summary',
+      postContainer: '.postContainer',
+      replyOriginal: '.replyContainer:not([data-clone])',
+      sideArrows: 'div.sideArrows',
+      post: '.post',
+      infoRoot: '.postInfo',
+      info: {
+        subject: '.subject',
+        name: '.name',
+        email: '.useremail',
+        tripcode: '.postertrip',
+        uniqueIDRoot: '.posteruid',
+        uniqueID: '.posteruid > .hand',
+        capcode: '.capcode.hand',
+        pass: '.n-pu',
+        flag: '.flag, .bfl',
+        date: '.dateTime',
+        nameBlock: '.nameBlock',
+        quote: '.postNum > a:nth-of-type(2)',
+        reply: '.replylink'
+      },
+      icons: {
+        isSticky: '.stickyIcon',
+        isClosed: '.closedIcon',
+        isArchived: '.archivedIcon'
+      },
+      file: {
+        text: '.fileText, .fileInfo',
+        link: '.fileText > a',
+        thumb: 'a.fileThumb > [data-md5]'
+      },
+      thumbLink: 'a.fileThumb',
+      highlightable: {
+        op: '.opContainer',
+        reply: ' > .reply',
+        catalog: ''
+      },
+      comment: '.postMessage',
+      spoiler: 's',
+      quotelink: ':not(pre) > .quotelink', // XXX https://github.com/4chan/4chan-JS/issues/77: 4chan currently creates quote links inside [code] tags; ignore them
+      catalog: {
+        board: '#threads',
+        thread: '.thread',
+        thumb: '.thumb'
+      },
+      boardList: '#boardNavDesktop > .boardList',
+      boardListBottom: '#boardNavDesktopFoot > .boardList',
+      styleSheet: 'link[rel*="stylesheet"][title]',
+      psa: '#globalMessage',
+      psaTop: '#globalToggle',
+      searchBox: '#search-box',
+      nav: {
+        prev: '.prev > form > [type=submit]',
+        next: '.next > form > [type=submit]'
+      }
+    },
+    classes: {
+      highlight: 'highlight'
+    },
+    xpath: {
+      thread: 'div[contains(concat(" ",@class," ")," thread ")]',
+      postContainer: 'div[contains(@class,"postContainer")]',
+      replyContainer: 'div[contains(@class,"replyContainer")]'
+    },
+    regexp: {
+      quotelink: new RegExp(`\
+^https?://boards\\.4chan(?:nel)?\\.org/+\
+([^/]+)\
+/+thread/+\
+(\\d+)\
+(?:[/?][^#]*)?\
+(?:#p\
+(\\d+)\
+)?\
+$\
+`),
+      quotelinkHTML: /<a [^>]*\bhref="(?:(?:\/\/boards\.4chan(?:nel)?\.org)?\/([^\/]+)\/thread\/)?(\d+)?(?:#p(\d+))?"/g,
+      pass: /^https?:\/\/www\.4chan(?:nel)?\.org\/+pass(?:$|[?#])/,
+      captcha: /^https?:\/\/sys\.4chan(?:nel)?\.org\/+captcha(?:$|[?#])/,
+    },
+    bgColoredEl() {
+      return $.el('div', { className: 'reply' });
+    },
+    isThisPageLegit() {
+      // not 404 error page or similar.
+      return ['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname) &&
+        d$1.doctype &&
+        !$('link[href*="favicon-status.ico"]', d$1.head) &&
+        !['4chan - Temporarily Offline', '4chan - Error', '504 Gateway Time-out', 'MathJax Equation Source'].includes(d$1.title);
+    },
+    is404() {
+      // XXX Sometimes threads don't 404 but are left over as stubs containing one garbage reply post.
+      return ['4chan - Temporarily Offline', '4chan - 404 Not Found'].includes(d$1.title) || ((g.VIEW === 'thread') && $('.board') && !$('.opContainer'));
+    },
+    isIncomplete() {
+      return ['index', 'thread'].includes(g.VIEW) && !$('.board + *');
+    },
+    isBoardlessPage(url) {
+      return ['www.4chan.org', 'www.4channel.org'].includes(url.hostname);
+    },
+    isAuxiliaryPage(url) {
+      return !['boards.4chan.org', 'boards.4channel.org'].includes(url.hostname);
+    },
+    isFileURL(url) {
+      return ImageHost.test(url.hostname);
+    },
+    initAuxiliary() {
+      switch (location.hostname) {
+        case 'www.4chan.org':
+        case 'www.4channel.org':
+          if (SWYotsuba.regexp.pass.test(location.href)) {
+            PassMessage.init();
+          } else {
+            $.onExists(doc, 'body', () => $.addStyle(CSS.www));
+            Captcha.replace.init();
+          }
+          return;
+        case 'sys.4chan.org':
+        case 'sys.4channel.org':
+          var pathname = location.pathname.split(/\/+/);
+          if (pathname[1] === 'captcha') {
+            $.onExists(doc, 'body', () => {
+              $.addClass(doc, 'captcha-t', 'captcha-iframe');
+              $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
+              Captcha.t.setupIframe();
+            });
+            return;
+          }
+          if (pathname[2] === 'imgboard.php') {
+            let match;
+            if (/\bmode=report\b/.test(location.search)) {
+              Report.init();
+            } else if (match = location.search.match(/\bres=(\d+)/)) {
+              $.ready(function () {
+                if (Conf['404 Redirect'] && ($.id('errmsg')?.textContent === 'Error: Specified thread does not exist.')) {
+                  return Redirect.navigate('thread', {
+                    boardID: g.BOARD.ID,
+                    postID: +match[1]
+                  });
+                }
+              });
+            }
+          } else if (pathname[2] === 'post') {
+            PostSuccessful.init();
+          }
+          return;
+      }
+    },
+    scriptData() {
+      for (var script of $$('script:not([src])', d$1.head)) {
+        if (/\bcooldowns *=/.test(script.textContent)) {
+          return script.textContent;
+        }
+      }
+      return '';
+    },
+    parseThreadMetadata(thread) {
+      let m;
+      const scriptData = this.scriptData();
+      thread.postLimit = /\bbumplimit *= *1\b/.test(scriptData);
+      thread.fileLimit = /\bimagelimit *= *1\b/.test(scriptData);
+      thread.ipCount = (m = scriptData.match(/\bunique_ips *= *(\d+)\b/)) ? +m[1] : undefined;
+      if ((g.BOARD.ID === 'f') && thread.OP.file) {
+        const { file } = thread.OP;
+        return $.ajax(this.urls.threadJSON({ boardID: 'f', threadID: thread.ID }), {
+          timeout: MINUTE,
+          onloadend() {
+            if (this.response) {
+              return file.text.dataset.md5 = (file.MD5 = this.response.posts[0].md5);
+            }
+          }
+        });
+      }
+    },
+    parseNodes(post, nodes) {
+      // Add CSS classes to sticky/closed icons on /f/ to match other boards.
+      if (post.boardID === 'f') {
+        return (() => {
+          const result = [];
+          for (var type of ['Sticky', 'Closed']) {
+            var icon;
+            if (icon = $(`img[alt=${type}]`, nodes.info)) {
+              result.push($.addClass(icon, `${type.toLowerCase()}Icon`, 'retina'));
+            }
+          }
+          return result;
+        })();
+      }
+    },
+    parseDate(node) {
+      return new Date(node.dataset.utc * 1000);
+    },
+    parseFile(post, file) {
+      let info;
+      const { text, link, thumb } = file;
+      if (!(info = link.nextSibling?.textContent.match(/\(([\d.]+ [KMG]?B).*\)/))) {
+        return false;
+      }
+      $.extend(file, {
+        name: text.title || link.title || link.textContent,
+        size: info[1],
+        dimensions: info[0].match(/\d+x\d+/)?.[0],
+        tag: info[0].match(/,[^,]*, ([a-z]+)\)/i)?.[1],
+        MD5: text.dataset.md5
+      });
+      if (thumb) {
+        $.extend(file, {
+          thumbURL: thumb.src,
+          MD5: thumb.dataset.md5,
+          isSpoiler: $.hasClass(thumb.parentNode, 'imgspoiler')
+        });
+        if (file.isSpoiler) {
+          let m;
+          file.thumbURL = (m = link.href.match(/\d+(?=\.\w+$)/)) ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${m[0]}s.jpg` : undefined;
+        }
+      }
+      return true;
+    },
+    cleanComment(bq) {
+      let abbr;
+      if (abbr = $('.abbr', bq)) { // 'Comment too long' or 'EXIF data available'
+        for (var node of $$('.abbr + br, .exif', bq)) {
+          $.rm(node);
+        }
+        for (let i = 0; i < 2; i++) {
+          var br;
+          if ((br = abbr.previousSibling) && (br.nodeName === 'BR')) {
+            $.rm(br);
+          }
+        }
+        return $.rm(abbr);
+      }
+    },
+    cleanCommentDisplay(bq) {
+      let b;
+      if ((b = $('b', bq)) && /^Rolled /.test(b.textContent)) {
+        $.rm(b);
+      }
+      return $.rm($('.fortune', bq));
+    },
+    insertTags(bq) {
+      let node;
+      for (node of $$('s, .removed-spoiler', bq)) {
+        $.replace(node, [$.tn('[spoiler]'), ...node.childNodes, $.tn('[/spoiler]')]);
+      }
+      for (node of $$('.prettyprint', bq)) {
+        $.replace(node, [$.tn('[code]'), ...node.childNodes, $.tn('[/code]')]);
+      }
+    },
+    hasCORS(url) {
+      return url.split('/').slice(0, 3).join('/') === (location.protocol + '//a.4cdn.org');
+    },
+    sfwBoards(sfw) {
+      return BoardConfig.sfwBoards(sfw);
+    },
+    uidColor(uid) {
+      let msg = 0;
+      let i = 0;
+      while (i < 8) {
+        msg = ((msg << 5) - msg) + uid.charCodeAt(i++);
+      }
+      return (msg >> 8) & 0xFFFFFF;
+    },
+    isLinkified(link) {
+      return ImageHost.test(link.hostname);
+    },
+    testNativeExtension() {
+      return $.global('testNativeExtension', {});
+    },
+    transformBoardList() {
+      let node;
+      const nodes = [];
+      const spacer = () => $.el('span', { className: 'spacer' });
+      const items = $.X('.//a|.//text()[not(ancestor::a)]', $(SWYotsuba.selectors.boardList));
+      let i = 0;
+      while ((node = items.snapshotItem(i++))) {
+        switch (node.nodeName) {
+          case '#text':
+            for (var chr of node.nodeValue) {
+              var span = $.el('span', { textContent: chr });
+              if (chr === ' ') {
+                span.className = 'space';
+              }
+              if (chr === ']') {
+                nodes.push(spacer());
+              }
+              nodes.push(span);
+              if (chr === '[') {
+                nodes.push(spacer());
+              }
+            }
+            break;
+          case 'A':
+            var a = node.cloneNode(true);
+            nodes.push(a);
+            break;
+        }
+      }
+      return nodes;
+    },
+    Build: {
+      staticPath: '//s.4cdn.org/image/',
+      gifIcon: window.devicePixelRatio >= 2 ? '@2x.gif' : '.gif',
+      spoilerRange: Object.create(null),
+      shortFilename(filename) {
+        const ext = filename.match(/\.?[^\.]*$/)[0];
+        if ((filename.length - ext.length) > 30) {
+          return `${filename.match(/(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[^]){0,25}/)[0]}(...)${ext}`;
+        } else {
+          return filename;
+        }
+      },
+      spoilerThumb(boardID) {
+        let spoilerRange;
+        if ((spoilerRange = this.spoilerRange[boardID])) {
+          // Randomize the spoiler image.
+          return `${this.staticPath}spoiler-${boardID}${Math.floor(1 + (spoilerRange * Math.random()))}.png`;
+        } else {
+          return `${this.staticPath}spoiler.png`;
+        }
+      },
+      sameThread(boardID, threadID) {
+        return (g.VIEW === 'thread') && (g.BOARD.ID === boardID) && (g.THREADID === +threadID);
+      },
+      threadURL(boardID, threadID) {
+        if (boardID !== g.BOARD.ID) {
+          return `//${BoardConfig.domain(boardID)}/${boardID}/thread/${threadID}`;
+        } else if ((g.VIEW !== 'thread') || (+threadID !== g.THREADID)) {
+          return `/${boardID}/thread/${threadID}`;
+        } else {
+          return '';
+        }
+      },
+      postURL(boardID, threadID, postID) {
+        return `${this.threadURL(boardID, threadID)}#p${postID}`;
+      },
+      parseJSON(data, { siteID, boardID }) {
+        const o = {
+          // id
+          ID: data.no,
+          postID: data.no,
+          threadID: data.resto || data.no,
+          boardID,
+          siteID,
+          isReply: !!data.resto,
+          // thread status
+          isSticky: !!data.sticky,
+          isClosed: !!data.closed,
+          isArchived: !!data.archived,
+          threadReplies: data.replies,
+          threadImages: data.images,
+          // file status
+          fileDeleted: !!data.filedeleted,
+          filesDeleted: data.filedeleted ? [0] : []
+        };
+        o.info = {
+          subject: $.unescape(data.sub),
+          email: $.unescape(data.email),
+          name: $.unescape(data.name) || '',
+          tripcode: data.trip,
+          pass: (data.since4pass != null) ? `${data.since4pass}` : undefined,
+          uniqueID: data.id,
+          flagCode: data.country,
+          flagCodeTroll: data.board_flag,
+          flag: $.unescape((data.country_name || data.flag_name)),
+          dateUTC: data.time,
+          dateText: data.now,
+          // Yes, we use the raw string here
+          commentHTML: { innerHTML: data.com || '', [isEscaped]: true }
+        };
+        if (data.capcode) {
+          o.info.capcode = data.capcode.replace(/_highlight$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          o.capcodeHighlight = /_highlight$/.test(data.capcode);
+          delete o.info.uniqueID;
+        }
+        o.files = [];
+        if (data.ext) {
+          o.file = this.parseJSONFile(data, { siteID, boardID });
+          o.files.push(o.file);
+        }
+        // Temporary JSON properties for events such as April 1 / Halloween
+        o.extra = dict();
+        for (var key in data) {
+          if (key[0] === 'x') {
+            o.extra[key] = data[key];
+          }
+        }
+        return o;
+      },
+      parseJSONFile(data, { siteID, boardID }) {
+        const site = g.sites[siteID];
+        const filename = (site.software === 'yotsuba') && (boardID === 'f') ?
+          `${encodeURIComponent(data.filename)}${data.ext}`
+          :
+            `${data.tim}${data.ext}`;
+        const o = {
+          name: ($.unescape(data.filename)) + data.ext,
+          url: site.urls.file({ siteID, boardID }, filename),
+          height: data.h,
+          width: data.w,
+          MD5: data.md5,
+          size: $.bytesToString(data.fsize),
+          thumbURL: site.urls.thumb({ siteID, boardID }, `${data.tim}s.jpg`),
+          theight: data.tn_h,
+          twidth: data.tn_w,
+          isSpoiler: !!data.spoiler,
+          tag: data.tag,
+          hasDownscale: !!data.m_img
+        };
+        if ((data.h != null) && !/\.pdf$/.test(o.url)) {
+          o.dimensions = `${o.width}x${o.height}`;
+        }
+        return o;
+      },
+      parseComment(html) {
+        html = html
+          .replace(/<br\b[^<]*>/gi, '\n')
+          .replace(/\n\n<span\b[^<]* class="abbr"[^]*$/i, '') // EXIF data (/p/)
+          .replace(/<[^>]*>/g, '');
+        return $.unescape(html);
+      },
+      parseCommentDisplay(html) {
+        // Hide spoilers.
+        if (!Conf['Remove Spoilers'] && !Conf['Reveal Spoilers']) {
+          let html2;
+          while ((html2 = html.replace(/<s>(?:(?!<\/?s>).)*<\/s>/g, '[spoiler]')) !== html) {
+            html = html2;
+          }
+        }
+        html = html
+          .replace(/^<b\b[^<]*>Rolled [^<]*<\/b>/i, '') // Rolls (/tg/, /qst/)
+          .replace(/<span\b[^<]* class="fortune"[^]*$/i, ''); // Fortunes (/s4s/)
+        // Remove preceding and following new lines, trailing spaces.
+        return this.parseComment(html).trim().replace(/\s+$/gm, '');
+      },
+      postFromObject(data, boardID) {
+        const o = this.parseJSON(data, { boardID, siteID: g.SITE.ID });
+        return this.post(o);
+      },
+      post(o) {
+        const { ID, threadID, boardID, file } = o;
+        const { subject, email, name, tripcode, capcode, pass, uniqueID, flagCode, flagCodeTroll, flag, dateUTC, dateText, commentHTML } = o.info;
+        const { staticPath, gifIcon } = this;
+        /* Post Info */
+        let capcodeDescription, capcodePlural, capcodeLC;
+        if (capcode) {
+          capcodeLC = capcode.toLowerCase();
+          if (capcode === 'Founder') {
+            capcodePlural = 'the Founder';
+            capcodeDescription = "4chan's Founder";
+          } else if (capcode === 'Verified') {
+            capcodePlural = 'Verified Users';
+            capcodeDescription = '';
+          } else {
+            const capcodeLong = $.getOwn({ 'Admin': 'Administrator', 'Mod': 'Moderator' }, capcode) || capcode;
+            capcodePlural = `${capcodeLong}s`;
+            capcodeDescription = `a 4chan ${capcodeLong}`;
+          }
+        }
+        const url = this.threadURL(boardID, threadID);
+        const postLink = `${url}#p${ID}`;
+        const quoteLink = this.sameThread(boardID, threadID) ?
+          `javascript:quote('${+ID}');`
+          :
+            `${url}#q${ID}`;
+        const postInfo = generatePostInfoHtml(ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon, capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID, threadID);
+        /* File Info */
+        let protocol, fileURL, shortFilename, fileThumb;
+        if (file) {
+          protocol = /^https?:(?=\/\/i\.4cdn\.org\/)/;
+          fileURL = file.url.replace(protocol, '');
+          shortFilename = this.shortFilename(file.name);
+          fileThumb = file.isSpoiler ? this.spoilerThumb(boardID) : file.thumbURL.replace(protocol, '');
+        }
+        const fileBlock = generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon);
+        /* Whole Post */
+        const postClass = o.isReply ? 'reply' : 'op';
+        const postContent = o.isReply ? [postInfo, fileBlock] : [fileBlock, postInfo];
+        postContent.push(h("blockquote", { class: "postMessage", id: `m${ID}` }, commentHTML));
+        // I wonder if there's a better way to skip this in the catalog without breaking hovers.
+        // Currently, this is just hidden by css.
+        if (!o.isReply && o.threadReplies != null) {
+          postContent.push(h("span", { class: "summary preview-summary" }, this.summaryText('', o.threadReplies, o.threadImages, true)));
+        }
+        const wholePost = h(hFragment, null,
+          (o.isReply ? h("div", { class: "sideArrows", id: `sa${ID}` }, ">>") : ''),
+          h("div", { id: `p${ID}`, class: `post ${postClass}${o.capcodeHighlight ? ' highlightPost' : ''}` }, ...postContent));
+        const container = $.el('div', {
+          className: `postContainer ${postClass}Container`,
+          id: `pc${ID}`
+        });
+        $.extend(container, wholePost);
+        // Fix quotelinks
+        for (var quote of $$('.quotelink', container)) {
+          var href = quote.getAttribute('href');
+          if (href[0] === '#') {
+            if (!this.sameThread(boardID, threadID)) {
+              quote.href = this.threadURL(boardID, threadID) + href;
+            }
+          } else {
+            var match;
+            if ((match = quote.href.match(SWYotsuba.regexp.quotelink)) && (this.sameThread(match[1], match[2]))) {
+              quote.href = href.match(/(#[^#]*)?$/)[0] || '#';
+            }
+          }
+        }
+        return container;
+      },
+      summaryText(status, posts, files, hoverPreview = false) {
+        let text = '';
+        if (status)
+          text += `${status} `;
+        text += `${posts} post${posts == 1 ? '' : 's'}`;
+        if (+files)
+          text += ` and ${files} image repl${files > 1 ? 'ies' : 'y'}`;
+        return hoverPreview ? text : `${text} ${status === '-' ? 'shown' : 'omitted'}.`;
+      },
+      summary(boardID, threadID, posts, files) {
+        return $.el('a', {
+          className: 'summary',
+          textContent: this.summaryText('', posts, files),
+          href: `/${boardID}/thread/${threadID}`
+        });
+      },
+      thread(thread, data, withReplies) {
+        let root;
+        if (root = thread.nodes.root) {
+          $.rmAll(root);
+        } else {
+          thread.nodes.root = (root = $.el('div', {
+            className: 'thread',
+            id: `t${data.no}`
+          }));
+        }
+        if (this.hat) {
+          $.add(root, this.hat.cloneNode(false));
+        }
+        $.add(root, thread.OP.nodes.root);
+        if (data.omitted_posts || (!withReplies && data.replies)) {
+          const [posts, files] = withReplies ?
+            // XXX data.omitted_images is not accurate.
+            [data.omitted_posts, data.images - data.last_replies.filter(data => !!data.ext).length]
+            :
+              [data.replies, data.images];
+          const summary = this.summary(thread.board.ID, data.no, posts, files);
+          $.add(root, summary);
+        }
+        return root;
+      },
+      catalogThread(thread, data, pageCount) {
+        let cssText, imgClass, src;
+        const { staticPath, gifIcon } = this;
+        const { tn_w, tn_h } = data;
+        if (data.spoiler && !Conf['Reveal Spoiler Thumbnails']) {
+          let spoilerRange;
+          src = `${staticPath}spoiler`;
+          if (spoilerRange = this.spoilerRange[thread.board]) {
+            // Randomize the spoiler image.
+            src += (`-${thread.board}`) + Math.floor(1 + (spoilerRange * Math.random()));
+          }
+          src += '.png';
+          imgClass = 'spoiler-file';
+          cssText = "--tn-w: 100; --tn-h: 100;";
+        } else if (data.filedeleted) {
+          src = `${staticPath}filedeleted-res${gifIcon}`;
+          imgClass = 'deleted-file';
+        } else if (thread.OP.file) {
+          src = thread.OP.file.thumbURL;
+          const ratio = 250 / Math.max(tn_w, tn_h);
+          cssText = `--tn-w: ${tn_w * ratio}; --tn-h: ${tn_h * ratio};`;
+        } else {
+          src = `${staticPath}nofile.png`;
+          imgClass = 'no-file';
+        }
+        const postCount = data.replies + 1;
+        const fileCount = data.images + !!data.ext;
+        const container = $.el('div', generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon));
+        $.before(thread.OP.nodes.info, [...container.childNodes]);
+        for (var br of $$('br', thread.OP.nodes.comment)) {
+          if (br.previousSibling && (br.previousSibling.nodeName === 'BR')) {
+            $.addClass(br, 'extra-linebreak');
+          }
+        }
+        const root = $.el('div', {
+          className: 'thread catalog-thread',
+          id: `t${thread}`
+        });
+        if (thread.OP.highlights) {
+          $.addClass(root, ...thread.OP.highlights);
+        }
+        if (!thread.OP.file) {
+          $.addClass(root, 'noFile');
+        }
+        root.style.cssText = cssText || '';
+        return root;
+      },
+      catalogReply(thread, data) {
+        let excerpt = '';
+        if (data.com) {
+          excerpt = this.parseCommentDisplay(data.com).replace(/>>\d+/g, '').trim().replace(/\n+/g, ' // ');
+        }
+        if (data.ext) {
+          if (!excerpt) {
+            excerpt = `${$.unescape(data.filename)}${data.ext}`;
+          }
+        }
+        if (data.com) {
+          if (!excerpt) {
+            excerpt = $.unescape(data.com.replace(/<br\b[^<]*>/gi, ' // '));
+          }
+        }
+        if (!excerpt) {
+          excerpt = '\xA0';
+        }
+        if (excerpt.length > 73) {
+          excerpt = `${excerpt.slice(0, 70)}...`;
+        }
+        const link = this.postURL(thread.board.ID, thread.ID, data.no);
+        return $.el('div', { className: 'catalog-reply' }, h(hFragment, null,
+          h("span", null,
+            h("time", { "data-utc": data.time * 1000, "data-abbrev": "1" }, "..."),
+            ": "),
+          h("a", { class: "catalog-reply-excerpt", href: link }, excerpt),
+          h("a", { class: "catalog-reply-preview", href: link }, "...")));
+      }
+    }
+  };
+
+  const SWTinyboard = {
+    isOPContainerThread: true,
+    mayLackJSON: true,
+    threadModTimeIgnoresSage: true,
+    disabledFeatures: [
+      'Resurrect Quotes',
+      'Quick Reply Personas',
+      'Quick Reply',
+      'Cooldown',
+      'Report Link',
+      'Delete Link',
+      'Edit Link',
+      'Quote Inlining',
+      'Quote Previewing',
+      'Quote Backlinks',
+      'File Info Formatting',
+      'Image Expansion',
+      'Image Expansion (Menu)',
+      'Comment Expansion',
+      'Thread Expansion',
+      'Favicon',
+      'Quote Threading',
+      'Thread Updater',
+      'Banner',
+      'Flash Features',
+      'Reply Pruning'
+    ],
+    detect() {
+      for (const script of $$('script:not([src])', d$1.head)) {
+        let m;
+        if (m = script.textContent.match(/\bvar configRoot=(".*?")/)) {
+          const properties = dict();
+          try {
+            const root = JSON.parse(m[1]);
+            if (root[0] === '/') {
+              properties.root = location.origin + root;
+            } else if (/^https?:/.test(root)) {
+              properties.root = root;
+            }
+          } catch (error) { }
+          return properties;
+        }
+      }
+      return false;
+    },
+    awaitBoard(cb) {
+      let reactUI;
+      if (reactUI = $.id('react-ui')) {
+        const s = (this.selectors = Object.create(this.selectors));
+        s.boardFor = { index: '.page-container' };
+        s.thread = 'div[id^="thread_"]';
+        return $.on(d$1, '4chanXMounted', cb);
+      } else {
+        return cb();
+      }
+    },
+    urls: {
+      thread({ siteID, boardID, threadID }, isArchived) {
+        return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.html`;
+      },
+      post({ postID }) { return `#${postID}`; },
+      index({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/`; },
+      catalog({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/catalog.html`; },
+      threadJSON({ siteID, boardID, threadID }, isArchived) {
+        const root = Conf['siteProperties'][siteID]?.root;
+        if (root) {
+          return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.json`;
+        } else {
+          return '';
+        }
+      },
+      archivedThreadJSON(thread) {
+        return SWTinyboard.urls.threadJSON(thread, true);
+      },
+      threadsListJSON({ siteID, boardID }) {
+        const root = Conf['siteProperties'][siteID]?.root;
+        if (root) {
+          return `${root}${boardID}/threads.json`;
+        } else {
+          return '';
+        }
+      },
+      archiveListJSON({ siteID, boardID }) {
+        const root = Conf['siteProperties'][siteID]?.root;
+        if (root) {
+          return `${root}${boardID}/archive/archive.json`;
+        } else {
+          return '';
+        }
+      },
+      catalogJSON({ siteID, boardID }) {
+        const root = Conf['siteProperties'][siteID]?.root;
+        if (root) {
+          return `${root}${boardID}/catalog.json`;
+        } else {
+          return '';
+        }
+      },
+      file({ siteID, boardID }, filename) {
+        return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${filename}`;
+      },
+      thumb(board, filename) {
+        return SWTinyboard.urls.file(board, filename);
+      }
+    },
+    selectors: {
+      board: 'form[name="postcontrols"]',
+      thread: 'input[name="board"] ~ div[id^="thread_"]',
+      threadDivider: 'div[id^="thread_"] > hr:last-child',
+      summary: '.omitted',
+      postContainer: 'div[id^="reply_"]:not(.hidden)',
+      opBottom: '.op',
+      replyOriginal: 'div[id^="reply_"]:not(.hidden)',
+      infoRoot: '.intro',
+      info: {
+        subject: '.subject',
+        name: '.name',
+        email: '.email',
+        tripcode: '.trip',
+        uniqueID: '.poster_id',
+        capcode: '.capcode',
+        flag: '.flag',
+        date: 'time',
+        nameBlock: 'label',
+        quote: 'a[href*="#q"]',
+        reply: 'a[href*="/res/"]:not([href*="#"])'
+      },
+      icons: {
+        isSticky: '.fa-thumb-tack',
+        isClosed: '.fa-lock'
+      },
+      file: {
+        text: '.fileinfo',
+        link: '.fileinfo > a',
+        thumb: 'a > .post-image'
+      },
+      thumbLink: '.file > a',
+      multifile: '.files > .file',
+      highlightable: {
+        op: ' > .op',
+        reply: '.reply',
+        catalog: ' > .thread'
+      },
+      comment: '.body',
+      spoiler: '.spoiler',
+      quotelink: 'a[onclick*="highlightReply("]',
+      catalog: {
+        board: '#Grid',
+        thread: '.mix',
+        thumb: '.thread-image'
+      },
+      boardList: '.boardlist',
+      boardListBottom: '.boardlist.bottom',
+      styleSheet: '#stylesheet',
+      psa: '.blotter',
+      nav: {
+        prev: '.pages > form > [value=Previous]',
+        next: '.pages > form > [value=Next]'
+      }
+    },
+    classes: {
+      highlight: 'highlighted'
+    },
+    xpath: {
+      thread: 'div[starts-with(@id,"thread_")]',
+      postContainer: 'div[starts-with(@id,"reply_") or starts-with(@id,"thread_")]',
+      replyContainer: 'div[starts-with(@id,"reply_")]'
+    },
+    regexp: {
+      quotelink: new RegExp(`\
+/\\
+([^/]+)\\
+/res/\\
+(\\d+)\\
+(?:\\.\\w+)?#\\
+(\\d+)\\
+$\
+`),
+      quotelinkHTML: /<a [^>]*\bhref="[^"]*\/([^\/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
+    },
+    Build: {
+      parseJSON(data, board) {
+        const o = SWYotsuba.Build.parseJSON(data, board);
+        if (data.ext === 'deleted') {
+          delete o.file;
+          $.extend(o, {
+            files: [],
+            fileDeleted: true,
+            filesDeleted: [0]
           });
         }
+        if (data.extra_files) {
+          let file;
+          for (let i = 0; i < data.extra_files.length; i++) {
+            const extra_file = data.extra_files[i];
+            if (extra_file.ext === 'deleted') {
+              o.filesDeleted.push(i);
+            } else {
+              file = SWYotsuba.Build.parseJSONFile(data, board);
+              o.files.push(file);
+            }
+          }
+          if (o.files.length) {
+            o.file = o.files[0];
+          }
+        }
+        return o;
+      },
+      parseComment(html) {
+        html = html
+          .replace(/<br\b[^<]*>/gi, '\n')
+          .replace(/<[^>]*>/g, '');
+        return $.unescape(html);
       }
-      return ThreadHiding.hiddenThreads = hiddenThreads2;
     },
-
-    isHidden(boardID, threadID) {
-      return !!(ThreadHiding.db && ThreadHiding.db.get({boardID, threadID}));
+    bgColoredEl() {
+      return $.el('div', { className: 'post reply' });
     },
+    isFileURL(url) {
+      return /\/src\/[^\/]+/.test(url.pathname);
+    },
+    preParsingFixes(board) {
+      let broken;
+      if (broken = $('a > input[name="board"]', board)) {
+        $.before(broken.parentNode, broken);
+      }
+    },
+    parseNodes(post, nodes) {
+      if (nodes.uniqueID) {
+        return;
+      }
+      let text = '';
+      let node = nodes.nameBlock.nextSibling;
+      while (node && (node.nodeType === 3)) {
+        text += node.textContent;
+        node = node.nextSibling;
+      }
+      let m;
+      if (m = text.match(/(\s*ID:\s*)(\S+)/)) {
+        let uniqueID;
+        nodes.info.normalize();
+        let nextSibling = nodes.nameBlock.nextSibling;
+        nextSibling = nextSibling.splitText(m[1].length);
+        nextSibling.splitText(m[2].length);
+        nodes.uniqueID = (uniqueID = $.el('span', { className: 'poster_id' }));
+        $.replace(nextSibling, uniqueID);
+        $.add(uniqueID, nextSibling);
+      }
+    },
+    parseDate(node) {
+      const datetime = node.getAttribute('datetime');
+      let date = Date.parse(datetime?.trim() || '');
+      if (!isNaN(date)) {
+        return new Date(date);
+      }
+      date = Date.parse(node.textContent.trim() + ' UTC');
+      if (!isNaN(date)) {
+        return new Date(date);
+      }
+      return undefined;
+    },
+    parseFile(post, file) {
+      const { text, link, thumb } = file;
+      if ($.x(`ancestor::${this.xpath.postContainer}[1]`, text) !== post.nodes.root) {
+        return false;
+      }
+      const nextSibling = link.nextSibling;
+      const hasParen = nextSibling && nextSibling.textContent && nextSibling.textContent.includes('(');
+      const infoNode = hasParen ? nextSibling : link.nextElementSibling;
+      if (!infoNode) {
+        return false;
+      }
+      const info = infoNode.textContent.match(/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/);
+      if (!info) {
+        return false;
+      }
+      const nameNode = $('.postfilename', text);
+      $.extend(file, {
+        name: nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0],
+        size: info[2],
+        dimensions: info[0].match(/\d+x\d+/)?.[0]
+      });
+      if (thumb) {
+        $.extend(file, {
+          thumbURL: /\/static\//.test(thumb.src) && $.isImage(link.href) ? link.href : thumb.src,
+          isSpoiler: /^Spoiler/i.test(info[1] || '') || (link.textContent === 'Spoiler Image')
+        });
+      }
+      return true;
+    },
+    isThumbExpanded(file) {
+      return $.hasClass(file.thumb.parentNode, 'expanded') || (file.thumb.parentNode.dataset.expanded === 'true');
+    },
+    isLinkified(link) {
+      return /\bnofollow\b/.test(link.rel);
+    },
+    catalogPin(threadRoot) {
+      return threadRoot.dataset.sticky = 'true';
+    }
+  };
 
+  const SW = {
+    tinyboard: SWTinyboard,
+    yotsuba: SWYotsuba
+  };
+
+  const Site = {
+    defaultProperties: {
+      '4chan.org': { software: 'yotsuba' },
+      '4channel.org': { canonical: '4chan.org' },
+      '4cdn.org': { canonical: '4chan.org' },
+      'notso.smuglo.li': { canonical: 'smuglo.li' },
+      'smugloli.net': { canonical: 'smuglo.li' },
+      'smug.nepu.moe': { canonical: 'smuglo.li' }
+    },
+    init(cb) {
+      $.extend(Conf['siteProperties'], Site.defaultProperties);
+      let hostname = Site.resolve();
+      if (hostname && $.hasOwn(SW, Conf['siteProperties'][hostname].software)) {
+        this.set(hostname);
+        cb();
+      }
+      $.onExists(doc, 'body', () => {
+        for (const software in SW) {
+          let changes;
+          if (changes = SW[software].detect?.()) {
+            changes.software = software;
+            hostname = location.hostname.replace(/^www\./, '');
+            const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
+            let changed = 0;
+            for (const key in changes) {
+              if (properties[key] !== changes[key]) {
+                properties[key] = changes[key];
+                changed++;
+              }
+            }
+            if (changed) {
+              $.set('siteProperties', Conf['siteProperties']);
+            }
+            if (!g.SITE) {
+              this.set(hostname);
+              cb();
+            }
+            return;
+          }
+        }
+      });
+    },
+    resolve(url = location) {
+      let { hostname } = url;
+      while (hostname && !$.hasOwn(Conf['siteProperties'], hostname)) {
+        hostname = hostname.replace(/^[^.]*\.?/, '');
+      }
+      if (hostname) {
+        let canonical;
+        if (canonical = Conf['siteProperties'][hostname]?.canonical) {
+          hostname = canonical;
+        }
+      }
+      return hostname;
+    },
+    parseURL(url = location) {
+      const siteID = Site.resolve(url);
+      const site = g.sites[siteID];
+      const r = {};
+      if (!site) {
+        return r;
+      }
+      r.siteID = site.ID;
+      if (site.isBoardlessPage?.(url)) {
+        return r;
+      }
+      const pathname = url.pathname.split(/\/+/);
+      r.boardID = pathname[1];
+      if (site.isFileURL(url)) {
+        r.VIEW = 'file';
+      } else if (site.isAuxiliaryPage?.(url)) {
+        // pass
+      } else if (['thread', 'res'].includes(pathname[2])) {
+        r.VIEW = 'thread';
+        r.threadID = (r.THREADID = +pathname[3].replace(/\.\w+$/, ''));
+      } else if ((pathname[2] === 'archive') && (pathname[3] === 'res')) {
+        r.VIEW = 'thread';
+        r.threadID = (r.THREADID = +pathname[4].replace(/\.\w+$/, ''));
+        r.threadArchived = true;
+      } else if (/^(?:catalog|archive)(?:\.\w+)?$/.test(pathname[2])) {
+        r.VIEW = pathname[2].replace(/\.\w+$/, '');
+      } else if (/^(?:index|\d*)(?:\.\w+)?$/.test(pathname[2])) {
+        r.VIEW = 'index';
+      }
+      return r;
+    },
+    set(hostname) {
+      for (const ID in Conf['siteProperties']) {
+        let site;
+        const properties = Conf['siteProperties'][ID];
+        if (properties.canonical) {
+          continue;
+        }
+        const { software } = properties;
+        if (!software || !$.hasOwn(SW, software)) {
+          continue;
+        }
+        g.sites[ID] = (site = Object.create(SW[software]));
+        $.extend(site, { ID, siteID: ID, properties, software });
+      }
+      return g.SITE = g.sites[hostname];
+    }
+  };
+
+  const CatalogLinks = {
+    init() {
+      if ((g.SITE.software === 'yotsuba') && (Conf['External Catalog'] || Conf['JSON Index']) && !(Conf['JSON Index'] && (g.VIEW === 'index'))) {
+        const selector = (() => {
+          switch (g.VIEW) {
+            case 'thread':
+            case 'archive': return '.navLinks.desktop > a';
+            case 'catalog': return '.navLinks > :first-child > a';
+            case 'index': return '#ctrl-top > a, .cataloglink > a';
+            default: return '';
+          }
+        })();
+        $.ready(function () {
+          for (const link of $$(selector, d)) {
+            let catalogURL;
+            switch (link.pathname.replace(/\/+/g, '/')) {
+              case `/${g.BOARD}/`:
+                if (Conf['JSON Index']) {
+                  link.textContent = 'Index';
+                }
+                link.href = CatalogLinks.index() || '';
+                break;
+              case `/${g.BOARD}/catalog`:
+                link.href = CatalogLinks.catalog() || '';
+                break;
+            }
+            if ((g.VIEW === 'catalog') && ((catalogURL = CatalogLinks.catalog()) !== g.SITE.urls.catalog?.(g.BOARD))) {
+              const catalogLink = link.parentNode.cloneNode(true);
+              const link2 = catalogLink.firstElementChild;
+              link2.href = catalogURL || '';
+              link2.textContent = link2.hostname === location.hostname ? `${meta.name} Catalog` : 'External Catalog';
+              $.after(link.parentNode, [$.tn(' '), catalogLink]);
+            }
+          }
+        });
+      }
+      if ((g.SITE.software === 'yotsuba') && Conf['JSON Index'] && Conf[`Use ${meta.name} Catalog`]) {
+        Callbacks.Post.push({
+          name: 'Catalog Link Rewrite',
+          cb: this.node
+        });
+      }
+      if (this.enabled = Conf['Catalog Links']) {
+        const el = UI.checkbox('Header catalog links', 'Catalog Links');
+        CatalogLinks.el = el;
+        el.id = 'toggleCatalog';
+        const input = $('input', el);
+        $.on(input, 'change', this.toggle);
+        $.sync('Header catalog links', CatalogLinks.set);
+        $.event('HeaderMenuEntry', {
+          el,
+          order: 95
+        });
+      }
+    },
     node() {
-      let data;
-      if (this.isReply || this.isClone || this.isFetchedQuote) { return; }
-
-      if (Conf['Thread Hiding Buttons']) {
-        $.prepend(this.nodes.root, ThreadHiding.makeButton(this.thread, 'hide'));
-      }
-
-      if (data = ThreadHiding.db.get({boardID: this.board.ID, threadID: this.ID})) {
-        ThreadHiding.hide(this.thread, data.makeStub, 'Hidden manually');
+      for (const a of $$('a', this.nodes.comment)) {
+        let m;
+        if (m = a.href.match(/^https?:\/\/(boards\.4chan(?:nel)?\.org\/[^\/]+)\/catalog(#s=.*)?/)) {
+          a.href = `//${m[1]}/${m[2] || '#catalog'}`;
+        }
       }
     },
-
-    onIndexRefresh() {
-      return g.BOARD.threads.forEach(function(thread) {
-        const {root} = thread.nodes;
-        if (thread.isHidden && thread.stub && !root.contains(thread.stub)) {
-          ThreadHiding.makeStub(thread, root);
-        }
-      });
+    toggle() {
+      $.event('CloseMenu');
+      $.set('Header catalog links', this.checked);
+      CatalogLinks.set(this.checked);
     },
-
-    menu: {
-      init() {
-        if ((g.VIEW !== 'index') || !Conf['Menu'] || !Conf['Thread Hiding Link']) { return; }
-
-        let div = $.el('div', {
-          className: 'hide-thread-link',
-          textContent: 'Hide'
-        }
-        );
-
-        const apply = $.el('a', {
-          textContent: 'Apply',
-          href: 'javascript:;'
-        }
-        );
-        $.on(apply, 'click', ThreadHiding.menu.hide);
-
-        const makeStub = UI.checkbox('Stubs', 'Make stub');
-
-        Menu.menu.addEntry({
-          el: div,
-          order: 20,
-          open({thread, isReply}) {
-            if (isReply || thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
-              return false;
-            }
-            ThreadHiding.menu.thread = thread;
-            return true;
-          },
-          subEntries: [{el: apply}, {el: makeStub}]});
-
-        div = $.el('a', {
-          className: 'show-thread-link',
-          textContent: 'Show',
-          href: 'javascript:;'
-        }
-        );
-        $.on(div, 'click', ThreadHiding.menu.show);
-
-        Menu.menu.addEntry({
-          el: div,
-          order: 20,
-          open({thread, isReply}) {
-            if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
-              return false;
-            }
-            ThreadHiding.menu.thread = thread;
-            return true;
+    set(useCatalog) {
+      Conf['Header catalog links'] = useCatalog;
+      CatalogLinks.setLinks($.id('board-list'));
+      CatalogLinks.setLinks($(g.SITE.selectors.boardListBottom));
+      CatalogLinks.el.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
+      $('input', CatalogLinks.el).checked = useCatalog;
+    },
+    setLinks(list) {
+      if ((!(CatalogLinks.enabled ?? Conf['Catalog Links'])) || !list) {
+        return;
+      }
+      // do not transform links unless they differ from the expected value at most by this tail
+      const tail = /(?:index)?(?:\.\w+)?$/;
+      for (const a of $$('a:not([data-only])', list)) {
+        let { siteID, boardID } = a.dataset;
+        if (!siteID || !boardID) {
+          let VIEW;
+          ({ siteID, boardID, VIEW } = Site.parseURL(a));
+          if (!siteID || !boardID ||
+            !['index', 'catalog'].includes(VIEW) ||
+            (!a.dataset.indexOptions && (a.href.replace(tail, '') !== (Get.url(VIEW, { siteID, boardID }) || '').replace(tail, '')))) {
+            continue;
           }
-        });
-
-        const hideStubLink = $.el('a', {
-          textContent: 'Hide stub',
-          href: 'javascript:;'
+          $.extend(a.dataset, { siteID, boardID });
         }
-        );
-        $.on(hideStubLink, 'click', ThreadHiding.menu.hideStub);
-
-        return Menu.menu.addEntry({
-          el: hideStubLink,
-          order: 15,
-          open({thread, isReply}) {
-            if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
-              return false;
-            }
-            return ThreadHiding.menu.thread = thread;
+        const board = { siteID, boardID };
+        const url = Conf['Header catalog links'] ? CatalogLinks.catalog(board) : Get.url('index', board);
+        if (url) {
+          a.href = url;
+          if (a.dataset.indexOptions && (url.split('#')[0] === Get.url('index', board))) {
+            a.href += (a.hash ? '/' : '#') + a.dataset.indexOptions;
           }
-        });
-      },
-
-      hide() {
-        const makeStub = $('input', this.parentNode).checked;
-        const {thread} = ThreadHiding.menu;
-        ThreadHiding.hide(thread, makeStub, 'Hidden manually');
-        ThreadHiding.saveHiddenState(thread, makeStub);
-        return $.event('CloseMenu');
-      },
-
-      show() {
-        const {thread} = ThreadHiding.menu;
-        ThreadHiding.show(thread);
-        ThreadHiding.saveHiddenState(thread);
-        return $.event('CloseMenu');
-      },
-
-      hideStub() {
-        const {thread} = ThreadHiding.menu;
-        ThreadHiding.show(thread);
-        ThreadHiding.hide(thread, false);
-        ThreadHiding.saveHiddenState(thread, false);
-        $.event('CloseMenu');
+        }
       }
     },
+    externalParse() {
+      CatalogLinks.externalList = dict();
+      for (const line of Conf['externalCatalogURLs'].split('\n')) {
+        if (line[0] === '#') {
+          continue;
+        }
+        const url = line.split(';')[0];
+        const boards = Filter.parseBoards(line.match(/;boards:([^;]+)/)?.[1] || '*');
+        const excludes = Filter.parseBoards(line.match(/;exclude:([^;]+)/)?.[1]) || dict();
+        for (const board in boards) {
+          if (!excludes[board] && !excludes[board.split('/')[0] + '/*']) {
+            CatalogLinks.externalList[board] = url;
+          }
+        }
+      }
+    },
+    external({ siteID, boardID }) {
+      if (!CatalogLinks.externalList) {
+        CatalogLinks.externalParse();
+      }
+      const external = (CatalogLinks.externalList[`${siteID}/${boardID}`] || CatalogLinks.externalList[`${siteID}/*`]);
+      if (external) {
+        return external.replace(/%board/g, boardID);
+      } else {
+        return undefined;
+      }
+    },
+    jsonIndex(board, hash) {
+      if ((g.SITE.ID === board.siteID) && (g.BOARD.ID === board.boardID) && (g.VIEW === 'index')) {
+        return hash;
+      } else {
+        return Get.url('index', board) + hash;
+      }
+    },
+    catalog(board = g.BOARD) {
+      let external, nativeCatalog;
+      if (Conf['External Catalog'] && (external = CatalogLinks.external(board))) {
+        return external;
+      } else if (Index.enabledOn(board) && Conf[`Use ${meta.name} Catalog`]) {
+        return CatalogLinks.jsonIndex(board, '#catalog');
+      } else if (nativeCatalog = Get.url('catalog', board)) {
+        return nativeCatalog;
+      } else {
+        return CatalogLinks.external(board);
+      }
+    },
+    index(board = g.BOARD) {
+      if (Index.enabledOn(board)) {
+        return CatalogLinks.jsonIndex(board, '#index');
+      } else {
+        return Get.url('index', board);
+      }
+    }
+  };
 
-    makeButton(thread, type) {
-      const span = $.el('span', {
-        className: 'stub-icon',
+  var Header = {
+    init() {
+      $.onExists(doc, 'body', () => {
+        if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) {
+          return;
+        }
+        $.add(this.bar, [this.noticesRoot, this.toggle]);
+        $.prepend(d$1.body, this.bar);
+        $.add(d$1.body, Header.hover);
+        return this.setBarPosition(Conf['Bottom Header']);
       });
-      const a = $.el('a', {
-        className: `${type}-post-button ${type}-thread-button`,
-        href:      'javascript:;'
+      this.menu = new UI.Menu('header');
+      const menuButton = $.el('span', { className: 'menu-button' });
+      Icon.set(menuButton, 'caretDown', 'Menu');
+      const box = UI.checkbox;
+      const barFixedToggler = box('Fixed Header', 'Fixed Header');
+      const headerToggler = box('Header auto-hide', 'Auto-hide header');
+      const scrollHeaderToggler = box('Header auto-hide on scroll', 'Auto-hide header on scroll');
+      const barPositionToggler = box('Bottom Header', 'Bottom header');
+      const linkJustifyToggler = box('Centered links', 'Centered links');
+      const customNavToggler = box('Custom Board Navigation', 'Custom board navigation');
+      const footerToggler = box('Bottom Board List', 'Hide bottom board list');
+      const shortcutToggler = box('Shortcut Icons', 'Shortcut Icons');
+      const editCustomNav = $.el('a', {
+        textContent: 'Edit custom board navigation',
+        href: 'javascript:;'
       });
-      Icon.set(span, type === 'hide' ? 'squareMinus' : 'squarePlus');
-      $.add(a, span);
-      a.dataset.fullID = thread.fullID;
-      $.on(a, 'click', ThreadHiding.toggle);
+      this.barFixedToggler = barFixedToggler.firstElementChild;
+      this.scrollHeaderToggler = scrollHeaderToggler.firstElementChild;
+      this.barPositionToggler = barPositionToggler.firstElementChild;
+      this.linkJustifyToggler = linkJustifyToggler.firstElementChild;
+      this.headerToggler = headerToggler.firstElementChild;
+      this.footerToggler = footerToggler.firstElementChild;
+      this.shortcutToggler = shortcutToggler.firstElementChild;
+      this.customNavToggler = customNavToggler.firstElementChild;
+      $.on(menuButton, 'click', this.menuToggle);
+      $.on(this.headerToggler, 'change', this.toggleBarVisibility);
+      $.on(this.barFixedToggler, 'change', this.toggleBarFixed);
+      $.on(this.barPositionToggler, 'change', this.toggleBarPosition);
+      $.on(this.scrollHeaderToggler, 'change', this.toggleHideBarOnScroll);
+      $.on(this.linkJustifyToggler, 'change', this.toggleLinkJustify);
+      $.on(this.footerToggler, 'change', this.toggleFooterVisibility);
+      $.on(this.shortcutToggler, 'change', this.toggleShortcutIcons);
+      $.on(this.customNavToggler, 'change', this.toggleCustomNav);
+      $.on(editCustomNav, 'click', this.editCustomNav);
+      this.setBarFixed(Conf['Fixed Header']);
+      this.setHideBarOnScroll(Conf['Header auto-hide on scroll']);
+      this.setBarVisibility(Conf['Header auto-hide']);
+      this.setLinkJustify(Conf['Centered links']);
+      this.setShortcutIcons(Conf['Shortcut Icons']);
+      this.setFooterVisibility(Conf['Bottom Board List']);
+      $.sync('Fixed Header', this.setBarFixed);
+      $.sync('Header auto-hide on scroll', this.setHideBarOnScroll);
+      $.sync('Bottom Header', this.setBarPosition);
+      $.sync('Shortcut Icons', this.setShortcutIcons);
+      $.sync('Header auto-hide', this.setBarVisibility);
+      $.sync('Centered links', this.setLinkJustify);
+      $.sync('Bottom Board List', this.setFooterVisibility);
+      this.addShortcut('menu', menuButton, 900);
+      this.menu.addEntry({
+        el: $.el('span', { textContent: 'Header' }),
+        order: 107,
+        subEntries: [
+          { el: barFixedToggler },
+          { el: headerToggler },
+          { el: scrollHeaderToggler },
+          { el: barPositionToggler },
+          { el: linkJustifyToggler },
+          { el: footerToggler },
+          { el: shortcutToggler },
+          { el: customNavToggler },
+          { el: editCustomNav }
+        ]
+      });
+      $.on(d$1, 'CreateNotification', this.createNotification);
+      $.on(d$1, 'HeaderMenuEntry', (e) => Header.menu.addEntry(e.detail));
+      this.setBoardList();
+      $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
+      $.ready(function () {
+        const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
+        if (!isPageLegit) {
+          return;
+        }
+        let footer;
+        if ((g.SITE.software === 'yotsuba') && !(footer = $.id('boardNavDesktopFoot'))) {
+          let absbot;
+          if (!(absbot = $.id('absbot'))) {
+            return;
+          }
+          footer = $.id('boardNavDesktop').cloneNode(true);
+          footer.id = 'boardNavDesktopFoot';
+          $('#navtopright', footer).id = 'navbotright';
+          $('#settingsWindowLink', footer).id = 'settingsWindowLinkBot';
+          $.before(absbot, footer);
+          $.global('stubCloneTopNav');
+        }
+        if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
+          for (var a of $$('a', Header.bottomBoardList)) {
+            if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
+              a.className = 'current';
+            }
+          }
+          return CatalogLinks.setLinks(Header.bottomBoardList);
+        }
+      });
+      if ((g.SITE.software === 'yotsuba') && ((g.VIEW === 'catalog') || !Conf['Disable Native Extension'])) {
+        const cs = $.el('a', { href: 'javascript:;' });
+        if (g.VIEW === 'catalog') {
+          cs.title = (cs.textContent = 'Catalog Settings');
+          Icon.set(cs, 'bookOpen', 'Catalog Settings');
+          this.addShortcut('native', cs, 810);
+        } else {
+          cs.title = (cs.textContent = '4chan Settings');
+          cs.className = 'native-settings';
+          this.addShortcut('native', cs, 810);
+        }
+        $.on(cs, 'click', () => $.id('settingsWindowLink').click());
+      }
+      return this.enableDesktopNotifications();
+    },
+    bar: $.el('div', { id: 'header-bar' }),
+    bottomBoardList: undefined,
+    boardList: undefined,
+    noticesRoot: $.el('div', { id: 'notifications' }),
+    shortcuts: $.el('span', { id: 'shortcuts' }),
+    hover: $.el('div', { id: 'hoverUI' }),
+    toggle: $.el('div', { id: 'scroll-marker' }),
+    setBoardList() {
+      let boardList;
+      Header.boardList = (boardList = $.el('span', { id: 'board-list' }));
+      $.extend(boardList, { innerHTML: "<span id=\"custom-board-list\"></span><span id=\"full-board-list\" hidden><span class=\"hide-board-list-container brackets-wrap\"><a href=\"javascript:;\" class=\"hide-board-list-button\">&nbsp;-&nbsp;</a></span> <span class=\"boardList\"></span></span>" });
+      const btn = $('.hide-board-list-button', boardList);
+      $.on(btn, 'click', Header.toggleBoardList);
+      $.prepend(Header.bar, [Header.boardList, Header.shortcuts]);
+      Header.setCustomNav(Conf['Custom Board Navigation']);
+      Header.generateBoardList(Conf['boardnav']);
+      $.sync('Custom Board Navigation', Header.setCustomNav);
+      return $.sync('boardnav', Header.generateBoardList);
+    },
+    generateFullBoardList() {
+      let nodes;
+      if (g.SITE.transformBoardList) {
+        nodes = g.SITE.transformBoardList();
+      } else {
+        nodes = [...$(g.SITE.selectors.boardList).cloneNode(true).childNodes];
+      }
+      const fullBoardList = $('.boardList', Header.boardList);
+      $.add(fullBoardList, nodes);
+      for (var a of $$('a', fullBoardList)) {
+        if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
+          a.className = 'current';
+        }
+      }
+      return CatalogLinks.setLinks(fullBoardList);
+    },
+    generateBoardList(boardnav) {
+      const list = $('#custom-board-list', Header.boardList);
+      $.rmAll(list);
+      if (!boardnav)
+        return;
+      boardnav = boardnav.replace(/(\r\n|\n|\r)/g, ' ');
+      const segments = boardnav.split(/(\{\{(?:"[^"]+")?|\}\})/);
+      const spanStack = [];
+      let currentContainer = list;
+      segments.forEach(segment => {
+        if (segment.startsWith('{{')) {
+          const span = $.el('span');
+          $.add(currentContainer, span);
+          spanStack.push(span);
+          currentContainer = span;
+          if (segment.length > 2)
+            span.className = segment.slice(3, -1);
+        } else if (segment === '}}') {
+          spanStack.pop();
+          currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
+        } else {
+          const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
+          const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
+          segmentNodes.forEach(node => currentContainer.appendChild(node));
+        }
+      });
+      return CatalogLinks.setLinks(list);
+    },
+    mapCustomNavigation(t) {
+      let a, href, m, url;
+      if (/^[^\w@]/.test(t)) {
+        return $.tn(t);
+      }
+      let text = (url = null);
+      t = t.replace(/-text:"([^"]+)"(?:,"([^"]+)")?/g, function (m0, m1, m2) {
+        text = m1;
+        url = m2;
+        return '';
+      });
+      let indexOptions = [];
+      t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function (m0, m1) {
+        indexOptions.push(m1.toLowerCase().replace(/\ /g, '-'));
+        return '';
+      });
+      indexOptions = indexOptions.join('/');
+      if (/^toggle-all/.test(t)) {
+        a = $.el('a', {
+          className: 'show-board-list-button',
+          textContent: text || '+',
+          href: 'javascript:;'
+        });
+        $.on(a, 'click', Header.toggleBoardList);
+        return a;
+      }
+      if (/^external/.test(t)) {
+        a = $.el('a', {
+          href: url || 'javascript:;',
+          textContent: text || '+',
+          className: 'external'
+        });
+        if (/-nt/.test(t)) {
+          a.target = '_blank';
+          a.rel = 'noopener';
+        }
+        return a;
+      }
+      let boardID = t.split('-')[0];
+      if (boardID === 'current') {
+        if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
+          boardID = g.BOARD.ID;
+        } else {
+          a = $.el('a', {
+            href: `/${g.BOARD.ID}/`,
+            textContent: text || decodeURIComponent(g.BOARD.ID),
+            className: 'current'
+          });
+          if (/-nt/.test(t)) {
+            a.target = '_blank';
+            a.rel = 'noopener';
+          }
+          if (/-index/.test(t)) {
+            a.dataset.only = 'index';
+          } else if (/-catalog/.test(t)) {
+            a.dataset.only = 'catalog';
+            a.href += 'catalog.html';
+          } else if (/-(archive|expired)/.test(t)) {
+            a = a.firstChild; // Its text node.
+          }
+          return a;
+        }
+      }
+      a = (function () {
+        let urlV;
+        if (boardID === '@') {
+          return $.el('a', {
+            href: 'https://twitter.com/4chan',
+            title: '4chan Twitter',
+            className: 'navSmall',
+            textContent: '@'
+          });
+        }
+        a = $.el('a', {
+          href: `//${BoardConfig.domain(boardID)}/${boardID}/`,
+          textContent: boardID,
+          title: BoardConfig.title(boardID)
+        });
+        if (['catalog', 'archive'].includes(g.VIEW) && (urlV = Get.url(g.VIEW, { siteID: '4chan.org', boardID }))) {
+          a.href = urlV;
+        }
+        if ((a.hostname === location.hostname) && (boardID === g.BOARD.ID)) {
+          a.className = 'current';
+        }
+        return a;
+      })();
+      a.textContent = /-title/.test(t) || (/-replace/.test(t) && (a.hostname === location.hostname) && (boardID === g.BOARD.ID)) ?
+        a.title || a.textContent
+        : /-full/.test(t) ?
+          (`/${boardID}/`) + (a.title ? ` - ${a.title}` : '')
+          :
+            text || boardID;
+      if (m = t.match(/-(index|catalog)/)) {
+        const urlIC = CatalogLinks[m[1]]({ siteID: '4chan.org', boardID });
+        if (urlIC) {
+          a.dataset.only = m[1];
+          a.href = urlIC;
+          if (m[1] === 'catalog') {
+            $.addClass(a, 'catalog');
+          }
+        } else {
+          return a.firstChild; // Its text node.
+        }
+      }
+      if (Conf['JSON Index'] && indexOptions) {
+        a.dataset.indexOptions = indexOptions;
+        if (['boards.4chan.org', 'boards.4channel.org'].includes(a.hostname) && (a.pathname.split('/')[2] === '')) {
+          a.href += (a.hash ? '/' : '#') + indexOptions;
+        }
+      }
+      if (/-archive/.test(t)) {
+        if (href = Redirect.to('board', { boardID })) {
+          a.href = href;
+        } else {
+          return a.firstChild; // Its text node.
+        }
+      }
+      if (/-expired/.test(t)) {
+        if (BoardConfig.isArchived(boardID)) {
+          a.href = `//${BoardConfig.domain(boardID)}/${boardID}/archive`;
+        } else {
+          return a.firstChild; // Its text node.
+        }
+      }
+      if (/-nt/.test(t)) {
+        a.target = '_blank';
+        a.rel = 'noopener';
+      }
       return a;
     },
-
-    makeStub(thread, root, reason) {
-      let summary, threadDivider;
-      let numReplies  = $$(g.SITE.selectors.replyOriginal, root).length;
-      if (summary = $(g.SITE.selectors.summary, root)) { numReplies += +summary.textContent.match(/\d+/); }
-
-      const a = ThreadHiding.makeButton(thread, 'show');
-      const { nameBlock, subject } = thread.OP.info;
-
-      if (subject) {
-        $.add(a, $.el('span', {
-          className: 'stub-subject',
-          textContent: subject
-        }));
-      }
-      $.add(a, $.el('span', {
-        className: 'stub-name',
-        textContent: nameBlock
-      }));
-      $.add(a, $.el('span', {
-        className: 'stub-replies',
-        textContent: `(${numReplies} repl${numReplies === 1 ? 'y' : 'ies'})`
-      }));
-
-      let reasons = thread.OP.filterResults?.reasons || [];
-      if (reason) reasons = [...reasons, reason];
-
-      if (Conf['Filter Reason'] && reasons.length) {
-        const reasonsSpan = $.el('span', { className: 'stub-reasons' });
-        $.add(reasonsSpan, reasons.map(re => $.el('span', { className: 'stub-reason', textContent: re })));
-        a.appendChild(reasonsSpan);
-      }
-
-      thread.stub = $.el('div', {className: 'stub'});
-
-      if (Conf['Menu']) {
-        $.add(thread.stub, [a, Menu.makeButton(thread.OP)]);
+    toggleBoardList() {
+      const { bar } = Header;
+      const custom = $('#custom-board-list', bar);
+      const full = $('#full-board-list', bar);
+      const showBoardList = !full.hidden;
+      custom.hidden = !showBoardList;
+      return full.hidden = showBoardList;
+    },
+    setLinkJustify(centered) {
+      Header.linkJustifyToggler.checked = centered;
+      if (centered) {
+        return $.addClass(doc, 'centered-links');
       } else {
-        $.add(thread.stub, a);
-      }
-      if (!Conf['Filter Reason'] && reasons) thread.stub.title = reasons.join(' & ');
-      $.prepend(root, thread.stub);
-
-      // Prevent hiding of thread divider on sites that put it inside the thread
-      if (threadDivider = $(g.SITE.selectors.threadDivider, root)) {
-        return $.addClass(threadDivider, 'threadDivider');
+        return $.rmClass(doc, 'centered-links');
       }
     },
-
-    saveHiddenState(thread, makeStub) {
-      if (thread.isHidden) {
-        ThreadHiding.db.set({
-          boardID:  thread.board.ID,
-          threadID: thread.ID,
-          val: {makeStub}});
+    toggleLinkJustify() {
+      $.event('CloseMenu', null);
+      const centered = this.nodeName === 'INPUT' ?
+        this.checked : undefined;
+      Header.setLinkJustify(centered);
+      return $.set('Centered links', centered);
+    },
+    setBarFixed(fixed) {
+      Header.barFixedToggler.checked = fixed;
+      if (fixed) {
+        $.addClass(doc, 'fixed');
+        return $.addClass(Header.bar, 'dialog');
       } else {
-        ThreadHiding.db.delete({
-          boardID:  thread.board.ID,
-          threadID: thread.ID
+        $.rmClass(doc, 'fixed');
+        return $.rmClass(Header.bar, 'dialog');
+      }
+    },
+    toggleBarFixed() {
+      $.event('CloseMenu', null);
+      Header.setBarFixed(this.checked);
+      Conf['Fixed Header'] = this.checked;
+      return $.set('Fixed Header', this.checked);
+    },
+    setShortcutIcons(show) {
+      Header.shortcutToggler.checked = show;
+      if (show) {
+        return $.addClass(doc, 'shortcut-icons');
+      } else {
+        return $.rmClass(doc, 'shortcut-icons');
+      }
+    },
+    toggleShortcutIcons() {
+      $.event('CloseMenu', null);
+      Header.setShortcutIcons(this.checked);
+      Conf['Shortcut Icons'] = this.checked;
+      return $.set('Shortcut Icons', this.checked);
+    },
+    setBarVisibility(hide) {
+      Header.headerToggler.checked = hide;
+      $.event('CloseMenu', null);
+      (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
+      return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
+    },
+    toggleBarVisibility() {
+      const hide = this.nodeName === 'INPUT' ?
+        this.checked
+        :
+          !$.hasClass(Header.bar, 'autohide');
+      Conf['Header auto-hide'] = hide;
+      $.set('Header auto-hide', hide);
+      Header.setBarVisibility(hide);
+      const message = `The header bar will ${hide ?
+      'automatically hide itself.'
+      :
+        'remain visible.'}`;
+      return new Notice('info', message, 2);
+    },
+    setHideBarOnScroll(hide) {
+      Header.scrollHeaderToggler.checked = hide;
+      if (hide) {
+        $.on(window, 'scroll', Header.hideBarOnScroll);
+        return;
+      }
+      $.off(window, 'scroll', Header.hideBarOnScroll);
+      $.rmClass(Header.bar, 'scroll');
+      return Header.bar.classList.toggle('autohide', Conf['Header auto-hide']);
+    },
+    toggleHideBarOnScroll() {
+      const hide = this.checked;
+      $.cb.checked.call(this);
+      return Header.setHideBarOnScroll(hide);
+    },
+    hideBarOnScroll() {
+      const offsetY = window.pageYOffset;
+      if (offsetY > (Header.previousOffset || 0)) {
+        $.addClass(Header.bar, 'autohide', 'scroll');
+      } else {
+        $.rmClass(Header.bar, 'autohide', 'scroll');
+      }
+      return Header.previousOffset = offsetY;
+    },
+    setBarPosition(bottom) {
+      if (Header.barPositionToggler)
+        Header.barPositionToggler.checked = bottom;
+      $.event('CloseMenu', null);
+      const args = bottom ? [
+        'bottom-header',
+        'top-header',
+        'after'
+      ] : [
+        'top-header',
+        'bottom-header',
+        'add'
+      ];
+      $.addClass(doc, args[0]);
+      $.rmClass(doc, args[1]);
+      return $[args[2]](Header.bar, Header.noticesRoot);
+    },
+    toggleBarPosition() {
+      $.cb.checked.call(this);
+      return Header.setBarPosition(this.checked);
+    },
+    setFooterVisibility(hide) {
+      Header.footerToggler.checked = hide;
+      return doc.classList.toggle('hide-bottom-board-list', hide);
+    },
+    toggleFooterVisibility() {
+      $.event('CloseMenu', null);
+      const hide = this.nodeName === 'INPUT' ?
+        this.checked
+        :
+          $.hasClass(doc, 'hide-bottom-board-list');
+      Header.setFooterVisibility(hide);
+      $.set('Bottom Board List', hide);
+      const message = hide ?
+        'The bottom navigation will now be hidden.'
+        :
+          'The bottom navigation will remain visible.';
+      return new Notice('info', message, 2);
+    },
+    setCustomNav(show) {
+      Header.customNavToggler.checked = show;
+      const cust = $('#custom-board-list', Header.bar);
+      const full = $('#full-board-list', Header.bar);
+      const btn = $('.hide-board-list-container', full);
+      return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
+    },
+    toggleCustomNav() {
+      $.cb.checked.call(this);
+      return Header.setCustomNav(this.checked);
+    },
+    editCustomNav() {
+      Settings.open('Advanced');
+      const settings = $.id('fourchanx-settings');
+      return $('[name=boardnav]', settings).focus();
+    },
+    scrollTo(root, down = false, needed = false) {
+      let height, x;
+      if (!root.offsetParent) {
+        return;
+      } // hidden or fixed
+      if (down) {
+        x = Header.getBottomOf(root);
+        if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && Conf['Bottom header']) {
+          ({ height } = Header.bar.getBoundingClientRect());
+          if (x <= 0) {
+            if (!Header.isHidden()) {
+              x += height;
+            }
+          } else {
+            if (Header.isHidden()) {
+              x -= height;
+            }
+          }
+        }
+        if (!needed || (x < 0)) {
+          return window.scrollBy(0, -x);
+        }
+      } else {
+        x = Header.getTopOf(root);
+        if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && !Conf['Bottom header']) {
+          ({ height } = Header.bar.getBoundingClientRect());
+          if (x >= 0) {
+            if (!Header.isHidden()) {
+              x += height;
+            }
+          } else {
+            if (Header.isHidden()) {
+              x -= height;
+            }
+          }
+        }
+        if (!needed || (x < 0)) {
+          return window.scrollBy(0, x);
+        }
+      }
+    },
+    scrollToIfNeeded(root, down) {
+      return Header.scrollTo(root, down, true);
+    },
+    getTopOf(root) {
+      let { top } = root.getBoundingClientRect();
+      if (Conf['Fixed Header'] && !Conf['Bottom Header']) {
+        const headRect = Header.toggle.getBoundingClientRect();
+        top -= headRect.top + headRect.height;
+      }
+      return top;
+    },
+    getBottomOf(root) {
+      const { clientHeight } = doc;
+      let bottom = clientHeight - root.getBoundingClientRect().bottom;
+      if (Conf['Fixed Header'] && Conf['Bottom Header']) {
+        const headRect = Header.toggle.getBoundingClientRect();
+        bottom -= (clientHeight - headRect.bottom) + headRect.height;
+      }
+      return bottom;
+    },
+    isNodeVisible(node) {
+      if (d$1.hidden || !doc.contains(node)) {
+        return false;
+      }
+      const { height } = node.getBoundingClientRect();
+      return ((Header.getTopOf(node) + height) >= 0) && ((Header.getBottomOf(node) + height) >= 0);
+    },
+    isHidden() {
+      const { top } = Header.bar.getBoundingClientRect();
+      if (Conf['Bottom header']) {
+        return top === doc.clientHeight;
+      } else {
+        return top < 0;
+      }
+    },
+    addShortcut(id, el, index) {
+      const shortcut = $.el('span', {
+        id: `shortcut-${id}`,
+        className: 'shortcut brackets-wrap'
+      });
+      $.add(shortcut, el);
+      shortcut.dataset.index = index.toString();
+      for (var item of $$('[data-index]', Header.shortcuts)) {
+        if (+item.dataset.index > +index) {
+          $.before(item, shortcut);
+          return;
+        }
+      }
+      return $.add(Header.shortcuts, shortcut);
+    },
+    rmShortcut(el) {
+      return $.rm(el.parentElement);
+    },
+    menuToggle(e) {
+      return Header.menu.toggle(e, this, g);
+    },
+    createNotification(e) {
+      let notice;
+      const { type, content, lifetime } = e.detail;
+      return notice = new Notice(type, content, lifetime);
+    },
+    areNotificationsEnabled: false,
+    enableDesktopNotifications() {
+      let notice;
+      if (!window.Notification || !Conf['Desktop Notifications']) {
+        return;
+      }
+      switch (Notification.permission) {
+        case 'granted':
+          Header.areNotificationsEnabled = true;
+          return;
+          break;
+        case 'denied':
+          // requestPermission doesn't work if status is 'denied',
+          // but it'll still work if status is 'default'.
+          return;
+          break;
+      }
+      const el = $.el('span', { innerHTML: `${meta.name} needs your permission to show desktop notifications. ` +
+          `[<a href=\"${E(meta.upstreamFaq)}#why-is-4chan-x-asking-for-permission-to-show-desktop-notifications\" target=\"_blank\">FAQ</a>]` +
+          `<br><button>Authorize</button> or <button>Disable</button>`
+      });
+      const [authorize, disable] = $$('button', el);
+      $.on(authorize, 'click', () => Notification.requestPermission(function (status) {
+        Header.areNotificationsEnabled = status === 'granted';
+        if (status === 'default') {
+          return;
+        }
+        return notice.close();
+      }));
+      $.on(disable, 'click', function () {
+        $.set('Desktop Notifications', false);
+        return notice.close();
+      });
+      return notice = new Notice('info', el);
+    }
+  };
+
+  const Volume = {
+    inputs: undefined,
+    init() {
+      if (!['index', 'thread'].includes(g.VIEW) ||
+        (!Conf['Image Expansion'] && !Conf['Image Hover'] && !Conf['Image Hover in Catalog'] && !Conf['Gallery'])) {
+        return;
+      }
+      $.sync('Allow Sound', (x) => {
+        Conf['Allow Sound'] = x;
+        if (Volume.inputs)
+          Volume.inputs.unmute.checked = x;
+      });
+      $.sync('Default Volume', (x) => {
+        Conf['Default Volume'] = x;
+        if (Volume.inputs)
+          Volume.inputs.volume.value = String(x);
+      });
+      if (Conf['Mouse Wheel Volume']) {
+        Callbacks.Post.push({
+          name: 'Mouse Wheel Volume',
+          cb: this.node
         });
       }
-      return ThreadHiding.catalogSet(thread.board);
+      if (g.SITE.noAudio?.(g.BOARD)) {
+        return;
+      }
+      if (Conf['Mouse Wheel Volume']) {
+        Callbacks.CatalogThread.push({
+          name: 'Mouse Wheel Volume',
+          cb: this.catalogNode
+        });
+      }
+      const unmuteEntry = UI.checkbox('Allow Sound', 'Allow Sound');
+      unmuteEntry.title = Config.main['Images and Videos']['Allow Sound'][1];
+      const volumeEntry = $.el('label', { title: 'Default volume for videos.' });
+      $.extend(volumeEntry, {
+        innerHTML: `<input name="Default Volume" type="range" min="0" max="1" step="0.01" value="${E(Conf["Default Volume"])}"> Volume`
+      });
+      this.inputs = {
+        unmute: unmuteEntry.firstElementChild,
+        volume: volumeEntry.firstElementChild
+      };
+      $.on(this.inputs.unmute, 'change', $.cb.checked);
+      $.on(this.inputs.volume, 'change', $.cb.value);
+      Header.menu.addEntry({ el: unmuteEntry, order: 200 });
+      Header.menu.addEntry({ el: volumeEntry, order: 201 });
     },
-
-    toggle(thread) {
-      if (!(thread instanceof Thread)) {
-        thread = g.threads.get(this.dataset.fullID);
-      }
-      if (thread.isHidden) {
-        ThreadHiding.show(thread);
-      } else {
-        ThreadHiding.hide(thread, undefined, 'Hidden manually');
-      }
-      return ThreadHiding.saveHiddenState(thread);
+    setup(video) {
+      video.muted = !Conf['Allow Sound'];
+      video.volume = Conf['Default Volume'];
+      $.on(video, 'volumechange', Volume.change);
     },
-
-    hide(thread, makeStub=Conf['Stubs'], reason) {
-      if (thread.isHidden) { return; }
-      const threadRoot = thread.nodes.root;
-      thread.isHidden = true;
-      Index.updateHideLabel();
-      if (thread.catalogView && !Index.showHiddenThreads) {
-        $.rm(thread.catalogView.nodes.root);
-        $.event('PostsRemoved', null, Index.root);
-      }
-
-      if (!makeStub) { return threadRoot.hidden = true; }
-
-      ThreadHiding.makeStub(thread, threadRoot, reason);
-    },
-
-    show(thread) {
-      if (thread.stub) {
-        $.rm(thread.stub);
-        delete thread.stub;
-      }
-      const threadRoot = thread.nodes.root;
-      threadRoot.hidden = (thread.isHidden = false);
-      Index.updateHideLabel();
-      if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
-        const { root } = thread.catalogView.nodes;
-
-        if (Index.showHiddenThreads) {
-          $.rm(root);
-          $.event('PostsRemoved', null, Index.root);
-        } else {
-          let i = Index.sortedThreadIDs.indexOf(thread.ID) - 1;
-
-          while (true) {
-            if (i < 0) {
-              $('.board').insertAdjacentElement('afterbegin', root);
-              break;
-            }
-            const rootPrevious = d.getElementById(`t${Index.sortedThreadIDs[i]}`);
-            if (rootPrevious) {
-              rootPrevious.insertAdjacentElement('afterend', root);
-              break;
-            }
-            --i;
-          }
-
-          $.event('PostsInserted', null, Index.root);
+    change() {
+      const { muted, volume } = this;
+      const items = {
+        'Allow Sound': !muted,
+        'Default Volume': volume
+      };
+      for (const key in items) {
+        const val = items[key];
+        if (Conf[key] === val) {
+          delete items[key];
         }
+      }
+      $.set(items);
+      $.extend(Conf, items);
+      if (Volume.inputs) {
+        Volume.inputs.unmute.checked = !muted;
+        Volume.inputs.volume.value = String(volume);
+      }
+    },
+    node() {
+      if (g.SITE.noAudio?.(this.board)) {
+        return;
+      }
+      for (const file of this.files) {
+        if (file.isVideo) {
+          if (file.thumb) {
+            $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+          }
+          $.on(($('.file-info', file.text) || file.link), 'wheel', Volume.wheel.bind(file.thumbLink));
+        }
+      }
+    },
+    catalogNode() {
+      const file = this.thread.OP.files[0];
+      if (!file?.isVideo) {
+        return;
+      }
+      $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+    },
+    wheel(e) {
+      let el;
+      if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) {
+        return;
+      }
+      if (!(el = $('video:not([data-md5])', this))) {
+        return;
+      }
+      if (el.muted || !$.hasAudio(el)) {
+        return;
+      }
+      let volume = el.volume + 0.1;
+      if (e.deltaY < 0) {
+        volume *= 1.1;
+      }
+      if (e.deltaY > 0) {
+        volume /= 1.1;
+      }
+      el.volume = $.minmax(volume - 0.1, 0, 1);
+      e.preventDefault();
+    }
+  };
+
+  const ImageCommon = {
+    cache: undefined,
+    // Pause and mute video in preparation for removing the element from the document.
+    pause(video) {
+      if (video.nodeName !== 'VIDEO') {
+        return;
+      }
+      const v = video;
+      v.pause();
+      $.off(v, 'volumechange', Volume.change);
+      v.muted = true;
+    },
+    rewind(el) {
+      if (el.nodeName === 'VIDEO') {
+        const v = el;
+        if (v.readyState >= v.HAVE_METADATA) {
+          return v.currentTime = 0;
+        }
+      } else if (/\.gif$/.test(el.src)) {
+        const img = el;
+        return $.queueTask(() => img.src = img.src);
+      }
+    },
+    pushCache(el) {
+      ImageCommon.cache = el;
+      $.on(el, 'error', ImageCommon.cacheError);
+    },
+    popCache() {
+      const el = ImageCommon.cache;
+      $.off(el, 'error', ImageCommon.cacheError);
+      delete ImageCommon.cache;
+      return el;
+    },
+    cacheError() {
+      if (ImageCommon.cache === this) {
+        delete ImageCommon.cache;
+      }
+    },
+    decodeError(file, fileObj) {
+      let message;
+      if (file.error?.code !== MediaError.MEDIA_ERR_DECODE) {
+        return false;
+      }
+      if (!(message = $('.warning', fileObj.thumb.parentNode))) {
+        message = $.el('div', { className: 'warning' });
+        $.after(fileObj.thumb, message);
+      }
+      message.textContent = 'Error: Corrupt or unplayable video';
+      return true;
+    },
+    isFromArchive(file) {
+      return (g.SITE.software === 'yotsuba') && !ImageHost.test(file.src.split('/')[2]);
+    },
+    error(file, post, fileObj, delay, cb) {
+      let timeoutID;
+      const src = fileObj.url.split('/');
+      let url = null;
+      if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect']) {
+        url = Redirect.to('file', {
+          boardID: post.board.ID,
+          filename: src[src.length - 1]
+        });
+      }
+      if (!url || !Redirect.securityCheck(url)) {
+        url = null;
+      }
+      if ((post.isDead || fileObj.isDead) && !ImageCommon.isFromArchive(file)) {
+        return cb(url);
+      }
+      if (delay != null) {
+        timeoutID = setTimeout((() => cb(url)), delay);
+      }
+      if (post.isDead || fileObj.isDead) {
+        return;
+      }
+      const redirect = function () {
+        if (!ImageCommon.isFromArchive(file)) {
+          if (delay != null) {
+            clearTimeout(timeoutID);
+          }
+          return cb(url);
+        }
+      };
+      const threadJSON = g.SITE.urls.threadJSON?.(post);
+      if (!threadJSON) {
+        return;
+      }
+      const parseJSON = function (isArchiveURL) {
+        let needle, postObj;
+        if (this.status === 404) {
+          let archivedThreadJSON;
+          if (!isArchiveURL && (archivedThreadJSON = g.SITE.urls.archivedThreadJSON?.(post))) {
+            $.ajax(archivedThreadJSON, { onloadend() { return parseJSON.call(this, true); } });
+          } else {
+            post.kill(!post.isClone, fileObj.index);
+          }
+        }
+        if (this.status !== 200) {
+          return redirect();
+        }
+        for (const p of this.response.posts) {
+          if (p.no === post.ID) {
+            postObj = p;
+            break;
+          }
+        }
+        if (!postObj || postObj.no !== post.ID) {
+          post.kill();
+          return redirect();
+        } else if ((needle = fileObj.docIndex, g.SITE.Build.parseJSON(postObj, post.board).filesDeleted.includes(needle))) {
+          post.kill(true);
+          return redirect();
+        } else {
+          return url = fileObj.url;
+        }
+      };
+      return $.ajax(threadJSON, { onloadend() { return parseJSON.call(this); } });
+    },
+    // XXX Estimate whether clicks are on the video controls and should be ignored.
+    onControls(e) {
+      return (Conf['Show Controls'] && Conf['Click Passthrough'] && (e.target.nodeName === 'VIDEO')) ||
+        (e.target.controls && ((e.target.getBoundingClientRect().bottom - e.clientY) < 35));
+    },
+    download(e) {
+      if (this.protocol === 'blob:') {
+        return true;
+      }
+      e.preventDefault();
+      const { href, download } = this;
+      return CrossOrigin.file(href, function (blob) {
+        if (blob) {
+          const a = $.el('a', {
+            href: URL.createObjectURL(blob),
+            download,
+            hidden: true
+          });
+          $.add(d$1.body, a);
+          a.click();
+          return $.rm(a);
+        } else {
+          return new Notice('warning', `Could not download ${href}`, 20);
+        }
+      });
+    }
+  };
+
+  // @ts-nocheck
+  var FileInfo = {
+    init() {
+      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['File Info Formatting']) {
+        return;
+      }
+      return Callbacks.Post.push({
+        name: 'File Info Formatting',
+        cb: this.node
+      });
+    },
+    node() {
+      if (!this.file) {
+        return;
+      }
+      if (this.isClone) {
+        let a;
+        for (a of $$('.file-info .download-button', this.file.text)) {
+          $.on(a, 'click', ImageCommon.download);
+        }
+        for (a of $$('.file-info .quick-filter-md5', this.file.text)) {
+          $.on(a, 'click', Filter.quickFilterMD5);
+        }
+        return;
+      }
+      const oldInfo = $.el('span', { className: 'fileText-original' });
+      $.prepend(this.file.link.parentNode, oldInfo);
+      $.add(oldInfo, [this.file.link.previousSibling, this.file.link, this.file.link.nextSibling]);
+      const info = $.el('span', { className: 'file-info' });
+      FileInfo.format(Conf['fileInfo'], this, info);
+      return $.prepend(this.file.text, info);
+    },
+    format(formatString, post, outputNode) {
+      let a;
+      const output = [];
+      formatString.replace(/%(.)|[^%]+/g, function (s, c) {
+        output.push($.hasOwn(FileInfo.formatters, c) ?
+          FileInfo.formatters[c].call(post)
+          :
+            { innerHTML: E(s) });
+        return '';
+      });
+      $.extend(outputNode, { innerHTML: E.cat(output) });
+      for (a of $$('.download-button', outputNode)) {
+        $.on(a, 'click', ImageCommon.download);
+      }
+      for (a of $$('.quick-filter-md5', outputNode)) {
+        $.on(a, 'click', Filter.quickFilterMD5);
+      }
+    },
+    formatters: {
+      t() { return { innerHTML: E(this.file.url.match(/[^/]*$/)[0]), [isEscaped]: true }; },
+      T() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.t.call(this)); },
+      l() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.n.call(this)); },
+      L() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.N.call(this)); },
+      n() {
+        const fullname = this.file.name;
+        const shortname = SW.yotsuba.Build.shortFilename(this.file.name, this.isReply);
+        if (fullname === shortname) {
+          return { innerHTML: E(fullname), [isEscaped]: true };
+        } else {
+          return h("span", { class: "fnswitch" },
+            h("span", { class: "fntrunc" }, shortname),
+            h("span", { class: "fnfull" }, fullname));
+        }
+      },
+      N() { return { innerHTML: E(this.file.name), [isEscaped]: true }; },
+      d() {
+        return h("a", { href: this.file.url, download: this.file.name, class: "download-button" }, Icon.raw('download'));
+      },
+      f() {
+        return {
+          innerHTML: `<a href="javascript:;" class="quick-filter-md5">${Icon.get('xmark')}</a>`,
+          [isEscaped]: true,
+        };
+      },
+      p() { return { innerHTML: ((this.file.isSpoiler) ? "Spoiler, " : ""), [isEscaped]: true }; },
+      s() { return { innerHTML: E(this.file.size), [isEscaped]: true }; },
+      B() { return { innerHTML: Math.round(this.file.sizeInBytes) + " Bytes", [isEscaped]: true }; },
+      K() { return { innerHTML: (Math.round(this.file.sizeInBytes / 1024)) + " KB", [isEscaped]: true }; },
+      M() { return { innerHTML: (Math.round(this.file.sizeInBytes / 1048576 * 100) / 100) + " MB", [isEscaped]: true }; },
+      r() { return { innerHTML: E(this.file.dimensions || "PDF"), [isEscaped]: true }; },
+      g() { return { innerHTML: ((this.file.tag) ? ", " + E(this.file.tag) : ""), [isEscaped]: true }; },
+      '%'() { return { innerHTML: "%", [isEscaped]: true }; }
+    }
+  };
+
+  var Time = {
+    init() {
+      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Time Formatting']) {
+        return;
+      }
+      Callbacks.Post.push({
+        name: 'Time Formatting',
+        cb: this.node
+      });
+    },
+    node() {
+      if (!this.info.date || this.isClone) {
+        return;
+      }
+      const { textContent } = this.nodes.date;
+      this.nodes.date.textContent = textContent.match(/^\s*/)[0] + Time.format(this.info.date) + textContent.match(/\s*$/)[0];
+    },
+    format(date, formatString = Conf['time']) {
+      return formatString.replace(/%(.)/g, function (s, c) {
+        if ($.hasOwn(Time.formatters, c)) {
+          return Time.formatters[c].call(date);
+        } else {
+          return s;
+        }
+      });
+    },
+    zeroPad(n) { if (n < 10) {
+      return `0${n}`;
+    } else {
+      return n;
+    } },
+    // Setting up the formatter takes more time than actually formatting the date,
+    // So while setting up this cache is a bit more code, it's faster at runtime
+    formatterCache: new Map(),
+    formatters: {
+      a() {
+        let formatter = Time.formatterCache.get('a');
+        if (!formatter) {
+          // || undefined to fall back to browser locale, an empty string gives an error
+          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { weekday: 'short' });
+          Time.formatterCache.set('a', formatter);
+        }
+        return formatter.format(this);
+      },
+      A() {
+        let formatter = Time.formatterCache.get('A');
+        if (!formatter) {
+          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { weekday: 'long' });
+          Time.formatterCache.set('A', formatter);
+        }
+        return formatter.format(this);
+      },
+      b() {
+        let formatter = Time.formatterCache.get('b');
+        if (!formatter) {
+          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { month: 'short' });
+          Time.formatterCache.set('b', formatter);
+        }
+        return formatter.format(this);
+      },
+      B() {
+        let formatter = Time.formatterCache.get('B');
+        if (!formatter) {
+          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { month: 'long' });
+          Time.formatterCache.set('B', formatter);
+        }
+        return formatter.format(this);
+      },
+      d() { return Time.zeroPad(this.getDate()); },
+      e() { return this.getDate(); },
+      H() { return Time.zeroPad(this.getHours()); },
+      I() { return Time.zeroPad((this.getHours() % 12) || 12); },
+      k() { return this.getHours(); },
+      l() { return (this.getHours() % 12) || 12; },
+      m() { return Time.zeroPad(this.getMonth() + 1); },
+      n() { return this.getMonth() + 1; },
+      M() { return Time.zeroPad(this.getMinutes()); },
+      p() {
+        let formatter = Time.formatterCache.get('p');
+        if (!formatter) {
+          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { hour: 'numeric', hour12: true });
+          Time.formatterCache.set('p', formatter);
+        }
+        const parts = formatter.formatToParts(this);
+        return parts.find((entry) => entry.type === 'dayPeriod').value;
+      },
+      P() { return Time.formatters.p.call(this).toLowerCase(); },
+      S() { return Time.zeroPad(this.getSeconds()); },
+      y() { return this.getFullYear().toString().slice(2); },
+      Y() { return this.getFullYear(); },
+      '%'() { return '%'; }
+    },
+  };
+
+  var Beep = 'UklGRjQDAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAc21wbDwAAABBAAADAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkYXRhzAIAAGMms8em0tleMV4zIpLVo8nhfSlcPR102Ki+5JspVEkdVtKzs+K1NEhUIT7DwKrcy0g6WygsrM2k1NpiLl0zIY/WpMrjgCdbPhxw2Kq+5Z4qUkkdU9K1s+K5NkVTITzBwqnczko3WikrqM+l1NxlLF0zIIvXpsnjgydZPhxs2ay95aIrUEkdUdC3suK8N0NUIjq+xKrcz002WioppdGm091pK1w0IIjYp8jkhydXPxxq2K295aUrTkoeTs65suK+OUFUIzi7xqrb0VA0WSoootKm0t5tKlo1H4TYqMfkiydWQBxm16+85actTEseS8y7seHAPD9TIza5yKra01QyWSson9On0d5wKVk2H4DYqcfkjidUQB1j1rG75KsvSkseScu8seDCPz1TJDW2yara1FYxWSwnm9Sn0N9zKVg2H33ZqsXkkihSQR1g1bK65K0wSEsfR8i+seDEQTxUJTOzy6rY1VowWC0mmNWoz993KVc3H3rYq8TklSlRQh1d1LS647AyR0wgRMbAsN/GRDpTJTKwzKrX1l4vVy4lldWpzt97KVY4IXbUr8LZljVPRCxhw7W3z6ZISkw1VK+4sMWvXEhSPk6buay9sm5JVkZNiLWqtrJ+TldNTnquqbCwilZXU1BwpKirrpNgWFhTaZmnpquZbFlbVmWOpaOonHZcXlljhaGhpZ1+YWBdYn2cn6GdhmdhYGN3lp2enIttY2Jjco+bnJuOdGZlZXCImJqakHpoZ2Zug5WYmZJ/bGlobX6RlpeSg3BqaW16jZSVkoZ0bGtteImSk5KIeG5tbnaFkJKRinxxbm91gY2QkIt/c3BwdH6Kj4+LgnZxcXR8iI2OjIR5c3J0e4WLjYuFe3VzdHmCioyLhn52dHR5gIiKioeAeHV1eH+GiYqHgXp2dnh9hIiJh4J8eHd4fIKHiIeDfXl4eHyBhoeHhH96eHmA';
+
+  // @ts-nocheck
+  var ThreadUpdater = {
+    init() {
+      let sc;
+      // Chromium won't play audio created in an inactive tab until the tab has been focused, so set it up now.
+      // XXX Sometimes the loading stalls in Firefox, esp. when opening in private browsing window followed by normal window.
+      // Don't let it keep the loading icon on indefinitely.
+      this.audio = $.el('audio');
+      if ($.engine !== 'gecko') {
+        this.audio.src = this.beep;
+      }
+      $.on(this.audio, 'error', () => {
+        new Notice('error', this.audio.error.message || 'Error when trying to play thread updater beep.', 15);
+      });
+      // Return after the audio player is initiated, so it works in the settings preview.
+      if ((g.VIEW !== 'thread') || !Conf['Thread Updater'])
+        return;
+      this.enabled = true;
+      if (Conf['Updater and Stats in Header']) {
+        this.dialog = (sc = $.el('span', { id: 'updater' }));
+        $.extend(sc, { innerHTML: '<span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' });
+        Header.addShortcut('updater', sc, 100);
+      } else {
+        this.dialog = (sc = UI.dialog('updater', { innerHTML: '<div class="move"></div><span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' }));
+        $.addClass(doc, 'float');
+        $.ready(() => $.add(d$1.body, sc));
+      }
+      this.checkPostCount = 0;
+      this.timer = $('#update-timer', sc);
+      this.status = $('#update-status', sc);
+      $.on(this.timer, 'click', this.update);
+      $.on(this.status, 'click', this.update);
+      const updateLink = $.el('span', { className: 'brackets-wrap updatelink' });
+      $.extend(updateLink, { innerHTML: '<a href="javascript:;">Update</a>' });
+      $.on(d$1, '4chanXInitFinished', function () {
+        let navLinksBot;
+        if (navLinksBot = $('.navLinksBot')) {
+          return $.add(navLinksBot, [$.tn(' '), updateLink]);
+        }
+      });
+      $.on(updateLink.firstElementChild, 'click', this.update);
+      const subEntries = [];
+      for (const name in Config.updater.checkbox) {
+        var conf = Config.updater.checkbox[name];
+        const el = UI.checkbox(name, name);
+        el.title = conf[1];
+        var input = el.firstElementChild;
+        $.on(input, 'change', $.cb.checked);
+        if (input.name === 'Scroll BG') {
+          $.on(input, 'change', this.cb.scrollBG);
+          this.cb.scrollBG();
+        } else if (input.name === 'Auto Update') {
+          $.on(input, 'change', this.setInterval);
+        }
+        subEntries.push({ el });
+      }
+      this.settings = $.el('span', { innerHTML: '<a href="javascript:;">Interval</a>' });
+      $.on(this.settings, 'click', this.intervalShortcut);
+      subEntries.push({ el: this.settings });
+      Header.menu.addEntry(this.entry = {
+        el: $.el('span', { textContent: 'Updater' }),
+        order: 110,
+        subEntries
+      });
+      return Callbacks.Thread.push({
+        name: 'Thread Updater',
+        cb: this.node
+      });
+    },
+    node() {
+      ThreadUpdater.thread = this;
+      ThreadUpdater.root = this.nodes.root;
+      ThreadUpdater.outdateCount = 0;
+      // We must keep track of our own list of live posts/files
+      // to provide an accurate deletedPosts/deletedFiles on update
+      // as posts may be `kill`ed elsewhere.
+      ThreadUpdater.postIDs = [];
+      ThreadUpdater.fileIDs = [];
+      this.posts.forEach(function (post) {
+        ThreadUpdater.postIDs.push(post.ID);
+        if (post.file) {
+          return ThreadUpdater.fileIDs.push(post.ID);
+        }
+      });
+      ThreadUpdater.cb.interval.call($.el('input', { value: Conf['Interval'] }));
+      $.on(d$1, 'QRPostSuccessful', ThreadUpdater.cb.checkpost);
+      $.on(d$1, 'visibilitychange', ThreadUpdater.cb.visibility);
+      return ThreadUpdater.setInterval();
+    },
+    /*
+    http://freesound.org/people/pierrecartoons1979/sounds/90112/
+    cc-by-nc-3.0
+    */
+    beep: `data:audio/wav;base64,${Beep}`,
+    playBeep(repeatIfPlaying = true) {
+      const { audio } = ThreadUpdater;
+      const source = Conf.beepSource || ThreadUpdater.beep;
+      if (audio.src !== source)
+        audio.src = source;
+      audio.volume = Math.max(.01, Math.min(+Conf.beepVolume, 1));
+      if (audio.paused) {
+        audio.play();
+      } else if (repeatIfPlaying) {
+        $.one(audio, 'ended', ThreadUpdater.playBeep);
+      }
+    },
+    cb: {
+      checkpost(e) {
+        if (e.detail.threadID !== ThreadUpdater.thread.ID) {
+          return;
+        }
+        ThreadUpdater.postID = e.detail.postID;
+        ThreadUpdater.checkPostCount = 0;
+        ThreadUpdater.outdateCount = 0;
+        return ThreadUpdater.setInterval();
+      },
+      visibility() {
+        if (d$1.hidden) {
+          return;
+        }
+        // Reset the counter when we focus this tab.
+        ThreadUpdater.outdateCount = 0;
+        if (ThreadUpdater.seconds > ThreadUpdater.interval) {
+          return ThreadUpdater.setInterval();
+        }
+      },
+      scrollBG() {
+        return ThreadUpdater.scrollBG = Conf['Scroll BG'] ?
+          () => true
+          :
+            () => !d$1.hidden;
+      },
+      interval(e) {
+        let val = parseInt(this.value, 10);
+        if (val < 1) {
+          val = 1;
+        }
+        ThreadUpdater.interval = (this.value = val);
+        if (e) {
+          return $.cb.value.call(this);
+        }
+      },
+      load() {
+        if (this !== ThreadUpdater.req) {
+          return;
+        } // aborted
+        switch (this.status) {
+          case 200:
+            ThreadUpdater.parse(this);
+            if (ThreadUpdater.thread.isArchived) {
+              return ThreadUpdater.kill();
+            } else {
+              return ThreadUpdater.setInterval();
+            }
+          case 404:
+            // XXX workaround for 4chan sending false 404s
+            return $.ajax(g.SITE.urls.catalogJSON({ boardID: ThreadUpdater.thread.board.ID }), { onloadend() {
+                let confirmed;
+                if (this.status === 200) {
+                  confirmed = true;
+                  for (var page of this.response) {
+                    for (var thread of page.threads) {
+                      if (thread.no === ThreadUpdater.thread.ID) {
+                        confirmed = false;
+                        break;
+                      }
+                    }
+                  }
+                } else {
+                  confirmed = false;
+                }
+                if (confirmed) {
+                  ThreadUpdater.kill();
+                } else {
+                  ThreadUpdater.error(this);
+                }
+              }
+            });
+          default:
+            return ThreadUpdater.error(this);
+        }
+      }
+    },
+    kill() {
+      ThreadUpdater.thread.kill();
+      ThreadUpdater.setInterval();
+      return $.event('ThreadUpdate', {
+        404: true,
+        threadID: ThreadUpdater.thread.fullID
+      });
+    },
+    error(req) {
+      if (req.status === 304) {
+        ThreadUpdater.set('status', '');
+      }
+      ThreadUpdater.setInterval();
+      if (!req.status) {
+        return ThreadUpdater.set('status', 'Connection Error', 'warning');
+      } else if (req.status !== 304) {
+        return ThreadUpdater.set('status', `${req.statusText} (${req.status})`, 'warning');
+      }
+    },
+    setInterval() {
+      clearTimeout(ThreadUpdater.timeoutID);
+      if (ThreadUpdater.thread.isDead) {
+        ThreadUpdater.set('status', (ThreadUpdater.thread.isArchived ? 'Archived' : '404'), 'warning');
+        ThreadUpdater.set('timer', '');
+        return;
+      }
+      // Fetching your own posts after posting
+      if (ThreadUpdater.postID && (ThreadUpdater.checkPostCount < 5)) {
+        ThreadUpdater.set('timer', '...', 'loading');
+        ThreadUpdater.timeoutID = setTimeout(ThreadUpdater.update, ++ThreadUpdater.checkPostCount * SECOND);
+        return;
+      }
+      if (!Conf['Auto Update']) {
+        ThreadUpdater.set('timer', 'Update');
+        return;
+      }
+      const { interval } = ThreadUpdater;
+      if (Conf['Optional Increase']) {
+        // Lower the max refresh rate limit on visible tabs.
+        const limit = d$1.hidden ? 10 : 5;
+        const j = Math.min(ThreadUpdater.outdateCount, limit);
+        // 1 second to 100, 30 to 300.
+        const cur = (Math.floor(interval * 0.1) || 1) * j * j;
+        ThreadUpdater.seconds = $.minmax(cur, interval, 300);
+      } else {
+        ThreadUpdater.seconds = interval;
+      }
+      return ThreadUpdater.timeout();
+    },
+    intervalShortcut() {
+      Settings.open('Advanced');
+      const settings = $.id('fourchanx-settings');
+      return $('input[name=Interval]', settings).focus();
+    },
+    set(name, text, klass) {
+      let node;
+      const el = ThreadUpdater[name];
+      if ((node = el.firstChild)) {
+        // Prevent the creation of a new DOM Node
+        // by setting the text node's data.
+        node.data = text;
+      } else {
+        el.textContent = text;
+      }
+      return el.className = klass ?? (text === '' ? 'empty' : '');
+    },
+    timeout() {
+      if (ThreadUpdater.seconds) {
+        ThreadUpdater.set('timer', ThreadUpdater.seconds);
+        ThreadUpdater.timeoutID = setTimeout(ThreadUpdater.timeout, 1000);
+      } else {
+        ThreadUpdater.outdateCount++;
+        ThreadUpdater.update();
+      }
+      return ThreadUpdater.seconds--;
+    },
+    update() {
+      let oldReq;
+      clearTimeout(ThreadUpdater.timeoutID);
+      ThreadUpdater.set('timer', '...', 'loading');
+      if (oldReq = ThreadUpdater.req) {
+        delete ThreadUpdater.req;
+        oldReq.abort();
+      }
+      return ThreadUpdater.req = $.whenModified(g.SITE.urls.threadJSON({ boardID: ThreadUpdater.thread.board.ID, threadID: ThreadUpdater.thread.ID }), 'ThreadUpdater', ThreadUpdater.cb.load, { timeout: MINUTE });
+    },
+    updateThreadStatus(type, status) {
+      let hasChanged;
+      if (!(hasChanged = ThreadUpdater.thread[`is${type}`] !== status)) {
+        return;
+      }
+      ThreadUpdater.thread.setStatus(type, status);
+      if ((type === 'Closed') && ThreadUpdater.thread.isArchived) {
+        return;
+      }
+      const change = type === 'Sticky' ?
+        status ?
+          'now a sticky'
+          :
+            'not a sticky anymore'
+        :
+          status ?
+            'now closed'
+            :
+              'not closed anymore';
+      return new Notice('info', `The thread is ${change}.`, 30);
+    },
+    parse(req) {
+      let ID, ipCountEl, post;
+      const postObjects = req.response.posts;
+      const OP = postObjects[0];
+      const thread = ThreadUpdater.thread;
+      const { board } = thread;
+      const lastPost = ThreadUpdater.postIDs[ThreadUpdater.postIDs.length - 1];
+      // XXX Reject updates that falsely delete the last post.
+      if ((postObjects[postObjects.length - 1].no < lastPost) &&
+        ((new Date(req.getResponseHeader('Last-Modified')) - thread.posts.get(lastPost).info.date) < (30 * SECOND))) {
+        return;
+      }
+      g.SITE.Build.spoilerRange[board] = OP.custom_spoiler;
+      thread.setStatus('Archived', !!OP.archived);
+      ThreadUpdater.updateThreadStatus('Sticky', !!OP.sticky);
+      ThreadUpdater.updateThreadStatus('Closed', !!OP.closed);
+      thread.postLimit = !!OP.bumplimit;
+      thread.fileLimit = !!OP.imagelimit;
+      if (OP.unique_ips)
+        thread.ipCount = OP.unique_ips;
+      const posts = []; // new post objects
+      const index = []; // existing posts
+      const files = []; // existing files
+      const newPosts = []; // new post fullID list for API
+      // Build the index, create posts.
+      for (var postObject of postObjects) {
+        ID = postObject.no;
+        index.push(ID);
+        if (postObject.fsize) {
+          files.push(ID);
+        }
+        // Insert new posts, not older ones.
+        if (ID <= lastPost) {
+          continue;
+        }
+        // XXX Resurrect wrongly deleted posts.
+        if ((post = thread.posts.get(ID)) && !post.isFetchedQuote) {
+          post.resurrect();
+          continue;
+        }
+        newPosts.push(`${board}.${ID}`);
+        var node = g.SITE.Build.postFromObject(postObject, board.ID);
+        posts.push(new Post(node, thread, board));
+        // Fetching your own posts after posting
+        if (ThreadUpdater.postID === ID) {
+          delete ThreadUpdater.postID;
+        }
+      }
+      // Check for deleted posts.
+      const deletedPosts = [];
+      for (ID of ThreadUpdater.postIDs) {
+        if (!index.includes(ID)) {
+          thread.posts.get(ID).kill();
+          deletedPosts.push(`${board}.${ID}`);
+        }
+      }
+      ThreadUpdater.postIDs = index;
+      // Check for deleted files.
+      const deletedFiles = [];
+      for (ID of ThreadUpdater.fileIDs) {
+        if (!(files.includes(ID) || deletedPosts.includes(`${board}.${ID}`))) {
+          thread.posts.get(ID).kill(true);
+          deletedFiles.push(`${board}.${ID}`);
+        }
+      }
+      ThreadUpdater.fileIDs = files;
+      if (!posts.length) {
+        ThreadUpdater.set('status', '');
+      } else {
+        ThreadUpdater.set('status', `+${posts.length}`, 'new');
+        ThreadUpdater.outdateCount = 0;
+        const unreadCount = Unread.posts?.size;
+        const unreadQYCount = Unread.postsQuotingYou?.size;
+        for (const post of posts) {
+          Callbacks.Post.execute(post);
+        }
+        if (d$1.hidden || !d$1.hasFocus()) {
+          if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
+            ThreadUpdater.playBeep();
+            if (Conf['Beep']) {
+              ThreadUpdater.playBeep();
+            }
+          } else if (Conf['Beep'] && (Unread.posts?.size > 0) && (unreadCount === 0)) {
+            ThreadUpdater.playBeep();
+          }
+        }
+        const scroll = Conf['Auto Scroll'] && ThreadUpdater.scrollBG() &&
+          ((ThreadUpdater.root.getBoundingClientRect().bottom - doc.clientHeight) < 25);
+        let firstPost = null;
+        for (post of posts) {
+          if (!QuoteThreading.insert(post)) {
+            if (!firstPost) {
+              firstPost = post.nodes.root;
+            }
+            $.add(ThreadUpdater.root, post.nodes.root);
+          }
+        }
+        $.event('PostsInserted', null, ThreadUpdater.root);
+        if (scroll) {
+          if (Conf['Bottom Scroll']) {
+            window.scrollTo(0, d$1.body.clientHeight);
+          } else {
+            if (firstPost) {
+              Header.scrollTo(firstPost);
+            }
+          }
+        }
+      }
+      // Update IP count in original post form.
+      if (OP.unique_ips && (ipCountEl = $.id('unique-ips'))) {
+        ipCountEl.textContent = OP.unique_ips;
+        ipCountEl.previousSibling.textContent = ipCountEl.previousSibling.textContent.replace(/\b(?:is|are)\b/, OP.unique_ips === 1 ? 'is' : 'are');
+        ipCountEl.nextSibling.textContent = ipCountEl.nextSibling.textContent.replace(/\bposters?\b/, OP.unique_ips === 1 ? 'poster' : 'posters');
+      }
+      return $.event('ThreadUpdate', {
+        404: false,
+        threadID: thread.fullID,
+        newPosts,
+        deletedPosts,
+        deletedFiles,
+        postCount: OP.replies + 1,
+        fileCount: OP.images + !!OP.fsize,
+        ipCount: OP.unique_ips
+      });
+    }
+  };
+
+  // @ts-nocheck
+  var Settings = {
+    dialog: undefined,
+    init() {
+      // 4chan X settings link
+      const link = $.el('a', {
+        className: 'settings-link',
+        title: `${meta.name} Settings`,
+        href: 'javascript:;'
+      });
+      Icon.set(link, 'wrench', 'Settings');
+      $.on(link, 'click', Settings.open);
+      Header.addShortcut('settings', link, 820);
+      const add = this.addSection;
+      add('Main', this.main);
+      add('Filter', this.filter);
+      add('Sauce', this.sauce);
+      add('Advanced', this.advanced);
+      add('Keybinds', this.keybinds);
+      $.on(d$1, 'AddSettingsSection', Settings.addSection);
+      $.on(d$1, 'OpenSettings', e => Settings.open(e.detail));
+      if ((g.SITE.software === 'yotsuba') && Conf['Disable Native Extension']) {
+        if ($.hasStorage) {
+          // Run in page context to handle case where 4chan X has localStorage access but not the page.
+          // (e.g. Pale Moon 26.2.2, GM 3.8, cookies disabled for 4chan only)
+          $.global('disableNativeExtension');
+        } else {
+          $.global('disableNativeExtensionNoStorage');
+        }
+      }
+    },
+    open(openSection) {
+      let dialog, sectionToOpen;
+      if (Settings.dialog) {
+        return;
+      }
+      $.event('CloseMenu');
+      Settings.dialog = (dialog = $.el('div', { id: 'overlay' }, settingsHtml));
+      $.on($('.export', dialog), 'click', Settings.export);
+      $.on($('.import', dialog), 'click', Settings.import);
+      $.on($('.reset', dialog), 'click', Settings.reset);
+      $.on($('input', dialog), 'change', Settings.onImport);
+      const links = [];
+      for (var section of Settings.sections) {
+        var link = $.el('a', {
+          className: `tab-${section.hyphenatedTitle}`,
+          textContent: section.title,
+          href: 'javascript:;'
+        });
+        $.on(link, 'click', Settings.openSection.bind(section));
+        links.push(link, $.tn(' | '));
+        if (section.title === openSection) {
+          sectionToOpen = link;
+        }
+      }
+      links.pop();
+      $.add($('.sections-list', dialog), links);
+      if (openSection !== 'none') {
+        (sectionToOpen ? sectionToOpen : links[0]).click();
+      }
+      Icon.set($('.close', dialog), 'xmark');
+      $.on($('.close', dialog), 'click', Settings.close);
+      $.on(window, 'beforeunload', Settings.close);
+      $.on(dialog, 'click', () => {
+        // Do not close when the mouse ends up outside the modal when selecting text in an input.
+        if (d$1.activeElement?.tagName === 'INPUT' || d$1.activeElement?.tagName === 'TEXTAREA')
+          return;
+        Settings.close();
+      });
+      $.on(dialog.firstElementChild, 'click', e => e.stopPropagation());
+      $.add(d$1.body, dialog);
+      links[0].focus();
+      $.event('OpenSettings', null, dialog);
+    },
+    close() {
+      if (!Settings.dialog) {
+        return;
+      }
+      // Unfocus current field to trigger change event.
+      d$1.activeElement?.blur();
+      $.rm(Settings.dialog);
+      delete Settings.dialog;
+    },
+    sections: [],
+    addSection(title, open) {
+      if (typeof title !== 'string') {
+        ({ title, open } = title.detail);
+      }
+      const hyphenatedTitle = title.toLowerCase().replace(/\s+/g, '-');
+      Settings.sections.push({ title, hyphenatedTitle, open });
+    },
+    openSection() {
+      let selected;
+      if (selected = $('.tab-selected', Settings.dialog)) {
+        $.rmClass(selected, 'tab-selected');
+      }
+      $.addClass($(`.tab-${this.hyphenatedTitle}`, Settings.dialog), 'tab-selected');
+      const section = $('section', Settings.dialog);
+      $.rmAll(section);
+      section.className = `section-${this.hyphenatedTitle}`;
+      this.open(section, g);
+      section.scrollTop = 0;
+      $.event('OpenSettings', null, section);
+    },
+    warnings: {
+      localStorage(cb) {
+        if ($.cantSync) {
+          const why = $.cantSet ? 'save your settings' : 'synchronize settings between tabs';
+          cb($.el('li', {
+            textContent: `\
+${meta.name} needs local storage to ${why}.
+Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's privacy settings (may be listed as part of "local data" or "cookies").\
+`
+          }));
+        }
+      },
+      ads(cb) {
+        $.onExists(doc, '.adg-rects > .desktop', ad => $.onExists(ad, 'iframe', function () {
+          const url = Redirect.to('thread', { boardID: 'qa', threadID: 362590 });
+          cb($.el('li', h(hFragment, null,
+            "To protect yourself from ",
+            h("a", { href: url, target: "_blank" }, "malicious ads"),
+            ", you should ",
+            h("a", { href: "https://github.com/gorhill/uBlock#ublock-origin", target: "_blank" }, "block ads"),
+            " on 4chan.")));
+        }));
+      }
+    },
+    main(section) {
+      let key;
+      const warnings = $.el('fieldset', { hidden: true }, { innerHTML: '<legend>Warnings</legend><ul></ul>' });
+      const addWarning = function (item) {
+        $.add($('ul', warnings), item);
+        warnings.hidden = false;
+      };
+      for (key in Settings.warnings) {
+        var warning = Settings.warnings[key];
+        warning(addWarning);
+      }
+      $.add(section, warnings);
+      const items = dict();
+      const inputs = dict();
+      const addCheckboxes = function (root, obj) {
+        const containers = [root];
+        const result = [];
+        for (key in obj) {
+          var arr = obj[key];
+          if (arr instanceof Array) {
+            var description = arr[1];
+            var div = $.el('div', { innerHTML: `<label><input type="checkbox" name="${key}">${key}</label><span class="description">: ${description}</span>` });
+            div.dataset.name = key;
+            var input = $('input', div);
+            $.on(input, 'change', $.cb.checked);
+            $.on(input, 'change', function () { this.parentNode.parentNode.dataset.checked = this.checked; });
+            items[key] = Conf[key];
+            inputs[key] = input;
+            var level = arr[2] || 0;
+            if (containers.length <= level) {
+              var container = $.el('div', { className: 'suboption-list' });
+              $.add(containers[containers.length - 1].lastElementChild, container);
+              containers[level] = container;
+            } else if (containers.length > (level + 1)) {
+              containers.splice(level + 1, containers.length - (level + 1));
+            }
+            result.push($.add(containers[level], div));
+          }
+        }
+        return result;
+      };
+      for (var keyFS in Config.main) {
+        var obj = Config.main[keyFS];
+        var fs = $.el('fieldset', { innerHTML: `<legend>${keyFS}</legend>` });
+        addCheckboxes(fs, obj);
+        if (keyFS === 'Posting and Captchas') {
+          $.add(fs, $.el('p', { innerHTML: 'For more info on captcha options and issues, see the <a href="' + meta.captchaFAQ + '" target="_blank">captcha FAQ</a>.' }));
+        }
+        $.add(section, fs);
+      }
+      addCheckboxes($('div[data-name="JSON Index"] > .suboption-list', section), Config.Index);
+      $.get(items, function (items) {
+        for (key in items) {
+          var val = items[key];
+          inputs[key].checked = val;
+          inputs[key].parentNode.parentNode.dataset.checked = val;
+        }
+      });
+      const div = $.el('div', { innerHTML: '<button></button><span class="description">: Clear manually-hidden threads and posts on all boards. Reload the page to apply.' });
+      const button = $('button', div);
+      $.get({ hiddenThreads: dict(), hiddenPosts: dict() }, function ({ hiddenThreads, hiddenPosts }) {
+        let board, ID, site, thread;
+        let hiddenNum = 0;
+        for (ID in hiddenThreads) {
+          site = hiddenThreads[ID];
+          if (ID !== 'boards') {
+            for (ID in site.boards) {
+              board = site.boards[ID];
+              hiddenNum += Object.keys(board).length;
+            }
+          }
+        }
+        for (ID in hiddenThreads.boards) {
+          board = hiddenThreads.boards[ID];
+          hiddenNum += Object.keys(board).length;
+        }
+        for (ID in hiddenPosts) {
+          site = hiddenPosts[ID];
+          if (ID !== 'boards') {
+            for (ID in site.boards) {
+              board = site.boards[ID];
+              for (ID in board) {
+                thread = board[ID];
+                hiddenNum += Object.keys(thread).length;
+              }
+            }
+          }
+        }
+        for (ID in hiddenPosts.boards) {
+          board = hiddenPosts.boards[ID];
+          for (ID in board) {
+            thread = board[ID];
+            hiddenNum += Object.keys(thread).length;
+          }
+        }
+        button.textContent = `Hidden: ${hiddenNum}`;
+      });
+      $.on(button, 'click', function () {
+        this.textContent = 'Hidden: 0';
+        $.get('hiddenThreads', dict(), function ({ hiddenThreads }) {
+          if ($.hasStorage && (g.SITE.software === 'yotsuba')) {
+            let boardID;
+            for (boardID in hiddenThreads['4chan.org']?.boards) {
+              localStorage.removeItem(`4chan-hide-t-${boardID}`);
+            }
+            for (boardID in hiddenThreads.boards) {
+              localStorage.removeItem(`4chan-hide-t-${boardID}`);
+            }
+          }
+          $.delete(['hiddenThreads', 'hiddenPosts']);
+        });
+      });
+      $('input[name="Stubs"]', section).closest('fieldset').insertAdjacentElement('beforeend', div);
+    },
+    isExportModalOpen: false,
+    async export() {
+      let exportHistory = Conf['Export History'];
+      let cancelled = false;
+      if (Conf['Ask to Export History']) {
+        if (Settings.isExportModalOpen)
+          return;
+        const dialog = UI.dialog('export-dialog', { innerHTML: ExportHtml });
+        const form = $('form', dialog);
+        const { history, ask } = form.elements;
+        history.checked = Conf['Export History'];
+        $.add(d$1.body, dialog);
+        const exportBtnRect = $('.export', Settings.dialog).getBoundingClientRect();
+        dialog.style.top = `${exportBtnRect.y + exportBtnRect.height}px`;
+        dialog.style.left = `${exportBtnRect.x}px`;
+        Settings.isExportModalOpen = true;
+        await new Promise(resolve => {
+          const close = () => {
+            dialog.remove();
+            resolve();
+            Settings.isExportModalOpen = false;
+          };
+          $.on(form, 'submit', (e) => {
+            e.preventDefault();
+            exportHistory = history.checked;
+            $.set('Export History', exportHistory);
+            $.set('Ask to Export History', ask.checked);
+            close();
+          });
+          $.on($('#cancel-export', dialog), 'click', () => {
+            cancelled = true;
+            close();
+          });
+        });
+        if (cancelled)
+          return;
+      }
+      // Make sure to export the most recent data, but don't overwrite existing `Conf` object.
+      const Conf2 = dict();
+      $.extend(Conf2, Conf);
+      if (!exportHistory) {
+        delete Conf2.hiddenThreads;
+        delete Conf2.hiddenPosts;
+        delete Conf2.hiddenPosterIds;
+        delete Conf2.lastReadPosts;
+        delete Conf2.yourPosts;
+        delete Conf2.watchedThreads;
+        delete Conf2.cooldowns;
+        delete Conf2['Index Sort'];
+      }
+      $.get(Conf2, function (Conf2) {
+        // Don't export cached JSON data.
+        delete Conf2['boardConfig'];
+        Settings.downloadExport({ version: g.VERSION, date: Date.now(), Conf: Conf2 });
+      });
+    },
+    downloadExport(data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = $.el('a', {
+        download: `${meta.name} v${g.VERSION}-${data.date}.json`,
+        href: url
+      });
+      const p = $('.imp-exp-result', Settings.dialog);
+      $.rmAll(p);
+      $.add(p, a);
+      a.click();
+    },
+    import() {
+      $('input[type=file]', this.parentNode).click();
+    },
+    onImport() {
+      let file;
+      if (!(file = this.files[0])) {
+        return;
+      }
+      this.value = null;
+      const output = $('.imp-exp-result');
+      if (!confirm('Your current settings will be entirely overwritten, are you sure?')) {
+        output.textContent = 'Import aborted.';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          Settings.loadSettings(dict.json(e.target.result), function (err) {
+            if (err) {
+              output.textContent = 'Import failed due to an error.';
+            } else if (confirm('Import successful. Reload now?')) {
+              window.location.reload();
+            }
+          });
+        } catch (error) {
+          const err = error;
+          output.textContent = 'Import failed due to an error.';
+          c.error(err.stack);
+        }
+      };
+      reader.readAsText(file);
+    },
+    upgrade(data, version) {
+      let corrupted, key, val;
+      const changes = dict();
+      const set = (key, value) => data[key] = (changes[key] = value);
+      // XXX https://github.com/greasemonkey/greasemonkey/issues/2600
+      if (corrupted = (version[0] === '"')) {
+        try {
+          version = JSON.parse(version);
+        } catch (error) { }
+      }
+      const compareString = version.replace(/^XT /i, '').replace(/\d+/g, x => x.padStart(5, '0'));
+      if (corrupted) {
+        for (key in data) {
+          val = data[key];
+          if (typeof val === 'string') {
+            try {
+              var val2 = JSON.parse(val);
+              set(key, val2);
+            } catch (error1) { }
+          }
+        }
+      }
+      if (compareString < '00001.00014.00016.00001') {
+        if (data['archiveLists'] != null) {
+          set('archiveLists', data['archiveLists'].replace('https://mayhemydg.github.io/archives.json/archives.json', 'https://nstepien.github.io/archives.json/archives.json'));
+        }
+      }
+      if (compareString < '00001.00014.00016.00007') {
+        if (data['sauces'] != null) {
+          set('sauces', data['sauces'].replace(/https:\/\/www\.deviantart\.com\/gallery\/#\/d%\$1%\$2;regexp:\/\^\\w\+_by_\\w\+\[_-\]d\(\[\\da-z\]\{6\}\)\\b\|\^d\(\[\\da-z\]\{6\}\)-\[\\da-z\]\{8\}-\//g, 'javascript:void(open("https://www.deviantart.com/"+%$1.replace(/_/g,"-")+"/art/"+parseInt(%$2,36)));regexp:/^\\w+_by_(\\w+)[_-]d([\\da-z]{6})\\b/').replace(/\/\/imgops\.com\/%URL/g, '//imgops.com/start?url=%URL'));
+        }
+      }
+      if (compareString < '00001.00014.00017.00002') {
+        if (data['jsWhitelist'] != null) {
+          set('jsWhitelist', data['jsWhitelist'] + '\n\nhttps://hcaptcha.com\nhttps://*.hcaptcha.com');
+        }
+      }
+      if (compareString < '00001.00014.00020.00004') {
+        if (data['archiveLists'] != null) {
+          set('archiveLists', data['archiveLists'].replace('https://nstepien.github.io/archives.json/archives.json', 'https://4chenz.github.io/archives.json/archives.json'));
+        }
+      }
+      if (compareString < '00001.00014.00022.00003') {
+        if (data['sauces']) {
+          set('sauces', data['sauces'].replace(/^#?\s*https:\/\/www\.google\.com\/searchbyimage\?image_url=%(IMG|T?URL)&safe=off(?=$|;)/mg, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
+          if (compareString === '00001.00014.00022.00002' && !/\bsbisrc=/.test(data['sauces'])) {
+            set('sauces', data['sauces'].replace(/^#?\s*https:\/\/lens\.google\.com\/uploadbyurl\?url=%(IMG|T?URL)(?=$|;)/m, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
+          }
+        }
+      }
+      if (compareString < '00002.00003.00001.00000') {
+        if (data['boardnav']) {
+          set('boardnav', data['boardnav'].replace('[external-text:"FAQ","4chan XT"]', `[external-text:"FAQ","${meta.faq}"]`));
+        }
+      }
+      if (compareString < '00002.00003.00006.00000') {
+        set('RelativeTime', data['Relative Post Dates'] ? (data['Relative Date Title'] ? 'Hover' : 'Show') : 'No');
+      }
+      if (compareString === '00002.00009.00000.00000') {
+        set('XEmbedder', data['Embed Tweets inline with fxTwitter'] ? 'fxt' : 'tf');
+        set('fxtMaxReplies', data['Resolve Tweet Replies'] ? (data['Resolve all Tweet Replies'] ? 100 : 1) : 0);
+        set('fxtLang', data['Translate non-English Tweets to English'] ? 'en' : '');
+      }
+      return changes;
+    },
+    loadSettings(data, cb) {
+      if (data.version !== g.VERSION) {
+        Settings.upgrade(data.Conf, data.version);
+      }
+      $.clear(function (err) {
+        if (err) {
+          return cb(err);
+        }
+        $.set(data.Conf, cb);
+      });
+    },
+    reset() {
+      if (confirm('Your current settings will be entirely wiped, are you sure?')) {
+        $.clear(function (err) {
+          if (err) {
+            $('.imp-exp-result').textContent = 'Import failed due to an error.';
+          } else if (confirm('Reset successful. Reload now?')) {
+            window.location.reload();
+          }
+        });
+      }
+    },
+    filter(section) {
+      $.extend(section, { innerHTML: FilterSelectHtml });
+      const select = $('select', section);
+      $.on(select, 'change', Settings.selectFilter);
+      Settings.selectFilter.call(select);
+    },
+    selectFilter() {
+      let name;
+      const div = this.nextElementSibling;
+      if ((name = this.value) !== 'guide') {
+        if (!$.hasOwn(Config.filter, name)) {
+          return;
+        }
+        $.rmAll(div);
+        const ta = $.el('textarea', {
+          name,
+          className: 'field',
+          spellcheck: false
+        });
+        $.on(ta, 'change', $.cb.value);
+        $.get(name, Conf[name], function (item) {
+          ta.value = item[name];
+          $.add(div, ta);
+        });
+        return;
+      }
+      const filterTypes = Object.keys(Config.filter)
+        .filter(x => x !== 'general')
+        .join(',\u200B'); // \u200B is zero width space, to control where line breaks happen on a narrow screen
+      $.extend(div, { innerHTML: FilterGuideHtml });
+      $('#filterTypes', div).textContent = `type:\u200B${filterTypes};`;
+      $('.warning', div).hidden = Conf['Filter'];
+    },
+    sauce(section) {
+      $.extend(section, { innerHTML: SauceHtml });
+      $('.warning', section).hidden = Conf['Sauce'];
+      const ta = $('textarea', section);
+      $.get('sauces', Conf['sauces'], function (item) {
+        ta.value = item['sauces'];
+        ta.hidden = false;
+      }); // XXX prevent Firefox from adding initialization to undo queue
+      $.on(ta, 'change', $.cb.value);
+    },
+    advanced(section) {
+      let input, name;
+      $.extend(section, { innerHTML: AdvancedHtml });
+      for (var warning of $$('.warning', section)) {
+        warning.hidden = Conf[warning.dataset.feature];
+      }
+      const inputs = dict();
+      for (input of $$('[name]', section)) {
+        inputs[input.name] = input;
+      }
+      $.on(inputs['archiveLists'], 'change', function () {
+        $.set('lastarchivecheck', 0);
+        Conf['lastarchivecheck'] = 0;
+        $.id('lastarchivecheck').textContent = 'never';
+      });
+      const items = dict();
+      for (name in inputs) {
+        input = inputs[name];
+        if (!['Interval', 'Custom CSS', 'timeLocale'].includes(name)) {
+          items[name] = Conf[name];
+          var event = ((input.nodeName === 'SELECT') ||
+            ['checkbox', 'radio'].includes(input.type) ||
+            ((input.nodeName === 'TEXTAREA') && !(name in Settings))) ? 'change' : 'input';
+          $.on(input, event, $.cb[input.type === 'checkbox' ? 'checked' : 'value']);
+          if (name in Settings) {
+            $.on(input, event, Settings[name]);
+          }
+        }
+      }
+      $.get(items, function (items) {
+        for (var key in items) {
+          var val = items[key];
+          input = inputs[key];
+          input[input.type === 'checkbox' ? 'checked' : 'value'] = val;
+          input.hidden = false; // XXX prevent Firefox from adding initialization to undo queue
+          if (key in Settings) {
+            Settings[key].call(input);
+          }
+        }
+      });
+      const listImageHost = $.id('list-fourchanImageHost');
+      for (var textContent of ImageHost.suggestions) {
+        $.add(listImageHost, $.el('option', { textContent }));
+      }
+      const interval = inputs['Interval'];
+      const customCSS = inputs['Custom CSS'];
+      const applyCSS = $('#apply-css', section);
+      const timeLocale = inputs.timeLocale;
+      interval.value = Conf['Interval'];
+      customCSS.checked = Conf['Custom CSS'];
+      inputs['usercss'].disabled = !Conf['Custom CSS'];
+      applyCSS.disabled = !Conf['Custom CSS'];
+      timeLocale.value = Conf.timeLocale;
+      $.on(interval, 'change', ThreadUpdater.cb.interval);
+      $.on(customCSS, 'change', Settings.togglecss);
+      $.on(applyCSS, 'click', () => CustomCSS.update());
+      $.on(timeLocale, 'change', Settings.setTimeLocale);
+      const itemsArchive = dict();
+      for (name of ['archives', 'selectedArchives', 'lastarchivecheck']) {
+        itemsArchive[name] = Conf[name];
+      }
+      $.get(itemsArchive, function (itemsArchive) {
+        $.extend(Conf, itemsArchive);
+        Redirect.selectArchives();
+        Settings.addArchiveTable(section);
+      });
+      const boardSelect = $('#archive-board-select', section);
+      const table = $('#archive-table', section);
+      const updateArchives = $('#update-archives', section);
+      $.on(boardSelect, 'change', function () {
+        $('tbody > :not([hidden])', table).hidden = true;
+        $(`tbody > .${this.value}`, table).hidden = false;
+      });
+      $.on(updateArchives, 'click', () => Redirect.update(() => Settings.addArchiveTable(section)));
+      $.on(inputs.beepVolume, 'change', () => { ThreadUpdater.playBeep(false); });
+      $.on(inputs.beepSource, 'change', () => { ThreadUpdater.playBeep(false); });
+    },
+    addArchiveTable(section) {
+      let boardID, o;
+      $('#lastarchivecheck', section).textContent = Conf['lastarchivecheck'] === 0 ?
+        'never'
+        :
+          new Date(Conf['lastarchivecheck']).toLocaleString();
+      const boardSelect = $('#archive-board-select', section);
+      const table = $('#archive-table', section);
+      const tbody = $('tbody', section);
+      $.rmAll(boardSelect);
+      $.rmAll(tbody);
+      const archBoards = dict();
+      for (var { uid, name, boards, files, software } of Conf['archives']) {
+        if (!['fuuka', 'foolfuuka'].includes(software)) {
+          continue;
+        }
+        for (boardID of boards) {
+          o = archBoards[boardID] || (archBoards[boardID] = {
+            thread: [],
+            threadJSON: [],
+            post: [],
+            file: []
+          });
+          if (!o.threadJSON)
+            o.threadJSON = [];
+          var archive = [uid ?? name, name];
+          o.thread.push(archive);
+          if (software === 'foolfuuka') {
+            o.post.push(archive);
+            o.threadJSON.push(archive);
+          }
+          if (files.includes(boardID)) {
+            o.file.push(archive);
+          }
+        }
+      }
+      const rows = [];
+      const boardOptions = [];
+      for (boardID of Object.keys(archBoards).sort()) { // Alphabetical order
+        var row = $.el('tr', { className: `board-${boardID}` });
+        row.hidden = boardID !== g.BOARD.ID;
+        boardOptions.push($.el('option', {
+          textContent: `/${boardID}/`,
+          value: `board-${boardID}`,
+          selected: boardID === g.BOARD.ID
+        }));
+        o = archBoards[boardID];
+        for (var item of ['thread', 'threadJSON', 'post', 'file']) {
+          $.add(row, Settings.addArchiveCell(boardID, o, item));
+        }
+        rows.push(row);
+      }
+      if (rows.length === 0) {
+        boardSelect.hidden = (table.hidden = true);
+        return;
+      }
+      boardSelect.hidden = (table.hidden = false);
+      if (!(g.BOARD.ID in archBoards)) {
+        rows[0].hidden = false;
+      }
+      $.add(boardSelect, boardOptions);
+      $.add(tbody, rows);
+      for (boardID in Conf['selectedArchives']) {
+        var data = Conf['selectedArchives'][boardID];
+        for (var type in data) {
+          var select;
+          var id = data[type];
+          if (select = $(`select[data-boardid='${boardID}'][data-type='${type}']`, tbody)) {
+            select.value = JSON.stringify(id);
+            if (!select.value) {
+              select.value = select.firstChild.value;
+            }
+          }
+        }
+      }
+    },
+    addArchiveCell(boardID, data, type) {
+      const { length } = data[type];
+      const td = $.el('td', { className: 'archive-cell' });
+      if (!length) {
+        td.textContent = '--';
+        return td;
+      }
+      const options = [];
+      let i = 0;
+      while (i < length) {
+        var archive = data[type][i++];
+        options.push($.el('option', {
+          value: JSON.stringify(archive[0]),
+          textContent: archive[1]
+        }));
+      }
+      $.extend(td, { innerHTML: '<select></select>' });
+      const select = td.firstElementChild;
+      if (!(select.disabled = length === 1)) {
+        // XXX GM can't into datasets
+        select.setAttribute('data-boardid', boardID);
+        select.setAttribute('data-type', type);
+        $.on(select, 'change', Settings.saveSelectedArchive);
+      }
+      $.add(select, options);
+      return td;
+    },
+    saveSelectedArchive() {
+      $.get('selectedArchives', Conf['selectedArchives'], ({ selectedArchives }) => {
+        (selectedArchives[this.dataset.boardid] || (selectedArchives[this.dataset.boardid] = dict()))[this.dataset.type] = JSON.parse(this.value);
+        $.set('selectedArchives', selectedArchives);
+        Conf['selectedArchives'] = selectedArchives;
+        Redirect.selectArchives();
+      });
+    },
+    boardnav() {
+      Header.generateBoardList(this.value);
+    },
+    time() {
+      this.nextElementSibling.textContent = Time.format(new Date(), this.value);
+    },
+    timeLocale() {
+      Settings.time.call($('[name=time]', Settings.dialog));
+    },
+    backlink() {
+      this.nextElementSibling.textContent = this.value.replace(/%(?:id|%)/g, x => ({ '%id': '123456789', '%%': '%' })[x]);
+    },
+    fileInfo() {
+      const data = {
+        isReply: true,
+        file: {
+          url: `//${ImageHost.host()}/g/1334437723720.jpg`,
+          name: 'd9bb2efc98dd0df141a94399ff5880b7.jpg',
+          size: '276 KB',
+          sizeInBytes: 276 * 1024,
+          dimensions: '1280x720',
+          isImage: true,
+          isVideo: false,
+          isSpoiler: true,
+          tag: 'Loop'
+        }
+      };
+      FileInfo.format(this.value, data, this.nextElementSibling);
+    },
+    favicon() {
+      Favicon.switch();
+      if ((g.VIEW === 'thread') && Conf['Unread Favicon']) {
+        Unread.update();
+      }
+      const img = this.nextElementSibling.children;
+      const f = Favicon;
+      const iterable = [f.SFW, f.unreadSFW, f.unreadSFWY, f.NSFW, f.unreadNSFW, f.unreadNSFWY, f.dead, f.unreadDead, f.unreadDeadY];
+      for (let i = 0; i < iterable.length; i++) {
+        var icon = iterable[i];
+        if (!img[i]) {
+          $.add(this.nextElementSibling, $.el('img'));
+        }
+        img[i].src = icon;
+      }
+    },
+    togglecss() {
+      if (($('textarea[name=usercss]', $.x('ancestor::fieldset[1]', this)).disabled = ($.id('apply-css').disabled = !this.checked))) {
+        CustomCSS.rmStyle();
+      } else {
+        CustomCSS.addStyle();
+      }
+      $.cb.checked.call(this);
+    },
+    setTimeLocale(e) {
+      const input = e.target;
+      try {
+        if (input.value !== '')
+          new Intl.DateTimeFormat(input.value);
+        input.setCustomValidity('');
+        Time.formatterCache.clear();
+        $.cb.value.call(input);
+        Settings.timeLocale.call(input);
+      } catch (e) {
+        input.setCustomValidity('Locale not recognized');
+        input.reportValidity();
+      }
+    },
+    keyBindInputs: dict(),
+    keybinds(section) {
+      let key;
+      $.extend(section, { innerHTML: KeybindsHtml });
+      $('.warning', section).hidden = Conf['Keybinds'];
+      const tbody = $('tbody', section);
+      const items = dict();
+      const inputs = Settings.keyBindInputs;
+      for (key in Config.hotkeys) {
+        var arr = Config.hotkeys[key];
+        var tr = $.el('tr', { innerHTML: `<td>${arr[1]}</td><td><input class="field"></td>` });
+        var input = $('input', tr);
+        input.name = key;
+        input.spellcheck = false;
+        items[key] = Conf[key];
+        inputs[key] = input;
+        $.on(input, 'keydown', Settings.keybind);
+        $.add(tbody, tr);
+      }
+      $.get(items, function (items) {
+        for (key in items) {
+          var val = items[key];
+          inputs[key].value = val;
+        }
+      });
+      $.on($('#reset-keys', section), 'click', Settings.resetKeybinds);
+    },
+    keybind(e) {
+      if (e.keyCode === 9)
+        return; // tab
+      e.preventDefault();
+      e.stopPropagation();
+      const key = Keybinds.keyCode(e);
+      if (key == null)
+        return; // empty string is backspace
+      this.value = key;
+      $.cb.value.call(this);
+    },
+    resetKeybinds() {
+      if (!confirm('Are you sure you want to reset the keybinds?'))
+        return;
+      const defaults = Object.fromEntries(Object.entries(Config.hotkeys).map(([key, value]) => [key, value[0]]));
+      $.set(defaults, () => {
+        Object.assign(Conf, defaults);
+        for (const [key, value] of Object.entries(defaults)) {
+          Settings.keyBindInputs[key].value = value;
+        }
+      });
+    },
+  };
+
+  ;
+  var Filter = {
+    /**
+    * Uses a Map for string types, with the value to filter for as the key.
+    * This allows faster lookup than iterating over every filter.
+    */
+    filters: new Map(),
+    init() {
+      if (!['index', 'thread', 'catalog'].includes(g.VIEW) || !Conf['Filter'])
+        return;
+      if ((g.VIEW === 'catalog') && !Conf['Filter in Native Catalog'])
+        return;
+      if (!Conf['Filtered Backlinks']) {
+        $.addClass(doc, 'hide-backlinks');
+      }
+      for (var key in Config.filter) {
+        for (var line of Conf[key].split('\n')) {
+          let hl;
+          let regexp;
+          let top;
+          let hide = true;
+          let mask = 0;
+          let boards = false;
+          let excludes = false;
+          let reason;
+          let poster = false;
+          let replies = false;
+          let noti = false;
+          let stub = Conf.Stubs;
+          if (line[0] === '#')
+            continue;
+          const regexpMatch = line.match(/\/(.*)\/(\w*)/);
+          if (!regexpMatch) {
+            continue;
+          }
+          if (key === 'uniqueID' || key === 'MD5') {
+            // MD5 filter will use strings instead of regular expressions.
+            regexp = regexpMatch[1];
+          } else {
+            try {
+              // Please, don't write silly regular expressions.
+              regexp = RegExp(regexpMatch[1], regexpMatch[2]);
+            } catch (err) {
+              // I warned you, bro.
+              new Notice('warning', [
+                $.tn(`Invalid ${key} filter:`),
+                $.el('br'),
+                $.tn(line),
+                $.el('br'),
+                $.tn(err.message)
+              ], 60);
+              continue;
+            }
+          }
+          // Don't mix up filter flags with the regular expression.
+          const options = line.length > regexpMatch[0].length ? line.replace(regexpMatch[0], '') : '';
+          if (options) {
+            // List of the boards this filter applies to.
+            boards = this.parseBoards(options.match(/(?:^|;)\s*boards:([^;]+)/)?.[1]);
+            // Boards to exclude from an otherwise global rule.
+            excludes = this.parseBoards(options.match(/(?:^|;)\s*exclude:([^;]+)/)?.[1]);
+            // Filter OPs along with their threads or replies only.
+            const op = options.match(/(?:^|;)\s*op:(no|only)/)?.[1] || '';
+            mask = $.getOwn({ 'no': 1, 'only': 2 }, op) || 0;
+            // Filter only posts with/without files.
+            const file = options.match(/(?:^|;)\s*file:(no|only)/)?.[1] || '';
+            mask = mask | ($.getOwn({ 'no': 4, 'only': 8 }, file) || 0);
+            // Overrule the `Show Stubs` setting.
+            // Defaults to stub showing.
+            stub = (() => {
+              switch (options.match(/(?:^|;)\s*stub:(yes|no)/)?.[1]) {
+                case 'yes':
+                  return true;
+                case 'no':
+                  return false;
+                default:
+                  return Conf['Stubs'];
+              }
+            })();
+            // Desktop notification
+            noti = /(?:^|;)\s*notify/.test(options);
+            // Highlight the post.
+            // If not specified, the highlight class will be filter-highlight.
+            const highlightRes = options.match(/(?:^|;)\s*highlight(?::([\w-]+))?/);
+            if (highlightRes) {
+              hl = highlightRes[1] || 'filter-highlight';
+              // Put highlighted OP's thread on top of the board page or not.
+              // Defaults to on top.
+              top = (options.match(/(?:^|;)\s*top:(yes|no)/)?.[1] || 'yes') === 'yes';
+              hide = /(?:^|;)\s*hide(?:[;:]|$)/.test(options);
+            }
+            // Hide the post (default case).
+            hide = hide || !(hl || noti);
+            reason = options.match(/(?:^|;)\s*reason:([^;$]+)/)?.[1];
+            poster = /(?:^|;)\s*poster(?:[;:]|$)/.test(options);
+            replies = /(?:^|;)\s*replies(?:[;:]|$)/.test(options);
+          }
+          const filterObj = { regexp, boards, excludes, mask, hide, stub, hl, top, noti, reason, poster, replies };
+          // Fields that this filter applies to (for 'general' filters)
+          if (key === 'general') {
+            const types = options.match(/(?:^|;)\s*type:([^;]*)/)?.[1].split(',')
+              || ['subject', 'name', 'filename', 'comment'];
+            for (var type of types) {
+              this.filters.get(type)?.push(filterObj) ?? this.filters.set(type, [filterObj]);
+            }
+          } else {
+            this.filters.get(key)?.push(filterObj) ?? this.filters.set(key, [filterObj]);
+          }
+        }
+      }
+      if (!this.filters.size)
+        return;
+      // conversion from array to map for string types
+      for (const type of ['MD5', 'uniqueID']) {
+        const filtersForType = this.filters.get(type);
+        if (!filtersForType)
+          continue;
+        const map = new Map();
+        for (const filter of filtersForType) {
+          map.get(filter.regexp)?.push(filter) ?? map.set(filter.regexp, [filter]);
+        }
+        this.filters.set(type, map);
+      }
+      if (g.VIEW === 'catalog') {
+        return Filter.catalog();
+      } else {
+        return Callbacks.Post.push({
+          name: 'Filter',
+          cb: this.node
+        });
+      }
+    },
+    // Parse comma-separated list of boards.
+    // Sites can be specified by a beginning part of the site domain followed by a colon.
+    parseBoards(boardsRaw) {
+      let boards;
+      if (!boardsRaw) {
+        return false;
+      }
+      if (boards = Filter.parseBoardsMemo[boardsRaw]) {
+        return boards;
+      }
+      boards = dict();
+      let siteFilter = '';
+      for (var boardID of boardsRaw.split(',')) {
+        if (boardID.includes(':')) {
+          [siteFilter, boardID] = boardID.split(':').slice(-2);
+        }
+        for (var siteID in g.sites) {
+          var site = g.sites[siteID];
+          if (siteID.slice(0, siteFilter.length) === siteFilter) {
+            if (['nsfw', 'sfw'].includes(boardID)) {
+              for (var boardID2 of site.sfwBoards?.(boardID === 'sfw') || []) {
+                boards[`${siteID}/${boardID2}`] = true;
+              }
+            } else {
+              boards[`${siteID}/${encodeURIComponent(boardID)}`] = true;
+            }
+          }
+        }
+      }
+      Filter.parseBoardsMemo[boardsRaw] = boards;
+      return boards;
+    },
+    parseBoardsMemo: dict(),
+    test(post, hideable = true) {
+      if (post.filterResults)
+        return post.filterResults;
+      let hide = false;
+      let stub = true;
+      let hl = undefined;
+      let top = false;
+      let noti = false;
+      let poster = false;
+      let replies = false;
+      let reasons;
+      if (QuoteYou.isYou(post)) {
+        hideable = false;
+      }
+      let mask = (post.isReply ? 2 : 1);
+      mask = (mask | (post.file ? 4 : 8));
+      const board = `${post.siteID}/${post.boardID}`;
+      const site = `${post.siteID}/*`;
+      for (const type of Filter.filters.keys()) {
+        for (const value of Filter.values(type, post)) {
+          const filtersOrMap = Filter.filters.get(type);
+          const filtersForType = Array.isArray(filtersOrMap) ? filtersOrMap : filtersOrMap.get(value);
+          if (!filtersForType)
+            continue;
+          const isString = type === 'uniqueID' || type === 'MD5';
+          for (const filter of filtersForType) {
+            if ((filter.boards && !(filter.boards[board] || filter.boards[site])) ||
+              (filter.excludes && (filter.excludes[board] || filter.excludes[site])) ||
+              (filter.mask & mask) ||
+              (isString ? (filter.regexp !== value) : !filter.regexp.test(value)))
+              continue;
+            if (filter.hide) {
+              if (hideable) {
+                hide = true;
+                if (stub) {
+                  ({ stub } = filter);
+                  (reasons || (reasons = [])).push(filter.reason || `Filtered ${type} ${filter.regexp}`);
+                }
+              }
+            }
+            if (filter.hl && !hl?.includes(filter.hl)) {
+              (hl || (hl = [])).push(filter.hl);
+            }
+            if (!top) {
+              ({ top } = filter);
+            }
+            if (filter.noti)
+              noti = true;
+            if (filter.poster)
+              poster = true;
+            if (filter.replies)
+              replies = true;
+          }
+        }
+      }
+      post.filterResults = { hide, stub, hl, top, noti, poster, replies, reasons };
+      return post.filterResults;
+    },
+    node() {
+      if (this.isClone ||
+        // Happens when hovering over a dead link in the catalog.
+        (!this.isReply && !this.thread.nodes.root))
+        return;
+      const { hide, stub, hl, noti, poster, replies } = Filter.test(this, (!this.isFetchedQuote && (this.isReply || (g.VIEW === 'index'))));
+      // Add temporary filter for the poster ID for future posts.
+      let reason;
+      if (poster && this.info.uniqueID) {
+        reason = `Hidden because it's the same poster as ${this.ID} (${this.filterResults.reasons})`;
+        const { uniqueID } = this.info;
+        const newFilter = {
+          regexp: uniqueID,
+          boards: false,
+          excludes: false,
+          mask: 0,
+          hide,
+          stub,
+          replies,
+          // A filter can only have one hl class.
+          hl: hl?.[0],
+          reason,
+        };
+        const map = Filter.filters.get('uniqueID');
+        if (map) {
+          map.get(uniqueID)?.push(newFilter) ?? map.set(uniqueID, [newFilter]);
+        } else {
+          Filter.filters.set('uniqueID', (new Map()).set(uniqueID, [newFilter]));
+        }
+      }
+      if (hide) {
+        if (this.isReply) {
+          PostHiding.hide(this, stub);
+          if (replies) {
+            Recursive.applyAndAdd(PostHiding.hide, this, stub, undefined, `Hidden recursively from ${this.ID}`);
+          }
+          if (poster && this.info.uniqueID) {
+            g.posts.forEach((p) => {
+              if (p.info.uniqueID === this.info.uniqueID && p !== this) {
+                PostHiding.hide(p, stub, replies, reason);
+                if (replies) {
+                  Recursive.applyAndAdd(PostHiding.hide, p, stub, undefined, `Hidden recursively from ${p.ID}`);
+                }
+              }
+            });
+          }
+        } else {
+          ThreadHiding.hide(this.thread, stub);
+        }
+      }
+      if (hl) {
+        this.highlights = hl;
+        $.addClass(this.nodes.root, ...hl);
+        if (this.isReply) {
+          const hlFn = (post, ...hl) => { $.addClass(post.nodes.root, ...hl); };
+          if (replies)
+            Recursive.applyAndAdd(hlFn, this, ...hl);
+          if (poster && this.info.uniqueID) {
+            g.posts.forEach((p) => {
+              if (p.info.uniqueID === this.info.uniqueID && p !== this) {
+                $.addClass(p.nodes.root, ...hl);
+                if (replies)
+                  Recursive.applyAndAdd(hlFn, p, ...hl);
+              }
+            });
+          }
+        }
+      }
+      if (noti && Unread.posts && (this.ID > Unread.lastReadPost) && !QuoteYou.isYou(this)) {
+        Unread.openNotification(this, ' triggered a notification filter');
+      }
+      if (this.file?.thumbLink) {
+        $.on(this.file.thumbLink, 'click', (e) => {
+          if (!e.shiftKey || !Conf['MD5 Quick Filter in Threads'])
+            return;
+          Filter.quickFilterMD5.call(this);
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        });
+      }
+    },
+    catalog() {
+      let url;
+      if (!(url = g.SITE.urls.catalogJSON?.(g.BOARD))) {
+        return;
+      }
+      Filter.catalogData = dict();
+      $.ajax(url, { onloadend: Filter.catalogParse });
+      return Callbacks.CatalogThreadNative.push({
+        name: 'Filter',
+        cb: this.catalogNode
+      });
+    },
+    catalogParse() {
+      if (![200, 404].includes(this.status)) {
+        new Notice('warning', `Failed to fetch catalog JSON data. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`, 1);
+        return;
+      }
+      for (var page of this.response) {
+        for (var item of page.threads) {
+          Filter.catalogData[item.no] = item;
+        }
+      }
+      g.BOARD.threads.forEach(function (thread) {
+        if (thread.catalogViewNative) {
+          return Filter.catalogNode.call(thread.catalogViewNative);
+        }
+      });
+    },
+    catalogNode() {
+      if ((this.boardID !== g.BOARD.ID) || !Filter.catalogData[this.ID]) {
+        return;
+      }
+      if (QuoteYou.db?.get({ siteID: g.SITE.ID, boardID: this.boardID, threadID: this.ID, postID: this.ID })) {
+        return;
+      }
+      const { hide, hl, top } = Filter.test(g.SITE.Build.parseJSON(Filter.catalogData[this.ID], this));
+      if (hide) {
+        this.nodes.root.hidden = true;
+      }
+      if (hl) {
+        this.highlights = hl;
+        $.addClass(this.nodes.root, ...hl);
+      }
+      if (top) {
+        $.prepend(this.nodes.root.parentNode, this.nodes.root);
+        g.SITE.catalogPin?.(this.nodes.root);
+      }
+    },
+    isHidden(post) {
+      return !!Filter.test(post).hide;
+    },
+    valueF: {
+      postID(post) { return [`${post.ID}`]; },
+      name(post) { return post.info.name === undefined ? [] : [post.info.name]; },
+      uniqueID(post) { return [post.info.uniqueID || '']; },
+      tripcode(post) { return post.info.tripcode === undefined ? [] : [post.info.tripcode]; },
+      capcode(post) { return post.info.capcode === undefined ? [] : [post.info.capcode]; },
+      pass(post) { return [post.info.pass]; },
+      email(post) { return [post.info.email]; },
+      subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
+      comment(post) {
+        if (post.info.comment == null) {
+          post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.(post.info.commentHTML.innerHTML);
+        }
+        return [post.info.comment];
+      },
+      flag(post) { return post.info.flag === undefined ? [] : [post.info.flag]; },
+      filename(post) { return post.files.map(f => f.name); },
+      dimensions(post) { return post.files.map(f => f.dimensions); },
+      filesize(post) { return post.files.map(f => f.size); },
+      MD5(post) { return post.files.map(f => f.MD5); }
+    },
+    values(key, post) {
+      if ($.hasOwn(Filter.valueF, key)) {
+        return Filter.valueF[key](post).filter(v => v != null);
+      } else {
+        return [key.split('+').map(function (k) {
+            let f;
+            if (f = $.getOwn(Filter.valueF, k)) {
+              return f(post).map(v => v || '').join('\n');
+            } else {
+              return '';
+            }
+          }).join('\n')];
+      }
+    },
+    addFilter(type, re, cb) {
+      if (!$.hasOwn(Config.filter, type)) {
+        return;
+      }
+      return $.get(type, Conf[type], function (item) {
+        let save = item[type];
+        // Add a new line before the regexp unless the text is empty.
+        save =
+          save ?
+            `${save}\n${re}`
+            :
+              re;
+        return $.set(type, save, cb);
+      });
+    },
+    removeFilters(type, res, cb) {
+      return $.get(type, Conf[type], function (item) {
+        let save = item[type];
+        const filterArray = Array.isArray(res) ? res : [...res.values()].flat();
+        const r = filterArray.map(Filter.escape).join('|');
+        save = save.replace(RegExp(`(?:$\n|^)(?:${r})$`, 'mg'), '');
+        return $.set(type, save, cb);
+      });
+    },
+    showFilters(type) {
+      // Open the settings and display & focus the relevant filter textarea.
+      Settings.open('Filter');
+      const section = $('.section-container');
+      const select = $('select[name=filter]', section);
+      select.value = type;
+      Settings.selectFilter.call(select);
+      return $.onExists(section, 'textarea', function (ta) {
+        const tl = ta.textLength;
+        ta.setSelectionRange(tl, tl);
+        return ta.focus();
+      });
+    },
+    quickFilterMD5() {
+      const post = this instanceof Post ? this : Get.postFromNode(this);
+      const files = post.files.filter(f => f.MD5);
+      if (!files.length) {
+        return;
+      }
+      const filter = files.map(f => `/${f.MD5}/`).join('\n');
+      Filter.addFilter('MD5', filter);
+      const origin = post.origin || post;
+      if (origin.isReply) {
+        PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f.MD5}`).join(' & '));
+      } else if (g.VIEW === 'index') {
+        ThreadHiding.hide(origin.thread);
+      }
+      if (!Conf['MD5 Quick Filter Notifications']) {
+        // feedback for when nothing gets hidden
+        if (post.nodes.post.getBoundingClientRect().height) {
+          new Notice('info', 'MD5 filtered.', 2);
+        }
+        return;
+      }
+      let { notice } = Filter.quickFilterMD5;
+      if (notice) {
+        notice.filters.push(filter);
+        notice.posts.push(origin);
+        $('span', notice.el).textContent = `${notice.filters.length} MD5s filtered.`;
+        notice.resetTimer();
+      } else {
+        const msg = $.el('div', { innerHTML: "<span>MD5 filtered.</span> [<a href=\"javascript:;\">show</a>] [<a href=\"javascript:;\">undo</a>]" });
+        notice = (Filter.quickFilterMD5.notice = new Notice('info', msg, 10, () => delete Filter.quickFilterMD5.notice));
+        notice.filters = [filter];
+        notice.posts = [origin];
+        const links = $$('a', msg);
+        $.on(links[0], 'click', Filter.quickFilterCB.show.bind(notice));
+        $.on(links[1], 'click', Filter.quickFilterCB.undo.bind(notice));
+      }
+    },
+    quickFilterCB: {
+      show() {
+        Filter.showFilters('MD5');
+        return this.close();
+      },
+      undo() {
+        Filter.removeFilters('MD5', this.filters);
+        for (var post of this.posts) {
+          if (post.isReply) {
+            PostHiding.show(post);
+          } else if (g.VIEW === 'index') {
+            ThreadHiding.show(post.thread);
+          }
+        }
+        return this.close();
+      }
+    },
+    escape(value) {
+      return value.replace(/\/|\\|\^|\$|\n|\.|\(|\)|\{|\}|\[|\]|\?|\*|\+|\|/g, (c) => {
+        if (c === '\n') {
+          return '\\n';
+        } else {
+          return `\\${c}`;
+        }
+      });
+    },
+    menu: {
+      init() {
+        if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Filter']) {
+          return;
+        }
+        const div = $.el('div', { textContent: 'Filter' });
+        const entry = {
+          el: div,
+          order: 50,
+          open(post) {
+            Filter.menu.post = post;
+            return true;
+          },
+          subEntries: []
+        };
+        for (var type of [
+          ['Name', 'name'],
+          ['Unique ID', 'uniqueID'],
+          ['Tripcode', 'tripcode'],
+          ['Capcode', 'capcode'],
+          ['Pass Date', 'pass'],
+          ['Email', 'email'],
+          ['Subject', 'subject'],
+          ['Comment', 'comment'],
+          ['Flag', 'flag'],
+          ['Filename', 'filename'],
+          ['Image dimensions', 'dimensions'],
+          ['Filesize', 'filesize'],
+          ['Image MD5', 'MD5']
+        ]) {
+          // Add a sub entry for each filter type.
+          entry.subEntries.push(Filter.menu.createSubEntry(type[0], type[1]));
+        }
+        return Menu.menu.addEntry(entry);
+      },
+      createSubEntry(text, type) {
+        const el = $.el('a', {
+          href: 'javascript:;',
+          textContent: text
+        });
+        el.dataset.type = type;
+        $.on(el, 'click', Filter.menu.makeFilter);
+        return {
+          el,
+          open(post) {
+            return Filter.values(type, post).length;
+          }
+        };
+      },
+      makeFilter() {
+        const { type } = this.dataset;
+        // Convert value -> regexp, unless type is MD5
+        const values = Filter.values(type, Filter.menu.post);
+        const res = values.map((value) => {
+          if (['uniqueID', 'MD5'].includes(type)) {
+            return `/${value}/`;
+          } else {
+            return `/^${Filter.escape(value)}$/`;
+          }
+        }).join('\n');
+        return Filter.addFilter(type, res, () => Filter.showFilters(type));
       }
     }
   };
@@ -14807,7 +19279,7 @@ svg.icon {
       let dialog, thumb = null;
       const cb = Gallery.cb;
       if (Conf['Fullscreen Gallery']) {
-        $.one(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
+        $.one(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
         doc.mozRequestFullScreen?.();
         doc.webkitRequestFullScreen?.(Element.ALLOW_KEYBOARD_INPUT);
       }
@@ -14863,9 +19335,9 @@ svg.icon {
         entry.order = 0;
         nodes.menu.addEntry(entry);
       }
-      $.on(d, 'keydown', cb.keybinds);
+      $.on(d$1, 'keydown', cb.keybinds);
       if (Conf['Keybinds']) {
-        $.off(d, 'keydown', Keybinds.keydown);
+        $.off(d$1, 'keydown', Keybinds.keydown);
       }
       $.on(window, 'resize', Gallery.cb.setHeight);
       for (const postThumb of $$(g.SITE.selectors.file.thumb)) {
@@ -14887,7 +19359,7 @@ svg.icon {
         }
       }
       $.addClass(doc, 'gallery-open');
-      $.add(d.body, dialog);
+      $.add(d$1.body, dialog);
       nodes.thumbs.scrollTop = 0;
       nodes.current.parentElement.scrollTop = 0;
       if (image) {
@@ -15184,16 +19656,16 @@ svg.icon {
         $.rm(Gallery.nodes.el);
         $.rmClass(doc, 'gallery-open');
         if (Conf['Fullscreen Gallery']) {
-          $.off(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', Gallery.cb.close);
-          d.mozCancelFullScreen?.();
-          d.webkitExitFullscreen?.();
+          $.off(d$1, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', Gallery.cb.close);
+          d$1.mozCancelFullScreen?.();
+          d$1.webkitExitFullscreen?.();
         }
         delete Gallery.nodes;
         delete Gallery.fileIDs;
         doc.style.overflow = '';
-        $.off(d, 'keydown', Gallery.cb.keybinds);
+        $.off(d$1, 'keydown', Gallery.cb.keybinds);
         if (Conf['Keybinds']) {
-          $.on(d, 'keydown', Keybinds.keydown);
+          $.on(d$1, 'keydown', Keybinds.keydown);
         }
         $.off(window, 'resize', Gallery.cb.setHeight);
         clearTimeout(Gallery.timeoutID);
@@ -15279,84 +19751,85 @@ svg.icon {
 </div>
 <div id="media-embed"><div></div></div>`;
 
-  // @ts-nocheck
-
-  var Linkify = {
+  const Linkify = {
     init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }
-
+      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) {
+        return;
+      }
       if (Conf['Comment Expansion']) {
         ExpandComment.callbacks.push(this.node);
       }
-
       Callbacks.Post.push({
         name: 'Linkify',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Embedding.init();
+      Embedding.init();
     },
-
     node() {
-      let link;
-      if (this.isClone) { return Embedding.events(this); }
-      if (!Linkify.regString.test(this.info.comment)) { return; }
-      for (link of $$('a', this.nodes.comment)) {
+      if (this.isClone) {
+        return Embedding.events(this);
+      }
+      if (!Linkify.regString.test(this.info.comment)) {
+        return;
+      }
+      for (const link of $$('a', this.nodes.comment)) {
         if (g.SITE.isLinkified?.(link)) {
           $.addClass(link, 'linkify');
-          if (ImageHost.useFaster) { ImageHost.fixLinks([link]); }
+          if (ImageHost.useFaster) {
+            ImageHost.fixLinks([link]);
+          }
           Embedding.process(link, this);
         }
       }
       const links = Linkify.process(this.nodes.comment);
-      if (ImageHost.useFaster) { ImageHost.fixLinks(links); }
-      for (link of links) { Embedding.process(link, this); }
+      if (ImageHost.useFaster) {
+        ImageHost.fixLinks(links);
+      }
+      for (const link of links) {
+        Embedding.process(link, this);
+      }
     },
-
     process(node) {
       let length;
-      const test     = /[^\s"]+/g;
-      const space    = /[\s"]/;
+      const test = /[^\s"]+/g;
+      const space = /[\s"]/;
       const snapshot = $.X('.//br|.//text()', node);
       let i = 0;
       const links = [];
-      while ((node = snapshot.snapshotItem(i++))) {
-        var result;
-        var {data} = node;
-        if (!data || (node.parentElement.nodeName === "A")) { continue; }
-
+      let currNode;
+      while ((currNode = snapshot.snapshotItem(i++))) {
+        let result;
+        let { data } = currNode;
+        if (!data || (currNode.parentElement.nodeName === "A")) {
+          continue;
+        }
         while ((result = test.exec(data))) {
-          var {index} = result;
-          var endNode = node;
-          var word    = result[0];
+          const { index } = result;
+          let endNode = currNode;
+          let word = result[0];
           // End of node, not necessarily end of space-delimited string
           if ((length = index + word.length) === data.length) {
-            var saved;
+            let saved;
             test.lastIndex = 0;
-
             while (saved = snapshot.snapshotItem(i++)) {
-              var end;
+              let end;
               if ((saved.nodeName === 'BR') || ((saved.parentElement.nodeName === 'P') && !saved.previousSibling)) {
-                var part1, part2;
+                let part1, part2;
                 if (
-                  // link deliberately split
-                  (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
+                // link deliberately split
+                (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
                   (part2 = snapshot.snapshotItem(i)?.data?.match(/^(\.[a-z\d-]+)*\//i)) &&
-                  ((part1[0] + part2[0]).search(Linkify.regString) === 0)
-                ) {
+                  ((part1[0] + part2[0]).search(Linkify.regString) === 0)) {
                   continue;
                 } else {
                   break;
                 }
               }
-
               if ((saved.parentElement.nodeName === "A") && !Linkify.regString.test(word)) {
                 break;
               }
-
-              endNode  = saved;
-              ({data}   = saved);
-
+              endNode = saved;
+              ({ data } = saved);
               if (end = space.exec(data)) {
                 // Set our snapshot and regex to start on this node at this position when the loop resumes
                 word += data.slice(0, end.index);
@@ -15364,28 +19837,27 @@ svg.icon {
                 i--;
                 break;
               } else {
-                ({length} = data);
-                word    += data;
+                ({ length } = data);
+                word += data;
               }
             }
           }
-
           if (Linkify.regString.test(word)) {
-            links.push(Linkify.makeRange(node, endNode, index, length));
+            links.push(Linkify.makeRange(currNode, endNode, index, length));
 
           }
-
-          if (!test.lastIndex || (node !== endNode)) { break; }
+          if (!test.lastIndex || (currNode !== endNode)) {
+            break;
+          }
         }
       }
-
+      const aLinks = [];
       i = links.length;
       while (i--) {
-        links[i] = Linkify.makeLink(links[i]);
+        aLinks[i] = Linkify.makeLink(links[i]);
       }
-      return links;
+      return aLinks;
     },
-
     regString: new RegExp(`(\
 \
 (https?|mailto|git|magnet|ftp|irc):(\
@@ -15400,170 +19872,72 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 |\
 [-\\w\\d.@]+@[a-z\\d.-]+\\.[a-z\\d]\
 )`, 'i'),
-
     makeRange(startNode, endNode, startOffset, endOffset) {
       const range = document.createRange();
       range.setStart(startNode, startOffset);
-      range.setEnd(endNode,   endOffset);
+      range.setEnd(endNode, endOffset);
       return range;
     },
-
     makeLink(range) {
       let t;
       let encodedDomain;
       let text = range.toString();
-
       // Clean start of range
       let i = text.search(Linkify.regString);
-
       if (i > 0) {
         text = text.slice(i);
-        while ((range.startOffset + i) >= range.startContainer.data.length) { i--; }
-
-        if (i) { range.setStart(range.startContainer, range.startOffset + i); }
+        while ((range.startOffset + i) >= range.startContainer.data.length) {
+          i--;
+        }
+        if (i) {
+          range.setStart(range.startContainer, range.startOffset + i);
+        }
       }
-
       // Clean end of range
       i = 0;
       while (/[)\]}>.,]/.test(t = text.charAt(text.length - (1 + i)))) {
-        if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) { break; }
+        if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) {
+          break;
+        }
         i++;
       }
-
       if (i) {
         text = text.slice(0, -i);
-        while ((range.endOffset - i) < 0) { i--; }
-
+        while ((range.endOffset - i) < 0) {
+          i--;
+        }
         if (i) {
           range.setEnd(range.endContainer, range.endOffset - i);
         }
       }
-
       // Make our link 'valid' if it is formatted incorrectly.
       if (!/((mailto|magnet):|.+:\/\/)/.test(text)) {
-        text = (
-          /@/.test(text) ?
-            'mailto:'
+        text = (/@/.test(text) ?
+          'mailto:'
           :
-            'http://'
-        ) + text;
+            'http://') + text;
       }
-
       // Decode percent-encoded characters in domain so that they behave consistently across browsers.
       if (encodedDomain = text.match(/^(https?:\/\/[^/]*%[0-9a-f]{2})(.*)$/i)) {
-        text = encodedDomain[1].replace(/%([0-9a-f]{2})/ig, function(x, y) {
-          if (y === '25') { return x; } else { return String.fromCharCode(parseInt(y, 16)); }
+        text = encodedDomain[1].replace(/%([0-9a-f]{2})/ig, function (x, y) {
+          if (y === '25') {
+            return x;
+          } else {
+            return String.fromCharCode(parseInt(y, 16));
+          }
         }) + encodedDomain[2];
       }
-
       const a = $.el('a', {
         className: 'linkify',
-        rel:       'noreferrer noopener',
-        target:    '_blank',
-        href:      text
-      }
-      );
-
+        rel: 'noreferrer noopener',
+        target: '_blank',
+        href: text
+      });
       // Insert the range into the anchor, the anchor into the range's DOM location, and destroy the range.
       $.add(a, range.extractContents());
       range.insertNode(a);
-
       return a;
     }
-  };
-
-  var Time = {
-    init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Time Formatting']) {
-        return;
-      }
-      Callbacks.Post.push({
-        name: 'Time Formatting',
-        cb: this.node
-      });
-    },
-    node() {
-      if (!this.info.date || this.isClone) {
-        return;
-      }
-      const { textContent } = this.nodes.date;
-      this.nodes.date.textContent = textContent.match(/^\s*/)[0] + Time.format(this.info.date) + textContent.match(/\s*$/)[0];
-    },
-    format(date, formatString = Conf['time']) {
-      return formatString.replace(/%(.)/g, function (s, c) {
-        if ($.hasOwn(Time.formatters, c)) {
-          return Time.formatters[c].call(date);
-        } else {
-          return s;
-        }
-      });
-    },
-    zeroPad(n) { if (n < 10) {
-      return `0${n}`;
-    } else {
-      return n;
-    } },
-    // Setting up the formatter takes more time than actually formatting the date,
-    // So while setting up this cache is a bit more code, it's faster at runtime
-    formatterCache: new Map(),
-    formatters: {
-      a() {
-        let formatter = Time.formatterCache.get('a');
-        if (!formatter) {
-          // || undefined to fall back to browser locale, an empty string gives an error
-          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { weekday: 'short' });
-          Time.formatterCache.set('a', formatter);
-        }
-        return formatter.format(this);
-      },
-      A() {
-        let formatter = Time.formatterCache.get('A');
-        if (!formatter) {
-          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { weekday: 'long' });
-          Time.formatterCache.set('A', formatter);
-        }
-        return formatter.format(this);
-      },
-      b() {
-        let formatter = Time.formatterCache.get('b');
-        if (!formatter) {
-          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { month: 'short' });
-          Time.formatterCache.set('b', formatter);
-        }
-        return formatter.format(this);
-      },
-      B() {
-        let formatter = Time.formatterCache.get('B');
-        if (!formatter) {
-          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { month: 'long' });
-          Time.formatterCache.set('B', formatter);
-        }
-        return formatter.format(this);
-      },
-      d() { return Time.zeroPad(this.getDate()); },
-      e() { return this.getDate(); },
-      H() { return Time.zeroPad(this.getHours()); },
-      I() { return Time.zeroPad((this.getHours() % 12) || 12); },
-      k() { return this.getHours(); },
-      l() { return (this.getHours() % 12) || 12; },
-      m() { return Time.zeroPad(this.getMonth() + 1); },
-      n() { return this.getMonth() + 1; },
-      M() { return Time.zeroPad(this.getMinutes()); },
-      p() {
-        let formatter = Time.formatterCache.get('p');
-        if (!formatter) {
-          formatter = Intl.DateTimeFormat(Conf['timeLocale'] || undefined, { hour: 'numeric', hour12: true });
-          Time.formatterCache.set('p', formatter);
-        }
-        const parts = formatter.formatToParts(this);
-        return parts.find((entry) => entry.type === 'dayPeriod').value;
-      },
-      P() { return Time.formatters.p.call(this).toLowerCase(); },
-      S() { return Time.zeroPad(this.getSeconds()); },
-      y() { return this.getFullYear().toString().slice(2); },
-      Y() { return this.getFullYear(); },
-      '%'() { return '%'; }
-    },
   };
 
   function EmbedFxTwitter(a) {
@@ -15766,8 +20140,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (Conf['Embedding'] && (g.VIEW !== 'archive')) {
         this.dialog = UI.dialog('embedding', { innerHTML: EmbeddingPage });
         this.media = $('#media-embed', this.dialog);
-        $.one(d, '4chanXInitFinished', this.ready);
-        $.on(d, 'IndexRefreshInternal', () => g.posts.forEach(function (post) {
+        $.one(d$1, '4chanXInitFinished', this.ready);
+        $.on(d$1, 'IndexRefreshInternal', () => g.posts.forEach(function (post) {
           for (post of [post, ...post.clones]) {
             for (var embed of post.nodes.embedlinks) {
               Embedding.cb.catalogRemove.call(embed);
@@ -15776,7 +20150,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }));
       }
       if (Embedding.shouldFetchTitles()) {
-        $.on(d, '4chanXInitFinished PostsInserted', function () {
+        $.on(d$1, '4chanXInitFinished PostsInserted', function () {
           for (const service of Object.values(Embedding.types)) {
             if (service.title?.batchSize) {
               Embedding.flushTitles(service.title);
@@ -15880,7 +20254,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
       Icon.set(jump, 'arrowRightLong');
       Icon.set(close, 'xmark');
-      return $.add(d.body, Embedding.dialog);
+      return $.add(d$1.body, Embedding.dialog);
     },
     closeFloat() {
       delete Embedding.lastEmbed;
@@ -15891,12 +20265,12 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       // only webkit can handle a blocking div
       const { style } = Embedding.media;
       if (Embedding.dragEmbed.mouseup) {
-        $.off(d, 'mouseup', Embedding.dragEmbed);
+        $.off(d$1, 'mouseup', Embedding.dragEmbed);
         Embedding.dragEmbed.mouseup = false;
         style.pointerEvents = '';
         return;
       }
-      $.on(d, 'mouseup', Embedding.dragEmbed);
+      $.on(d$1, 'mouseup', Embedding.dragEmbed);
       Embedding.dragEmbed.mouseup = true;
       return style.pointerEvents = 'none';
     },
@@ -16444,460 +20818,43 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     },
   };
 
-  var Beep = 'UklGRjQDAABXQVZFZm10IBAAAAABAAEAgD4AAIA+AAABAAgAc21wbDwAAABBAAADAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABkYXRhzAIAAGMms8em0tleMV4zIpLVo8nhfSlcPR102Ki+5JspVEkdVtKzs+K1NEhUIT7DwKrcy0g6WygsrM2k1NpiLl0zIY/WpMrjgCdbPhxw2Kq+5Z4qUkkdU9K1s+K5NkVTITzBwqnczko3WikrqM+l1NxlLF0zIIvXpsnjgydZPhxs2ay95aIrUEkdUdC3suK8N0NUIjq+xKrcz002WioppdGm091pK1w0IIjYp8jkhydXPxxq2K295aUrTkoeTs65suK+OUFUIzi7xqrb0VA0WSoootKm0t5tKlo1H4TYqMfkiydWQBxm16+85actTEseS8y7seHAPD9TIza5yKra01QyWSson9On0d5wKVk2H4DYqcfkjidUQB1j1rG75KsvSkseScu8seDCPz1TJDW2yara1FYxWSwnm9Sn0N9zKVg2H33ZqsXkkihSQR1g1bK65K0wSEsfR8i+seDEQTxUJTOzy6rY1VowWC0mmNWoz993KVc3H3rYq8TklSlRQh1d1LS647AyR0wgRMbAsN/GRDpTJTKwzKrX1l4vVy4lldWpzt97KVY4IXbUr8LZljVPRCxhw7W3z6ZISkw1VK+4sMWvXEhSPk6buay9sm5JVkZNiLWqtrJ+TldNTnquqbCwilZXU1BwpKirrpNgWFhTaZmnpquZbFlbVmWOpaOonHZcXlljhaGhpZ1+YWBdYn2cn6GdhmdhYGN3lp2enIttY2Jjco+bnJuOdGZlZXCImJqakHpoZ2Zug5WYmZJ/bGlobX6RlpeSg3BqaW16jZSVkoZ0bGtteImSk5KIeG5tbnaFkJKRinxxbm91gY2QkIt/c3BwdH6Kj4+LgnZxcXR8iI2OjIR5c3J0e4WLjYuFe3VzdHmCioyLhn52dHR5gIiKioeAeHV1eH+GiYqHgXp2dnh9hIiJh4J8eHd4fIKHiIeDfXl4eHyBhoeHhH96eHmA';
-
-  // @ts-nocheck
-  var ThreadUpdater = {
+  const Keybinds = {
     init() {
-      let sc;
-      // Chromium won't play audio created in an inactive tab until the tab has been focused, so set it up now.
-      // XXX Sometimes the loading stalls in Firefox, esp. when opening in private browsing window followed by normal window.
-      // Don't let it keep the loading icon on indefinitely.
-      this.audio = $.el('audio');
-      if ($.engine !== 'gecko') {
-        this.audio.src = this.beep;
-      }
-      $.on(this.audio, 'error', () => {
-        new Notice('error', this.audio.error.message || 'Error when trying to play thread updater beep.', 15);
-      });
-      // Return after the audio player is initiated, so it works in the settings preview.
-      if ((g.VIEW !== 'thread') || !Conf['Thread Updater'])
-        return;
-      this.enabled = true;
-      if (Conf['Updater and Stats in Header']) {
-        this.dialog = (sc = $.el('span', { id: 'updater' }));
-        $.extend(sc, { innerHTML: '<span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' });
-        Header.addShortcut('updater', sc, 100);
-      } else {
-        this.dialog = (sc = UI.dialog('updater', { innerHTML: '<div class="move"></div><span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' }));
-        $.addClass(doc, 'float');
-        $.ready(() => $.add(d.body, sc));
-      }
-      this.checkPostCount = 0;
-      this.timer = $('#update-timer', sc);
-      this.status = $('#update-status', sc);
-      $.on(this.timer, 'click', this.update);
-      $.on(this.status, 'click', this.update);
-      const updateLink = $.el('span', { className: 'brackets-wrap updatelink' });
-      $.extend(updateLink, { innerHTML: '<a href="javascript:;">Update</a>' });
-      $.on(d, '4chanXInitFinished', function () {
-        let navLinksBot;
-        if (navLinksBot = $('.navLinksBot')) {
-          return $.add(navLinksBot, [$.tn(' '), updateLink]);
-        }
-      });
-      $.on(updateLink.firstElementChild, 'click', this.update);
-      const subEntries = [];
-      for (const name in Config.updater.checkbox) {
-        var conf = Config.updater.checkbox[name];
-        const el = UI.checkbox(name, name);
-        el.title = conf[1];
-        var input = el.firstElementChild;
-        $.on(input, 'change', $.cb.checked);
-        if (input.name === 'Scroll BG') {
-          $.on(input, 'change', this.cb.scrollBG);
-          this.cb.scrollBG();
-        } else if (input.name === 'Auto Update') {
-          $.on(input, 'change', this.setInterval);
-        }
-        subEntries.push({ el });
-      }
-      this.settings = $.el('span', { innerHTML: '<a href="javascript:;">Interval</a>' });
-      $.on(this.settings, 'click', this.intervalShortcut);
-      subEntries.push({ el: this.settings });
-      Header.menu.addEntry(this.entry = {
-        el: $.el('span', { textContent: 'Updater' }),
-        order: 110,
-        subEntries
-      });
-      return Callbacks.Thread.push({
-        name: 'Thread Updater',
-        cb: this.node
-      });
-    },
-    node() {
-      ThreadUpdater.thread = this;
-      ThreadUpdater.root = this.nodes.root;
-      ThreadUpdater.outdateCount = 0;
-      // We must keep track of our own list of live posts/files
-      // to provide an accurate deletedPosts/deletedFiles on update
-      // as posts may be `kill`ed elsewhere.
-      ThreadUpdater.postIDs = [];
-      ThreadUpdater.fileIDs = [];
-      this.posts.forEach(function (post) {
-        ThreadUpdater.postIDs.push(post.ID);
-        if (post.file) {
-          return ThreadUpdater.fileIDs.push(post.ID);
-        }
-      });
-      ThreadUpdater.cb.interval.call($.el('input', { value: Conf['Interval'] }));
-      $.on(d, 'QRPostSuccessful', ThreadUpdater.cb.checkpost);
-      $.on(d, 'visibilitychange', ThreadUpdater.cb.visibility);
-      return ThreadUpdater.setInterval();
-    },
-    /*
-    http://freesound.org/people/pierrecartoons1979/sounds/90112/
-    cc-by-nc-3.0
-    */
-    beep: `data:audio/wav;base64,${Beep}`,
-    playBeep(repeatIfPlaying = true) {
-      const { audio } = ThreadUpdater;
-      const source = Conf.beepSource || ThreadUpdater.beep;
-      if (audio.src !== source)
-        audio.src = source;
-      audio.volume = Math.max(.01, Math.min(+Conf.beepVolume, 1));
-      if (audio.paused) {
-        audio.play();
-      } else if (repeatIfPlaying) {
-        $.one(audio, 'ended', ThreadUpdater.playBeep);
-      }
-    },
-    cb: {
-      checkpost(e) {
-        if (e.detail.threadID !== ThreadUpdater.thread.ID) {
-          return;
-        }
-        ThreadUpdater.postID = e.detail.postID;
-        ThreadUpdater.checkPostCount = 0;
-        ThreadUpdater.outdateCount = 0;
-        return ThreadUpdater.setInterval();
-      },
-      visibility() {
-        if (d.hidden) {
-          return;
-        }
-        // Reset the counter when we focus this tab.
-        ThreadUpdater.outdateCount = 0;
-        if (ThreadUpdater.seconds > ThreadUpdater.interval) {
-          return ThreadUpdater.setInterval();
-        }
-      },
-      scrollBG() {
-        return ThreadUpdater.scrollBG = Conf['Scroll BG'] ?
-          () => true
-          :
-            () => !d.hidden;
-      },
-      interval(e) {
-        let val = parseInt(this.value, 10);
-        if (val < 1) {
-          val = 1;
-        }
-        ThreadUpdater.interval = (this.value = val);
-        if (e) {
-          return $.cb.value.call(this);
-        }
-      },
-      load() {
-        if (this !== ThreadUpdater.req) {
-          return;
-        } // aborted
-        switch (this.status) {
-          case 200:
-            ThreadUpdater.parse(this);
-            if (ThreadUpdater.thread.isArchived) {
-              return ThreadUpdater.kill();
-            } else {
-              return ThreadUpdater.setInterval();
-            }
-          case 404:
-            // XXX workaround for 4chan sending false 404s
-            return $.ajax(g.SITE.urls.catalogJSON({ boardID: ThreadUpdater.thread.board.ID }), { onloadend() {
-                let confirmed;
-                if (this.status === 200) {
-                  confirmed = true;
-                  for (var page of this.response) {
-                    for (var thread of page.threads) {
-                      if (thread.no === ThreadUpdater.thread.ID) {
-                        confirmed = false;
-                        break;
-                      }
-                    }
-                  }
-                } else {
-                  confirmed = false;
-                }
-                if (confirmed) {
-                  ThreadUpdater.kill();
-                } else {
-                  ThreadUpdater.error(this);
-                }
-              }
-            });
-          default:
-            return ThreadUpdater.error(this);
-        }
-      }
-    },
-    kill() {
-      ThreadUpdater.thread.kill();
-      ThreadUpdater.setInterval();
-      return $.event('ThreadUpdate', {
-        404: true,
-        threadID: ThreadUpdater.thread.fullID
-      });
-    },
-    error(req) {
-      if (req.status === 304) {
-        ThreadUpdater.set('status', '');
-      }
-      ThreadUpdater.setInterval();
-      if (!req.status) {
-        return ThreadUpdater.set('status', 'Connection Error', 'warning');
-      } else if (req.status !== 304) {
-        return ThreadUpdater.set('status', `${req.statusText} (${req.status})`, 'warning');
-      }
-    },
-    setInterval() {
-      clearTimeout(ThreadUpdater.timeoutID);
-      if (ThreadUpdater.thread.isDead) {
-        ThreadUpdater.set('status', (ThreadUpdater.thread.isArchived ? 'Archived' : '404'), 'warning');
-        ThreadUpdater.set('timer', '');
+      if (!Conf['Keybinds']) {
         return;
       }
-      // Fetching your own posts after posting
-      if (ThreadUpdater.postID && (ThreadUpdater.checkPostCount < 5)) {
-        ThreadUpdater.set('timer', '...', 'loading');
-        ThreadUpdater.timeoutID = setTimeout(ThreadUpdater.update, ++ThreadUpdater.checkPostCount * SECOND);
-        return;
-      }
-      if (!Conf['Auto Update']) {
-        ThreadUpdater.set('timer', 'Update');
-        return;
-      }
-      const { interval } = ThreadUpdater;
-      if (Conf['Optional Increase']) {
-        // Lower the max refresh rate limit on visible tabs.
-        const limit = d.hidden ? 10 : 5;
-        const j = Math.min(ThreadUpdater.outdateCount, limit);
-        // 1 second to 100, 30 to 300.
-        const cur = (Math.floor(interval * 0.1) || 1) * j * j;
-        ThreadUpdater.seconds = $.minmax(cur, interval, 300);
-      } else {
-        ThreadUpdater.seconds = interval;
-      }
-      return ThreadUpdater.timeout();
-    },
-    intervalShortcut() {
-      Settings.open('Advanced');
-      const settings = $.id('fourchanx-settings');
-      return $('input[name=Interval]', settings).focus();
-    },
-    set(name, text, klass) {
-      let node;
-      const el = ThreadUpdater[name];
-      if ((node = el.firstChild)) {
-        // Prevent the creation of a new DOM Node
-        // by setting the text node's data.
-        node.data = text;
-      } else {
-        el.textContent = text;
-      }
-      return el.className = klass ?? (text === '' ? 'empty' : '');
-    },
-    timeout() {
-      if (ThreadUpdater.seconds) {
-        ThreadUpdater.set('timer', ThreadUpdater.seconds);
-        ThreadUpdater.timeoutID = setTimeout(ThreadUpdater.timeout, 1000);
-      } else {
-        ThreadUpdater.outdateCount++;
-        ThreadUpdater.update();
-      }
-      return ThreadUpdater.seconds--;
-    },
-    update() {
-      let oldReq;
-      clearTimeout(ThreadUpdater.timeoutID);
-      ThreadUpdater.set('timer', '...', 'loading');
-      if (oldReq = ThreadUpdater.req) {
-        delete ThreadUpdater.req;
-        oldReq.abort();
-      }
-      return ThreadUpdater.req = $.whenModified(g.SITE.urls.threadJSON({ boardID: ThreadUpdater.thread.board.ID, threadID: ThreadUpdater.thread.ID }), 'ThreadUpdater', ThreadUpdater.cb.load, { timeout: MINUTE });
-    },
-    updateThreadStatus(type, status) {
-      let hasChanged;
-      if (!(hasChanged = ThreadUpdater.thread[`is${type}`] !== status)) {
-        return;
-      }
-      ThreadUpdater.thread.setStatus(type, status);
-      if ((type === 'Closed') && ThreadUpdater.thread.isArchived) {
-        return;
-      }
-      const change = type === 'Sticky' ?
-        status ?
-          'now a sticky'
-          :
-            'not a sticky anymore'
-        :
-          status ?
-            'now closed'
-            :
-              'not closed anymore';
-      return new Notice('info', `The thread is ${change}.`, 30);
-    },
-    parse(req) {
-      let ID, ipCountEl, post;
-      const postObjects = req.response.posts;
-      const OP = postObjects[0];
-      const thread = ThreadUpdater.thread;
-      const { board } = thread;
-      const lastPost = ThreadUpdater.postIDs[ThreadUpdater.postIDs.length - 1];
-      // XXX Reject updates that falsely delete the last post.
-      if ((postObjects[postObjects.length - 1].no < lastPost) &&
-        ((new Date(req.getResponseHeader('Last-Modified')) - thread.posts.get(lastPost).info.date) < (30 * SECOND))) {
-        return;
-      }
-      g.SITE.Build.spoilerRange[board] = OP.custom_spoiler;
-      thread.setStatus('Archived', !!OP.archived);
-      ThreadUpdater.updateThreadStatus('Sticky', !!OP.sticky);
-      ThreadUpdater.updateThreadStatus('Closed', !!OP.closed);
-      thread.postLimit = !!OP.bumplimit;
-      thread.fileLimit = !!OP.imagelimit;
-      if (OP.unique_ips)
-        thread.ipCount = OP.unique_ips;
-      const posts = []; // new post objects
-      const index = []; // existing posts
-      const files = []; // existing files
-      const newPosts = []; // new post fullID list for API
-      // Build the index, create posts.
-      for (var postObject of postObjects) {
-        ID = postObject.no;
-        index.push(ID);
-        if (postObject.fsize) {
-          files.push(ID);
-        }
-        // Insert new posts, not older ones.
-        if (ID <= lastPost) {
-          continue;
-        }
-        // XXX Resurrect wrongly deleted posts.
-        if ((post = thread.posts.get(ID)) && !post.isFetchedQuote) {
-          post.resurrect();
-          continue;
-        }
-        newPosts.push(`${board}.${ID}`);
-        var node = g.SITE.Build.postFromObject(postObject, board.ID);
-        posts.push(new Post(node, thread, board));
-        // Fetching your own posts after posting
-        if (ThreadUpdater.postID === ID) {
-          delete ThreadUpdater.postID;
-        }
-      }
-      // Check for deleted posts.
-      const deletedPosts = [];
-      for (ID of ThreadUpdater.postIDs) {
-        if (!index.includes(ID)) {
-          thread.posts.get(ID).kill();
-          deletedPosts.push(`${board}.${ID}`);
-        }
-      }
-      ThreadUpdater.postIDs = index;
-      // Check for deleted files.
-      const deletedFiles = [];
-      for (ID of ThreadUpdater.fileIDs) {
-        if (!(files.includes(ID) || deletedPosts.includes(`${board}.${ID}`))) {
-          thread.posts.get(ID).kill(true);
-          deletedFiles.push(`${board}.${ID}`);
-        }
-      }
-      ThreadUpdater.fileIDs = files;
-      if (!posts.length) {
-        ThreadUpdater.set('status', '');
-      } else {
-        ThreadUpdater.set('status', `+${posts.length}`, 'new');
-        ThreadUpdater.outdateCount = 0;
-        const unreadCount = Unread.posts?.size;
-        const unreadQYCount = Unread.postsQuotingYou?.size;
-        for (const post of posts) {
-          Callbacks.Post.execute(post);
-        }
-        if (d.hidden || !d.hasFocus()) {
-          if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
-            ThreadUpdater.playBeep();
-            if (Conf['Beep']) {
-              ThreadUpdater.playBeep();
-            }
-          } else if (Conf['Beep'] && (Unread.posts?.size > 0) && (unreadCount === 0)) {
-            ThreadUpdater.playBeep();
-          }
-        }
-        const scroll = Conf['Auto Scroll'] && ThreadUpdater.scrollBG() &&
-          ((ThreadUpdater.root.getBoundingClientRect().bottom - doc.clientHeight) < 25);
-        let firstPost = null;
-        for (post of posts) {
-          if (!QuoteThreading.insert(post)) {
-            if (!firstPost) {
-              firstPost = post.nodes.root;
-            }
-            $.add(ThreadUpdater.root, post.nodes.root);
-          }
-        }
-        $.event('PostsInserted', null, ThreadUpdater.root);
-        if (scroll) {
-          if (Conf['Bottom Scroll']) {
-            window.scrollTo(0, d.body.clientHeight);
-          } else {
-            if (firstPost) {
-              Header.scrollTo(firstPost);
-            }
-          }
-        }
-      }
-      // Update IP count in original post form.
-      if (OP.unique_ips && (ipCountEl = $.id('unique-ips'))) {
-        ipCountEl.textContent = OP.unique_ips;
-        ipCountEl.previousSibling.textContent = ipCountEl.previousSibling.textContent.replace(/\b(?:is|are)\b/, OP.unique_ips === 1 ? 'is' : 'are');
-        ipCountEl.nextSibling.textContent = ipCountEl.nextSibling.textContent.replace(/\bposters?\b/, OP.unique_ips === 1 ? 'poster' : 'posters');
-      }
-      return $.event('ThreadUpdate', {
-        404: false,
-        threadID: thread.fullID,
-        newPosts,
-        deletedPosts,
-        deletedFiles,
-        postCount: OP.replies + 1,
-        fileCount: OP.images + !!OP.fsize,
-        ipCount: OP.unique_ips
-      });
-    }
-  };
-
-  // @ts-nocheck
-
-  var Keybinds = {
-    init() {
-      if (!Conf['Keybinds']) { return; }
-
-      for (var hotkey in Config.hotkeys) {
+      for (const hotkey in Config.hotkeys) {
         $.sync(hotkey, Keybinds.sync);
       }
-
-      var init = function() {
-        $.off(d, '4chanXInitFinished', init);
-        $.on(d, 'keydown', Keybinds.keydown);
-        for (var node of $$('[accesskey]')) {
+      const init = function () {
+        $.off(d$1, '4chanXInitFinished', init);
+        $.on(d$1, 'keydown', Keybinds.keydown);
+        for (const node of $$('[accesskey]')) {
           node.removeAttribute('accesskey');
         }
       };
-      return $.on(d, '4chanXInitFinished', init);
+      $.on(d$1, '4chanXInitFinished', init);
     },
-
     sync(key, hotkey) {
-      return Conf[hotkey] = key;
+      Conf[hotkey] = key;
     },
-
     keydown(e) {
       let key, thread, threadRoot;
       let catalog, notifications;
-      if (!(key = Keybinds.keyCode(e))) { return; }
-      const {target} = e;
+      if (!(key = Keybinds.keyCode(e))) {
+        return;
+      }
+      const target = e.target;
       if (['INPUT', 'TEXTAREA'].includes(target.nodeName)) {
-        if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) { return; }
+        if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) {
+          return;
+        }
       }
       if (['index', 'thread'].includes(g.VIEW)) {
         threadRoot = Nav.getThread();
-        thread = Get.threadFromRoot(threadRoot);
+        if (threadRoot) {
+          thread = Get.threadFromRoot(threadRoot);
+        }
       }
       let hasAction = false;
       // QR & Options
@@ -16925,7 +20882,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (Settings.dialog) {
           Settings.close();
         } else if ((notifications = $$('.notification')).length) {
-          for (var notification of notifications) {
+          for (const notification of notifications) {
             $('.close', notification).click();
           }
         } else if (QR.nodes?.preview) {
@@ -16986,12 +20943,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (key === Conf['Update']) {
         switch (g.VIEW) {
           case 'thread':
-            if (ThreadUpdater.enabled) ThreadUpdater.update();
+            if (ThreadUpdater.enabled)
+              ThreadUpdater.update();
             hasAction = true;
-          break;
+            break;
           case 'index':
-            if (Index.enabled) Index.update();
+            if (Index.enabled)
+              Index.update();
             hasAction = true;
+            break;
         }
       }
       if (key === Conf['Watch'] && ThreadWatcher.enabled && thread) {
@@ -17010,16 +20970,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QuoteThreading.toggleThreading();
         hasAction = true;
       }
-      if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled) {
+      if (key === Conf['Mark thread read'] && g.VIEW === 'index' && thread && UnreadIndex.enabled && threadRoot) {
         UnreadIndex.markRead.call(threadRoot);
         hasAction = true;
       }
       // Images
       if (key === Conf['Expand image'] && ImageExpand.enabled && threadRoot) {
-        var post = Get.postFromNode(Keybinds.post(threadRoot));
-        if (post.file) {
-          ImageExpand.toggle(post);
-          hasAction = true;
+        const p = Keybinds.post(threadRoot);
+        if (p) {
+          const post = Get.postFromNode(p);
+          if (post.file) {
+            ImageExpand.toggle(post);
+            hasAction = true;
+          }
         }
       }
       if (key === Conf['Expand images'] && ImageExpand.enabled) {
@@ -17053,8 +21016,9 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       if (key === Conf['Next page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
         if (Index.enabled) {
-          if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-          $('.next button', Index.pagelist).click();
+          if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+            $('.next button', Index.pagelist).click();
+          }
         } else {
           $(g.SITE.selectors.nav.next)?.click();
         }
@@ -17062,20 +21026,21 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       if (key === Conf['Previous page'] && g.VIEW === 'index' && !g.SITE.isOnePage?.(g.BOARD)) {
         if (Index.enabled) {
-          if (!['paged', 'infinite'].includes(Conf['Index Mode'])) { return; }
-          $('.prev button', Index.pagelist).click();
+          if (['paged', 'infinite'].includes(Conf['Index Mode'])) {
+            $('.prev button', Index.pagelist).click();
+          }
         } else {
           $(g.SITE.selectors.nav.prev)?.click();
         }
         hasAction = true;
       }
       if (key === Conf['Search form'] && g.VIEW === 'index') {
-        var searchInput = Index.enabled ?
+        const searchInput = Index.enabled ?
           Index.searchInput
-        : g.SITE.selectors.searchBox ?
-          $(g.SITE.selectors.searchBox)
-        :
-          undefined;
+          : g.SITE.selectors.searchBox ?
+            $(g.SITE.selectors.searchBox)
+            :
+              undefined;
         if (searchInput) {
           Header.scrollToIfNeeded(searchInput);
           searchInput.focus();
@@ -17107,17 +21072,16 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         Nav.scroll(-1);
         hasAction = true;
       }
-      if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot && thread) {
         ExpandThread.toggle(thread);
-        // Keep thread from moving off screen when contracted.
         Header.scrollTo(threadRoot);
         hasAction = true;
       }
-      if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot && thread) {
         Keybinds.open(thread);
         hasAction = true;
       }
-      if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot) {
+      if (key === Conf['Open thread tab'] && g.VIEW === 'index' && threadRoot && thread) {
         Keybinds.open(thread, true);
         hasAction = true;
       }
@@ -17134,16 +21098,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         Keybinds.hl(0, threadRoot);
         hasAction = true;
       }
-      if (key === Conf['Hide'] && thread && ThreadHiding.db) {
+      if (key === Conf['Hide'] && thread && ThreadHiding.db && threadRoot) {
         Header.scrollTo(threadRoot);
         ThreadHiding.toggle(thread);
         hasAction = true;
       }
       if (key === Conf['Quick Filter MD5'] && threadRoot) {
-        post = Keybinds.post(threadRoot);
-        Keybinds.hl(+1, threadRoot);
-        Filter.quickFilterMD5.call(post, e);
-        hasAction = true;
+        const p = Keybinds.post(threadRoot);
+        if (p) {
+          const post = Get.postFromNode(p);
+          Keybinds.hl(+1, threadRoot);
+          Filter.quickFilterMD5.call(post, e);
+          hasAction = true;
+        }
       }
       if (key === Conf['Previous Post Quoting You'] && threadRoot && QuoteYou.db) {
         QuoteYou.cb.seek('preceding');
@@ -17158,138 +21125,147 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         e.stopPropagation();
       }
     },
-
     keyCode(e) {
-      let key = (() => { let kc;
-      switch ((kc = e.keyCode)) {
-        case 8: // return
-          return '';
-        case 13:
-          return 'Enter';
-        case 27:
-          return 'Esc';
-        case 32:
-          return 'Space';
-        case 37:
-          return 'Left';
-        case 38:
-          return 'Up';
-        case 39:
-          return 'Right';
-        case 40:
-          return 'Down';
-        case 188:
-          return 'Comma';
-        case 190:
-          return 'Period';
-        case 191:
-          return 'Slash';
-        case 59: case 186:
-          return 'Semicolon';
-        default:
-          if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
-            return String.fromCharCode(kc).toLowerCase();
-          } else if (96 <= kc && kc <= 105) { // numpad 0-9
-            return String.fromCharCode(kc - 48);
-          } else {
-            return null;
-          }
-      } })();
+      const key = (() => {
+        const kc = e.keyCode;
+        switch (kc) {
+          case 8: // return
+            return '';
+          case 13:
+            return 'Enter';
+          case 27:
+            return 'Esc';
+          case 32:
+            return 'Space';
+          case 37:
+            return 'Left';
+          case 38:
+            return 'Up';
+          case 39:
+            return 'Right';
+          case 40:
+            return 'Down';
+          case 188:
+            return 'Comma';
+          case 190:
+            return 'Period';
+          case 191:
+            return 'Slash';
+          case 59:
+          case 186:
+            return 'Semicolon';
+          default:
+            if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
+              return String.fromCharCode(kc).toLowerCase();
+            } else if (96 <= kc && kc <= 105) { // numpad 0-9
+              return String.fromCharCode(kc - 48);
+            } else {
+              return null;
+            }
+        }
+      })();
       if (key) {
-        if (e.altKey) {   key = 'Alt+'   + key; }
-        if (e.ctrlKey) {  key = 'Ctrl+'  + key; }
-        if (e.metaKey) {  key = 'Meta+'  + key; }
-        if (e.shiftKey) { key = 'Shift+' + key; }
+        let finalKey = key;
+        if (e.altKey) {
+          finalKey = 'Alt+' + finalKey;
+        }
+        if (e.ctrlKey) {
+          finalKey = 'Ctrl+' + finalKey;
+        }
+        if (e.metaKey) {
+          finalKey = 'Meta+' + finalKey;
+        }
+        if (e.shiftKey) {
+          finalKey = 'Shift+' + finalKey;
+        }
+        return finalKey;
       }
       return key;
     },
-
     post(thread) {
       const s = g.SITE.selectors;
-      return (
-        $(`${s.postContainer}${s.highlightable.reply}.${g.SITE.classes.highlight}`, thread) ||
-        $(`${g.SITE.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread)
-      );
+      return ($(`${s.postContainer}${s.highlightable.reply}.${g.SITE.classes.highlight}`, thread) ||
+        $(`${g.SITE.isOPContainerThread ? s.thread : s.postContainer}${s.highlightable.op}`, thread));
     },
-
     qr(thread) {
       QR.open();
       if (thread != null) {
-        QR.quote.call(Keybinds.post(thread));
+        const p = Keybinds.post(thread);
+        if (p) {
+          QR.quote.call(Get.postFromNode(p));
+        }
       }
-      return QR.nodes.com.focus();
+      QR.nodes.com.focus();
     },
-
     tags(tag, ta) {
-      BoardConfig.ready(function() {
-        const {config} = g.BOARD;
-        const supported = (() => { switch (tag) {
-          case 'spoiler':     return !!config.spoilers;
-          case 'code':        return !!config.code_tags;
-          case 'math': case 'eqn': return !!config.math_tags;
-          case 'sjis':        return !!config.sjis_tags;
-        } })();
-        if (!supported) { return new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD}/.`, 20); }
+      BoardConfig.ready(function () {
+        const { config } = g.BOARD;
+        const supported = (() => {
+          switch (tag) {
+            case 'spoiler': return !!config.spoilers;
+            case 'code': return !!config.code_tags;
+            case 'math':
+            case 'eqn': return !!config.math_tags;
+            case 'sjis': return !!config.sjis_tags;
+            default: return false;
+          }
+        })();
+        if (!supported) {
+          new Notice('warning', `[${tag}] tags are not supported on /${g.BOARD.ID}/.`, 20);
+        }
       });
-
-      const {
-        value
-      } = ta;
+      const { value } = ta;
       const selStart = ta.selectionStart;
-      const selEnd   = ta.selectionEnd;
-
+      const selEnd = ta.selectionEnd;
       ta.value =
         value.slice(0, selStart) +
-        `[${tag}]` + value.slice(selStart, selEnd) + `[/${tag}]` +
-        value.slice(selEnd);
-
+          `[${tag}]` + value.slice(selStart, selEnd) + `[/${tag}]` +
+          value.slice(selEnd);
       // Move the caret to the end of the selection.
       const range = (`[${tag}]`).length + selEnd;
       ta.setSelectionRange(range, range);
-
-      // Fire the 'input' event
-      return $.event('input', null, ta);
+      $.event('input', null, ta);
     },
-
     sage() {
-      const isSage  = /sage/i.test(QR.nodes.email.value);
-      return QR.nodes.email.value = isSage ?
-        ""
-      : "sage";
+      const isSage = /sage/i.test(QR.nodes.email.value);
+      QR.nodes.email.value = isSage ? "" : "sage";
     },
-
     open(thread, tab) {
-      if (g.VIEW !== 'index') { return; }
-      const url = Get.url('thread', thread);
-      if (tab) {
-        return $.open(url);
-      } else {
-        return location.href = url;
-      }
-    },
-
-    hl(delta, thread) {
-      const replySelector = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
-      const {highlight} = g.SITE.classes;
-
-      const postEl = $(`${replySelector}.${highlight}`, thread);
-
-      if (!delta) {
-        if (postEl) { $.rmClass(postEl, highlight); }
+      if (g.VIEW !== 'index') {
         return;
       }
-
+      const url = Get.url('thread', thread);
+      if (tab) {
+        $.open(url);
+      } else {
+        location.href = url;
+      }
+    },
+    hl(delta, thread) {
+      const replySelector = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
+      const { highlight } = g.SITE.classes;
+      const postEl = $(`${replySelector}.${highlight}`, thread);
+      if (!delta) {
+        if (postEl) {
+          $.rmClass(postEl, highlight);
+        }
+        return;
+      }
       if (postEl) {
-        const {height} = postEl.getBoundingClientRect();
+        const { height } = postEl.getBoundingClientRect();
         if ((Header.getTopOf(postEl) >= -height) && (Header.getBottomOf(postEl) >= -height)) { // We're at least partially visible
           let next;
-          const {root} = Get.postFromNode(postEl).nodes;
+          const { root } = Get.postFromNode(postEl).nodes;
           const axis = delta === +1 ?
             'following'
-          :
-            'preceding';
-          if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
-          if (!next.matches(replySelector)) { next = $(replySelector, next); }
+            :
+              'preceding';
+          if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) {
+            return;
+          }
+          if (!next.matches(replySelector)) {
+            next = $(replySelector, next);
+          }
           Header.scrollToIfNeeded(next, delta === +1);
           $.addClass(next, highlight);
           $.rmClass(postEl, highlight);
@@ -17297,10 +21273,11 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         $.rmClass(postEl, highlight);
       }
-
       const replies = $$(replySelector, thread);
-      if (delta === -1) { replies.reverse(); }
-      for (var reply of replies) {
+      if (delta === -1) {
+        replies.reverse();
+      }
+      for (const reply of replies) {
         if (((delta === +1) && (Header.getTopOf(reply) > 0)) || ((delta === -1) && (Header.getBottomOf(reply) > 0))) {
           $.addClass(reply, highlight);
           return;
@@ -17316,10 +21293,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       prerequested: undefined,
       captchas: [],
       init() {
-        $.on(d, 'SaveCaptcha', (e) => {
+        $.on(d$1, 'SaveCaptcha', (e) => {
           return this.saveAPI(e.detail);
         });
-        $.on(d, 'NoCaptcha', (e) => {
+        $.on(d$1, 'NoCaptcha', (e) => {
           return this.noCaptcha(e.detail);
         });
       },
@@ -17333,7 +21310,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return this.neededRaw() && $.event('LoadCaptcha', undefined);
       },
       haveCookie() {
-        const hasCT = /\b_ct=/.test(d.cookie);
+        const hasCT = /\b_ct=/.test(d$1.cookie);
         let hasTicket = false;
         try {
           hasTicket = !!(localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'));
@@ -17384,7 +21361,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (cb = this.submitCB) {
           if (!this.haveCookie() || detail?.error) {
             QR.error(detail?.error || 'Failed to retrieve captcha.');
-            QR.captcha.setup(d.activeElement === QR.nodes.status);
+            QR.captcha.setup(d$1.activeElement === QR.nodes.status);
           }
           delete this.submitCB;
           cb();
@@ -17449,7 +21426,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           $.addClass(QR.nodes.el, 'noscript-captcha');
         }
         Captcha.cache.init();
-        $.on(d, 'CaptchaCount', this.count.bind(this));
+        $.on(d$1, 'CaptchaCount', this.count.bind(this));
         const root = $.el('div', { className: 'captcha-root' });
         $.extend(root, {
           innerHTML: '<div class="captcha-counter"><a href="javascript:;"></a></div>'
@@ -17486,7 +21463,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return $.queueTask(() => {
           const needed = Captcha.cache.needed();
           if (needed && !this.prevNeeded) {
-            this.setup(QR.cooldown.auto && (d.activeElement === QR.nodes.status));
+            this.setup(QR.cooldown.auto && (d$1.activeElement === QR.nodes.status));
           }
           return this.prevNeeded = needed;
         });
@@ -17515,7 +21492,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1226835
           $.queueTask(() => {
             let iframe;
-            if (this.nodes.container && (d.activeElement === this.nodes.counter) && (iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', this.nodes.container))) {
+            if (this.nodes.container && (d$1.activeElement === this.nodes.counter) && (iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', this.nodes.container))) {
               iframe.focus();
               return QR.focus();
             }
@@ -17570,7 +21547,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         $.addClass(QR.nodes.el, 'captcha-open');
         this.fixQRPosition();
         $.on(iframe, 'load', this.fixQRPosition.bind(this));
-        if (d.activeElement === this.nodes.counter) {
+        if (d$1.activeElement === this.nodes.counter) {
           iframe.focus();
         }
         // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
@@ -17608,7 +21585,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           response: token || (textarea ? textarea.value : ''),
           timeout: Date.now() + this.lifetime
         });
-        const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
+        const focus = (d$1.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d$1.activeElement.src);
         if (Captcha.cache.needed()) {
           if (focus) {
             if (QR.cooldown.auto || Conf['Post on Captcha Completion']) {
@@ -17919,7 +21896,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         return;
       }
       this.posts = [];
-      $.on(d, '4chanXInitFinished', () => BoardConfig.ready(QR.initReady));
+      $.on(d$1, '4chanXInitFinished', () => BoardConfig.ready(QR.initReady));
       Callbacks.Post.push({
         name: 'Quick Reply',
         cb: this.node
@@ -17990,15 +21967,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           $.prepend(navLinksBot, linkBot);
         }
       }
-      $.on(d, 'QRGetFile', QR.getFile);
-      $.on(d, 'QRDrawFile', QR.drawFile);
-      $.on(d, 'QRSetFile', QR.setFile);
-      $.on(d, 'paste', QR.paste);
-      $.on(d, 'dragover', QR.dragOver);
-      $.on(d, 'drop', QR.dropFile);
-      $.on(d, 'dragstart dragend', QR.drag);
-      $.on(d, 'IndexRefreshInternal', QR.generatePostableThreadsList);
-      $.on(d, 'ThreadUpdate', QR.statusCheck);
+      $.on(d$1, 'QRGetFile', QR.getFile);
+      $.on(d$1, 'QRDrawFile', QR.drawFile);
+      $.on(d$1, 'QRSetFile', QR.setFile);
+      $.on(d$1, 'paste', QR.paste);
+      $.on(d$1, 'dragover', QR.dragOver);
+      $.on(d$1, 'drop', QR.dropFile);
+      $.on(d$1, 'dragstart dragend', QR.drag);
+      $.on(d$1, 'IndexRefreshInternal', QR.generatePostableThreadsList);
+      $.on(d$1, 'ThreadUpdate', QR.statusCheck);
       if (!Conf['Persistent QR']) {
         return;
       }
@@ -18066,14 +22043,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     focus() {
       return $.queueTask(function () {
         if (!QR.inBubble()) {
-          QR.hasFocus = d.activeElement && QR.nodes.el.contains(d.activeElement);
+          QR.hasFocus = d$1.activeElement && QR.nodes.el.contains(d$1.activeElement);
           return QR.nodes.el.classList.toggle('focus', QR.hasFocus);
         }
       });
     },
     inBubble() {
       const bubbles = $$('iframe[src^="https://www.google.com/recaptcha/api2/frame"]');
-      return bubbles.includes(d.activeElement) || bubbles.some(el => (getComputedStyle(el).visibility !== 'hidden') && (el.getBoundingClientRect().bottom > 0));
+      return bubbles.includes(d$1.activeElement) || bubbles.some(el => (getComputedStyle(el).visibility !== 'hidden') && (el.getBoundingClientRect().bottom > 0));
     },
     hide() {
       QR.blur();
@@ -18092,8 +22069,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
     },
     blur() {
-      if (QR.nodes.el.contains(d.activeElement)) {
-        return d.activeElement.blur();
+      if (QR.nodes.el.contains(d$1.activeElement)) {
+        return d$1.activeElement.blur();
       }
     },
     toggleSJIS(e) {
@@ -18144,10 +22121,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       const notice = new Notice('warning', el);
       QR.notifications.push(notice);
       if (!Header.areNotificationsEnabled) {
-        if (d.hidden && !QR.cooldown.auto) {
+        if (d$1.hidden && !QR.cooldown.auto) {
           return alert(el.textContent);
         }
-      } else if (d.hidden || !(focusOverride || d.hasFocus())) {
+      } else if (d$1.hidden || !(focusOverride || d$1.hasFocus())) {
         const notif = new Notification(el.textContent, {
           body: el.textContent,
           icon: Favicon.logo
@@ -18217,7 +22194,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (!QR.postingIsEnabled) {
         return;
       }
-      const sel = d.getSelection();
+      const sel = d$1.getSelection();
       const post = Get.postFromNode(this);
       const { root } = post.nodes;
       const postRange = new Range();
@@ -18372,8 +22349,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     drag(e) {
       // Let it drag anything from the page.
       const toggle = e.type === 'dragstart' ? $.off : $.on;
-      toggle(d, 'dragover', QR.dragOver);
-      return toggle(d, 'drop', QR.dropFile);
+      toggle(d$1, 'dragover', QR.dragOver);
+      return toggle(d$1, 'drop', QR.dropFile);
     },
     dragOver(e) {
       e.preventDefault();
@@ -18468,7 +22445,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         QR.handleFile(file, files.length);
       }
       $.addClass(QR.nodes.el, 'dump');
-      if ((d.activeElement === QR.nodes.fileButton) && $.hasClass(QR.nodes.fileSubmit, 'has-file')) {
+      if ((d$1.activeElement === QR.nodes.fileButton) && $.hasClass(QR.nodes.fileSubmit, 'has-file')) {
         return QR.nodes.filename.focus();
       }
     },
@@ -18605,7 +22582,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       window.addEventListener('focus', QR.focus, true);
       window.addEventListener('blur', QR.focus, true);
       // We don't receive blur events from captcha iframe.
-      $.on(d, 'click', QR.focus);
+      $.on(d$1, 'click', QR.focus);
       // XXX Workaround for image pasting in Firefox, obsolete as of v50.
       // https://bugzilla.mozilla.org/show_bug.cgi?id=906420
       if (($.engine === 'gecko') && !window.DataTransferItemList) {
@@ -18639,7 +22616,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       QR.status();
       QR.cooldown.setup();
       QR.captcha.init();
-      $.add(d.body, dialog);
+      $.add(d$1.body, dialog);
       QR.captcha.setup();
       QR.oekaki.setup();
       // Create a custom event when the QR dialog is first initialized.
@@ -18735,7 +22712,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           err = 'Original comment required.';
         }
       }
-      if (QR.captcha.isEnabled && !((QR.captcha === Captcha.v2) && /\b_ct=/.test(d.cookie) && threadID) && !(err && !force)) {
+      if (QR.captcha.isEnabled && !((QR.captcha === Captcha.v2) && /\b_ct=/.test(d$1.cookie) && threadID) && !(err && !force)) {
         captcha = QR.captcha.getOne(!!threadID);
         if (QR.captcha === Captcha.v2) {
           if (!captcha) {
@@ -18744,7 +22721,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         }
         if (!captcha) {
           err = 'No valid captcha.';
-          QR.captcha.setup(!QR.cooldown.auto || (d.activeElement === QR.nodes.status));
+          QR.captcha.setup(!QR.cooldown.auto || (d$1.activeElement === QR.nodes.status));
         }
       }
       QR.cleanNotifications();
@@ -18910,7 +22887,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } else { // stop auto-posting
           QR.cooldown.auto = false;
         }
-        QR.captcha.setup(QR.cooldown.auto && [QR.nodes.status, d.body].includes(d.activeElement));
+        QR.captcha.setup(QR.cooldown.auto && [QR.nodes.status, d$1.body].includes(d$1.activeElement));
         QR.status();
         QR.error(err);
         return;
@@ -18939,7 +22916,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       } })());
       if (postsCount) {
         post.rm();
-        QR.captcha.setup(d.activeElement === QR.nodes.status);
+        QR.captcha.setup(d$1.activeElement === QR.nodes.status);
       } else if (Conf['Persistent QR']) {
         post.rm();
         if (Conf['Auto Hide QR']) {
@@ -19050,7 +23027,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       if (!QR.selected.file)
         return;
       QR.nodes.preview = $.el('div', { id: 'overlay', className: 'media-preview' });
-      $.add(d.body, QR.nodes.preview);
+      $.add(d$1.body, QR.nodes.preview);
       QR.previewUrl = URL.createObjectURL(QR.selected.file);
       if (QR.selected.file.type.startsWith('video/')) {
         const video = $.el('video', { controls: true, src: QR.previewUrl, autoplay: true });
@@ -19370,7 +23347,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         $.global('setupQR');
       },
       load(cb) {
-        if ($('script[src^="//s.4cdn.org/js/tegaki"]', d.head)) {
+        if ($('script[src^="//s.4cdn.org/js/tegaki"]', d$1.head)) {
           cb();
         } else {
           const style = $.el('link', {
@@ -19385,7 +23362,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           };
           $.on(style, 'load', onload);
           $.on(script, 'load', onload);
-          $.add(d.head, [style, script]);
+          $.add(d$1.head, [style, script]);
         }
       },
       draw() {
@@ -19466,7 +23443,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         let m;
         if (QR.persona.pwd != null) {
           return QR.persona.pwd;
-        } else if (m = d.cookie.match(/4chan_pass=([^;]+)/)) {
+        } else if (m = d$1.cookie.match(/4chan_pass=([^;]+)/)) {
           return decodeURIComponent(m[1]);
         } else {
           return '';
@@ -20080,66 +24057,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      if (platform === 'crx') {
+
         $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
           .then(({ response, responseHeaderString }) => {
           if (response)
             response = new Uint8Array(response);
           cb(response, responseHeaderString);
         });
-      } else {
-        const fallback = function () {
-          return $.ajax(url, {
-            headers,
-            responseType: 'arraybuffer',
-            onloadend() {
-              if (this.status && this.response) {
-                return cb(new Uint8Array(this.response), this.getAllResponseHeaders());
-              } else {
-                return cb(null);
-              }
-            }
-          });
-        };
-        if ((typeof window.GM_xmlhttpRequest === 'undefined' || window.GM_xmlhttpRequest === null)) {
-          fallback();
-          return;
-        }
-        const gmOptions = {
-          method: "GET",
-          anonymous: true,
-          url,
-          headers,
-          responseType: 'arraybuffer',
-          overrideMimeType: 'text/plain; charset=x-user-defined',
-          onload(xhr) {
-            let data;
-            if (xhr.response instanceof ArrayBuffer) {
-              data = new Uint8Array(xhr.response);
-            } else {
-              const r = xhr.responseText;
-              data = new Uint8Array(r.length);
-              let i = 0;
-              while (i < r.length) {
-                data[i] = r.charCodeAt(i);
-                i++;
-              }
-            }
-            return cb(data, xhr.responseHeaders);
-          },
-          onerror() {
-            return cb(null);
-          },
-          onabort() {
-            return cb(null);
-          }
-        };
-        try {
-          return (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
-        } catch (error) {
-          return fallback();
-        }
-      }
+
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20211,62 +24136,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-      if (platform === 'userscript') {
-        if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
-          return $.ajax(url, options);
-        }
-        const gmOptions = {
-          method: 'GET',
-          anonymous: true,
-          url,
-          headers,
-          timeout,
-          onload(xhr) {
-            try {
-              let response = xhr.responseText;
-              if (responseType === 'json') {
-                try {
-                  response = JSON.parse(xhr.responseText);
-                } catch (error) {
-                  console.error(error);
-                  console.error(xhr);
-                }
-              }
-              $.extend(req, {
-                url,
-                headers,
-                response,
-                status: xhr.status,
-                statusText: xhr.statusText,
-                responseHeaderString: xhr.responseHeaders
-              });
-            } catch (error) { }
-            return req.onloadend();
-          },
-          onerror() { return req.onloadend(); },
-          onabort() { return req.onloadend(); },
-          ontimeout() { return req.onloadend(); }
-        };
-        try {
-          gmReq = (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
-        } catch (error) {
-          return $.ajax(url, options);
-        }
-        if (gmReq && (typeof gmReq.abort === 'function')) {
-          req.abort = function () {
-            try {
-              return gmReq.abort();
-            } catch (error1) { }
-          };
-        }
-      } else {
+
         $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
           if (result.status) {
             $.extend(req, result);
           }
           return req.onloadend();
         });
-      }
+
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20281,7 +24158,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-      if (platform === 'crx') {
+
         return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
           if (result) {
             return cb();
@@ -20289,3802 +24166,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             return cbFail();
           }
         });
-      }
+
       return cb();
     },
   };
-
-  const ImageCommon = {
-    cache: undefined,
-    // Pause and mute video in preparation for removing the element from the document.
-    pause(video) {
-      if (video.nodeName !== 'VIDEO') {
-        return;
-      }
-      const v = video;
-      v.pause();
-      $.off(v, 'volumechange', Volume.change);
-      v.muted = true;
-    },
-    rewind(el) {
-      if (el.nodeName === 'VIDEO') {
-        const v = el;
-        if (v.readyState >= v.HAVE_METADATA) {
-          return v.currentTime = 0;
-        }
-      } else if (/\.gif$/.test(el.src)) {
-        const img = el;
-        return $.queueTask(() => img.src = img.src);
-      }
-    },
-    pushCache(el) {
-      ImageCommon.cache = el;
-      $.on(el, 'error', ImageCommon.cacheError);
-    },
-    popCache() {
-      const el = ImageCommon.cache;
-      $.off(el, 'error', ImageCommon.cacheError);
-      delete ImageCommon.cache;
-      return el;
-    },
-    cacheError() {
-      if (ImageCommon.cache === this) {
-        delete ImageCommon.cache;
-      }
-    },
-    decodeError(file, fileObj) {
-      let message;
-      if (file.error?.code !== MediaError.MEDIA_ERR_DECODE) {
-        return false;
-      }
-      if (!(message = $('.warning', fileObj.thumb.parentNode))) {
-        message = $.el('div', { className: 'warning' });
-        $.after(fileObj.thumb, message);
-      }
-      message.textContent = 'Error: Corrupt or unplayable video';
-      return true;
-    },
-    isFromArchive(file) {
-      return (g.SITE.software === 'yotsuba') && !ImageHost.test(file.src.split('/')[2]);
-    },
-    error(file, post, fileObj, delay, cb) {
-      let timeoutID;
-      const src = fileObj.url.split('/');
-      let url = null;
-      if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect']) {
-        url = Redirect.to('file', {
-          boardID: post.board.ID,
-          filename: src[src.length - 1]
-        });
-      }
-      if (!url || !Redirect.securityCheck(url)) {
-        url = null;
-      }
-      if ((post.isDead || fileObj.isDead) && !ImageCommon.isFromArchive(file)) {
-        return cb(url);
-      }
-      if (delay != null) {
-        timeoutID = setTimeout((() => cb(url)), delay);
-      }
-      if (post.isDead || fileObj.isDead) {
-        return;
-      }
-      const redirect = function () {
-        if (!ImageCommon.isFromArchive(file)) {
-          if (delay != null) {
-            clearTimeout(timeoutID);
-          }
-          return cb(url);
-        }
-      };
-      const threadJSON = g.SITE.urls.threadJSON?.(post);
-      if (!threadJSON) {
-        return;
-      }
-      const parseJSON = function (isArchiveURL) {
-        let needle, postObj;
-        if (this.status === 404) {
-          let archivedThreadJSON;
-          if (!isArchiveURL && (archivedThreadJSON = g.SITE.urls.archivedThreadJSON?.(post))) {
-            $.ajax(archivedThreadJSON, { onloadend() { return parseJSON.call(this, true); } });
-          } else {
-            post.kill(!post.isClone, fileObj.index);
-          }
-        }
-        if (this.status !== 200) {
-          return redirect();
-        }
-        for (const p of this.response.posts) {
-          if (p.no === post.ID) {
-            postObj = p;
-            break;
-          }
-        }
-        if (!postObj || postObj.no !== post.ID) {
-          post.kill();
-          return redirect();
-        } else if ((needle = fileObj.docIndex, g.SITE.Build.parseJSON(postObj, post.board).filesDeleted.includes(needle))) {
-          post.kill(true);
-          return redirect();
-        } else {
-          return url = fileObj.url;
-        }
-      };
-      return $.ajax(threadJSON, { onloadend() { return parseJSON.call(this); } });
-    },
-    // XXX Estimate whether clicks are on the video controls and should be ignored.
-    onControls(e) {
-      return (Conf['Show Controls'] && Conf['Click Passthrough'] && (e.target.nodeName === 'VIDEO')) ||
-        (e.target.controls && ((e.target.getBoundingClientRect().bottom - e.clientY) < 35));
-    },
-    download(e) {
-      if (this.protocol === 'blob:') {
-        return true;
-      }
-      e.preventDefault();
-      const { href, download } = this;
-      return CrossOrigin.file(href, function (blob) {
-        if (blob) {
-          const a = $.el('a', {
-            href: URL.createObjectURL(blob),
-            download,
-            hidden: true
-          });
-          $.add(d.body, a);
-          a.click();
-          return $.rm(a);
-        } else {
-          return new Notice('warning', `Could not download ${href}`, 20);
-        }
-      });
-    }
-  };
-
-  const passMessagePage = h("div", { class: "box-inner" },
-    h("div", { class: "boxbar" },
-      h("h2", null,
-        "Trouble buying a 4chan Pass? (a message from 4chan X)",
-        h("a", { href: "javascript:;", style: "text-decoration: none; float: right; margin-right: 4px;", title: "Close" }, "\u00D7"))),
-    h("div", { class: "boxcontent" },
-      "Check the 4chan X wiki for ",
-      h("a", { href: `${meta.captchaFAQ}#alternatives`, target: "_blank", rel: "noopener" }, "alternative solutions"),
-      "."));
-
-  // @ts-nocheck
-
-  const PassMessage = {
-    init() {
-      if (Conf['passMessageClosed']) { return; }
-      const msg = $.el('div',
-        {className: 'box-outer top-box'}
-      ,
-        passMessagePage);
-      msg.style.cssText = 'padding-bottom: 0;';
-      const close = $('a', msg);
-      $.on(close, 'click', function() {
-        $.rm(msg);
-        return $.set('passMessageClosed', true);
-      });
-      return $.ready(function() {
-        let hd;
-        if (hd = $.id('hd')) {
-          return $.after(hd, msg);
-        } else {
-          return $.prepend(d.body, msg);
-        }
-      });
-    }
-  };
-
-  var ReportPage = `<legend><label><input id="archive-report-enabled" type="checkbox">Report illegal content to archives</label></legend>
-<label for="archive-report-reason">Details</label>
-<textarea id="archive-report-reason" disabled>Illegal content</textarea>
-<button id="archive-report-submit" hidden>Submit</button>`;
-
-  // @ts-nocheck
-
-  var Report = {
-    init() {
-      let match;
-      if (!(match = location.search.match(/\bno=(\d+)/))) { return; }
-      Captcha.replace.init();
-      this.postID = +match[1];
-      return $.ready(this.ready);
-    },
-
-    ready() {
-      $.addStyle(CSS.report);
-
-      if (Conf['Archive Report']) { Report.archive(); }
-
-      new MutationObserver(function() {
-        Report.fit('iframe[src^="https://www.google.com/recaptcha/api2/frame"]');
-        return Report.fit('body');
-      }).observe(d.body, {
-        childList:  true,
-        attributes: true,
-        subtree:    true
-      }
-      );
-      return Report.fit('body');
-    },
-
-    fit(selector) {
-      let el;
-      if (!((el = $(selector, doc)) && (getComputedStyle(el).visibility !== 'hidden'))) { return; }
-      const dy = (el.getBoundingClientRect().bottom - doc.clientHeight) + 8;
-      if (dy > 0) { return window.resizeBy(0, dy); }
-    },
-
-    archive() {
-      let match, urls;
-      if (!(urls = Redirect.report(g.BOARD.ID)).length) { return; }
-
-      const form    = $('form');
-      const types   = $.id('reportTypes');
-      const message = $('h3');
-
-      const fieldset = $.el('fieldset', {
-        id: 'archive-report',
-        hidden: true
-      }
-      ,
-        { innerHTML: ReportPage });
-      const enabled = $('#archive-report-enabled', fieldset);
-      const reason  = $('#archive-report-reason',  fieldset);
-      const submit  = $('#archive-report-submit',  fieldset);
-
-      $.on(enabled, 'change', function() {
-        return reason.disabled = !this.checked;
-      });
-
-      if (form && types) {
-        fieldset.hidden = !$('[value="31"]', types).checked;
-        $.on(types, 'change', function(e) {
-          fieldset.hidden = (e.target.value !== '31');
-          return Report.fit('body');
-        });
-        $.after(types, fieldset);
-        Report.fit('body');
-        $.one(form, 'submit', function(e) {
-          if (!fieldset.hidden && enabled.checked) {
-            e.preventDefault();
-            return Report.archiveSubmit(urls, reason.value, results => {
-              this.action = '#archiveresults=' + encodeURIComponent(JSON.stringify(results));
-              return this.submit();
-            });
-          }
-        });
-      } else if (message) {
-        fieldset.hidden = /Report submitted!/.test(message.textContent);
-        $.on(enabled, 'change', function() {
-          return submit.hidden = !this.checked;
-        });
-        $.after(message, fieldset);
-        $.on(submit, 'click', () => Report.archiveSubmit(urls, reason.value, Report.archiveResults));
-      }
-
-      if (match = location.hash.match(/^#archiveresults=(.*)$/)) {
-        try {
-          return Report.archiveResults(JSON.parse(decodeURIComponent(match[1])));
-        } catch (error) {}
-      }
-    },
-
-    archiveSubmit(urls, reason, cb) {
-      const form = $.formData({
-        board:  g.BOARD.ID,
-        num:    Report.postID,
-        reason
-      });
-      const results = [];
-      for (var [name, url] of urls) {
-        (function(name, url) {
-          return $.ajax(url, {
-            onloadend() {
-              results.push([name, this.response || {error: ''}]);
-              if (results.length === urls.length) {
-                return cb(results);
-              }
-            },
-            form
-          });
-        })(name, url);
-      }
-    },
-
-    archiveResults(results) {
-      const fieldset = $.id('archive-report');
-      for (var [name, response] of results) {
-        var line = $.el('h3',
-          {className: 'archive-report-response'});
-        if ('success' in response) {
-          $.addClass(line, 'archive-report-success');
-          line.textContent = `${name}: ${response.success}`;
-        } else {
-          $.addClass(line, 'archive-report-error');
-          line.textContent = `${name}: ${response.error || 'Error reporting post.'}`;
-        }
-        if (fieldset) {
-          $.before(fieldset, line);
-        } else {
-          $.add(d.body, line);
-        }
-      }
-    }
-  };
-
-  const PostSuccessful = {
-    init() {
-      if (!Conf['Remember Your Posts']) {
-        return;
-      }
-      $.ready(PostSuccessful.ready);
-    },
-    ready() {
-      if (d.title !== 'Post successful!') {
-        return;
-      }
-      const h1 = $('h1');
-      if (!h1 || !h1.nextSibling) {
-        return;
-      }
-      const textContent = h1.nextSibling.textContent;
-      if (!textContent) {
-        return;
-      }
-      const match = textContent.match(/thread:(\d+),no:(\d+)/);
-      if (!match) {
-        return;
-      }
-      const postID = +match[2];
-      const threadID = +match[1] || postID;
-      const db = new DataBoard('yourPosts');
-      db.set({
-        boardID: g.BOARD.ID,
-        threadID,
-        postID,
-        val: true
-      });
-    }
-  };
-
-  function generatePostInfoHtml(ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon, capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID, threadID) {
-    const nameHtml = [h("span", { class: `name${capcode ? ' capcode' : ''}` }, name)];
-    if (tripcode)
-      nameHtml.push(' ', h("span", { class: "postertrip" }, tripcode));
-    if (pass)
-      nameHtml.push(' ', h("span", { title: `Pass user since ${pass}`, class: "n-pu" }));
-    if (capcode) {
-      nameHtml.push(' ', h("strong", { class: `capcode hand id_${capcodeLC}`, title: `Highlight posts by ${capcodePlural}` },
-        "## ",
-        capcode));
-    }
-    const nameBlockContent = email ? [' ', h("a", { href: `mailto:${email}`, class: "useremail" }, ...nameHtml)] : nameHtml;
-    if (!(boardID === "f" && !o.isReply || capcodeDescription))
-      nameBlockContent.push(' ');
-    if (capcodeDescription) {
-      nameBlockContent.push(h("img", { src: `${staticPath}${capcodeLC}icon${gifIcon}`, alt: `${capcode} Icon`, title: `This user is ${capcodeDescription}.`, class: "identityIcon retina" }));
-    }
-    if (uniqueID && !capcode) {
-      nameBlockContent.push(h("span", { class: `posteruid id_${uniqueID}` },
-        "(ID: ",
-        h("span", { class: "hand", title: "Highlight posts by this ID" }, uniqueID),
-        ")"));
-    }
-    if (flagCode)
-      nameBlockContent.push(' ', h("span", { title: flag, class: `flag flag-${flagCode.toLowerCase()}` }));
-    if (flagCodeTroll)
-      nameBlockContent.push(' ', h("span", { title: flag, class: `bfl bfl-${flagCodeTroll.toLowerCase()}` }));
-    const postNumContent = [
-      h("a", { href: postLink, title: "Link to this post" }, "No."),
-      h("a", { href: quoteLink, title: "Reply to this post" }, ID),
-    ];
-    if (o.isSticky) {
-      const src = `${staticPath}sticky${gifIcon}`;
-      postNumContent.push(' ');
-      if (boardID === "f") {
-        postNumContent.push(h("img", { src: src, alt: "Sticky", title: "Sticky", style: "height: 18px; width: 18px;" }));
-      } else {
-        postNumContent.push(h("img", { src: src, alt: "Sticky", title: "Sticky", class: "stickyIcon retina" }));
-      }
-    }
-    if (o.isClosed && !o.isArchived) {
-      postNumContent.push(' ');
-      const src = `${staticPath}closed${gifIcon}`;
-      if (boardID === "f") {
-        postNumContent.push(h("img", { src: src, alt: "Closed", title: "Closed", style: "height: 18px; width: 18px;" }));
-      } else {
-        postNumContent.push(h("img", { src: src, alt: "Closed", title: "Closed", class: "closedIcon retina" }));
-      }
-    }
-    if (o.isArchived) {
-      postNumContent.push(' ', h("img", { src: `${staticPath}archived${gifIcon}`, alt: "Archived", title: "Archived", class: "archivedIcon retina" }));
-    }
-    if (!o.isReply && g.VIEW === "index") {
-      postNumContent.push(' \u00A0 ', // \u00A0 is nbsp
-      h("span", null,
-        "[",
-        h("a", { href: `/${boardID}/thread/${threadID}`, class: "replylink" }, "Reply"),
-        "]"));
-    }
-    return h("div", { class: "postInfo desktop", id: `pi${ID}` },
-      h("input", { type: "checkbox", name: ID, value: "delete" }),
-      ' ',
-      ...((!o.isReply || boardID === "f" || subject) ? [h("span", { class: "subject" }, subject), ' '] : []),
-      h("span", { class: `nameBlock${capcode ? ` capcode${capcode}` : ''}` }, ...nameBlockContent),
-      ' ',
-      h("span", { class: "dateTime", "data-utc": dateUTC }, dateText),
-      ' ',
-      h("span", { class: `postNum${!(boardID === " f" && !o.isReply) ? ' desktop' : ''}` }, ...postNumContent));
-  }
-
-  function generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon) {
-    if (file) {
-      const fileContent = [];
-      if (boardID === "f") {
-        fileContent.push(h("div", { class: "fileInfo", "data-md5": file.MD5 },
-          h("span", { class: "fileText", id: `fT${ID}` },
-            'File: ',
-            h("a", { "data-width": file.width, "data-height": file.height, href: fileURL, target: "_blank" }, file.name),
-            "-(",
-            file.size,
-            ", ",
-            file.dimensions,
-            file.tag ? ', ' + file.tag : '',
-            ")")));
-      } else {
-        fileContent.push(h("div", { class: "fileText", id: `fT${ID}`, title: file.isSpoiler ? file.name : null },
-          'File: ',
-          h("a", { title: file.name === shortFilename || file.isSpoiler ? null : file.name, href: fileURL, target: "_blank" }, file.isSpoiler ? 'Spoiler Image' : shortFilename),
-          ` (${file.size}, ${file.dimensions || "PDF"})`), h("a", { class: `fileThumb${file.isSpoiler ? ' imgspoiler' : ''}`, href: fileURL, target: "_blank", "data-m": file.hasDownscale ? '' : null },
-          h("img", { src: fileThumb, alt: file.size, "data-md5": file.MD5, style: `height: ${file.isSpoiler ? '100' : file.theight}px; width: ${file.isSpoiler ? '100' : file.twidth}px;`, loading: "lazy" })));
-      }
-      return h("div", { class: "file", id: `f${ID}` }, ...fileContent);
-    } else if (o.fileDeleted) {
-      return h("div", { class: "file", id: `f${ID}` },
-        h("span", { class: "fileThumb" },
-          h("img", { src: `${staticPath}filedeleted-res${gifIcon}`, alt: "File deleted.", class: "fileDeletedRes retina" })));
-    }
-    return { innerHTML: '', [isEscaped]: true };
-  }
-
-  function generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon) {
-    return h(hFragment, null,
-      h("a", { class: "catalog-link", href: `/${thread.board}/thread/${thread.ID}` }, imgClass ?
-        h("img", { src: src, class: `catalog-thumb ${imgClass}` }) :
-        h("img", { src: src, class: "catalog-thumb", "data-width": data.tn_w, "data-height": data.tn_h })),
-      h("div", { class: "catalog-stats" },
-        h("span", { title: "Posts / Files / Page" },
-          h("span", { class: `post-count${data.bumplimit ? ' warning' : ''}` }, postCount),
-          ' / ',
-          h("span", { class: `file-count${data.imagelimit ? ' warning' : ''}` }, fileCount),
-          ' / ',
-          h("span", { class: "page-count" }, pageCount)),
-        h("span", { class: "catalog-icons" },
-          thread.isSticky ? h("img", { src: `${staticPath}sticky${gifIcon}`, class: "stickyIcon", title: "Sticky" }) : '',
-          thread.isClosed ? h("img", { src: `${staticPath}closed${gifIcon}`, class: "closedIcon", title: "Closed" }) : '')));
-  }
-
-  // @ts-nocheck
-  const SWYotsuba = {
-    isOPContainerThread: false,
-    hasIPCount: true,
-    archivedBoardsKnown: true,
-    urls: {
-      thread({ boardID, threadID }) { return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/thread/${threadID}`; },
-      post({ postID }) { return `#p${postID}`; },
-      index({ boardID }) { return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/`; },
-      catalog({ boardID }) { if (boardID === 'f') {
-        return undefined;
-      } else {
-        return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/catalog`;
-      } },
-      archive({ boardID }) { if (BoardConfig.isArchived(boardID)) {
-        return `${location.protocol}//${BoardConfig.domain(boardID)}/${boardID}/archive`;
-      } else {
-        return undefined;
-      } },
-      threadJSON({ boardID, threadID }) { return `${location.protocol}//a.4cdn.org/${boardID}/thread/${threadID}.json`; },
-      threadsListJSON({ boardID }) { return `${location.protocol}//a.4cdn.org/${boardID}/threads.json`; },
-      archiveListJSON({ boardID }) { if (BoardConfig.isArchived(boardID)) {
-        return `${location.protocol}//a.4cdn.org/${boardID}/archive.json`;
-      } else {
-        return '';
-      } },
-      catalogJSON({ boardID }) { return `${location.protocol}//a.4cdn.org/${boardID}/catalog.json`; },
-      file({ boardID }, filename) {
-        const hostname = boardID === 'f' ? ImageHost.flashHost() : ImageHost.host();
-        return `${location.protocol}//${hostname}/${boardID}/${filename}`;
-      },
-      thumb({ boardID }, filename) {
-        return `${location.protocol}//${ImageHost.thumbHost()}/${boardID}/${filename}`;
-      }
-    },
-    isPrunedByAge({ boardID }) { return boardID === 'f'; },
-    areMD5sDeferred({ boardID }) { return boardID === 'f'; },
-    isOnePage({ boardID }) { return boardID === 'f'; },
-    noAudio({ boardID }) { return BoardConfig.noAudio(boardID); },
-    selectors: {
-      board: '.board',
-      thread: '.thread',
-      threadDivider: '.board > hr',
-      summary: 'a.summary',
-      postContainer: '.postContainer',
-      replyOriginal: '.replyContainer:not([data-clone])',
-      sideArrows: 'div.sideArrows',
-      post: '.post',
-      infoRoot: '.postInfo',
-      info: {
-        subject: '.subject',
-        name: '.name',
-        email: '.useremail',
-        tripcode: '.postertrip',
-        uniqueIDRoot: '.posteruid',
-        uniqueID: '.posteruid > .hand',
-        capcode: '.capcode.hand',
-        pass: '.n-pu',
-        flag: '.flag, .bfl',
-        date: '.dateTime',
-        nameBlock: '.nameBlock',
-        quote: '.postNum > a:nth-of-type(2)',
-        reply: '.replylink'
-      },
-      icons: {
-        isSticky: '.stickyIcon',
-        isClosed: '.closedIcon',
-        isArchived: '.archivedIcon'
-      },
-      file: {
-        text: '.fileText, .fileInfo',
-        link: '.fileText > a',
-        thumb: 'a.fileThumb > [data-md5]'
-      },
-      thumbLink: 'a.fileThumb',
-      highlightable: {
-        op: '.opContainer',
-        reply: ' > .reply',
-        catalog: ''
-      },
-      comment: '.postMessage',
-      spoiler: 's',
-      quotelink: ':not(pre) > .quotelink', // XXX https://github.com/4chan/4chan-JS/issues/77: 4chan currently creates quote links inside [code] tags; ignore them
-      catalog: {
-        board: '#threads',
-        thread: '.thread',
-        thumb: '.thumb'
-      },
-      boardList: '#boardNavDesktop > .boardList',
-      boardListBottom: '#boardNavDesktopFoot > .boardList',
-      styleSheet: 'link[rel*="stylesheet"][title]',
-      psa: '#globalMessage',
-      psaTop: '#globalToggle',
-      searchBox: '#search-box',
-      nav: {
-        prev: '.prev > form > [type=submit]',
-        next: '.next > form > [type=submit]'
-      }
-    },
-    classes: {
-      highlight: 'highlight'
-    },
-    xpath: {
-      thread: 'div[contains(concat(" ",@class," ")," thread ")]',
-      postContainer: 'div[contains(@class,"postContainer")]',
-      replyContainer: 'div[contains(@class,"replyContainer")]'
-    },
-    regexp: {
-      quotelink: new RegExp(`\
-^https?://boards\\.4chan(?:nel)?\\.org/+\
-([^/]+)\
-/+thread/+\
-(\\d+)\
-(?:[/?][^#]*)?\
-(?:#p\
-(\\d+)\
-)?\
-$\
-`),
-      quotelinkHTML: /<a [^>]*\bhref="(?:(?:\/\/boards\.4chan(?:nel)?\.org)?\/([^\/]+)\/thread\/)?(\d+)?(?:#p(\d+))?"/g,
-      pass: /^https?:\/\/www\.4chan(?:nel)?\.org\/+pass(?:$|[?#])/,
-      captcha: /^https?:\/\/sys\.4chan(?:nel)?\.org\/+captcha(?:$|[?#])/,
-    },
-    bgColoredEl() {
-      return $.el('div', { className: 'reply' });
-    },
-    isThisPageLegit() {
-      // not 404 error page or similar.
-      return ['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname) &&
-        d.doctype &&
-        !$('link[href*="favicon-status.ico"]', d.head) &&
-        !['4chan - Temporarily Offline', '4chan - Error', '504 Gateway Time-out', 'MathJax Equation Source'].includes(d.title);
-    },
-    is404() {
-      // XXX Sometimes threads don't 404 but are left over as stubs containing one garbage reply post.
-      return ['4chan - Temporarily Offline', '4chan - 404 Not Found'].includes(d.title) || ((g.VIEW === 'thread') && $('.board') && !$('.opContainer'));
-    },
-    isIncomplete() {
-      return ['index', 'thread'].includes(g.VIEW) && !$('.board + *');
-    },
-    isBoardlessPage(url) {
-      return ['www.4chan.org', 'www.4channel.org'].includes(url.hostname);
-    },
-    isAuxiliaryPage(url) {
-      return !['boards.4chan.org', 'boards.4channel.org'].includes(url.hostname);
-    },
-    isFileURL(url) {
-      return ImageHost.test(url.hostname);
-    },
-    initAuxiliary() {
-      switch (location.hostname) {
-        case 'www.4chan.org':
-        case 'www.4channel.org':
-          if (SWYotsuba.regexp.pass.test(location.href)) {
-            PassMessage.init();
-          } else {
-            $.onExists(doc, 'body', () => $.addStyle(CSS.www));
-            Captcha.replace.init();
-          }
-          return;
-        case 'sys.4chan.org':
-        case 'sys.4channel.org':
-          var pathname = location.pathname.split(/\/+/);
-          if (pathname[1] === 'captcha') {
-            $.onExists(doc, 'body', () => {
-              $.addClass(doc, 'captcha-t', 'captcha-iframe');
-              $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
-              Captcha.t.setupIframe();
-            });
-            return;
-          }
-          if (pathname[2] === 'imgboard.php') {
-            let match;
-            if (/\bmode=report\b/.test(location.search)) {
-              Report.init();
-            } else if (match = location.search.match(/\bres=(\d+)/)) {
-              $.ready(function () {
-                if (Conf['404 Redirect'] && ($.id('errmsg')?.textContent === 'Error: Specified thread does not exist.')) {
-                  return Redirect.navigate('thread', {
-                    boardID: g.BOARD.ID,
-                    postID: +match[1]
-                  });
-                }
-              });
-            }
-          } else if (pathname[2] === 'post') {
-            PostSuccessful.init();
-          }
-          return;
-      }
-    },
-    scriptData() {
-      for (var script of $$('script:not([src])', d.head)) {
-        if (/\bcooldowns *=/.test(script.textContent)) {
-          return script.textContent;
-        }
-      }
-      return '';
-    },
-    parseThreadMetadata(thread) {
-      let m;
-      const scriptData = this.scriptData();
-      thread.postLimit = /\bbumplimit *= *1\b/.test(scriptData);
-      thread.fileLimit = /\bimagelimit *= *1\b/.test(scriptData);
-      thread.ipCount = (m = scriptData.match(/\bunique_ips *= *(\d+)\b/)) ? +m[1] : undefined;
-      if ((g.BOARD.ID === 'f') && thread.OP.file) {
-        const { file } = thread.OP;
-        return $.ajax(this.urls.threadJSON({ boardID: 'f', threadID: thread.ID }), {
-          timeout: MINUTE,
-          onloadend() {
-            if (this.response) {
-              return file.text.dataset.md5 = (file.MD5 = this.response.posts[0].md5);
-            }
-          }
-        });
-      }
-    },
-    parseNodes(post, nodes) {
-      // Add CSS classes to sticky/closed icons on /f/ to match other boards.
-      if (post.boardID === 'f') {
-        return (() => {
-          const result = [];
-          for (var type of ['Sticky', 'Closed']) {
-            var icon;
-            if (icon = $(`img[alt=${type}]`, nodes.info)) {
-              result.push($.addClass(icon, `${type.toLowerCase()}Icon`, 'retina'));
-            }
-          }
-          return result;
-        })();
-      }
-    },
-    parseDate(node) {
-      return new Date(node.dataset.utc * 1000);
-    },
-    parseFile(post, file) {
-      let info;
-      const { text, link, thumb } = file;
-      if (!(info = link.nextSibling?.textContent.match(/\(([\d.]+ [KMG]?B).*\)/))) {
-        return false;
-      }
-      $.extend(file, {
-        name: text.title || link.title || link.textContent,
-        size: info[1],
-        dimensions: info[0].match(/\d+x\d+/)?.[0],
-        tag: info[0].match(/,[^,]*, ([a-z]+)\)/i)?.[1],
-        MD5: text.dataset.md5
-      });
-      if (thumb) {
-        $.extend(file, {
-          thumbURL: thumb.src,
-          MD5: thumb.dataset.md5,
-          isSpoiler: $.hasClass(thumb.parentNode, 'imgspoiler')
-        });
-        if (file.isSpoiler) {
-          let m;
-          file.thumbURL = (m = link.href.match(/\d+(?=\.\w+$)/)) ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${m[0]}s.jpg` : undefined;
-        }
-      }
-      return true;
-    },
-    cleanComment(bq) {
-      let abbr;
-      if (abbr = $('.abbr', bq)) { // 'Comment too long' or 'EXIF data available'
-        for (var node of $$('.abbr + br, .exif', bq)) {
-          $.rm(node);
-        }
-        for (let i = 0; i < 2; i++) {
-          var br;
-          if ((br = abbr.previousSibling) && (br.nodeName === 'BR')) {
-            $.rm(br);
-          }
-        }
-        return $.rm(abbr);
-      }
-    },
-    cleanCommentDisplay(bq) {
-      let b;
-      if ((b = $('b', bq)) && /^Rolled /.test(b.textContent)) {
-        $.rm(b);
-      }
-      return $.rm($('.fortune', bq));
-    },
-    insertTags(bq) {
-      let node;
-      for (node of $$('s, .removed-spoiler', bq)) {
-        $.replace(node, [$.tn('[spoiler]'), ...node.childNodes, $.tn('[/spoiler]')]);
-      }
-      for (node of $$('.prettyprint', bq)) {
-        $.replace(node, [$.tn('[code]'), ...node.childNodes, $.tn('[/code]')]);
-      }
-    },
-    hasCORS(url) {
-      return url.split('/').slice(0, 3).join('/') === (location.protocol + '//a.4cdn.org');
-    },
-    sfwBoards(sfw) {
-      return BoardConfig.sfwBoards(sfw);
-    },
-    uidColor(uid) {
-      let msg = 0;
-      let i = 0;
-      while (i < 8) {
-        msg = ((msg << 5) - msg) + uid.charCodeAt(i++);
-      }
-      return (msg >> 8) & 0xFFFFFF;
-    },
-    isLinkified(link) {
-      return ImageHost.test(link.hostname);
-    },
-    testNativeExtension() {
-      return $.global('testNativeExtension', {});
-    },
-    transformBoardList() {
-      let node;
-      const nodes = [];
-      const spacer = () => $.el('span', { className: 'spacer' });
-      const items = $.X('.//a|.//text()[not(ancestor::a)]', $(SWYotsuba.selectors.boardList));
-      let i = 0;
-      while ((node = items.snapshotItem(i++))) {
-        switch (node.nodeName) {
-          case '#text':
-            for (var chr of node.nodeValue) {
-              var span = $.el('span', { textContent: chr });
-              if (chr === ' ') {
-                span.className = 'space';
-              }
-              if (chr === ']') {
-                nodes.push(spacer());
-              }
-              nodes.push(span);
-              if (chr === '[') {
-                nodes.push(spacer());
-              }
-            }
-            break;
-          case 'A':
-            var a = node.cloneNode(true);
-            nodes.push(a);
-            break;
-        }
-      }
-      return nodes;
-    },
-    Build: {
-      staticPath: '//s.4cdn.org/image/',
-      gifIcon: window.devicePixelRatio >= 2 ? '@2x.gif' : '.gif',
-      spoilerRange: Object.create(null),
-      shortFilename(filename) {
-        const ext = filename.match(/\.?[^\.]*$/)[0];
-        if ((filename.length - ext.length) > 30) {
-          return `${filename.match(/(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[^]){0,25}/)[0]}(...)${ext}`;
-        } else {
-          return filename;
-        }
-      },
-      spoilerThumb(boardID) {
-        let spoilerRange;
-        if ((spoilerRange = this.spoilerRange[boardID])) {
-          // Randomize the spoiler image.
-          return `${this.staticPath}spoiler-${boardID}${Math.floor(1 + (spoilerRange * Math.random()))}.png`;
-        } else {
-          return `${this.staticPath}spoiler.png`;
-        }
-      },
-      sameThread(boardID, threadID) {
-        return (g.VIEW === 'thread') && (g.BOARD.ID === boardID) && (g.THREADID === +threadID);
-      },
-      threadURL(boardID, threadID) {
-        if (boardID !== g.BOARD.ID) {
-          return `//${BoardConfig.domain(boardID)}/${boardID}/thread/${threadID}`;
-        } else if ((g.VIEW !== 'thread') || (+threadID !== g.THREADID)) {
-          return `/${boardID}/thread/${threadID}`;
-        } else {
-          return '';
-        }
-      },
-      postURL(boardID, threadID, postID) {
-        return `${this.threadURL(boardID, threadID)}#p${postID}`;
-      },
-      parseJSON(data, { siteID, boardID }) {
-        const o = {
-          // id
-          ID: data.no,
-          postID: data.no,
-          threadID: data.resto || data.no,
-          boardID,
-          siteID,
-          isReply: !!data.resto,
-          // thread status
-          isSticky: !!data.sticky,
-          isClosed: !!data.closed,
-          isArchived: !!data.archived,
-          threadReplies: data.replies,
-          threadImages: data.images,
-          // file status
-          fileDeleted: !!data.filedeleted,
-          filesDeleted: data.filedeleted ? [0] : []
-        };
-        o.info = {
-          subject: $.unescape(data.sub),
-          email: $.unescape(data.email),
-          name: $.unescape(data.name) || '',
-          tripcode: data.trip,
-          pass: (data.since4pass != null) ? `${data.since4pass}` : undefined,
-          uniqueID: data.id,
-          flagCode: data.country,
-          flagCodeTroll: data.board_flag,
-          flag: $.unescape((data.country_name || data.flag_name)),
-          dateUTC: data.time,
-          dateText: data.now,
-          // Yes, we use the raw string here
-          commentHTML: { innerHTML: data.com || '', [isEscaped]: true }
-        };
-        if (data.capcode) {
-          o.info.capcode = data.capcode.replace(/_highlight$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          o.capcodeHighlight = /_highlight$/.test(data.capcode);
-          delete o.info.uniqueID;
-        }
-        o.files = [];
-        if (data.ext) {
-          o.file = this.parseJSONFile(data, { siteID, boardID });
-          o.files.push(o.file);
-        }
-        // Temporary JSON properties for events such as April 1 / Halloween
-        o.extra = dict();
-        for (var key in data) {
-          if (key[0] === 'x') {
-            o.extra[key] = data[key];
-          }
-        }
-        return o;
-      },
-      parseJSONFile(data, { siteID, boardID }) {
-        const site = g.sites[siteID];
-        const filename = (site.software === 'yotsuba') && (boardID === 'f') ?
-          `${encodeURIComponent(data.filename)}${data.ext}`
-          :
-            `${data.tim}${data.ext}`;
-        const o = {
-          name: ($.unescape(data.filename)) + data.ext,
-          url: site.urls.file({ siteID, boardID }, filename),
-          height: data.h,
-          width: data.w,
-          MD5: data.md5,
-          size: $.bytesToString(data.fsize),
-          thumbURL: site.urls.thumb({ siteID, boardID }, `${data.tim}s.jpg`),
-          theight: data.tn_h,
-          twidth: data.tn_w,
-          isSpoiler: !!data.spoiler,
-          tag: data.tag,
-          hasDownscale: !!data.m_img
-        };
-        if ((data.h != null) && !/\.pdf$/.test(o.url)) {
-          o.dimensions = `${o.width}x${o.height}`;
-        }
-        return o;
-      },
-      parseComment(html) {
-        html = html
-          .replace(/<br\b[^<]*>/gi, '\n')
-          .replace(/\n\n<span\b[^<]* class="abbr"[^]*$/i, '') // EXIF data (/p/)
-          .replace(/<[^>]*>/g, '');
-        return $.unescape(html);
-      },
-      parseCommentDisplay(html) {
-        // Hide spoilers.
-        if (!Conf['Remove Spoilers'] && !Conf['Reveal Spoilers']) {
-          let html2;
-          while ((html2 = html.replace(/<s>(?:(?!<\/?s>).)*<\/s>/g, '[spoiler]')) !== html) {
-            html = html2;
-          }
-        }
-        html = html
-          .replace(/^<b\b[^<]*>Rolled [^<]*<\/b>/i, '') // Rolls (/tg/, /qst/)
-          .replace(/<span\b[^<]* class="fortune"[^]*$/i, ''); // Fortunes (/s4s/)
-        // Remove preceding and following new lines, trailing spaces.
-        return this.parseComment(html).trim().replace(/\s+$/gm, '');
-      },
-      postFromObject(data, boardID) {
-        const o = this.parseJSON(data, { boardID, siteID: g.SITE.ID });
-        return this.post(o);
-      },
-      post(o) {
-        const { ID, threadID, boardID, file } = o;
-        const { subject, email, name, tripcode, capcode, pass, uniqueID, flagCode, flagCodeTroll, flag, dateUTC, dateText, commentHTML } = o.info;
-        const { staticPath, gifIcon } = this;
-        /* Post Info */
-        let capcodeDescription, capcodePlural, capcodeLC;
-        if (capcode) {
-          capcodeLC = capcode.toLowerCase();
-          if (capcode === 'Founder') {
-            capcodePlural = 'the Founder';
-            capcodeDescription = "4chan's Founder";
-          } else if (capcode === 'Verified') {
-            capcodePlural = 'Verified Users';
-            capcodeDescription = '';
-          } else {
-            const capcodeLong = $.getOwn({ 'Admin': 'Administrator', 'Mod': 'Moderator' }, capcode) || capcode;
-            capcodePlural = `${capcodeLong}s`;
-            capcodeDescription = `a 4chan ${capcodeLong}`;
-          }
-        }
-        const url = this.threadURL(boardID, threadID);
-        const postLink = `${url}#p${ID}`;
-        const quoteLink = this.sameThread(boardID, threadID) ?
-          `javascript:quote('${+ID}');`
-          :
-            `${url}#q${ID}`;
-        const postInfo = generatePostInfoHtml(ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon, capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID, threadID);
-        /* File Info */
-        let protocol, fileURL, shortFilename, fileThumb;
-        if (file) {
-          protocol = /^https?:(?=\/\/i\.4cdn\.org\/)/;
-          fileURL = file.url.replace(protocol, '');
-          shortFilename = this.shortFilename(file.name);
-          fileThumb = file.isSpoiler ? this.spoilerThumb(boardID) : file.thumbURL.replace(protocol, '');
-        }
-        const fileBlock = generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon);
-        /* Whole Post */
-        const postClass = o.isReply ? 'reply' : 'op';
-        const postContent = o.isReply ? [postInfo, fileBlock] : [fileBlock, postInfo];
-        postContent.push(h("blockquote", { class: "postMessage", id: `m${ID}` }, commentHTML));
-        // I wonder if there's a better way to skip this in the catalog without breaking hovers.
-        // Currently, this is just hidden by css.
-        if (!o.isReply && o.threadReplies != null) {
-          postContent.push(h("span", { class: "summary preview-summary" }, this.summaryText('', o.threadReplies, o.threadImages, true)));
-        }
-        const wholePost = h(hFragment, null,
-          (o.isReply ? h("div", { class: "sideArrows", id: `sa${ID}` }, ">>") : ''),
-          h("div", { id: `p${ID}`, class: `post ${postClass}${o.capcodeHighlight ? ' highlightPost' : ''}` }, ...postContent));
-        const container = $.el('div', {
-          className: `postContainer ${postClass}Container`,
-          id: `pc${ID}`
-        });
-        $.extend(container, wholePost);
-        // Fix quotelinks
-        for (var quote of $$('.quotelink', container)) {
-          var href = quote.getAttribute('href');
-          if (href[0] === '#') {
-            if (!this.sameThread(boardID, threadID)) {
-              quote.href = this.threadURL(boardID, threadID) + href;
-            }
-          } else {
-            var match;
-            if ((match = quote.href.match(SWYotsuba.regexp.quotelink)) && (this.sameThread(match[1], match[2]))) {
-              quote.href = href.match(/(#[^#]*)?$/)[0] || '#';
-            }
-          }
-        }
-        return container;
-      },
-      summaryText(status, posts, files, hoverPreview = false) {
-        let text = '';
-        if (status)
-          text += `${status} `;
-        text += `${posts} post${posts == 1 ? '' : 's'}`;
-        if (+files)
-          text += ` and ${files} image repl${files > 1 ? 'ies' : 'y'}`;
-        return hoverPreview ? text : `${text} ${status === '-' ? 'shown' : 'omitted'}.`;
-      },
-      summary(boardID, threadID, posts, files) {
-        return $.el('a', {
-          className: 'summary',
-          textContent: this.summaryText('', posts, files),
-          href: `/${boardID}/thread/${threadID}`
-        });
-      },
-      thread(thread, data, withReplies) {
-        let root;
-        if (root = thread.nodes.root) {
-          $.rmAll(root);
-        } else {
-          thread.nodes.root = (root = $.el('div', {
-            className: 'thread',
-            id: `t${data.no}`
-          }));
-        }
-        if (this.hat) {
-          $.add(root, this.hat.cloneNode(false));
-        }
-        $.add(root, thread.OP.nodes.root);
-        if (data.omitted_posts || (!withReplies && data.replies)) {
-          const [posts, files] = withReplies ?
-            // XXX data.omitted_images is not accurate.
-            [data.omitted_posts, data.images - data.last_replies.filter(data => !!data.ext).length]
-            :
-              [data.replies, data.images];
-          const summary = this.summary(thread.board.ID, data.no, posts, files);
-          $.add(root, summary);
-        }
-        return root;
-      },
-      catalogThread(thread, data, pageCount) {
-        let cssText, imgClass, src;
-        const { staticPath, gifIcon } = this;
-        const { tn_w, tn_h } = data;
-        if (data.spoiler && !Conf['Reveal Spoiler Thumbnails']) {
-          let spoilerRange;
-          src = `${staticPath}spoiler`;
-          if (spoilerRange = this.spoilerRange[thread.board]) {
-            // Randomize the spoiler image.
-            src += (`-${thread.board}`) + Math.floor(1 + (spoilerRange * Math.random()));
-          }
-          src += '.png';
-          imgClass = 'spoiler-file';
-          cssText = "--tn-w: 100; --tn-h: 100;";
-        } else if (data.filedeleted) {
-          src = `${staticPath}filedeleted-res${gifIcon}`;
-          imgClass = 'deleted-file';
-        } else if (thread.OP.file) {
-          src = thread.OP.file.thumbURL;
-          const ratio = 250 / Math.max(tn_w, tn_h);
-          cssText = `--tn-w: ${tn_w * ratio}; --tn-h: ${tn_h * ratio};`;
-        } else {
-          src = `${staticPath}nofile.png`;
-          imgClass = 'no-file';
-        }
-        const postCount = data.replies + 1;
-        const fileCount = data.images + !!data.ext;
-        const container = $.el('div', generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon));
-        $.before(thread.OP.nodes.info, [...container.childNodes]);
-        for (var br of $$('br', thread.OP.nodes.comment)) {
-          if (br.previousSibling && (br.previousSibling.nodeName === 'BR')) {
-            $.addClass(br, 'extra-linebreak');
-          }
-        }
-        const root = $.el('div', {
-          className: 'thread catalog-thread',
-          id: `t${thread}`
-        });
-        if (thread.OP.highlights) {
-          $.addClass(root, ...thread.OP.highlights);
-        }
-        if (!thread.OP.file) {
-          $.addClass(root, 'noFile');
-        }
-        root.style.cssText = cssText || '';
-        return root;
-      },
-      catalogReply(thread, data) {
-        let excerpt = '';
-        if (data.com) {
-          excerpt = this.parseCommentDisplay(data.com).replace(/>>\d+/g, '').trim().replace(/\n+/g, ' // ');
-        }
-        if (data.ext) {
-          if (!excerpt) {
-            excerpt = `${$.unescape(data.filename)}${data.ext}`;
-          }
-        }
-        if (data.com) {
-          if (!excerpt) {
-            excerpt = $.unescape(data.com.replace(/<br\b[^<]*>/gi, ' // '));
-          }
-        }
-        if (!excerpt) {
-          excerpt = '\xA0';
-        }
-        if (excerpt.length > 73) {
-          excerpt = `${excerpt.slice(0, 70)}...`;
-        }
-        const link = this.postURL(thread.board.ID, thread.ID, data.no);
-        return $.el('div', { className: 'catalog-reply' }, h(hFragment, null,
-          h("span", null,
-            h("time", { "data-utc": data.time * 1000, "data-abbrev": "1" }, "..."),
-            ": "),
-          h("a", { class: "catalog-reply-excerpt", href: link }, excerpt),
-          h("a", { class: "catalog-reply-preview", href: link }, "...")));
-      }
-    }
-  };
-
-  const SWTinyboard = {
-    isOPContainerThread: true,
-    mayLackJSON: true,
-    threadModTimeIgnoresSage: true,
-    disabledFeatures: [
-      'Resurrect Quotes',
-      'Quick Reply Personas',
-      'Quick Reply',
-      'Cooldown',
-      'Report Link',
-      'Delete Link',
-      'Edit Link',
-      'Quote Inlining',
-      'Quote Previewing',
-      'Quote Backlinks',
-      'File Info Formatting',
-      'Image Expansion',
-      'Image Expansion (Menu)',
-      'Comment Expansion',
-      'Thread Expansion',
-      'Favicon',
-      'Quote Threading',
-      'Thread Updater',
-      'Banner',
-      'Flash Features',
-      'Reply Pruning'
-    ],
-    detect() {
-      for (const script of $$('script:not([src])', d.head)) {
-        let m;
-        if (m = script.textContent.match(/\bvar configRoot=(".*?")/)) {
-          const properties = dict();
-          try {
-            const root = JSON.parse(m[1]);
-            if (root[0] === '/') {
-              properties.root = location.origin + root;
-            } else if (/^https?:/.test(root)) {
-              properties.root = root;
-            }
-          } catch (error) { }
-          return properties;
-        }
-      }
-      return false;
-    },
-    awaitBoard(cb) {
-      let reactUI;
-      if (reactUI = $.id('react-ui')) {
-        const s = (this.selectors = Object.create(this.selectors));
-        s.boardFor = { index: '.page-container' };
-        s.thread = 'div[id^="thread_"]';
-        return $.on(d, '4chanXMounted', cb);
-      } else {
-        return cb();
-      }
-    },
-    urls: {
-      thread({ siteID, boardID, threadID }, isArchived) {
-        return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.html`;
-      },
-      post({ postID }) { return `#${postID}`; },
-      index({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/`; },
-      catalog({ siteID, boardID }) { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/catalog.html`; },
-      threadJSON({ siteID, boardID, threadID }, isArchived) {
-        const root = Conf['siteProperties'][siteID]?.root;
-        if (root) {
-          return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.json`;
-        } else {
-          return '';
-        }
-      },
-      archivedThreadJSON(thread) {
-        return SWTinyboard.urls.threadJSON(thread, true);
-      },
-      threadsListJSON({ siteID, boardID }) {
-        const root = Conf['siteProperties'][siteID]?.root;
-        if (root) {
-          return `${root}${boardID}/threads.json`;
-        } else {
-          return '';
-        }
-      },
-      archiveListJSON({ siteID, boardID }) {
-        const root = Conf['siteProperties'][siteID]?.root;
-        if (root) {
-          return `${root}${boardID}/archive/archive.json`;
-        } else {
-          return '';
-        }
-      },
-      catalogJSON({ siteID, boardID }) {
-        const root = Conf['siteProperties'][siteID]?.root;
-        if (root) {
-          return `${root}${boardID}/catalog.json`;
-        } else {
-          return '';
-        }
-      },
-      file({ siteID, boardID }, filename) {
-        return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${filename}`;
-      },
-      thumb(board, filename) {
-        return SWTinyboard.urls.file(board, filename);
-      }
-    },
-    selectors: {
-      board: 'form[name="postcontrols"]',
-      thread: 'input[name="board"] ~ div[id^="thread_"]',
-      threadDivider: 'div[id^="thread_"] > hr:last-child',
-      summary: '.omitted',
-      postContainer: 'div[id^="reply_"]:not(.hidden)',
-      opBottom: '.op',
-      replyOriginal: 'div[id^="reply_"]:not(.hidden)',
-      infoRoot: '.intro',
-      info: {
-        subject: '.subject',
-        name: '.name',
-        email: '.email',
-        tripcode: '.trip',
-        uniqueID: '.poster_id',
-        capcode: '.capcode',
-        flag: '.flag',
-        date: 'time',
-        nameBlock: 'label',
-        quote: 'a[href*="#q"]',
-        reply: 'a[href*="/res/"]:not([href*="#"])'
-      },
-      icons: {
-        isSticky: '.fa-thumb-tack',
-        isClosed: '.fa-lock'
-      },
-      file: {
-        text: '.fileinfo',
-        link: '.fileinfo > a',
-        thumb: 'a > .post-image'
-      },
-      thumbLink: '.file > a',
-      multifile: '.files > .file',
-      highlightable: {
-        op: ' > .op',
-        reply: '.reply',
-        catalog: ' > .thread'
-      },
-      comment: '.body',
-      spoiler: '.spoiler',
-      quotelink: 'a[onclick*="highlightReply("]',
-      catalog: {
-        board: '#Grid',
-        thread: '.mix',
-        thumb: '.thread-image'
-      },
-      boardList: '.boardlist',
-      boardListBottom: '.boardlist.bottom',
-      styleSheet: '#stylesheet',
-      psa: '.blotter',
-      nav: {
-        prev: '.pages > form > [value=Previous]',
-        next: '.pages > form > [value=Next]'
-      }
-    },
-    classes: {
-      highlight: 'highlighted'
-    },
-    xpath: {
-      thread: 'div[starts-with(@id,"thread_")]',
-      postContainer: 'div[starts-with(@id,"reply_") or starts-with(@id,"thread_")]',
-      replyContainer: 'div[starts-with(@id,"reply_")]'
-    },
-    regexp: {
-      quotelink: new RegExp(`\
-/\\
-([^/]+)\\
-/res/\\
-(\\d+)\\
-(?:\\.\\w+)?#\\
-(\\d+)\\
-$\
-`),
-      quotelinkHTML: /<a [^>]*\bhref="[^"]*\/([^\/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
-    },
-    Build: {
-      parseJSON(data, board) {
-        const o = SWYotsuba.Build.parseJSON(data, board);
-        if (data.ext === 'deleted') {
-          delete o.file;
-          $.extend(o, {
-            files: [],
-            fileDeleted: true,
-            filesDeleted: [0]
-          });
-        }
-        if (data.extra_files) {
-          let file;
-          for (let i = 0; i < data.extra_files.length; i++) {
-            const extra_file = data.extra_files[i];
-            if (extra_file.ext === 'deleted') {
-              o.filesDeleted.push(i);
-            } else {
-              file = SWYotsuba.Build.parseJSONFile(data, board);
-              o.files.push(file);
-            }
-          }
-          if (o.files.length) {
-            o.file = o.files[0];
-          }
-        }
-        return o;
-      },
-      parseComment(html) {
-        html = html
-          .replace(/<br\b[^<]*>/gi, '\n')
-          .replace(/<[^>]*>/g, '');
-        return $.unescape(html);
-      }
-    },
-    bgColoredEl() {
-      return $.el('div', { className: 'post reply' });
-    },
-    isFileURL(url) {
-      return /\/src\/[^\/]+/.test(url.pathname);
-    },
-    preParsingFixes(board) {
-      let broken;
-      if (broken = $('a > input[name="board"]', board)) {
-        $.before(broken.parentNode, broken);
-      }
-    },
-    parseNodes(post, nodes) {
-      if (nodes.uniqueID) {
-        return;
-      }
-      let text = '';
-      let node = nodes.nameBlock.nextSibling;
-      while (node && (node.nodeType === 3)) {
-        text += node.textContent;
-        node = node.nextSibling;
-      }
-      let m;
-      if (m = text.match(/(\s*ID:\s*)(\S+)/)) {
-        let uniqueID;
-        nodes.info.normalize();
-        let nextSibling = nodes.nameBlock.nextSibling;
-        nextSibling = nextSibling.splitText(m[1].length);
-        nextSibling.splitText(m[2].length);
-        nodes.uniqueID = (uniqueID = $.el('span', { className: 'poster_id' }));
-        $.replace(nextSibling, uniqueID);
-        $.add(uniqueID, nextSibling);
-      }
-    },
-    parseDate(node) {
-      const datetime = node.getAttribute('datetime');
-      let date = Date.parse(datetime?.trim() || '');
-      if (!isNaN(date)) {
-        return new Date(date);
-      }
-      date = Date.parse(node.textContent.trim() + ' UTC');
-      if (!isNaN(date)) {
-        return new Date(date);
-      }
-      return undefined;
-    },
-    parseFile(post, file) {
-      const { text, link, thumb } = file;
-      if ($.x(`ancestor::${this.xpath.postContainer}[1]`, text) !== post.nodes.root) {
-        return false;
-      }
-      const nextSibling = link.nextSibling;
-      const hasParen = nextSibling && nextSibling.textContent && nextSibling.textContent.includes('(');
-      const infoNode = hasParen ? nextSibling : link.nextElementSibling;
-      if (!infoNode) {
-        return false;
-      }
-      const info = infoNode.textContent.match(/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/);
-      if (!info) {
-        return false;
-      }
-      const nameNode = $('.postfilename', text);
-      $.extend(file, {
-        name: nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0],
-        size: info[2],
-        dimensions: info[0].match(/\d+x\d+/)?.[0]
-      });
-      if (thumb) {
-        $.extend(file, {
-          thumbURL: /\/static\//.test(thumb.src) && $.isImage(link.href) ? link.href : thumb.src,
-          isSpoiler: /^Spoiler/i.test(info[1] || '') || (link.textContent === 'Spoiler Image')
-        });
-      }
-      return true;
-    },
-    isThumbExpanded(file) {
-      return $.hasClass(file.thumb.parentNode, 'expanded') || (file.thumb.parentNode.dataset.expanded === 'true');
-    },
-    isLinkified(link) {
-      return /\bnofollow\b/.test(link.rel);
-    },
-    catalogPin(threadRoot) {
-      return threadRoot.dataset.sticky = 'true';
-    }
-  };
-
-  const SW = {
-    tinyboard: SWTinyboard,
-    yotsuba: SWYotsuba
-  };
-
-  // @ts-nocheck
-  var FileInfo = {
-    init() {
-      if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['File Info Formatting']) {
-        return;
-      }
-      return Callbacks.Post.push({
-        name: 'File Info Formatting',
-        cb: this.node
-      });
-    },
-    node() {
-      if (!this.file) {
-        return;
-      }
-      if (this.isClone) {
-        let a;
-        for (a of $$('.file-info .download-button', this.file.text)) {
-          $.on(a, 'click', ImageCommon.download);
-        }
-        for (a of $$('.file-info .quick-filter-md5', this.file.text)) {
-          $.on(a, 'click', Filter.quickFilterMD5);
-        }
-        return;
-      }
-      const oldInfo = $.el('span', { className: 'fileText-original' });
-      $.prepend(this.file.link.parentNode, oldInfo);
-      $.add(oldInfo, [this.file.link.previousSibling, this.file.link, this.file.link.nextSibling]);
-      const info = $.el('span', { className: 'file-info' });
-      FileInfo.format(Conf['fileInfo'], this, info);
-      return $.prepend(this.file.text, info);
-    },
-    format(formatString, post, outputNode) {
-      let a;
-      const output = [];
-      formatString.replace(/%(.)|[^%]+/g, function (s, c) {
-        output.push($.hasOwn(FileInfo.formatters, c) ?
-          FileInfo.formatters[c].call(post)
-          :
-            { innerHTML: E(s) });
-        return '';
-      });
-      $.extend(outputNode, { innerHTML: E.cat(output) });
-      for (a of $$('.download-button', outputNode)) {
-        $.on(a, 'click', ImageCommon.download);
-      }
-      for (a of $$('.quick-filter-md5', outputNode)) {
-        $.on(a, 'click', Filter.quickFilterMD5);
-      }
-    },
-    formatters: {
-      t() { return { innerHTML: E(this.file.url.match(/[^/]*$/)[0]), [isEscaped]: true }; },
-      T() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.t.call(this)); },
-      l() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.n.call(this)); },
-      L() { return h("a", { href: this.file.url, target: "_blank" }, FileInfo.formatters.N.call(this)); },
-      n() {
-        const fullname = this.file.name;
-        const shortname = SW.yotsuba.Build.shortFilename(this.file.name, this.isReply);
-        if (fullname === shortname) {
-          return { innerHTML: E(fullname), [isEscaped]: true };
-        } else {
-          return h("span", { class: "fnswitch" },
-            h("span", { class: "fntrunc" }, shortname),
-            h("span", { class: "fnfull" }, fullname));
-        }
-      },
-      N() { return { innerHTML: E(this.file.name), [isEscaped]: true }; },
-      d() {
-        return h("a", { href: this.file.url, download: this.file.name, class: "download-button" }, Icon.raw('download'));
-      },
-      f() {
-        return {
-          innerHTML: `<a href="javascript:;" class="quick-filter-md5">${Icon.get('xmark')}</a>`,
-          [isEscaped]: true,
-        };
-      },
-      p() { return { innerHTML: ((this.file.isSpoiler) ? "Spoiler, " : ""), [isEscaped]: true }; },
-      s() { return { innerHTML: E(this.file.size), [isEscaped]: true }; },
-      B() { return { innerHTML: Math.round(this.file.sizeInBytes) + " Bytes", [isEscaped]: true }; },
-      K() { return { innerHTML: (Math.round(this.file.sizeInBytes / 1024)) + " KB", [isEscaped]: true }; },
-      M() { return { innerHTML: (Math.round(this.file.sizeInBytes / 1048576 * 100) / 100) + " MB", [isEscaped]: true }; },
-      r() { return { innerHTML: E(this.file.dimensions || "PDF"), [isEscaped]: true }; },
-      g() { return { innerHTML: ((this.file.tag) ? ", " + E(this.file.tag) : ""), [isEscaped]: true }; },
-      '%'() { return { innerHTML: "%", [isEscaped]: true }; }
-    }
-  };
-
-  // @ts-nocheck
-  var Settings = {
-    dialog: undefined,
-    init() {
-      // 4chan X settings link
-      const link = $.el('a', {
-        className: 'settings-link',
-        title: `${meta.name} Settings`,
-        href: 'javascript:;'
-      });
-      Icon.set(link, 'wrench', 'Settings');
-      $.on(link, 'click', Settings.open);
-      Header.addShortcut('settings', link, 820);
-      const add = this.addSection;
-      add('Main', this.main);
-      add('Filter', this.filter);
-      add('Sauce', this.sauce);
-      add('Advanced', this.advanced);
-      add('Keybinds', this.keybinds);
-      $.on(d, 'AddSettingsSection', Settings.addSection);
-      $.on(d, 'OpenSettings', e => Settings.open(e.detail));
-      if ((g.SITE.software === 'yotsuba') && Conf['Disable Native Extension']) {
-        if ($.hasStorage) {
-          // Run in page context to handle case where 4chan X has localStorage access but not the page.
-          // (e.g. Pale Moon 26.2.2, GM 3.8, cookies disabled for 4chan only)
-          $.global('disableNativeExtension');
-        } else {
-          $.global('disableNativeExtensionNoStorage');
-        }
-      }
-    },
-    open(openSection) {
-      let dialog, sectionToOpen;
-      if (Settings.dialog) {
-        return;
-      }
-      $.event('CloseMenu');
-      Settings.dialog = (dialog = $.el('div', { id: 'overlay' }, settingsHtml));
-      $.on($('.export', dialog), 'click', Settings.export);
-      $.on($('.import', dialog), 'click', Settings.import);
-      $.on($('.reset', dialog), 'click', Settings.reset);
-      $.on($('input', dialog), 'change', Settings.onImport);
-      const links = [];
-      for (var section of Settings.sections) {
-        var link = $.el('a', {
-          className: `tab-${section.hyphenatedTitle}`,
-          textContent: section.title,
-          href: 'javascript:;'
-        });
-        $.on(link, 'click', Settings.openSection.bind(section));
-        links.push(link, $.tn(' | '));
-        if (section.title === openSection) {
-          sectionToOpen = link;
-        }
-      }
-      links.pop();
-      $.add($('.sections-list', dialog), links);
-      if (openSection !== 'none') {
-        (sectionToOpen ? sectionToOpen : links[0]).click();
-      }
-      Icon.set($('.close', dialog), 'xmark');
-      $.on($('.close', dialog), 'click', Settings.close);
-      $.on(window, 'beforeunload', Settings.close);
-      $.on(dialog, 'click', () => {
-        // Do not close when the mouse ends up outside the modal when selecting text in an input.
-        if (d.activeElement?.tagName === 'INPUT' || d.activeElement?.tagName === 'TEXTAREA')
-          return;
-        Settings.close();
-      });
-      $.on(dialog.firstElementChild, 'click', e => e.stopPropagation());
-      $.add(d.body, dialog);
-      links[0].focus();
-      $.event('OpenSettings', null, dialog);
-    },
-    close() {
-      if (!Settings.dialog) {
-        return;
-      }
-      // Unfocus current field to trigger change event.
-      d.activeElement?.blur();
-      $.rm(Settings.dialog);
-      delete Settings.dialog;
-    },
-    sections: [],
-    addSection(title, open) {
-      if (typeof title !== 'string') {
-        ({ title, open } = title.detail);
-      }
-      const hyphenatedTitle = title.toLowerCase().replace(/\s+/g, '-');
-      Settings.sections.push({ title, hyphenatedTitle, open });
-    },
-    openSection() {
-      let selected;
-      if (selected = $('.tab-selected', Settings.dialog)) {
-        $.rmClass(selected, 'tab-selected');
-      }
-      $.addClass($(`.tab-${this.hyphenatedTitle}`, Settings.dialog), 'tab-selected');
-      const section = $('section', Settings.dialog);
-      $.rmAll(section);
-      section.className = `section-${this.hyphenatedTitle}`;
-      this.open(section, g);
-      section.scrollTop = 0;
-      $.event('OpenSettings', null, section);
-    },
-    warnings: {
-      localStorage(cb) {
-        if ($.cantSync) {
-          const why = $.cantSet ? 'save your settings' : 'synchronize settings between tabs';
-          cb($.el('li', {
-            textContent: `\
-${meta.name} needs local storage to ${why}.
-Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's privacy settings (may be listed as part of "local data" or "cookies").\
-`
-          }));
-        }
-      },
-      ads(cb) {
-        $.onExists(doc, '.adg-rects > .desktop', ad => $.onExists(ad, 'iframe', function () {
-          const url = Redirect.to('thread', { boardID: 'qa', threadID: 362590 });
-          cb($.el('li', h(hFragment, null,
-            "To protect yourself from ",
-            h("a", { href: url, target: "_blank" }, "malicious ads"),
-            ", you should ",
-            h("a", { href: "https://github.com/gorhill/uBlock#ublock-origin", target: "_blank" }, "block ads"),
-            " on 4chan.")));
-        }));
-      }
-    },
-    main(section) {
-      let key;
-      const warnings = $.el('fieldset', { hidden: true }, { innerHTML: '<legend>Warnings</legend><ul></ul>' });
-      const addWarning = function (item) {
-        $.add($('ul', warnings), item);
-        warnings.hidden = false;
-      };
-      for (key in Settings.warnings) {
-        var warning = Settings.warnings[key];
-        warning(addWarning);
-      }
-      $.add(section, warnings);
-      const items = dict();
-      const inputs = dict();
-      const addCheckboxes = function (root, obj) {
-        const containers = [root];
-        const result = [];
-        for (key in obj) {
-          var arr = obj[key];
-          if (arr instanceof Array) {
-            var description = arr[1];
-            var div = $.el('div', { innerHTML: `<label><input type="checkbox" name="${key}">${key}</label><span class="description">: ${description}</span>` });
-            div.dataset.name = key;
-            var input = $('input', div);
-            $.on(input, 'change', $.cb.checked);
-            $.on(input, 'change', function () { this.parentNode.parentNode.dataset.checked = this.checked; });
-            items[key] = Conf[key];
-            inputs[key] = input;
-            var level = arr[2] || 0;
-            if (containers.length <= level) {
-              var container = $.el('div', { className: 'suboption-list' });
-              $.add(containers[containers.length - 1].lastElementChild, container);
-              containers[level] = container;
-            } else if (containers.length > (level + 1)) {
-              containers.splice(level + 1, containers.length - (level + 1));
-            }
-            result.push($.add(containers[level], div));
-          }
-        }
-        return result;
-      };
-      for (var keyFS in Config.main) {
-        var obj = Config.main[keyFS];
-        var fs = $.el('fieldset', { innerHTML: `<legend>${keyFS}</legend>` });
-        addCheckboxes(fs, obj);
-        if (keyFS === 'Posting and Captchas') {
-          $.add(fs, $.el('p', { innerHTML: 'For more info on captcha options and issues, see the <a href="' + meta.captchaFAQ + '" target="_blank">captcha FAQ</a>.' }));
-        }
-        $.add(section, fs);
-      }
-      addCheckboxes($('div[data-name="JSON Index"] > .suboption-list', section), Config.Index);
-      $.get(items, function (items) {
-        for (key in items) {
-          var val = items[key];
-          inputs[key].checked = val;
-          inputs[key].parentNode.parentNode.dataset.checked = val;
-        }
-      });
-      const div = $.el('div', { innerHTML: '<button></button><span class="description">: Clear manually-hidden threads and posts on all boards. Reload the page to apply.' });
-      const button = $('button', div);
-      $.get({ hiddenThreads: dict(), hiddenPosts: dict() }, function ({ hiddenThreads, hiddenPosts }) {
-        let board, ID, site, thread;
-        let hiddenNum = 0;
-        for (ID in hiddenThreads) {
-          site = hiddenThreads[ID];
-          if (ID !== 'boards') {
-            for (ID in site.boards) {
-              board = site.boards[ID];
-              hiddenNum += Object.keys(board).length;
-            }
-          }
-        }
-        for (ID in hiddenThreads.boards) {
-          board = hiddenThreads.boards[ID];
-          hiddenNum += Object.keys(board).length;
-        }
-        for (ID in hiddenPosts) {
-          site = hiddenPosts[ID];
-          if (ID !== 'boards') {
-            for (ID in site.boards) {
-              board = site.boards[ID];
-              for (ID in board) {
-                thread = board[ID];
-                hiddenNum += Object.keys(thread).length;
-              }
-            }
-          }
-        }
-        for (ID in hiddenPosts.boards) {
-          board = hiddenPosts.boards[ID];
-          for (ID in board) {
-            thread = board[ID];
-            hiddenNum += Object.keys(thread).length;
-          }
-        }
-        button.textContent = `Hidden: ${hiddenNum}`;
-      });
-      $.on(button, 'click', function () {
-        this.textContent = 'Hidden: 0';
-        $.get('hiddenThreads', dict(), function ({ hiddenThreads }) {
-          if ($.hasStorage && (g.SITE.software === 'yotsuba')) {
-            let boardID;
-            for (boardID in hiddenThreads['4chan.org']?.boards) {
-              localStorage.removeItem(`4chan-hide-t-${boardID}`);
-            }
-            for (boardID in hiddenThreads.boards) {
-              localStorage.removeItem(`4chan-hide-t-${boardID}`);
-            }
-          }
-          $.delete(['hiddenThreads', 'hiddenPosts']);
-        });
-      });
-      $('input[name="Stubs"]', section).closest('fieldset').insertAdjacentElement('beforeend', div);
-    },
-    isExportModalOpen: false,
-    async export() {
-      let exportHistory = Conf['Export History'];
-      let cancelled = false;
-      if (Conf['Ask to Export History']) {
-        if (Settings.isExportModalOpen)
-          return;
-        const dialog = UI.dialog('export-dialog', { innerHTML: ExportDialog });
-        const form = $('form', dialog);
-        const { history, ask } = form.elements;
-        history.checked = Conf['Export History'];
-        $.add(d.body, dialog);
-        const exportBtnRect = $('.export', Settings.dialog).getBoundingClientRect();
-        dialog.style.top = `${exportBtnRect.y + exportBtnRect.height}px`;
-        dialog.style.left = `${exportBtnRect.x}px`;
-        Settings.isExportModalOpen = true;
-        await new Promise(resolve => {
-          const close = () => {
-            dialog.remove();
-            resolve();
-            Settings.isExportModalOpen = false;
-          };
-          $.on(form, 'submit', (e) => {
-            e.preventDefault();
-            exportHistory = history.checked;
-            $.set('Export History', exportHistory);
-            $.set('Ask to Export History', ask.checked);
-            close();
-          });
-          $.on($('#cancel-export', dialog), 'click', () => {
-            cancelled = true;
-            close();
-          });
-        });
-        if (cancelled)
-          return;
-      }
-      // Make sure to export the most recent data, but don't overwrite existing `Conf` object.
-      const Conf2 = dict();
-      $.extend(Conf2, Conf);
-      if (!exportHistory) {
-        delete Conf2.hiddenThreads;
-        delete Conf2.hiddenPosts;
-        delete Conf2.hiddenPosterIds;
-        delete Conf2.lastReadPosts;
-        delete Conf2.yourPosts;
-        delete Conf2.watchedThreads;
-        delete Conf2.cooldowns;
-        delete Conf2['Index Sort'];
-      }
-      $.get(Conf2, function (Conf2) {
-        // Don't export cached JSON data.
-        delete Conf2['boardConfig'];
-        Settings.downloadExport({ version: g.VERSION, date: Date.now(), Conf: Conf2 });
-      });
-    },
-    downloadExport(data) {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = $.el('a', {
-        download: `${meta.name} v${g.VERSION}-${data.date}.json`,
-        href: url
-      });
-      const p = $('.imp-exp-result', Settings.dialog);
-      $.rmAll(p);
-      $.add(p, a);
-      a.click();
-    },
-    import() {
-      $('input[type=file]', this.parentNode).click();
-    },
-    onImport() {
-      let file;
-      if (!(file = this.files[0])) {
-        return;
-      }
-      this.value = null;
-      const output = $('.imp-exp-result');
-      if (!confirm('Your current settings will be entirely overwritten, are you sure?')) {
-        output.textContent = 'Import aborted.';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        try {
-          Settings.loadSettings(dict.json(e.target.result), function (err) {
-            if (err) {
-              output.textContent = 'Import failed due to an error.';
-            } else if (confirm('Import successful. Reload now?')) {
-              window.location.reload();
-            }
-          });
-        } catch (error) {
-          const err = error;
-          output.textContent = 'Import failed due to an error.';
-          c.error(err.stack);
-        }
-      };
-      reader.readAsText(file);
-    },
-    upgrade(data, version) {
-      let corrupted, key, val;
-      const changes = dict();
-      const set = (key, value) => data[key] = (changes[key] = value);
-      // XXX https://github.com/greasemonkey/greasemonkey/issues/2600
-      if (corrupted = (version[0] === '"')) {
-        try {
-          version = JSON.parse(version);
-        } catch (error) { }
-      }
-      const compareString = version.replace(/^XT /i, '').replace(/\d+/g, x => x.padStart(5, '0'));
-      if (corrupted) {
-        for (key in data) {
-          val = data[key];
-          if (typeof val === 'string') {
-            try {
-              var val2 = JSON.parse(val);
-              set(key, val2);
-            } catch (error1) { }
-          }
-        }
-      }
-      if (compareString < '00001.00014.00016.00001') {
-        if (data['archiveLists'] != null) {
-          set('archiveLists', data['archiveLists'].replace('https://mayhemydg.github.io/archives.json/archives.json', 'https://nstepien.github.io/archives.json/archives.json'));
-        }
-      }
-      if (compareString < '00001.00014.00016.00007') {
-        if (data['sauces'] != null) {
-          set('sauces', data['sauces'].replace(/https:\/\/www\.deviantart\.com\/gallery\/#\/d%\$1%\$2;regexp:\/\^\\w\+_by_\\w\+\[_-\]d\(\[\\da-z\]\{6\}\)\\b\|\^d\(\[\\da-z\]\{6\}\)-\[\\da-z\]\{8\}-\//g, 'javascript:void(open("https://www.deviantart.com/"+%$1.replace(/_/g,"-")+"/art/"+parseInt(%$2,36)));regexp:/^\\w+_by_(\\w+)[_-]d([\\da-z]{6})\\b/').replace(/\/\/imgops\.com\/%URL/g, '//imgops.com/start?url=%URL'));
-        }
-      }
-      if (compareString < '00001.00014.00017.00002') {
-        if (data['jsWhitelist'] != null) {
-          set('jsWhitelist', data['jsWhitelist'] + '\n\nhttps://hcaptcha.com\nhttps://*.hcaptcha.com');
-        }
-      }
-      if (compareString < '00001.00014.00020.00004') {
-        if (data['archiveLists'] != null) {
-          set('archiveLists', data['archiveLists'].replace('https://nstepien.github.io/archives.json/archives.json', 'https://4chenz.github.io/archives.json/archives.json'));
-        }
-      }
-      if (compareString < '00001.00014.00022.00003') {
-        if (data['sauces']) {
-          set('sauces', data['sauces'].replace(/^#?\s*https:\/\/www\.google\.com\/searchbyimage\?image_url=%(IMG|T?URL)&safe=off(?=$|;)/mg, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
-          if (compareString === '00001.00014.00022.00002' && !/\bsbisrc=/.test(data['sauces'])) {
-            set('sauces', data['sauces'].replace(/^#?\s*https:\/\/lens\.google\.com\/uploadbyurl\?url=%(IMG|T?URL)(?=$|;)/m, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
-          }
-        }
-      }
-      if (compareString < '00002.00003.00001.00000') {
-        if (data['boardnav']) {
-          set('boardnav', data['boardnav'].replace('[external-text:"FAQ","4chan XT"]', `[external-text:"FAQ","${meta.faq}"]`));
-        }
-      }
-      if (compareString < '00002.00003.00006.00000') {
-        set('RelativeTime', data['Relative Post Dates'] ? (data['Relative Date Title'] ? 'Hover' : 'Show') : 'No');
-      }
-      if (compareString === '00002.00009.00000.00000') {
-        set('XEmbedder', data['Embed Tweets inline with fxTwitter'] ? 'fxt' : 'tf');
-        set('fxtMaxReplies', data['Resolve Tweet Replies'] ? (data['Resolve all Tweet Replies'] ? 100 : 1) : 0);
-        set('fxtLang', data['Translate non-English Tweets to English'] ? 'en' : '');
-      }
-      return changes;
-    },
-    loadSettings(data, cb) {
-      if (data.version !== g.VERSION) {
-        Settings.upgrade(data.Conf, data.version);
-      }
-      $.clear(function (err) {
-        if (err) {
-          return cb(err);
-        }
-        $.set(data.Conf, cb);
-      });
-    },
-    reset() {
-      if (confirm('Your current settings will be entirely wiped, are you sure?')) {
-        $.clear(function (err) {
-          if (err) {
-            $('.imp-exp-result').textContent = 'Import failed due to an error.';
-          } else if (confirm('Reset successful. Reload now?')) {
-            window.location.reload();
-          }
-        });
-      }
-    },
-    filter(section) {
-      $.extend(section, { innerHTML: FilterSelectPage });
-      const select = $('select', section);
-      $.on(select, 'change', Settings.selectFilter);
-      Settings.selectFilter.call(select);
-    },
-    selectFilter() {
-      let name;
-      const div = this.nextElementSibling;
-      if ((name = this.value) !== 'guide') {
-        if (!$.hasOwn(Config.filter, name)) {
-          return;
-        }
-        $.rmAll(div);
-        const ta = $.el('textarea', {
-          name,
-          className: 'field',
-          spellcheck: false
-        });
-        $.on(ta, 'change', $.cb.value);
-        $.get(name, Conf[name], function (item) {
-          ta.value = item[name];
-          $.add(div, ta);
-        });
-        return;
-      }
-      const filterTypes = Object.keys(Config.filter)
-        .filter(x => x !== 'general')
-        .join(',\u200B'); // \u200B is zero width space, to control where line breaks happen on a narrow screen
-      $.extend(div, { innerHTML: FilterGuidePage });
-      $('#filterTypes', div).textContent = `type:\u200B${filterTypes};`;
-      $('.warning', div).hidden = Conf['Filter'];
-    },
-    sauce(section) {
-      $.extend(section, { innerHTML: SaucePage });
-      $('.warning', section).hidden = Conf['Sauce'];
-      const ta = $('textarea', section);
-      $.get('sauces', Conf['sauces'], function (item) {
-        ta.value = item['sauces'];
-        ta.hidden = false;
-      }); // XXX prevent Firefox from adding initialization to undo queue
-      $.on(ta, 'change', $.cb.value);
-    },
-    advanced(section) {
-      let input, name;
-      $.extend(section, { innerHTML: AdvancedPage });
-      for (var warning of $$('.warning', section)) {
-        warning.hidden = Conf[warning.dataset.feature];
-      }
-      const inputs = dict();
-      for (input of $$('[name]', section)) {
-        inputs[input.name] = input;
-      }
-      $.on(inputs['archiveLists'], 'change', function () {
-        $.set('lastarchivecheck', 0);
-        Conf['lastarchivecheck'] = 0;
-        $.id('lastarchivecheck').textContent = 'never';
-      });
-      const items = dict();
-      for (name in inputs) {
-        input = inputs[name];
-        if (!['Interval', 'Custom CSS', 'timeLocale'].includes(name)) {
-          items[name] = Conf[name];
-          var event = ((input.nodeName === 'SELECT') ||
-            ['checkbox', 'radio'].includes(input.type) ||
-            ((input.nodeName === 'TEXTAREA') && !(name in Settings))) ? 'change' : 'input';
-          $.on(input, event, $.cb[input.type === 'checkbox' ? 'checked' : 'value']);
-          if (name in Settings) {
-            $.on(input, event, Settings[name]);
-          }
-        }
-      }
-      $.get(items, function (items) {
-        for (var key in items) {
-          var val = items[key];
-          input = inputs[key];
-          input[input.type === 'checkbox' ? 'checked' : 'value'] = val;
-          input.hidden = false; // XXX prevent Firefox from adding initialization to undo queue
-          if (key in Settings) {
-            Settings[key].call(input);
-          }
-        }
-      });
-      const listImageHost = $.id('list-fourchanImageHost');
-      for (var textContent of ImageHost.suggestions) {
-        $.add(listImageHost, $.el('option', { textContent }));
-      }
-      const interval = inputs['Interval'];
-      const customCSS = inputs['Custom CSS'];
-      const applyCSS = $('#apply-css', section);
-      const timeLocale = inputs.timeLocale;
-      interval.value = Conf['Interval'];
-      customCSS.checked = Conf['Custom CSS'];
-      inputs['usercss'].disabled = !Conf['Custom CSS'];
-      applyCSS.disabled = !Conf['Custom CSS'];
-      timeLocale.value = Conf.timeLocale;
-      $.on(interval, 'change', ThreadUpdater.cb.interval);
-      $.on(customCSS, 'change', Settings.togglecss);
-      $.on(applyCSS, 'click', () => CustomCSS.update());
-      $.on(timeLocale, 'change', Settings.setTimeLocale);
-      const itemsArchive = dict();
-      for (name of ['archives', 'selectedArchives', 'lastarchivecheck']) {
-        itemsArchive[name] = Conf[name];
-      }
-      $.get(itemsArchive, function (itemsArchive) {
-        $.extend(Conf, itemsArchive);
-        Redirect.selectArchives();
-        Settings.addArchiveTable(section);
-      });
-      const boardSelect = $('#archive-board-select', section);
-      const table = $('#archive-table', section);
-      const updateArchives = $('#update-archives', section);
-      $.on(boardSelect, 'change', function () {
-        $('tbody > :not([hidden])', table).hidden = true;
-        $(`tbody > .${this.value}`, table).hidden = false;
-      });
-      $.on(updateArchives, 'click', () => Redirect.update(() => Settings.addArchiveTable(section)));
-      $.on(inputs.beepVolume, 'change', () => { ThreadUpdater.playBeep(false); });
-      $.on(inputs.beepSource, 'change', () => { ThreadUpdater.playBeep(false); });
-    },
-    addArchiveTable(section) {
-      let boardID, o;
-      $('#lastarchivecheck', section).textContent = Conf['lastarchivecheck'] === 0 ?
-        'never'
-        :
-          new Date(Conf['lastarchivecheck']).toLocaleString();
-      const boardSelect = $('#archive-board-select', section);
-      const table = $('#archive-table', section);
-      const tbody = $('tbody', section);
-      $.rmAll(boardSelect);
-      $.rmAll(tbody);
-      const archBoards = dict();
-      for (var { uid, name, boards, files, software } of Conf['archives']) {
-        if (!['fuuka', 'foolfuuka'].includes(software)) {
-          continue;
-        }
-        for (boardID of boards) {
-          o = archBoards[boardID] || (archBoards[boardID] = {
-            thread: [],
-            threadJSON: [],
-            post: [],
-            file: []
-          });
-          if (!o.threadJSON)
-            o.threadJSON = [];
-          var archive = [uid ?? name, name];
-          o.thread.push(archive);
-          if (software === 'foolfuuka') {
-            o.post.push(archive);
-            o.threadJSON.push(archive);
-          }
-          if (files.includes(boardID)) {
-            o.file.push(archive);
-          }
-        }
-      }
-      const rows = [];
-      const boardOptions = [];
-      for (boardID of Object.keys(archBoards).sort()) { // Alphabetical order
-        var row = $.el('tr', { className: `board-${boardID}` });
-        row.hidden = boardID !== g.BOARD.ID;
-        boardOptions.push($.el('option', {
-          textContent: `/${boardID}/`,
-          value: `board-${boardID}`,
-          selected: boardID === g.BOARD.ID
-        }));
-        o = archBoards[boardID];
-        for (var item of ['thread', 'threadJSON', 'post', 'file']) {
-          $.add(row, Settings.addArchiveCell(boardID, o, item));
-        }
-        rows.push(row);
-      }
-      if (rows.length === 0) {
-        boardSelect.hidden = (table.hidden = true);
-        return;
-      }
-      boardSelect.hidden = (table.hidden = false);
-      if (!(g.BOARD.ID in archBoards)) {
-        rows[0].hidden = false;
-      }
-      $.add(boardSelect, boardOptions);
-      $.add(tbody, rows);
-      for (boardID in Conf['selectedArchives']) {
-        var data = Conf['selectedArchives'][boardID];
-        for (var type in data) {
-          var select;
-          var id = data[type];
-          if (select = $(`select[data-boardid='${boardID}'][data-type='${type}']`, tbody)) {
-            select.value = JSON.stringify(id);
-            if (!select.value) {
-              select.value = select.firstChild.value;
-            }
-          }
-        }
-      }
-    },
-    addArchiveCell(boardID, data, type) {
-      const { length } = data[type];
-      const td = $.el('td', { className: 'archive-cell' });
-      if (!length) {
-        td.textContent = '--';
-        return td;
-      }
-      const options = [];
-      let i = 0;
-      while (i < length) {
-        var archive = data[type][i++];
-        options.push($.el('option', {
-          value: JSON.stringify(archive[0]),
-          textContent: archive[1]
-        }));
-      }
-      $.extend(td, { innerHTML: '<select></select>' });
-      const select = td.firstElementChild;
-      if (!(select.disabled = length === 1)) {
-        // XXX GM can't into datasets
-        select.setAttribute('data-boardid', boardID);
-        select.setAttribute('data-type', type);
-        $.on(select, 'change', Settings.saveSelectedArchive);
-      }
-      $.add(select, options);
-      return td;
-    },
-    saveSelectedArchive() {
-      $.get('selectedArchives', Conf['selectedArchives'], ({ selectedArchives }) => {
-        (selectedArchives[this.dataset.boardid] || (selectedArchives[this.dataset.boardid] = dict()))[this.dataset.type] = JSON.parse(this.value);
-        $.set('selectedArchives', selectedArchives);
-        Conf['selectedArchives'] = selectedArchives;
-        Redirect.selectArchives();
-      });
-    },
-    boardnav() {
-      Header.generateBoardList(this.value);
-    },
-    time() {
-      this.nextElementSibling.textContent = Time.format(new Date(), this.value);
-    },
-    timeLocale() {
-      Settings.time.call($('[name=time]', Settings.dialog));
-    },
-    backlink() {
-      this.nextElementSibling.textContent = this.value.replace(/%(?:id|%)/g, x => ({ '%id': '123456789', '%%': '%' })[x]);
-    },
-    fileInfo() {
-      const data = {
-        isReply: true,
-        file: {
-          url: `//${ImageHost.host()}/g/1334437723720.jpg`,
-          name: 'd9bb2efc98dd0df141a94399ff5880b7.jpg',
-          size: '276 KB',
-          sizeInBytes: 276 * 1024,
-          dimensions: '1280x720',
-          isImage: true,
-          isVideo: false,
-          isSpoiler: true,
-          tag: 'Loop'
-        }
-      };
-      FileInfo.format(this.value, data, this.nextElementSibling);
-    },
-    favicon() {
-      Favicon.switch();
-      if ((g.VIEW === 'thread') && Conf['Unread Favicon']) {
-        Unread.update();
-      }
-      const img = this.nextElementSibling.children;
-      const f = Favicon;
-      const iterable = [f.SFW, f.unreadSFW, f.unreadSFWY, f.NSFW, f.unreadNSFW, f.unreadNSFWY, f.dead, f.unreadDead, f.unreadDeadY];
-      for (let i = 0; i < iterable.length; i++) {
-        var icon = iterable[i];
-        if (!img[i]) {
-          $.add(this.nextElementSibling, $.el('img'));
-        }
-        img[i].src = icon;
-      }
-    },
-    togglecss() {
-      if (($('textarea[name=usercss]', $.x('ancestor::fieldset[1]', this)).disabled = ($.id('apply-css').disabled = !this.checked))) {
-        CustomCSS.rmStyle();
-      } else {
-        CustomCSS.addStyle();
-      }
-      $.cb.checked.call(this);
-    },
-    setTimeLocale(e) {
-      const input = e.target;
-      try {
-        if (input.value !== '')
-          new Intl.DateTimeFormat(input.value);
-        input.setCustomValidity('');
-        Time.formatterCache.clear();
-        $.cb.value.call(input);
-        Settings.timeLocale.call(input);
-      } catch (e) {
-        input.setCustomValidity('Locale not recognized');
-        input.reportValidity();
-      }
-    },
-    keyBindInputs: dict(),
-    keybinds(section) {
-      let key;
-      $.extend(section, { innerHTML: KeybindsPage });
-      $('.warning', section).hidden = Conf['Keybinds'];
-      const tbody = $('tbody', section);
-      const items = dict();
-      const inputs = Settings.keyBindInputs;
-      for (key in Config.hotkeys) {
-        var arr = Config.hotkeys[key];
-        var tr = $.el('tr', { innerHTML: `<td>${arr[1]}</td><td><input class="field"></td>` });
-        var input = $('input', tr);
-        input.name = key;
-        input.spellcheck = false;
-        items[key] = Conf[key];
-        inputs[key] = input;
-        $.on(input, 'keydown', Settings.keybind);
-        $.add(tbody, tr);
-      }
-      $.get(items, function (items) {
-        for (key in items) {
-          var val = items[key];
-          inputs[key].value = val;
-        }
-      });
-      $.on($('#reset-keys', section), 'click', Settings.resetKeybinds);
-    },
-    keybind(e) {
-      if (e.keyCode === 9)
-        return; // tab
-      e.preventDefault();
-      e.stopPropagation();
-      const key = Keybinds.keyCode(e);
-      if (key == null)
-        return; // empty string is backspace
-      this.value = key;
-      $.cb.value.call(this);
-    },
-    resetKeybinds() {
-      if (!confirm('Are you sure you want to reset the keybinds?'))
-        return;
-      const defaults = Object.fromEntries(Object.entries(Config.hotkeys).map(([key, value]) => [key, value[0]]));
-      $.set(defaults, () => {
-        Object.assign(Conf, defaults);
-        for (const [key, value] of Object.entries(defaults)) {
-          Settings.keyBindInputs[key].value = value;
-        }
-      });
-    },
-  };
-
-  ;
-  var Filter = {
-    /**
-    * Uses a Map for string types, with the value to filter for as the key.
-    * This allows faster lookup than iterating over every filter.
-    */
-    filters: new Map(),
-    init() {
-      if (!['index', 'thread', 'catalog'].includes(g.VIEW) || !Conf['Filter'])
-        return;
-      if ((g.VIEW === 'catalog') && !Conf['Filter in Native Catalog'])
-        return;
-      if (!Conf['Filtered Backlinks']) {
-        $.addClass(doc, 'hide-backlinks');
-      }
-      for (var key in Config.filter) {
-        for (var line of Conf[key].split('\n')) {
-          let hl;
-          let regexp;
-          let top;
-          let hide = true;
-          let mask = 0;
-          let boards = false;
-          let excludes = false;
-          let reason;
-          let poster = false;
-          let replies = false;
-          let noti = false;
-          let stub = Conf.Stubs;
-          if (line[0] === '#')
-            continue;
-          const regexpMatch = line.match(/\/(.*)\/(\w*)/);
-          if (!regexpMatch) {
-            continue;
-          }
-          if (key === 'uniqueID' || key === 'MD5') {
-            // MD5 filter will use strings instead of regular expressions.
-            regexp = regexpMatch[1];
-          } else {
-            try {
-              // Please, don't write silly regular expressions.
-              regexp = RegExp(regexpMatch[1], regexpMatch[2]);
-            } catch (err) {
-              // I warned you, bro.
-              new Notice('warning', [
-                $.tn(`Invalid ${key} filter:`),
-                $.el('br'),
-                $.tn(line),
-                $.el('br'),
-                $.tn(err.message)
-              ], 60);
-              continue;
-            }
-          }
-          // Don't mix up filter flags with the regular expression.
-          const options = line.length > regexpMatch[0].length ? line.replace(regexpMatch[0], '') : '';
-          if (options) {
-            // List of the boards this filter applies to.
-            boards = this.parseBoards(options.match(/(?:^|;)\s*boards:([^;]+)/)?.[1]);
-            // Boards to exclude from an otherwise global rule.
-            excludes = this.parseBoards(options.match(/(?:^|;)\s*exclude:([^;]+)/)?.[1]);
-            // Filter OPs along with their threads or replies only.
-            const op = options.match(/(?:^|;)\s*op:(no|only)/)?.[1] || '';
-            mask = $.getOwn({ 'no': 1, 'only': 2 }, op) || 0;
-            // Filter only posts with/without files.
-            const file = options.match(/(?:^|;)\s*file:(no|only)/)?.[1] || '';
-            mask = mask | ($.getOwn({ 'no': 4, 'only': 8 }, file) || 0);
-            // Overrule the `Show Stubs` setting.
-            // Defaults to stub showing.
-            stub = (() => {
-              switch (options.match(/(?:^|;)\s*stub:(yes|no)/)?.[1]) {
-                case 'yes':
-                  return true;
-                case 'no':
-                  return false;
-                default:
-                  return Conf['Stubs'];
-              }
-            })();
-            // Desktop notification
-            noti = /(?:^|;)\s*notify/.test(options);
-            // Highlight the post.
-            // If not specified, the highlight class will be filter-highlight.
-            const highlightRes = options.match(/(?:^|;)\s*highlight(?::([\w-]+))?/);
-            if (highlightRes) {
-              hl = highlightRes[1] || 'filter-highlight';
-              // Put highlighted OP's thread on top of the board page or not.
-              // Defaults to on top.
-              top = (options.match(/(?:^|;)\s*top:(yes|no)/)?.[1] || 'yes') === 'yes';
-              hide = /(?:^|;)\s*hide(?:[;:]|$)/.test(options);
-            }
-            // Hide the post (default case).
-            hide = hide || !(hl || noti);
-            reason = options.match(/(?:^|;)\s*reason:([^;$]+)/)?.[1];
-            poster = /(?:^|;)\s*poster(?:[;:]|$)/.test(options);
-            replies = /(?:^|;)\s*replies(?:[;:]|$)/.test(options);
-          }
-          const filterObj = { regexp, boards, excludes, mask, hide, stub, hl, top, noti, reason, poster, replies };
-          // Fields that this filter applies to (for 'general' filters)
-          if (key === 'general') {
-            const types = options.match(/(?:^|;)\s*type:([^;]*)/)?.[1].split(',')
-              || ['subject', 'name', 'filename', 'comment'];
-            for (var type of types) {
-              this.filters.get(type)?.push(filterObj) ?? this.filters.set(type, [filterObj]);
-            }
-          } else {
-            this.filters.get(key)?.push(filterObj) ?? this.filters.set(key, [filterObj]);
-          }
-        }
-      }
-      if (!this.filters.size)
-        return;
-      // conversion from array to map for string types
-      for (const type of ['MD5', 'uniqueID']) {
-        const filtersForType = this.filters.get(type);
-        if (!filtersForType)
-          continue;
-        const map = new Map();
-        for (const filter of filtersForType) {
-          map.get(filter.regexp)?.push(filter) ?? map.set(filter.regexp, [filter]);
-        }
-        this.filters.set(type, map);
-      }
-      if (g.VIEW === 'catalog') {
-        return Filter.catalog();
-      } else {
-        return Callbacks.Post.push({
-          name: 'Filter',
-          cb: this.node
-        });
-      }
-    },
-    // Parse comma-separated list of boards.
-    // Sites can be specified by a beginning part of the site domain followed by a colon.
-    parseBoards(boardsRaw) {
-      let boards;
-      if (!boardsRaw) {
-        return false;
-      }
-      if (boards = Filter.parseBoardsMemo[boardsRaw]) {
-        return boards;
-      }
-      boards = dict();
-      let siteFilter = '';
-      for (var boardID of boardsRaw.split(',')) {
-        if (boardID.includes(':')) {
-          [siteFilter, boardID] = boardID.split(':').slice(-2);
-        }
-        for (var siteID in g.sites) {
-          var site = g.sites[siteID];
-          if (siteID.slice(0, siteFilter.length) === siteFilter) {
-            if (['nsfw', 'sfw'].includes(boardID)) {
-              for (var boardID2 of site.sfwBoards?.(boardID === 'sfw') || []) {
-                boards[`${siteID}/${boardID2}`] = true;
-              }
-            } else {
-              boards[`${siteID}/${encodeURIComponent(boardID)}`] = true;
-            }
-          }
-        }
-      }
-      Filter.parseBoardsMemo[boardsRaw] = boards;
-      return boards;
-    },
-    parseBoardsMemo: dict(),
-    test(post, hideable = true) {
-      if (post.filterResults)
-        return post.filterResults;
-      let hide = false;
-      let stub = true;
-      let hl = undefined;
-      let top = false;
-      let noti = false;
-      let poster = false;
-      let replies = false;
-      let reasons;
-      if (QuoteYou.isYou(post)) {
-        hideable = false;
-      }
-      let mask = (post.isReply ? 2 : 1);
-      mask = (mask | (post.file ? 4 : 8));
-      const board = `${post.siteID}/${post.boardID}`;
-      const site = `${post.siteID}/*`;
-      for (const type of Filter.filters.keys()) {
-        for (const value of Filter.values(type, post)) {
-          const filtersOrMap = Filter.filters.get(type);
-          const filtersForType = Array.isArray(filtersOrMap) ? filtersOrMap : filtersOrMap.get(value);
-          if (!filtersForType)
-            continue;
-          const isString = type === 'uniqueID' || type === 'MD5';
-          for (const filter of filtersForType) {
-            if ((filter.boards && !(filter.boards[board] || filter.boards[site])) ||
-              (filter.excludes && (filter.excludes[board] || filter.excludes[site])) ||
-              (filter.mask & mask) ||
-              (isString ? (filter.regexp !== value) : !filter.regexp.test(value)))
-              continue;
-            if (filter.hide) {
-              if (hideable) {
-                hide = true;
-                if (stub) {
-                  ({ stub } = filter);
-                  (reasons || (reasons = [])).push(filter.reason || `Filtered ${type} ${filter.regexp}`);
-                }
-              }
-            }
-            if (filter.hl && !hl?.includes(filter.hl)) {
-              (hl || (hl = [])).push(filter.hl);
-            }
-            if (!top) {
-              ({ top } = filter);
-            }
-            if (filter.noti)
-              noti = true;
-            if (filter.poster)
-              poster = true;
-            if (filter.replies)
-              replies = true;
-          }
-        }
-      }
-      post.filterResults = { hide, stub, hl, top, noti, poster, replies, reasons };
-      return post.filterResults;
-    },
-    node() {
-      if (this.isClone ||
-        // Happens when hovering over a dead link in the catalog.
-        (!this.isReply && !this.thread.nodes.root))
-        return;
-      const { hide, stub, hl, noti, poster, replies } = Filter.test(this, (!this.isFetchedQuote && (this.isReply || (g.VIEW === 'index'))));
-      // Add temporary filter for the poster ID for future posts.
-      let reason;
-      if (poster && this.info.uniqueID) {
-        reason = `Hidden because it's the same poster as ${this.ID} (${this.filterResults.reasons})`;
-        const { uniqueID } = this.info;
-        const newFilter = {
-          regexp: uniqueID,
-          boards: false,
-          excludes: false,
-          mask: 0,
-          hide,
-          stub,
-          replies,
-          // A filter can only have one hl class.
-          hl: hl?.[0],
-          reason,
-        };
-        const map = Filter.filters.get('uniqueID');
-        if (map) {
-          map.get(uniqueID)?.push(newFilter) ?? map.set(uniqueID, [newFilter]);
-        } else {
-          Filter.filters.set('uniqueID', (new Map()).set(uniqueID, [newFilter]));
-        }
-      }
-      if (hide) {
-        if (this.isReply) {
-          PostHiding.hide(this, stub);
-          if (replies) {
-            Recursive.applyAndAdd(PostHiding.hide, this, stub, undefined, `Hidden recursively from ${this.ID}`);
-          }
-          if (poster && this.info.uniqueID) {
-            g.posts.forEach((p) => {
-              if (p.info.uniqueID === this.info.uniqueID && p !== this) {
-                PostHiding.hide(p, stub, replies, reason);
-                if (replies) {
-                  Recursive.applyAndAdd(PostHiding.hide, p, stub, undefined, `Hidden recursively from ${p.ID}`);
-                }
-              }
-            });
-          }
-        } else {
-          ThreadHiding.hide(this.thread, stub);
-        }
-      }
-      if (hl) {
-        this.highlights = hl;
-        $.addClass(this.nodes.root, ...hl);
-        if (this.isReply) {
-          const hlFn = (post, ...hl) => { $.addClass(post.nodes.root, ...hl); };
-          if (replies)
-            Recursive.applyAndAdd(hlFn, this, ...hl);
-          if (poster && this.info.uniqueID) {
-            g.posts.forEach((p) => {
-              if (p.info.uniqueID === this.info.uniqueID && p !== this) {
-                $.addClass(p.nodes.root, ...hl);
-                if (replies)
-                  Recursive.applyAndAdd(hlFn, p, ...hl);
-              }
-            });
-          }
-        }
-      }
-      if (noti && Unread.posts && (this.ID > Unread.lastReadPost) && !QuoteYou.isYou(this)) {
-        Unread.openNotification(this, ' triggered a notification filter');
-      }
-      if (this.file?.thumbLink) {
-        $.on(this.file.thumbLink, 'click', (e) => {
-          if (!e.shiftKey || !Conf['MD5 Quick Filter in Threads'])
-            return;
-          Filter.quickFilterMD5.call(this);
-          e.preventDefault();
-          e.stopImmediatePropagation();
-        });
-      }
-    },
-    catalog() {
-      let url;
-      if (!(url = g.SITE.urls.catalogJSON?.(g.BOARD))) {
-        return;
-      }
-      Filter.catalogData = dict();
-      $.ajax(url, { onloadend: Filter.catalogParse });
-      return Callbacks.CatalogThreadNative.push({
-        name: 'Filter',
-        cb: this.catalogNode
-      });
-    },
-    catalogParse() {
-      if (![200, 404].includes(this.status)) {
-        new Notice('warning', `Failed to fetch catalog JSON data. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`, 1);
-        return;
-      }
-      for (var page of this.response) {
-        for (var item of page.threads) {
-          Filter.catalogData[item.no] = item;
-        }
-      }
-      g.BOARD.threads.forEach(function (thread) {
-        if (thread.catalogViewNative) {
-          return Filter.catalogNode.call(thread.catalogViewNative);
-        }
-      });
-    },
-    catalogNode() {
-      if ((this.boardID !== g.BOARD.ID) || !Filter.catalogData[this.ID]) {
-        return;
-      }
-      if (QuoteYou.db?.get({ siteID: g.SITE.ID, boardID: this.boardID, threadID: this.ID, postID: this.ID })) {
-        return;
-      }
-      const { hide, hl, top } = Filter.test(g.SITE.Build.parseJSON(Filter.catalogData[this.ID], this));
-      if (hide) {
-        this.nodes.root.hidden = true;
-      }
-      if (hl) {
-        this.highlights = hl;
-        $.addClass(this.nodes.root, ...hl);
-      }
-      if (top) {
-        $.prepend(this.nodes.root.parentNode, this.nodes.root);
-        g.SITE.catalogPin?.(this.nodes.root);
-      }
-    },
-    isHidden(post) {
-      return !!Filter.test(post).hide;
-    },
-    valueF: {
-      postID(post) { return [`${post.ID}`]; },
-      name(post) { return post.info.name === undefined ? [] : [post.info.name]; },
-      uniqueID(post) { return [post.info.uniqueID || '']; },
-      tripcode(post) { return post.info.tripcode === undefined ? [] : [post.info.tripcode]; },
-      capcode(post) { return post.info.capcode === undefined ? [] : [post.info.capcode]; },
-      pass(post) { return [post.info.pass]; },
-      email(post) { return [post.info.email]; },
-      subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
-      comment(post) {
-        if (post.info.comment == null) {
-          post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.(post.info.commentHTML.innerHTML);
-        }
-        return [post.info.comment];
-      },
-      flag(post) { return post.info.flag === undefined ? [] : [post.info.flag]; },
-      filename(post) { return post.files.map(f => f.name); },
-      dimensions(post) { return post.files.map(f => f.dimensions); },
-      filesize(post) { return post.files.map(f => f.size); },
-      MD5(post) { return post.files.map(f => f.MD5); }
-    },
-    values(key, post) {
-      if ($.hasOwn(Filter.valueF, key)) {
-        return Filter.valueF[key](post).filter(v => v != null);
-      } else {
-        return [key.split('+').map(function (k) {
-            let f;
-            if (f = $.getOwn(Filter.valueF, k)) {
-              return f(post).map(v => v || '').join('\n');
-            } else {
-              return '';
-            }
-          }).join('\n')];
-      }
-    },
-    addFilter(type, re, cb) {
-      if (!$.hasOwn(Config.filter, type)) {
-        return;
-      }
-      return $.get(type, Conf[type], function (item) {
-        let save = item[type];
-        // Add a new line before the regexp unless the text is empty.
-        save =
-          save ?
-            `${save}\n${re}`
-            :
-              re;
-        return $.set(type, save, cb);
-      });
-    },
-    removeFilters(type, res, cb) {
-      return $.get(type, Conf[type], function (item) {
-        let save = item[type];
-        const filterArray = Array.isArray(res) ? res : [...res.values()].flat();
-        const r = filterArray.map(Filter.escape).join('|');
-        save = save.replace(RegExp(`(?:$\n|^)(?:${r})$`, 'mg'), '');
-        return $.set(type, save, cb);
-      });
-    },
-    showFilters(type) {
-      // Open the settings and display & focus the relevant filter textarea.
-      Settings.open('Filter');
-      const section = $('.section-container');
-      const select = $('select[name=filter]', section);
-      select.value = type;
-      Settings.selectFilter.call(select);
-      return $.onExists(section, 'textarea', function (ta) {
-        const tl = ta.textLength;
-        ta.setSelectionRange(tl, tl);
-        return ta.focus();
-      });
-    },
-    quickFilterMD5() {
-      const post = this instanceof Post ? this : Get.postFromNode(this);
-      const files = post.files.filter(f => f.MD5);
-      if (!files.length) {
-        return;
-      }
-      const filter = files.map(f => `/${f.MD5}/`).join('\n');
-      Filter.addFilter('MD5', filter);
-      const origin = post.origin || post;
-      if (origin.isReply) {
-        PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f.MD5}`).join(' & '));
-      } else if (g.VIEW === 'index') {
-        ThreadHiding.hide(origin.thread);
-      }
-      if (!Conf['MD5 Quick Filter Notifications']) {
-        // feedback for when nothing gets hidden
-        if (post.nodes.post.getBoundingClientRect().height) {
-          new Notice('info', 'MD5 filtered.', 2);
-        }
-        return;
-      }
-      let { notice } = Filter.quickFilterMD5;
-      if (notice) {
-        notice.filters.push(filter);
-        notice.posts.push(origin);
-        $('span', notice.el).textContent = `${notice.filters.length} MD5s filtered.`;
-        notice.resetTimer();
-      } else {
-        const msg = $.el('div', { innerHTML: "<span>MD5 filtered.</span> [<a href=\"javascript:;\">show</a>] [<a href=\"javascript:;\">undo</a>]" });
-        notice = (Filter.quickFilterMD5.notice = new Notice('info', msg, 10, () => delete Filter.quickFilterMD5.notice));
-        notice.filters = [filter];
-        notice.posts = [origin];
-        const links = $$('a', msg);
-        $.on(links[0], 'click', Filter.quickFilterCB.show.bind(notice));
-        $.on(links[1], 'click', Filter.quickFilterCB.undo.bind(notice));
-      }
-    },
-    quickFilterCB: {
-      show() {
-        Filter.showFilters('MD5');
-        return this.close();
-      },
-      undo() {
-        Filter.removeFilters('MD5', this.filters);
-        for (var post of this.posts) {
-          if (post.isReply) {
-            PostHiding.show(post);
-          } else if (g.VIEW === 'index') {
-            ThreadHiding.show(post.thread);
-          }
-        }
-        return this.close();
-      }
-    },
-    escape(value) {
-      return value.replace(/\/|\\|\^|\$|\n|\.|\(|\)|\{|\}|\[|\]|\?|\*|\+|\|/g, (c) => {
-        if (c === '\n') {
-          return '\\n';
-        } else {
-          return `\\${c}`;
-        }
-      });
-    },
-    menu: {
-      init() {
-        if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Filter']) {
-          return;
-        }
-        const div = $.el('div', { textContent: 'Filter' });
-        const entry = {
-          el: div,
-          order: 50,
-          open(post) {
-            Filter.menu.post = post;
-            return true;
-          },
-          subEntries: []
-        };
-        for (var type of [
-          ['Name', 'name'],
-          ['Unique ID', 'uniqueID'],
-          ['Tripcode', 'tripcode'],
-          ['Capcode', 'capcode'],
-          ['Pass Date', 'pass'],
-          ['Email', 'email'],
-          ['Subject', 'subject'],
-          ['Comment', 'comment'],
-          ['Flag', 'flag'],
-          ['Filename', 'filename'],
-          ['Image dimensions', 'dimensions'],
-          ['Filesize', 'filesize'],
-          ['Image MD5', 'MD5']
-        ]) {
-          // Add a sub entry for each filter type.
-          entry.subEntries.push(Filter.menu.createSubEntry(type[0], type[1]));
-        }
-        return Menu.menu.addEntry(entry);
-      },
-      createSubEntry(text, type) {
-        const el = $.el('a', {
-          href: 'javascript:;',
-          textContent: text
-        });
-        el.dataset.type = type;
-        $.on(el, 'click', Filter.menu.makeFilter);
-        return {
-          el,
-          open(post) {
-            return Filter.values(type, post).length;
-          }
-        };
-      },
-      makeFilter() {
-        const { type } = this.dataset;
-        // Convert value -> regexp, unless type is MD5
-        const values = Filter.values(type, Filter.menu.post);
-        const res = values.map((value) => {
-          if (['uniqueID', 'MD5'].includes(type)) {
-            return `/${value}/`;
-          } else {
-            return `/^${Filter.escape(value)}$/`;
-          }
-        }).join('\n');
-        return Filter.addFilter(type, res, () => Filter.showFilters(type));
-      }
-    }
-  };
-
-  const Site = {
-    defaultProperties: {
-      '4chan.org': { software: 'yotsuba' },
-      '4channel.org': { canonical: '4chan.org' },
-      '4cdn.org': { canonical: '4chan.org' },
-      'notso.smuglo.li': { canonical: 'smuglo.li' },
-      'smugloli.net': { canonical: 'smuglo.li' },
-      'smug.nepu.moe': { canonical: 'smuglo.li' }
-    },
-    init(cb) {
-      $.extend(Conf['siteProperties'], Site.defaultProperties);
-      let hostname = Site.resolve();
-      if (hostname && $.hasOwn(SW, Conf['siteProperties'][hostname].software)) {
-        this.set(hostname);
-        cb();
-      }
-      $.onExists(doc, 'body', () => {
-        for (const software in SW) {
-          let changes;
-          if (changes = SW[software].detect?.()) {
-            changes.software = software;
-            hostname = location.hostname.replace(/^www\./, '');
-            const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
-            let changed = 0;
-            for (const key in changes) {
-              if (properties[key] !== changes[key]) {
-                properties[key] = changes[key];
-                changed++;
-              }
-            }
-            if (changed) {
-              $.set('siteProperties', Conf['siteProperties']);
-            }
-            if (!g.SITE) {
-              this.set(hostname);
-              cb();
-            }
-            return;
-          }
-        }
-      });
-    },
-    resolve(url = location) {
-      let { hostname } = url;
-      while (hostname && !$.hasOwn(Conf['siteProperties'], hostname)) {
-        hostname = hostname.replace(/^[^.]*\.?/, '');
-      }
-      if (hostname) {
-        let canonical;
-        if (canonical = Conf['siteProperties'][hostname]?.canonical) {
-          hostname = canonical;
-        }
-      }
-      return hostname;
-    },
-    parseURL(url = location) {
-      const siteID = Site.resolve(url);
-      const site = g.sites[siteID];
-      const r = {};
-      if (!site) {
-        return r;
-      }
-      r.siteID = site.ID;
-      if (site.isBoardlessPage?.(url)) {
-        return r;
-      }
-      const pathname = url.pathname.split(/\/+/);
-      r.boardID = pathname[1];
-      if (site.isFileURL(url)) {
-        r.VIEW = 'file';
-      } else if (site.isAuxiliaryPage?.(url)) {
-        // pass
-      } else if (['thread', 'res'].includes(pathname[2])) {
-        r.VIEW = 'thread';
-        r.threadID = (r.THREADID = +pathname[3].replace(/\.\w+$/, ''));
-      } else if ((pathname[2] === 'archive') && (pathname[3] === 'res')) {
-        r.VIEW = 'thread';
-        r.threadID = (r.THREADID = +pathname[4].replace(/\.\w+$/, ''));
-        r.threadArchived = true;
-      } else if (/^(?:catalog|archive)(?:\.\w+)?$/.test(pathname[2])) {
-        r.VIEW = pathname[2].replace(/\.\w+$/, '');
-      } else if (/^(?:index|\d*)(?:\.\w+)?$/.test(pathname[2])) {
-        r.VIEW = 'index';
-      }
-      return r;
-    },
-    set(hostname) {
-      for (const ID in Conf['siteProperties']) {
-        let site;
-        const properties = Conf['siteProperties'][ID];
-        if (properties.canonical) {
-          continue;
-        }
-        const { software } = properties;
-        if (!software || !$.hasOwn(SW, software)) {
-          continue;
-        }
-        g.sites[ID] = (site = Object.create(SW[software]));
-        $.extend(site, { ID, siteID: ID, properties, software });
-      }
-      return g.SITE = g.sites[hostname];
-    }
-  };
-
-  // @ts-nocheck
-
-  var CatalogLinks = {
-    init() {
-      if ((g.SITE.software === 'yotsuba') && (Conf['External Catalog'] || Conf['JSON Index']) && !(Conf['JSON Index'] && (g.VIEW === 'index'))) {
-        const selector = (() => { switch (g.VIEW) {
-          case 'thread': case 'archive': return '.navLinks.desktop > a';
-          case 'catalog':           return '.navLinks > :first-child > a';
-          case 'index':             return '#ctrl-top > a, .cataloglink > a';
-        } })();
-        $.ready(function() {
-          for (var link of $$(selector)) {
-            var catalogURL;
-            switch (link.pathname.replace(/\/+/g, '/')) {
-              case `/${g.BOARD}/`:
-                if (Conf['JSON Index']) { link.textContent = 'Index'; }
-                link.href = CatalogLinks.index();
-                break;
-              case `/${g.BOARD}/catalog`:
-                link.href = CatalogLinks.catalog();
-                break;
-            }
-            if ((g.VIEW === 'catalog') && ((catalogURL = CatalogLinks.catalog()) !== g.SITE.urls.catalog?.(g.BOARD))) {
-              var catalogLink = link.parentNode.cloneNode(true);
-              var link2 = catalogLink.firstElementChild;
-              link2.href = catalogURL;
-              link2.textContent = link2.hostname === location.hostname ? `${meta.name} Catalog` : 'External Catalog';
-              $.after(link.parentNode, [$.tn(' '), catalogLink]);
-            }
-          }
-        });
-      }
-
-      if ((g.SITE.software === 'yotsuba') && Conf['JSON Index'] && Conf[`Use ${meta.name} Catalog`]) {
-        Callbacks.Post.push({
-          name: 'Catalog Link Rewrite',
-          cb:   this.node
-        });
-      }
-
-      if (this.enabled = Conf['Catalog Links']) {
-        let el;
-        CatalogLinks.el = (el = UI.checkbox('Header catalog links', 'Catalog Links'));
-        el.id = 'toggleCatalog';
-        const input = $('input', el);
-        $.on(input, 'change', this.toggle);
-        $.sync('Header catalog links', CatalogLinks.set);
-        return Header.menu.addEntry({
-          el,
-          order: 95
-        });
-      }
-    },
-
-    node() {
-      for (var a of $$('a', this.nodes.comment)) {
-        var m;
-        if (m = a.href.match(/^https?:\/\/(boards\.4chan(?:nel)?\.org\/[^\/]+)\/catalog(#s=.*)?/)) {
-          a.href = `//${m[1]}/${m[2] || '#catalog'}`;
-        }
-      }
-    },
-
-    toggle() {
-      $.event('CloseMenu');
-      $.set('Header catalog links', this.checked);
-      return CatalogLinks.set(this.checked);
-    },
-
-    set(useCatalog) {
-      Conf['Header catalog links'] = useCatalog;
-      CatalogLinks.setLinks(Header.boardList);
-      CatalogLinks.setLinks(Header.bottomBoardList);
-      CatalogLinks.el.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
-      return $('input', CatalogLinks.el).checked = useCatalog;
-    },
-
-    // Also called by Header when board lists are loaded / generated.
-    setLinks(list) {
-      if ((!(CatalogLinks.enabled ?? Conf['Catalog Links'])) || !list) { return; }
-
-      // do not transform links unless they differ from the expected value at most by this tail
-      const tail = /(?:index)?(?:\.\w+)?$/;
-
-      for (var a of $$('a:not([data-only])', list)) {
-        var {siteID, boardID} = a.dataset;
-        if (!siteID || !boardID) {
-          var VIEW;
-          ({siteID, boardID, VIEW} = Site.parseURL(a));
-          if (
-            !siteID || !boardID ||
-            !['index', 'catalog'].includes(VIEW) ||
-            (!a.dataset.indexOptions && (a.href.replace(tail, '') !== (Get.url(VIEW, {siteID, boardID}) || '').replace(tail, '')))
-          ) { continue; }
-          $.extend(a.dataset, {siteID, boardID});
-        }
-
-        var board = {siteID, boardID};
-        var url = Conf['Header catalog links'] ? CatalogLinks.catalog(board) : Get.url('index', board);
-        if (url) {
-          a.href = url;
-          if (a.dataset.indexOptions && (url.split('#')[0] === Get.url('index', board))) {
-            a.href += (a.hash ? '/' : '#') + a.dataset.indexOptions;
-          }
-        }
-      }
-    },
-
-    externalParse() {
-      CatalogLinks.externalList = dict();
-      for (var line of Conf['externalCatalogURLs'].split('\n')) {
-        if (line[0] === '#') { continue; }
-        var url = line.split(';')[0];
-        var boards   = Filter.parseBoards(line.match(/;boards:([^;]+)/)?.[1] || '*');
-        var excludes = Filter.parseBoards(line.match(/;exclude:([^;]+)/)?.[1]) || dict();
-        for (var board in boards) {
-          if (!excludes[board] && !excludes[board.split('/')[0] + '/*']) {
-            CatalogLinks.externalList[board] = url;
-          }
-        }
-      }
-    },
-
-    external({siteID, boardID}) {
-      if (!CatalogLinks.externalList) { CatalogLinks.externalParse(); }
-      const external = (CatalogLinks.externalList[`${siteID}/${boardID}`] || CatalogLinks.externalList[`${siteID}/*`]);
-      if (external) { return external.replace(/%board/g, boardID); } else { return undefined; }
-    },
-
-    jsonIndex(board, hash) {
-      if ((g.SITE.ID === board.siteID) && (g.BOARD.ID === board.boardID) && (g.VIEW === 'index')) {
-        return hash;
-      } else {
-        return Get.url('index', board) + hash;
-      }
-    },
-
-    catalog(board=g.BOARD) {
-      let external, nativeCatalog;
-      if (Conf['External Catalog'] && (external = CatalogLinks.external(board))) {
-        return external;
-      } else if (Index.enabledOn(board) && Conf[`Use ${meta.name} Catalog`]) {
-        return CatalogLinks.jsonIndex(board, '#catalog');
-      } else if (nativeCatalog = Get.url('catalog', board)) {
-        return nativeCatalog;
-      } else {
-        return CatalogLinks.external(board);
-      }
-    },
-
-    index(board=g.BOARD) {
-      if (Index.enabledOn(board)) {
-        return CatalogLinks.jsonIndex(board, '#index');
-      } else {
-        return Get.url('index', board);
-      }
-    }
-  };
-
-  var Header = {
-    init() {
-      $.onExists(doc, 'body', () => {
-        if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) {
-          return;
-        }
-        $.add(this.bar, [this.noticesRoot, this.toggle]);
-        $.prepend(d.body, this.bar);
-        $.add(d.body, Header.hover);
-        return this.setBarPosition(Conf['Bottom Header']);
-      });
-      this.menu = new UI.Menu('header');
-      const menuButton = $.el('span', { className: 'menu-button' });
-      Icon.set(menuButton, 'caretDown', 'Menu');
-      const box = UI.checkbox;
-      const barFixedToggler = box('Fixed Header', 'Fixed Header');
-      const headerToggler = box('Header auto-hide', 'Auto-hide header');
-      const scrollHeaderToggler = box('Header auto-hide on scroll', 'Auto-hide header on scroll');
-      const barPositionToggler = box('Bottom Header', 'Bottom header');
-      const linkJustifyToggler = box('Centered links', 'Centered links');
-      const customNavToggler = box('Custom Board Navigation', 'Custom board navigation');
-      const footerToggler = box('Bottom Board List', 'Hide bottom board list');
-      const shortcutToggler = box('Shortcut Icons', 'Shortcut Icons');
-      const editCustomNav = $.el('a', {
-        textContent: 'Edit custom board navigation',
-        href: 'javascript:;'
-      });
-      this.barFixedToggler = barFixedToggler.firstElementChild;
-      this.scrollHeaderToggler = scrollHeaderToggler.firstElementChild;
-      this.barPositionToggler = barPositionToggler.firstElementChild;
-      this.linkJustifyToggler = linkJustifyToggler.firstElementChild;
-      this.headerToggler = headerToggler.firstElementChild;
-      this.footerToggler = footerToggler.firstElementChild;
-      this.shortcutToggler = shortcutToggler.firstElementChild;
-      this.customNavToggler = customNavToggler.firstElementChild;
-      $.on(menuButton, 'click', this.menuToggle);
-      $.on(this.headerToggler, 'change', this.toggleBarVisibility);
-      $.on(this.barFixedToggler, 'change', this.toggleBarFixed);
-      $.on(this.barPositionToggler, 'change', this.toggleBarPosition);
-      $.on(this.scrollHeaderToggler, 'change', this.toggleHideBarOnScroll);
-      $.on(this.linkJustifyToggler, 'change', this.toggleLinkJustify);
-      $.on(this.footerToggler, 'change', this.toggleFooterVisibility);
-      $.on(this.shortcutToggler, 'change', this.toggleShortcutIcons);
-      $.on(this.customNavToggler, 'change', this.toggleCustomNav);
-      $.on(editCustomNav, 'click', this.editCustomNav);
-      this.setBarFixed(Conf['Fixed Header']);
-      this.setHideBarOnScroll(Conf['Header auto-hide on scroll']);
-      this.setBarVisibility(Conf['Header auto-hide']);
-      this.setLinkJustify(Conf['Centered links']);
-      this.setShortcutIcons(Conf['Shortcut Icons']);
-      this.setFooterVisibility(Conf['Bottom Board List']);
-      $.sync('Fixed Header', this.setBarFixed);
-      $.sync('Header auto-hide on scroll', this.setHideBarOnScroll);
-      $.sync('Bottom Header', this.setBarPosition);
-      $.sync('Shortcut Icons', this.setShortcutIcons);
-      $.sync('Header auto-hide', this.setBarVisibility);
-      $.sync('Centered links', this.setLinkJustify);
-      $.sync('Bottom Board List', this.setFooterVisibility);
-      this.addShortcut('menu', menuButton, 900);
-      this.menu.addEntry({
-        el: $.el('span', { textContent: 'Header' }),
-        order: 107,
-        subEntries: [
-          { el: barFixedToggler },
-          { el: headerToggler },
-          { el: scrollHeaderToggler },
-          { el: barPositionToggler },
-          { el: linkJustifyToggler },
-          { el: footerToggler },
-          { el: shortcutToggler },
-          { el: customNavToggler },
-          { el: editCustomNav }
-        ]
-      });
-      $.on(d, 'CreateNotification', this.createNotification);
-      this.setBoardList();
-      $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
-      $.ready(function () {
-        const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
-        if (!isPageLegit) {
-          return;
-        }
-        let footer;
-        if ((g.SITE.software === 'yotsuba') && !(footer = $.id('boardNavDesktopFoot'))) {
-          let absbot;
-          if (!(absbot = $.id('absbot'))) {
-            return;
-          }
-          footer = $.id('boardNavDesktop').cloneNode(true);
-          footer.id = 'boardNavDesktopFoot';
-          $('#navtopright', footer).id = 'navbotright';
-          $('#settingsWindowLink', footer).id = 'settingsWindowLinkBot';
-          $.before(absbot, footer);
-          $.global('stubCloneTopNav');
-        }
-        if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
-          for (var a of $$('a', Header.bottomBoardList)) {
-            if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
-              a.className = 'current';
-            }
-          }
-          return CatalogLinks.setLinks(Header.bottomBoardList);
-        }
-      });
-      if ((g.SITE.software === 'yotsuba') && ((g.VIEW === 'catalog') || !Conf['Disable Native Extension'])) {
-        const cs = $.el('a', { href: 'javascript:;' });
-        if (g.VIEW === 'catalog') {
-          cs.title = (cs.textContent = 'Catalog Settings');
-          Icon.set(cs, 'bookOpen', 'Catalog Settings');
-          this.addShortcut('native', cs, 810);
-        } else {
-          cs.title = (cs.textContent = '4chan Settings');
-          cs.className = 'native-settings';
-          this.addShortcut('native', cs, 810);
-        }
-        $.on(cs, 'click', () => $.id('settingsWindowLink').click());
-      }
-      return this.enableDesktopNotifications();
-    },
-    bar: $.el('div', { id: 'header-bar' }),
-    bottomBoardList: undefined,
-    boardList: undefined,
-    noticesRoot: $.el('div', { id: 'notifications' }),
-    shortcuts: $.el('span', { id: 'shortcuts' }),
-    hover: $.el('div', { id: 'hoverUI' }),
-    toggle: $.el('div', { id: 'scroll-marker' }),
-    setBoardList() {
-      let boardList;
-      Header.boardList = (boardList = $.el('span', { id: 'board-list' }));
-      $.extend(boardList, { innerHTML: "<span id=\"custom-board-list\"></span><span id=\"full-board-list\" hidden><span class=\"hide-board-list-container brackets-wrap\"><a href=\"javascript:;\" class=\"hide-board-list-button\">&nbsp;-&nbsp;</a></span> <span class=\"boardList\"></span></span>" });
-      const btn = $('.hide-board-list-button', boardList);
-      $.on(btn, 'click', Header.toggleBoardList);
-      $.prepend(Header.bar, [Header.boardList, Header.shortcuts]);
-      Header.setCustomNav(Conf['Custom Board Navigation']);
-      Header.generateBoardList(Conf['boardnav']);
-      $.sync('Custom Board Navigation', Header.setCustomNav);
-      return $.sync('boardnav', Header.generateBoardList);
-    },
-    generateFullBoardList() {
-      let nodes;
-      if (g.SITE.transformBoardList) {
-        nodes = g.SITE.transformBoardList();
-      } else {
-        nodes = [...$(g.SITE.selectors.boardList).cloneNode(true).childNodes];
-      }
-      const fullBoardList = $('.boardList', Header.boardList);
-      $.add(fullBoardList, nodes);
-      for (var a of $$('a', fullBoardList)) {
-        if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
-          a.className = 'current';
-        }
-      }
-      return CatalogLinks.setLinks(fullBoardList);
-    },
-    generateBoardList(boardnav) {
-      const list = $('#custom-board-list', Header.boardList);
-      $.rmAll(list);
-      if (!boardnav)
-        return;
-      boardnav = boardnav.replace(/(\r\n|\n|\r)/g, ' ');
-      const segments = boardnav.split(/(\{\{(?:"[^"]+")?|\}\})/);
-      const spanStack = [];
-      let currentContainer = list;
-      segments.forEach(segment => {
-        if (segment.startsWith('{{')) {
-          const span = $.el('span');
-          $.add(currentContainer, span);
-          spanStack.push(span);
-          currentContainer = span;
-          if (segment.length > 2)
-            span.className = segment.slice(3, -1);
-        } else if (segment === '}}') {
-          spanStack.pop();
-          currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
-        } else {
-          const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
-          const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
-          segmentNodes.forEach(node => currentContainer.appendChild(node));
-        }
-      });
-      return CatalogLinks.setLinks(list);
-    },
-    mapCustomNavigation(t) {
-      let a, href, m, url;
-      if (/^[^\w@]/.test(t)) {
-        return $.tn(t);
-      }
-      let text = (url = null);
-      t = t.replace(/-text:"([^"]+)"(?:,"([^"]+)")?/g, function (m0, m1, m2) {
-        text = m1;
-        url = m2;
-        return '';
-      });
-      let indexOptions = [];
-      t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function (m0, m1) {
-        indexOptions.push(m1.toLowerCase().replace(/\ /g, '-'));
-        return '';
-      });
-      indexOptions = indexOptions.join('/');
-      if (/^toggle-all/.test(t)) {
-        a = $.el('a', {
-          className: 'show-board-list-button',
-          textContent: text || '+',
-          href: 'javascript:;'
-        });
-        $.on(a, 'click', Header.toggleBoardList);
-        return a;
-      }
-      if (/^external/.test(t)) {
-        a = $.el('a', {
-          href: url || 'javascript:;',
-          textContent: text || '+',
-          className: 'external'
-        });
-        if (/-nt/.test(t)) {
-          a.target = '_blank';
-          a.rel = 'noopener';
-        }
-        return a;
-      }
-      let boardID = t.split('-')[0];
-      if (boardID === 'current') {
-        if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-          boardID = g.BOARD.ID;
-        } else {
-          a = $.el('a', {
-            href: `/${g.BOARD.ID}/`,
-            textContent: text || decodeURIComponent(g.BOARD.ID),
-            className: 'current'
-          });
-          if (/-nt/.test(t)) {
-            a.target = '_blank';
-            a.rel = 'noopener';
-          }
-          if (/-index/.test(t)) {
-            a.dataset.only = 'index';
-          } else if (/-catalog/.test(t)) {
-            a.dataset.only = 'catalog';
-            a.href += 'catalog.html';
-          } else if (/-(archive|expired)/.test(t)) {
-            a = a.firstChild; // Its text node.
-          }
-          return a;
-        }
-      }
-      a = (function () {
-        let urlV;
-        if (boardID === '@') {
-          return $.el('a', {
-            href: 'https://twitter.com/4chan',
-            title: '4chan Twitter',
-            className: 'navSmall',
-            textContent: '@'
-          });
-        }
-        a = $.el('a', {
-          href: `//${BoardConfig.domain(boardID)}/${boardID}/`,
-          textContent: boardID,
-          title: BoardConfig.title(boardID)
-        });
-        if (['catalog', 'archive'].includes(g.VIEW) && (urlV = Get.url(g.VIEW, { siteID: '4chan.org', boardID }))) {
-          a.href = urlV;
-        }
-        if ((a.hostname === location.hostname) && (boardID === g.BOARD.ID)) {
-          a.className = 'current';
-        }
-        return a;
-      })();
-      a.textContent = /-title/.test(t) || (/-replace/.test(t) && (a.hostname === location.hostname) && (boardID === g.BOARD.ID)) ?
-        a.title || a.textContent
-        : /-full/.test(t) ?
-          (`/${boardID}/`) + (a.title ? ` - ${a.title}` : '')
-          :
-            text || boardID;
-      if (m = t.match(/-(index|catalog)/)) {
-        const urlIC = CatalogLinks[m[1]]({ siteID: '4chan.org', boardID });
-        if (urlIC) {
-          a.dataset.only = m[1];
-          a.href = urlIC;
-          if (m[1] === 'catalog') {
-            $.addClass(a, 'catalog');
-          }
-        } else {
-          return a.firstChild; // Its text node.
-        }
-      }
-      if (Conf['JSON Index'] && indexOptions) {
-        a.dataset.indexOptions = indexOptions;
-        if (['boards.4chan.org', 'boards.4channel.org'].includes(a.hostname) && (a.pathname.split('/')[2] === '')) {
-          a.href += (a.hash ? '/' : '#') + indexOptions;
-        }
-      }
-      if (/-archive/.test(t)) {
-        if (href = Redirect.to('board', { boardID })) {
-          a.href = href;
-        } else {
-          return a.firstChild; // Its text node.
-        }
-      }
-      if (/-expired/.test(t)) {
-        if (BoardConfig.isArchived(boardID)) {
-          a.href = `//${BoardConfig.domain(boardID)}/${boardID}/archive`;
-        } else {
-          return a.firstChild; // Its text node.
-        }
-      }
-      if (/-nt/.test(t)) {
-        a.target = '_blank';
-        a.rel = 'noopener';
-      }
-      return a;
-    },
-    toggleBoardList() {
-      const { bar } = Header;
-      const custom = $('#custom-board-list', bar);
-      const full = $('#full-board-list', bar);
-      const showBoardList = !full.hidden;
-      custom.hidden = !showBoardList;
-      return full.hidden = showBoardList;
-    },
-    setLinkJustify(centered) {
-      Header.linkJustifyToggler.checked = centered;
-      if (centered) {
-        return $.addClass(doc, 'centered-links');
-      } else {
-        return $.rmClass(doc, 'centered-links');
-      }
-    },
-    toggleLinkJustify() {
-      $.event('CloseMenu', null);
-      const centered = this.nodeName === 'INPUT' ?
-        this.checked : undefined;
-      Header.setLinkJustify(centered);
-      return $.set('Centered links', centered);
-    },
-    setBarFixed(fixed) {
-      Header.barFixedToggler.checked = fixed;
-      if (fixed) {
-        $.addClass(doc, 'fixed');
-        return $.addClass(Header.bar, 'dialog');
-      } else {
-        $.rmClass(doc, 'fixed');
-        return $.rmClass(Header.bar, 'dialog');
-      }
-    },
-    toggleBarFixed() {
-      $.event('CloseMenu', null);
-      Header.setBarFixed(this.checked);
-      Conf['Fixed Header'] = this.checked;
-      return $.set('Fixed Header', this.checked);
-    },
-    setShortcutIcons(show) {
-      Header.shortcutToggler.checked = show;
-      if (show) {
-        return $.addClass(doc, 'shortcut-icons');
-      } else {
-        return $.rmClass(doc, 'shortcut-icons');
-      }
-    },
-    toggleShortcutIcons() {
-      $.event('CloseMenu', null);
-      Header.setShortcutIcons(this.checked);
-      Conf['Shortcut Icons'] = this.checked;
-      return $.set('Shortcut Icons', this.checked);
-    },
-    setBarVisibility(hide) {
-      Header.headerToggler.checked = hide;
-      $.event('CloseMenu', null);
-      (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
-      return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
-    },
-    toggleBarVisibility() {
-      const hide = this.nodeName === 'INPUT' ?
-        this.checked
-        :
-          !$.hasClass(Header.bar, 'autohide');
-      Conf['Header auto-hide'] = hide;
-      $.set('Header auto-hide', hide);
-      Header.setBarVisibility(hide);
-      const message = `The header bar will ${hide ?
-      'automatically hide itself.'
-      :
-        'remain visible.'}`;
-      return new Notice('info', message, 2);
-    },
-    setHideBarOnScroll(hide) {
-      Header.scrollHeaderToggler.checked = hide;
-      if (hide) {
-        $.on(window, 'scroll', Header.hideBarOnScroll);
-        return;
-      }
-      $.off(window, 'scroll', Header.hideBarOnScroll);
-      $.rmClass(Header.bar, 'scroll');
-      return Header.bar.classList.toggle('autohide', Conf['Header auto-hide']);
-    },
-    toggleHideBarOnScroll() {
-      const hide = this.checked;
-      $.cb.checked.call(this);
-      return Header.setHideBarOnScroll(hide);
-    },
-    hideBarOnScroll() {
-      const offsetY = window.pageYOffset;
-      if (offsetY > (Header.previousOffset || 0)) {
-        $.addClass(Header.bar, 'autohide', 'scroll');
-      } else {
-        $.rmClass(Header.bar, 'autohide', 'scroll');
-      }
-      return Header.previousOffset = offsetY;
-    },
-    setBarPosition(bottom) {
-      if (Header.barPositionToggler)
-        Header.barPositionToggler.checked = bottom;
-      $.event('CloseMenu', null);
-      const args = bottom ? [
-        'bottom-header',
-        'top-header',
-        'after'
-      ] : [
-        'top-header',
-        'bottom-header',
-        'add'
-      ];
-      $.addClass(doc, args[0]);
-      $.rmClass(doc, args[1]);
-      return $[args[2]](Header.bar, Header.noticesRoot);
-    },
-    toggleBarPosition() {
-      $.cb.checked.call(this);
-      return Header.setBarPosition(this.checked);
-    },
-    setFooterVisibility(hide) {
-      Header.footerToggler.checked = hide;
-      return doc.classList.toggle('hide-bottom-board-list', hide);
-    },
-    toggleFooterVisibility() {
-      $.event('CloseMenu', null);
-      const hide = this.nodeName === 'INPUT' ?
-        this.checked
-        :
-          $.hasClass(doc, 'hide-bottom-board-list');
-      Header.setFooterVisibility(hide);
-      $.set('Bottom Board List', hide);
-      const message = hide ?
-        'The bottom navigation will now be hidden.'
-        :
-          'The bottom navigation will remain visible.';
-      return new Notice('info', message, 2);
-    },
-    setCustomNav(show) {
-      Header.customNavToggler.checked = show;
-      const cust = $('#custom-board-list', Header.bar);
-      const full = $('#full-board-list', Header.bar);
-      const btn = $('.hide-board-list-container', full);
-      return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
-    },
-    toggleCustomNav() {
-      $.cb.checked.call(this);
-      return Header.setCustomNav(this.checked);
-    },
-    editCustomNav() {
-      Settings.open('Advanced');
-      const settings = $.id('fourchanx-settings');
-      return $('[name=boardnav]', settings).focus();
-    },
-    scrollTo(root, down = false, needed = false) {
-      let height, x;
-      if (!root.offsetParent) {
-        return;
-      } // hidden or fixed
-      if (down) {
-        x = Header.getBottomOf(root);
-        if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && Conf['Bottom header']) {
-          ({ height } = Header.bar.getBoundingClientRect());
-          if (x <= 0) {
-            if (!Header.isHidden()) {
-              x += height;
-            }
-          } else {
-            if (Header.isHidden()) {
-              x -= height;
-            }
-          }
-        }
-        if (!needed || (x < 0)) {
-          return window.scrollBy(0, -x);
-        }
-      } else {
-        x = Header.getTopOf(root);
-        if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && !Conf['Bottom header']) {
-          ({ height } = Header.bar.getBoundingClientRect());
-          if (x >= 0) {
-            if (!Header.isHidden()) {
-              x += height;
-            }
-          } else {
-            if (Header.isHidden()) {
-              x -= height;
-            }
-          }
-        }
-        if (!needed || (x < 0)) {
-          return window.scrollBy(0, x);
-        }
-      }
-    },
-    scrollToIfNeeded(root, down) {
-      return Header.scrollTo(root, down, true);
-    },
-    getTopOf(root) {
-      let { top } = root.getBoundingClientRect();
-      if (Conf['Fixed Header'] && !Conf['Bottom Header']) {
-        const headRect = Header.toggle.getBoundingClientRect();
-        top -= headRect.top + headRect.height;
-      }
-      return top;
-    },
-    getBottomOf(root) {
-      const { clientHeight } = doc;
-      let bottom = clientHeight - root.getBoundingClientRect().bottom;
-      if (Conf['Fixed Header'] && Conf['Bottom Header']) {
-        const headRect = Header.toggle.getBoundingClientRect();
-        bottom -= (clientHeight - headRect.bottom) + headRect.height;
-      }
-      return bottom;
-    },
-    isNodeVisible(node) {
-      if (d.hidden || !doc.contains(node)) {
-        return false;
-      }
-      const { height } = node.getBoundingClientRect();
-      return ((Header.getTopOf(node) + height) >= 0) && ((Header.getBottomOf(node) + height) >= 0);
-    },
-    isHidden() {
-      const { top } = Header.bar.getBoundingClientRect();
-      if (Conf['Bottom header']) {
-        return top === doc.clientHeight;
-      } else {
-        return top < 0;
-      }
-    },
-    addShortcut(id, el, index) {
-      const shortcut = $.el('span', {
-        id: `shortcut-${id}`,
-        className: 'shortcut brackets-wrap'
-      });
-      $.add(shortcut, el);
-      shortcut.dataset.index = index.toString();
-      for (var item of $$('[data-index]', Header.shortcuts)) {
-        if (+item.dataset.index > +index) {
-          $.before(item, shortcut);
-          return;
-        }
-      }
-      return $.add(Header.shortcuts, shortcut);
-    },
-    rmShortcut(el) {
-      return $.rm(el.parentElement);
-    },
-    menuToggle(e) {
-      return Header.menu.toggle(e, this, g);
-    },
-    createNotification(e) {
-      let notice;
-      const { type, content, lifetime } = e.detail;
-      return notice = new Notice(type, content, lifetime);
-    },
-    areNotificationsEnabled: false,
-    enableDesktopNotifications() {
-      let notice;
-      if (!window.Notification || !Conf['Desktop Notifications']) {
-        return;
-      }
-      switch (Notification.permission) {
-        case 'granted':
-          Header.areNotificationsEnabled = true;
-          return;
-          break;
-        case 'denied':
-          // requestPermission doesn't work if status is 'denied',
-          // but it'll still work if status is 'default'.
-          return;
-          break;
-      }
-      const el = $.el('span', { innerHTML: `${meta.name} needs your permission to show desktop notifications. ` +
-          `[<a href=\"${E(meta.upstreamFaq)}#why-is-4chan-x-asking-for-permission-to-show-desktop-notifications\" target=\"_blank\">FAQ</a>]` +
-          `<br><button>Authorize</button> or <button>Disable</button>`
-      });
-      const [authorize, disable] = $$('button', el);
-      $.on(authorize, 'click', () => Notification.requestPermission(function (status) {
-        Header.areNotificationsEnabled = status === 'granted';
-        if (status === 'default') {
-          return;
-        }
-        return notice.close();
-      }));
-      $.on(disable, 'click', function () {
-        $.set('Desktop Notifications', false);
-        return notice.close();
-      });
-      return notice = new Notice('info', el);
-    }
-  };
-
-  class Notice {
-    constructor(type, content, timeout, onclose) {
-      this.add = this.add.bind(this);
-      this.close = this.close.bind(this);
-      this.timeout = timeout;
-      this.onclose = onclose;
-      this.el = $.el('div', {
-        innerHTML: `<a href="javascript:;" class="close" title="Close">${Icon.get('xmark')}</a><div class="message"></div>`
-      });
-      this.el.style.opacity = '0';
-      this.setType(type);
-      $.on(this.el.firstElementChild, 'click', this.close);
-      let contentNode;
-      if (typeof content === 'string') {
-        contentNode = $.tn(content);
-      } else if (content instanceof Array) {
-        contentNode = $.nodes(content);
-      } else {
-        contentNode = content;
-      }
-      $.add(this.el.lastElementChild, contentNode);
-      $.ready(this.add);
-    }
-    setType(type) {
-      this.el.className = `notification ${type}`;
-    }
-    add() {
-      if (this.closed)
-        return;
-      if (d.hidden) {
-        $.on(d, 'visibilitychange', this.add);
-        return;
-      }
-      $.off(d, 'visibilitychange', this.add);
-      $.add(Header.noticesRoot, this.el);
-      this.el.clientHeight; // force reflow
-      this.el.style.opacity = '1';
-      if (this.timeout) {
-        this.timeoutId = setTimeout(this.close, this.timeout * SECOND);
-      }
-    }
-    close() {
-      if (this.timeoutId)
-        clearTimeout(this.timeoutId);
-      this.closed = true;
-      $.off(d, 'visibilitychange', this.add);
-      $.rm(this.el);
-      this.onclose?.();
-    }
-    resetTimer() {
-      if (this.timeout) {
-        clearTimeout(this.timeoutId);
-        this.timeoutId = setTimeout(this.close, this.timeout * SECOND);
-      }
-    }
-  }
 
   var archives = [{
     "uid": 3,
@@ -24456,12 +24541,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   }
 
-  // @ts-nocheck
-
   const Anonymize = {
     init() {
-      if (!Conf['Anonymize']) { return; }
-      return $.addClass(doc, 'anonymize');
+      if (!Conf['Anonymize']) {
+        return;
+      }
+      $.addClass(doc, 'anonymize');
     }
   };
 
@@ -24572,7 +24657,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
                 download: `${folderName}/${seqName}`,
                 hidden: true
               });
-              $.add(d.body, a);
+              $.add(d$1.body, a);
               a.click();
               setTimeout(() => {
                 URL.revokeObjectURL(a.href);
@@ -24720,13 +24805,13 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         name: 'Image Replace',
         cb: this.node
       });
-      $.on(d, 'PostsInserted', () => {
+      $.on(d$1, 'PostsInserted', () => {
         if (ImageLoader.prefetchEnabled || replace) {
           g.posts.forEach(ImageLoader.prefetchAll);
         }
       });
       if (Conf['Replace WEBM']) {
-        $.on(d, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
+        $.on(d$1, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
       }
       if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(g.VIEW)) {
         return;
@@ -24897,7 +24982,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           }
           $.before(this, output);
           parent.tabIndex = 0;
-          if (d.activeElement === this) {
+          if (d$1.activeElement === this) {
             parent.focus();
           }
           this.tabIndex = -1;
@@ -24969,75 +25054,68 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const ArchiveLink = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) { return; }
-
-      const div = $.el('div',
-        {textContent: 'Archive'});
-
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) {
+        return;
+      }
+      const div = $.el('div', { textContent: 'Archive' });
       const entry = {
         el: div,
         order: 60,
-        open({ID, thread, board}) {
-          return !!Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
+        open({ ID, thread, board }) {
+          return !!Redirect.to('thread', { postID: ID, threadID: thread.ID, boardID: board.ID });
         },
         subEntries: []
       };
-
-      for (var type of [
-        ['Post',      'post'],
-        ['Name',      'name'],
-        ['Tripcode',  'tripcode'],
-        ['Capcode',   'capcode'],
-        ['Subject',   'subject'],
-        ['Flag',      'country'],
-        ['Filename',  'filename'],
+      const types = [
+        ['Post', 'post'],
+        ['Name', 'name'],
+        ['Tripcode', 'tripcode'],
+        ['Capcode', 'capcode'],
+        ['Subject', 'subject'],
+        ['Flag', 'country'],
+        ['Filename', 'filename'],
         ['Image MD5', 'MD5']
-      ]) {
+      ];
+      for (const [text, type] of types) {
         // Add a sub entry for each type.
-        entry.subEntries.push(this.createSubEntry(type[0], type[1]));
+        entry.subEntries.push(this.createSubEntry(text, type));
       }
-
-      return Menu.menu.addEntry(entry);
+      Menu.menu.addEntry(entry);
     },
-
     createSubEntry(text, type) {
       const el = $.el('a', {
         textContent: text,
         target: '_blank'
-      }
-      );
-
+      });
       const open = type === 'post' ?
-        function({ID, thread, board}) {
-          el.href = Redirect.to('thread', {postID: ID, threadID: thread.ID, boardID: board.ID});
+        function ({ ID, thread, board }) {
+          el.href = Redirect.to('thread', { postID: ID, threadID: thread.ID, boardID: board.ID }) || '';
           return true;
         }
-      :
-        function(post) {
-          const typeParam = (type === 'country') && post.info.flagCodeTroll ?
-            'troll_country'
-          :
-            type;
-          const value = type === 'country' ?
-            post.info.flagCode || post.info.flagCodeTroll?.toLowerCase()
-          :
-            Filter.values(type, post)[0];
-          // We want to parse the exact same stuff as the filter does already.
-          if (!value) { return false; }
-          el.href = Redirect.to('search', {
-            boardID:  post.board.ID,
-            type:     typeParam,
-            value,
-            isSearch: true
-          }
-          );
-          return true;
-        };
-
+        :
+          function (post) {
+            const typeParam = (type === 'country') && post.info.flagCodeTroll ?
+              'troll_country'
+              :
+                type;
+            const value = type === 'country' ?
+              post.info.flagCode || post.info.flagCodeTroll?.toLowerCase()
+              :
+                Filter.values(type, post)[0];
+            // We want to parse the exact same stuff as the filter does already.
+            if (!value) {
+              return false;
+            }
+            el.href = Redirect.to('search', {
+              boardID: post.board.ID,
+              type: typeParam,
+              value,
+              isSearch: true
+            }) || '';
+            return true;
+          };
       return {
         el,
         open
@@ -25045,21 +25123,19 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var CopyTextLink = {
+  const CopyTextLink = {
+    text: '',
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'copy-text-link',
         href: 'javascript:;',
         textContent: 'Copy Text'
-      }
-      );
-      $.on(a, 'click', CopyTextLink.copy);
-
-      return Menu.menu.addEntry({
+      });
+      $.on(a, 'click', this.copy.bind(this));
+      Menu.menu.addEntry({
         el: a,
         order: 12,
         open(post) {
@@ -25068,49 +25144,44 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       });
     },
-
     copy() {
       const el = $.el('textarea', {
         className: 'copy-text-element',
-        value: CopyTextLink.text
-      }
-      );
-      $.add(d.body, el);
+        value: this.text
+      });
+      $.add(d$1.body, el);
       el.select();
       try {
-        d.execCommand('copy');
-      } catch (error) {}
-      return $.rm(el);
+        d$1.execCommand('copy');
+      } catch (error) { }
+      $.rm(el);
     }
   };
 
-  // @ts-nocheck
-  var DeleteLink = {
+  const DeleteLink = {
     auto: [dict(), dict()],
-
+    nodes: null,
+    post: null,
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Delete Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Delete Link']) {
+        return;
+      }
       const div = $.el('div', {
         className: 'delete-link',
         textContent: 'Delete'
-      }
-      );
+      });
       const postEl = $.el('a', {
         className: 'delete-post',
         href: 'javascript:;'
-      }
-      );
+      });
       const fileEl = $.el('a', {
         className: 'delete-file',
         href: 'javascript:;'
-      }
-      );
+      });
       this.nodes = {
-        menu:  div.firstChild,
+        menu: div.firstChild,
         links: [postEl, fileEl]
       };
-
       const postEntry = {
         el: postEl,
         open() {
@@ -25121,27 +25192,30 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       };
       const fileEntry = {
         el: fileEl,
-        open({file}) {
-          if (!file || file.isDead) { return false; }
+        open({ file }) {
+          if (!file || file.isDead) {
+            return false;
+          }
           fileEl.textContent = DeleteLink.linkText(true);
           $.on(fileEl, 'click', DeleteLink.toggle);
           return true;
         }
       };
-
-      return Menu.menu.addEntry({
+      Menu.menu.addEntry({
         el: div,
         order: 40,
         open(post) {
-          if (post.isDead) { return false; }
+          if (post.isDead) {
+            return false;
+          }
           DeleteLink.post = post;
           DeleteLink.nodes.menu.textContent = DeleteLink.menuText();
           DeleteLink.cooldown.start(post);
           return true;
         },
-        subEntries: [postEntry, fileEntry]});
+        subEntries: [postEntry, fileEntry]
+      });
     },
-
     menuText() {
       let seconds;
       if ((seconds = DeleteLink.cooldown.seconds[DeleteLink.post.fullID])) {
@@ -25150,7 +25224,6 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return 'Delete';
       }
     },
-
     linkText(fileOnly) {
       let text = fileOnly ? 'File' : 'Post';
       if (DeleteLink.auto[+fileOnly][DeleteLink.post.fullID]) {
@@ -25158,97 +25231,100 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       }
       return text;
     },
-
     toggle() {
-      const {post} = DeleteLink;
+      const post = DeleteLink.post;
       const fileOnly = $.hasClass(this, 'delete-file');
       const auto = DeleteLink.auto[+fileOnly];
-
       if (auto[post.fullID]) {
         delete auto[post.fullID];
       } else {
         auto[post.fullID] = true;
       }
       this.textContent = DeleteLink.linkText(fileOnly);
-
       if (!DeleteLink.cooldown.seconds[post.fullID]) {
-        return DeleteLink.delete(post, fileOnly);
+        DeleteLink.delete(post, fileOnly);
       }
     },
-
     delete(post, fileOnly) {
       const link = DeleteLink.nodes.links[+fileOnly];
       delete DeleteLink.auto[+fileOnly][post.fullID];
-      if (post.fullID === DeleteLink.post.fullID) { $.off(link, 'click', DeleteLink.toggle); }
-
+      if (post.fullID === DeleteLink.post.fullID) {
+        $.off(link, 'click', DeleteLink.toggle);
+      }
       const form = {
         mode: 'usrdel',
         onlyimgdel: fileOnly,
         pwd: QR.persona.getPassword()
       };
       form[+post.ID] = 'delete';
-
-      return $.ajax($.id('delform').action.replace(`/${g.BOARD}/`, `/${post.board}/`), {
+      $.ajax($.id('delform').action.replace(`/${g.BOARD}/`, `/${post.board}/`), {
         responseType: 'document',
         withCredentials: true,
-        onloadend() { return DeleteLink.load(link, post, fileOnly, this.response); },
+        onloadend() { DeleteLink.load(link, post, fileOnly, this.response); },
         form: $.formData(form)
-      }
-      );
+      });
     },
-
     load(link, post, fileOnly, resDoc) {
       let msg;
       if (!resDoc) {
         new Notice('warning', 'Connection error, please retry.', 20);
-        if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          $.on(link, 'click', DeleteLink.toggle);
+        }
         return;
       }
-
       link.textContent = DeleteLink.linkText(fileOnly);
       if (resDoc.title === '4chan - Banned') { // Ban/warn check
-        const el = $.el('span', {innerHTML: "You can&#039;t delete posts because you are <a href=\"//www.4chan.org/banned\" target=\"_blank\">banned</a>."});
-        return new Notice('warning', el, 20);
+        const el = $.el('span', { innerHTML: "You can&#039;t delete posts because you are <a href=\"//www.4chan.org/banned\" target=\"_blank\">banned</a>." });
+        new Notice('warning', el, 20);
       } else if (msg = resDoc.getElementById('errmsg')) { // error!
         new Notice('warning', msg.textContent, 20);
-        if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          $.on(link, 'click', DeleteLink.toggle);
+        }
         if (QR.cooldown.data && Conf['Cooldown'] && /\bwait\b/i.test(msg.textContent)) {
           DeleteLink.cooldown.start(post, 5);
           DeleteLink.auto[+fileOnly][post.fullID] = true;
-          return DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
+          DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
         }
       } else {
-        if (!fileOnly) { QR.cooldown.delete(post); }
+        if (!fileOnly) {
+          QR.cooldown.delete(post);
+        }
         if (resDoc.title === 'Updating index...') {
           // We're 100% sure.
           (post.origin || post).kill(fileOnly);
         }
-        if (post.fullID === DeleteLink.post.fullID) { return link.textContent = 'Deleted'; }
+        if (post.fullID === DeleteLink.post.fullID) {
+          link.textContent = 'Deleted';
+        }
       }
     },
-
     cooldown: {
       seconds: dict(),
-
       start(post, seconds) {
         // Already counting.
-        if (DeleteLink.cooldown.seconds[post.fullID] != null) { return; }
-
-        if (seconds == null) { seconds = QR.cooldown.secondsDeletion(post); }
+        if (DeleteLink.cooldown.seconds[post.fullID] != null) {
+          return;
+        }
+        if (seconds == null) {
+          seconds = QR.cooldown.secondsDeletion(post);
+        }
         if (seconds > 0) {
           DeleteLink.cooldown.seconds[post.fullID] = seconds;
-          return DeleteLink.cooldown.count(post);
+          DeleteLink.cooldown.count(post);
         }
       },
-
       count(post) {
-        if (post.fullID === DeleteLink.post.fullID) { DeleteLink.nodes.menu.textContent = DeleteLink.menuText(); }
+        if (post.fullID === DeleteLink.post.fullID) {
+          DeleteLink.nodes.menu.textContent = DeleteLink.menuText();
+        }
         if ((DeleteLink.cooldown.seconds[post.fullID] > 0) && Conf['Cooldown']) {
           DeleteLink.cooldown.seconds[post.fullID]--;
           setTimeout(DeleteLink.cooldown.count, 1000, post);
         } else {
           delete DeleteLink.cooldown.seconds[post.fullID];
-          for (var fileOnly of [false, true]) {
+          for (const fileOnly of [false, true]) {
             if (DeleteLink.auto[+fileOnly][post.fullID]) {
               DeleteLink.delete(post, fileOnly);
             }
@@ -25258,27 +25334,25 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
   const DownloadLink = {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'download-link',
         textContent: 'Download file'
-      }
-      );
-
+      });
       // Specifying the filename with the download attribute only works for same-origin links.
       $.on(a, 'click', ImageCommon.download);
-
-      return Menu.menu.addEntry({
+      Menu.menu.addEntry({
         el: a,
         order: 100,
-        open({file}) {
-          if (!file) { return false; }
-          a.href     = file.url;
+        open({ file }) {
+          if (!file) {
+            return false;
+          }
+          a.href = file.url;
           a.download = file.name;
           return true;
         }
@@ -25286,21 +25360,20 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var ReportLink = {
+  const ReportLink = {
+    url: '',
+    dims: '',
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) {
+        return;
+      }
       const a = $.el('a', {
         className: 'report-link',
         href: 'javascript:;',
         textContent: 'Report'
-      }
-      );
-      $.on(a, 'click', ReportLink.report);
-
-      return Menu.menu.addEntry({
+      });
+      $.on(a, 'click', this.report);
+      Menu.menu.addEntry({
         el: a,
         order: 10,
         open(post) {
@@ -25314,113 +25387,107 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       });
     },
-
     report() {
-      const {url, dims} = ReportLink;
-      const id  = Date.now();
+      const { url, dims } = ReportLink;
+      const id = String(Date.now());
       const set = `toolbar=0,scrollbars=1,location=0,status=1,menubar=0,resizable=1,${dims}`;
-      return window.open(url, id, set);
+      window.open(url, id, set);
     }
   };
 
-  // @ts-nocheck
-
-  var AntiAutoplay = {
+  const AntiAutoplay = {
     init() {
-      if (!Conf['Disable Autoplaying Sounds']) { return; }
+      if (!Conf['Disable Autoplaying Sounds']) {
+        return;
+      }
       $.addClass(doc, 'anti-autoplay');
-      for (var audio of $$('audio[autoplay]', doc)) { this.stop(audio); }
-      window.addEventListener('loadstart', (e => this.stop(e.target)), true);
+      for (const audio of $$('audio[autoplay]', doc)) {
+        this.stop(audio);
+      }
+      window.addEventListener('loadstart', ((e) => this.stop(e.target)), true);
       Callbacks.Post.push({
         name: 'Disable Autoplaying Sounds',
-        cb:   this.node
+        cb: this.node
       });
-      return $.ready(() => this.process(d.body));
+      $.ready(() => this.process(d$1.body));
     },
-
     stop(audio) {
-      if (!audio.autoplay) { return; }
+      if (!audio.autoplay) {
+        return;
+      }
       audio.pause();
       audio.autoplay = false;
-      if (audio.controls) { return; }
+      if (audio.controls) {
+        return;
+      }
       audio.controls = true;
-      return $.addClass(audio, 'controls-added');
+      $.addClass(audio, 'controls-added');
     },
-
     node() {
-      return AntiAutoplay.process(this.nodes.comment);
+      AntiAutoplay.process(this.nodes.comment);
     },
-
     process(root) {
-      for (var iframe of $$('iframe[src*="youtube"][src*="autoplay=1"]', root)) {
+      for (const iframe of $$('iframe[src*="youtube"][src*="autoplay=1"]', root)) {
         AntiAutoplay.processVideo(iframe, 'src');
       }
-      for (var object of $$('object[data*="youtube"][data*="autoplay=1"]', root)) {
+      for (const object of $$('object[data*="youtube"][data*="autoplay=1"]', root)) {
         AntiAutoplay.processVideo(object, 'data');
       }
     },
-
     processVideo(el, attr) {
       el[attr] = el[attr].replace(/\?autoplay=1&?/, '?').replace('&autoplay=1', '');
-      if (window.getComputedStyle(el).display === 'none') { el.style.display = 'block'; }
-      return $.addClass(el, 'autoplay-removed');
+      if (window.getComputedStyle(el).display === 'none') {
+        el.style.display = 'block';
+      }
+      $.addClass(el, 'autoplay-removed');
     }
   };
 
-  // @ts-nocheck
-
-  var Banner = {
+  const Banner = {
+    original: dict(),
     init() {
       if (Conf['Custom Board Titles']) {
-        this.db = new DataBoard('customTitles', null, true);
+        this.db = new DataBoard('customTitles', undefined, true);
       }
-
-      $.asap((() => d.body), () => $.asap((() => $('hr')), Banner.ready));
-
+      $.asap((() => d$1.body), () => $.asap((() => $('hr')), Banner.ready));
       // Let 4chan's JS load the banner if enabled; otherwise, load it ourselves.
       if (g.BOARD.ID !== 'f') {
-        return $.on(d, '4chanXInitFinished', () => $.queueTask(Banner.load));
+        $.on(d$1, '4chanXInitFinished', () => $.queueTask(Banner.load));
       }
     },
-
     ready() {
       const banner = $(".boardBanner");
-      const {children} = banner;
-
+      const { children } = banner;
       if ((g.VIEW === 'thread') && Conf['Remove Thread Excerpt']) {
-        Banner.setTitle(children[1].textContent);
+        Banner.setTitle(children[1].textContent || '');
       }
-
       children[0].title = "Click to change";
       $.on(children[0], 'click', Banner.cb.toggle);
-
       if (Conf['Custom Board Titles']) {
         Banner.custom(children[1]);
-        if (children[2]) { return Banner.custom(children[2]); }
+        if (children[2]) {
+          Banner.custom(children[2]);
+        }
       }
     },
-
     load() {
       const bannerCnt = $.id('bannerCnt');
-      if (!bannerCnt.firstChild) {
+      if (bannerCnt && !bannerCnt.firstChild) {
         const img = $.el('img', {
           alt: '4chan',
           src: '//s.4cdn.org/image/title/' + bannerCnt.dataset.src
-        }
-        );
-        return $.add(bannerCnt, img);
+        });
+        $.add(bannerCnt, img);
       }
     },
-
     setTitle(title) {
       if (Unread.title != null) {
         Unread.title = title;
-        return Unread.update();
+        Unread.update();
       } else {
-        return d.title = title;
+        d$1.title = title;
       }
     },
-
     cb: {
       toggle() {
         if (!Banner.choices?.length) {
@@ -25428,77 +25495,77 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
         const i = Math.floor(Banner.choices.length * Math.random());
         const banner = Banner.choices.splice(i, 1);
-        return $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
+        $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
       },
-
       click(e) {
-        if (!e.ctrlKey && !e.metaKey) { return; }
-        if (Banner.original[this.className] == null) { Banner.original[this.className] = this.cloneNode(true); }
-        this.contentEditable = true;
-        for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-        return this.focus();
+        if (!e.ctrlKey && !e.metaKey) {
+          return;
+        }
+        if (Banner.original[this.className] == null) {
+          Banner.original[this.className] = this.cloneNode(true);
+        }
+        this.contentEditable = 'true';
+        for (const br of $$('br', this)) {
+          $.replace(br, $.tn('\n'));
+        }
+        this.focus();
       },
-
       keydown(e) {
         e.stopPropagation();
-        if (!e.shiftKey && (e.keyCode === 13)) { return this.blur(); }
+        if (!e.shiftKey && (e.keyCode === 13)) {
+          this.blur();
+        }
       },
-
       blur() {
-        for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-        if (this.textContent = this.textContent.replace(/\n*$/, '')) {
-          this.contentEditable = false;
-          return Banner.db.set({
-            boardID:  g.BOARD.ID,
+        for (const br of $$('br', this)) {
+          $.replace(br, $.tn('\n'));
+        }
+        const text = this.textContent || '';
+        if (this.textContent = text.replace(/\n*$/, '')) {
+          this.contentEditable = 'false';
+          Banner.db.set({
+            boardID: g.BOARD.ID,
             threadID: this.className,
             val: {
               title: this.textContent,
-              orig:  Banner.original[this.className].textContent
+              orig: Banner.original[this.className].textContent
             }
           });
         } else {
           $.rmAll(this);
           $.add(this, [...Banner.original[this.className].cloneNode(true).childNodes]);
-          return Banner.db.delete({
-            boardID:  g.BOARD.ID,
+          Banner.db.delete({
+            boardID: g.BOARD.ID,
             threadID: this.className
           });
         }
       }
     },
-
-    original: dict(),
-
     custom(child) {
       let data;
-      const {className} = child;
+      const { className } = child;
       child.title = `Ctrl/\u2318+click to edit board ${className.slice(5).toLowerCase()}`;
       child.spellcheck = false;
-
-      for (var event of ['click', 'keydown', 'blur']) {
+      for (const event of ['click', 'keydown', 'blur']) {
         $.on(child, event, Banner.cb[event]);
       }
-
-      if (data = Banner.db.get({boardID: g.BOARD.ID, threadID: className})) {
+      if (data = Banner.db.get({ boardID: g.BOARD.ID, threadID: className })) {
         if (Conf['Persistent Custom Board Titles'] || (data.orig === child.textContent)) {
           Banner.original[className] = child.cloneNode(true);
-          return child.textContent = data.title;
+          child.textContent = data.title;
         } else {
-          return Banner.db.delete({boardID: g.BOARD.ID, threadID: className});
+          Banner.db.delete({ boardID: g.BOARD.ID, threadID: className });
         }
       }
     }
   };
 
-  // @ts-nocheck
-
-  var Flash = {
+  const Flash = {
     init() {
       if ((g.BOARD.ID === 'f') && Conf['Enable Native Flash Embedding']) {
-        return $.ready(Flash.initReady);
+        $.ready(Flash.initReady);
       }
     },
-
     initReady() {
       if ($.hasStorage) {
         $.global('initFlash');
@@ -25511,250 +25578,250 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var Fourchan = {
+  const Fourchan = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) {
+        return;
+      }
       BoardConfig.ready(this.initBoard);
-      return $.on(d, '4chanXInitFinished', this.initReady);
+      $.on(d$1, '4chanXInitFinished', this.initReady);
     },
-
     initBoard() {
       if (g.BOARD.config.code_tags) {
-        $.on(window, 'prettyprint:cb', function(e) {
+        $.on(window, 'prettyprint:cb', function (e) {
           let post, pre;
-          if (!(post = g.posts.get(e.detail.ID))) { return; }
-          if (!(pre  = $$('.prettyprint', post.nodes.comment)[+e.detail.i])) { return; }
+          if (!(post = g.posts.get(e.detail.ID))) {
+            return;
+          }
+          if (!(pre = $$('.prettyprint', post.nodes.comment)[+e.detail.i])) {
+            return;
+          }
           if (!$.hasClass(pre, 'prettyprinted')) {
             pre.innerHTML = e.detail.html;
-            return $.addClass(pre, 'prettyprinted');
+            $.addClass(pre, 'prettyprinted');
           }
         });
         $.global('fourChanPrettyPrintListener');
         Callbacks.Post.push({
           name: 'Parse [code] tags',
-          cb:   Fourchan.code
+          cb: Fourchan.code
         });
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (post.callbacksExecuted) {
-            return Callbacks.Post.execute(post, ['Parse [code] tags'], true);
+            Callbacks.Post.execute(post, ['Parse [code] tags'], true);
           }
         });
         ExpandComment.callbacks.push(Fourchan.code);
       }
-
       if (g.BOARD.config.math_tags) {
         $.global('fourChanMathjaxListener');
         Callbacks.Post.push({
           name: 'Parse [math] tags',
-          cb:   Fourchan.math
+          cb: Fourchan.math
         });
-        g.posts.forEach(function(post) {
+        g.posts.forEach(function (post) {
           if (post.callbacksExecuted) {
-            return Callbacks.Post.execute(post, ['Parse [math] tags'], true);
+            Callbacks.Post.execute(post, ['Parse [math] tags'], true);
           }
         });
-        return ExpandComment.callbacks.push(Fourchan.math);
+        ExpandComment.callbacks.push(Fourchan.math);
       }
     },
-
     // Disable 4chan's ID highlighting (replaced by IDHighlight) and reported post hiding.
     initReady() {
-      return $.global('disable4chanIdHl');
+      $.global('disable4chanIdHl');
     },
-
     code() {
-      if (this.isClone) { return; }
-      return $.ready(() => {
+      if (this.isClone) {
+        return;
+      }
+      $.ready(() => {
         const iterable = $$('.prettyprint', this.nodes.comment);
         for (let i = 0; i < iterable.length; i++) {
-          var pre = iterable[i];
+          const pre = iterable[i];
           if (!$.hasClass(pre, 'prettyprinted')) {
-            $.event('prettyprint', {ID: this.fullID, i, html: pre.innerHTML}, window);
+            $.event('prettyprint', { ID: this.fullID, i, html: pre.innerHTML }, window);
           }
         }
       });
     },
-
     math() {
       let wbrs;
-      if (!/\[(math|eqn)\]/.test(this.nodes.comment.textContent)) { return; }
+      if (!/\[(math|eqn)\]/.test(this.nodes.comment.textContent)) {
+        return;
+      }
       // XXX <wbr> tags frequently break MathJax; remove them.
       if ((wbrs = $$('wbr', this.nodes.comment)).length) {
-        for (var wbr of wbrs) { $.rm(wbr); }
+        for (const wbr of wbrs) {
+          $.rm(wbr);
+        }
         this.nodes.comment.normalize();
       }
-      var cb = () => {
-        if (!doc.contains(this.nodes.comment)) { return; }
-        $.off(d, 'PostsInserted', cb);
-        return $.event('mathjax', null, this.nodes.comment);
+      const cb = () => {
+        if (!doc.contains(this.nodes.comment)) {
+          return;
+        }
+        $.off(d$1, 'PostsInserted', cb);
+        $.event('mathjax', null, this.nodes.comment);
       };
-      $.on(d, 'PostsInserted', cb);
-      return cb();
+      $.on(d$1, 'PostsInserted', cb);
+      cb();
     }
   };
 
-  // @ts-nocheck
-
-  var IDColor = {
+  const IDColor = {
+    ids: dict(),
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Color User IDs']) { return; }
-      this.ids = dict();
+      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Color User IDs']) {
+        return;
+      }
       this.ids['Heaven'] = [0, 0, 0, '#fff'];
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Color User IDs',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       let span, uid;
-      if (this.isClone || !((uid = this.info.uniqueID) && (span = this.nodes.uniqueID))) { return; }
-
+      if (this.isClone || !((uid = this.info.uniqueID) && (span = this.nodes.uniqueID))) {
+        return;
+      }
       const rgb = IDColor.ids[uid] || IDColor.compute(uid);
-
       // Style the damn node.
-      const {style} = span;
+      const { style } = span;
       style.color = rgb[3];
       style.backgroundColor = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-      return $.addClass(span, 'painted');
+      $.addClass(span, 'painted');
     },
-
     compute(uid) {
       // Convert chars to integers, bitshift and math to create a larger integer
       // Create a nice string of binary
       const hash = g.SITE.uidColor ? g.SITE.uidColor(uid) : parseInt(uid, 16);
-
       // Convert binary string to numerical values with bitshift and '&' truncation.
       const rgb = [
         (hash >> 16) & 0xFF,
-        (hash >> 8)  & 0xFF,
+        (hash >> 8) & 0xFF,
         hash & 0xFF
       ];
-
       // Weight color luminance values, assign a font color that should be readable.
       rgb.push($.luma(rgb) > 125 ?
         '#000'
-      :
-        '#fff'
-      );
-
+        :
+          '#fff');
       // Cache.
       return this.ids[uid] = rgb;
     }
   };
 
-  // @ts-nocheck
-
-  var IDHighlight = {
-    init() {
-      if (!['index', 'thread'].includes(g.VIEW)) { return; }
-
-      return Callbacks.Post.push({
-        name: 'Highlight by User ID',
-        cb:   this.node
-      });
-    },
-
+  const IDHighlight = {
     uniqueID: null,
-
-    node() {
-      if (this.nodes.uniqueIDRoot) { $.on(this.nodes.uniqueIDRoot, 'click', IDHighlight.click(this)); }
-      if (this.nodes.capcode) { $.on(this.nodes.capcode,      'click', IDHighlight.click(this)); }
-      if (!this.isClone) { return IDHighlight.set(this); }
-    },
-
-    set(post) {
-      const match = (post.info.uniqueID || post.info.capcode) === IDHighlight.uniqueID;
-      return $[match ? 'addClass' : 'rmClass'](post.nodes.post, 'highlight');
-    },
-
-    click(post) { return function() {
-      const uniqueID = post.info.uniqueID || post.info.capcode;
-      IDHighlight.uniqueID = IDHighlight.uniqueID === uniqueID ? null : uniqueID;
-      return g.posts.forEach(IDHighlight.set);
-    }; }
-  };
-
-  // @ts-nocheck
-
-  var IDPostCount = {
     init() {
-      if ((g.VIEW !== 'thread') || !Conf['Count Posts by ID']) { return; }
-      Callbacks.Thread.push({
-        name: 'Count Posts by ID',
-        cb() { return IDPostCount.thread = this; }
-      });
-      return Callbacks.Post.push({
-        name: 'Count Posts by ID',
-        cb:   this.node
+      if (!['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      Callbacks.Post.push({
+        name: 'Highlight by User ID',
+        cb: this.node
       });
     },
-
     node() {
-      if (this.nodes.uniqueID && (this.thread === IDPostCount.thread)) {
-        return $.on(this.nodes.uniqueID, 'mouseover', IDPostCount.count);
+      if (this.nodes.uniqueIDRoot) {
+        $.on(this.nodes.uniqueIDRoot, 'click', IDHighlight.click(this));
+      }
+      if (this.nodes.capcode) {
+        $.on(this.nodes.capcode, 'click', IDHighlight.click(this));
+      }
+      if (!this.isClone) {
+        IDHighlight.set(this);
       }
     },
-
-    count() {
-      const {uniqueID} = Get.postFromNode(this).info;
-      let n = 0;
-      IDPostCount.thread.posts.forEach(function(post) {
-        if (post.info.uniqueID === uniqueID) { return n++; }
-      });
-      return this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
+    set(post) {
+      const match = (post.info.uniqueID || post.info.capcode) === IDHighlight.uniqueID;
+      $[match ? 'addClass' : 'rmClass'](post.nodes.post, 'highlight');
+    },
+    click(post) {
+      return function () {
+        const uniqueID = post.info.uniqueID || post.info.capcode;
+        IDHighlight.uniqueID = IDHighlight.uniqueID === uniqueID ? null : uniqueID;
+        g.posts.forEach(IDHighlight.set);
+      };
     }
   };
 
-  // @ts-nocheck
-
-  var ModContact = {
+  const IDPostCount = {
     init() {
-      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) { return; }
-      return Callbacks.Post.push({
-        name: 'Mod Contact Links',
-        cb:   this.node
+      if ((g.VIEW !== 'thread') || !Conf['Count Posts by ID']) {
+        return;
+      }
+      Callbacks.Thread.push({
+        name: 'Count Posts by ID',
+        cb() { IDPostCount.thread = this; }
+      });
+      Callbacks.Post.push({
+        name: 'Count Posts by ID',
+        cb: this.node
       });
     },
+    node() {
+      if (this.nodes.uniqueID && (this.thread === IDPostCount.thread)) {
+        $.on(this.nodes.uniqueID, 'mouseover', IDPostCount.count);
+      }
+    },
+    count() {
+      const { uniqueID } = Get.postFromNode(this).info;
+      let n = 0;
+      IDPostCount.thread.posts.forEach(function (post) {
+        if (post.info.uniqueID === uniqueID) {
+          n++;
+        }
+      });
+      this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
+    }
+  };
 
+  const ModContact = {
+    init() {
+      if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
+      Callbacks.Post.push({
+        name: 'Mod Contact Links',
+        cb: this.node
+      });
+    },
     node() {
       let moved;
-      if (this.isClone || !$.hasOwn(ModContact.specific, this.info.capcode)) { return; }
-      const links = $.el('span', {className: 'contact-links brackets-wrap'});
+      if (this.isClone || !$.hasOwn(ModContact.specific, this.info.capcode)) {
+        return;
+      }
+      const links = $.el('span', { className: 'contact-links brackets-wrap' });
       $.extend(links, ModContact.template(this.info.capcode));
       $.after(this.nodes.capcode, links);
       if ((moved = this.info.comment.match(/This thread was moved to >>>\/(\w+)\//)) && $.hasOwn(ModContact.moveNote, moved[1])) {
-        const moveNote = $.el('div', {className: 'move-note'});
+        const moveNote = $.el('div', { className: 'move-note' });
         $.extend(moveNote, ModContact.moveNote[moved[1]]);
-        return $.add(this.nodes.post, moveNote);
+        $.add(this.nodes.post, moveNote);
       }
     },
-
     template(capcode) {
-      return {innerHTML: "<a href=\"https://www.4chan.org/feedback\" target=\"_blank\">feedback</a>" + (ModContact.specific[capcode]()).innerHTML};
+      return { innerHTML: "<a href=\"https://www.4chan.org/feedback\" target=\"_blank\">feedback</a>" + (ModContact.specific[capcode]()).innerHTML };
     },
-
     specific: {
-      Mod() { return {innerHTML: " <a href=\"https://www.4chan-x.net/4chan-irc.html\" target=\"_blank\">IRC</a>"}; },
+      Mod() { return { innerHTML: " <a href=\"https://www.4chan-x.net/4chan-irc.html\" target=\"_blank\">IRC</a>" }; },
       Manager() { return ModContact.specific.Mod(); },
-      Developer() { return {innerHTML: " <a href=\"https://github.com/4chan\" target=\"_blank\">github</a>"}; },
-      Admin() { return {innerHTML: " <a href=\"https://twitter.com/hiroyuki_ni\" target=\"_blank\">twitter</a>"}; }
+      Developer() { return { innerHTML: " <a href=\"https://github.com/4chan\" target=\"_blank\">github</a>" }; },
+      Admin() { return { innerHTML: " <a href=\"https://twitter.com/hiroyuki_ni\" target=\"_blank\">twitter</a>" }; }
     },
-
     moveNote: {
-      qa: {innerHTML: "Moving a thread to /qa/ does not imply mods will read it. If you wish to contact mods, use <a href=\"https://www.4chan.org/feedback\" target=\"_blank\">feedback</a><span class=\"invisible\"> (https://www.4chan.org/feedback)</span> or <a href=\"https://www.4chan-x.net/4chan-irc.html\" target=\"_blank\">IRC</a><span class=\"invisible\"> (https://www.4chan-x.net/4chan-irc.html)</span>."}
+      qa: { innerHTML: "Moving a thread to /qa/ does not imply mods will read it. If you wish to contact mods, use <a href=\"https://www.4chan.org/feedback\" target=\"_blank\">feedback</a><span class=\"invisible\"> (https://www.4chan.org/feedback)</span> or <a href=\"https://www.4chan-x.net/4chan-irc.html\" target=\"_blank\">IRC</a><span class=\"invisible\"> (https://www.4chan-x.net/4chan-irc.html)</span>." }
     }
   };
 
-  // @ts-nocheck
-
   const NormalizeURL = {
     init() {
-      if (!Conf['Normalize URL']) { return; }
-
+      if (!Conf['Normalize URL']) {
+        return;
+      }
       let pathname = location.pathname.split(/\/+/);
       if (g.SITE.software === 'yotsuba') {
         switch (g.VIEW) {
@@ -25767,134 +25834,133 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             break;
         }
       }
-      pathname = pathname.join('/');
-      if (location.pathname !== pathname) {
-        return history.replaceState(history.state, '', `${location.protocol}//${location.host}${pathname}${location.hash}`);
+      const pathJoined = pathname.join('/');
+      if (location.pathname !== pathJoined) {
+        history.replaceState(history.state, '', `${location.protocol}//${location.host}${pathJoined}${location.hash}`);
       }
     }
   };
 
-  // @ts-nocheck
-
-  var PostJumper = {
+  const PostJumper = {
     init() {
-      if (!Conf['Unique ID and Capcode Navigation'] || !['index', 'thread'].includes(g.VIEW)) { return; }
-
+      if (!Conf['Unique ID and Capcode Navigation'] || !['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
       this.buttons = this.makeButtons();
       Icon.set(this.buttons.firstChild, 'arrowUpLong');
       Icon.set(this.buttons.lastChild, 'arrowDownLong');
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Post Jumper',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       if (this.isClone) {
-        for (var buttons of $$('.postJumper', this.nodes.info)) {
+        for (const buttons of $$('.postJumper', this.nodes.info)) {
           PostJumper.addListeners(buttons);
         }
         return;
       }
-
       if (this.nodes.uniqueIDRoot) {
-        PostJumper.addButtons(this,'uniqueID');
+        PostJumper.addButtons(this, 'uniqueID');
       }
-
       if (this.nodes.capcode) {
-        return PostJumper.addButtons(this,'capcode');
+        PostJumper.addButtons(this, 'capcode');
       }
     },
-
-    addButtons(post,type) {
+    addButtons(post, type) {
       const value = post.info[type];
       const buttons = PostJumper.buttons.cloneNode(true);
-      $.extend(buttons.dataset, {type, value});
-      $.after(post.nodes[type+(type === 'capcode' ? '' : 'Root')], buttons);
-      return PostJumper.addListeners(buttons);
+      $.extend(buttons.dataset, { type, value });
+      $.after(post.nodes[type + (type === 'capcode' ? '' : 'Root')], buttons);
+      PostJumper.addListeners(buttons);
     },
-
     addListeners(buttons) {
       $.on(buttons.firstChild, 'click', PostJumper.buttonClick);
-      return $.on(buttons.lastChild, 'click', PostJumper.buttonClick);
+      $.on(buttons.lastChild, 'click', PostJumper.buttonClick);
     },
-
     buttonClick() {
       let toJumper;
       const dir = $.hasClass(this, 'prev') ? -1 : 1;
       if (toJumper = PostJumper.find(this.parentNode, dir)) {
-        return PostJumper.scroll(this.parentNode, toJumper);
+        PostJumper.scroll(this.parentNode, toJumper);
       }
     },
-
     find(jumper, dir) {
-      const {type, value} = jumper.dataset;
-      const xpath = `span[contains(@class,\"postJumper\") and @data-value=\"${value}\" and @data-type=\"${type}\"]`;
+      const { type, value } = jumper.dataset;
+      const xpath = `span[contains(@class,"postJumper") and @data-value="${value}" and @data-type="${type}"]`;
       const axis = dir < 0 ? 'preceding' : 'following';
       let jumper2 = jumper;
       while (jumper2 = $.x(`${axis}::${xpath}`, jumper2)) {
-        if (jumper2.getBoundingClientRect().height) { return jumper2; }
+        if (jumper2.getBoundingClientRect().height) {
+          return jumper2;
+        }
       }
       if (jumper2 = $.x(`(//${xpath})[${dir < 0 ? 'last()' : '1'}]`)) {
-        if (jumper2.getBoundingClientRect().height) { return jumper2; }
+        if (jumper2.getBoundingClientRect().height) {
+          return jumper2;
+        }
       }
       while ((jumper2 = $.x(`${axis}::${xpath}`, jumper2)) && (jumper2 !== jumper)) {
-        if (jumper2.getBoundingClientRect().height) { return jumper2; }
+        if (jumper2.getBoundingClientRect().height) {
+          return jumper2;
+        }
       }
       return null;
     },
-
     makeButtons() {
       const charPrev = '\u23EB';
       const charNext = '\u23EC';
       const classPrev = 'prev';
       const classNext = 'next';
-      const span = $.el('span',
-        {className: 'postJumper'});
-      $.extend(span, {innerHTML: "<a href=\"javascript:;\" class=\"" + E(classPrev) + "\">" + E(charPrev) + "</a><a href=\"javascript:;\" class=\"" + E(classNext) + "\">" + E(charNext) + "</a>"});
+      const span = $.el('span', { className: 'postJumper' });
+      $.extend(span, { innerHTML: "<a href=\"javascript:;\" class=\"" + E(classPrev) + "\">" + E(charPrev) + "</a><a href=\"javascript:;\" class=\"" + E(classNext) + "\">" + E(charNext) + "</a>" });
       return span;
     },
-
     scroll(fromJumper, toJumper) {
-      const prevPos = fromJumper.getBoundingClientRect().top;
-      const destPos = toJumper.getBoundingClientRect().top;
-      return window.scrollBy(0, destPos-prevPos);
+      FastDOM.read(() => {
+        const prevPos = fromJumper.getBoundingClientRect().top;
+        const destPos = toJumper.getBoundingClientRect().top;
+        FastDOM.write(() => {
+          window.scrollBy(0, destPos - prevPos);
+        });
+      });
     }
   };
-
-  // @ts-nocheck
 
   const PSA = {
     init() {
       let el;
       if ((g.SITE.software === 'yotsuba') && (g.BOARD.ID === 'qa')) {
-        const announcement = {innerHTML: "Stay in touch with your <a href=\"https://www.4chan-x.net/qa_friends.html\" target=\"_blank\" rel=\"noopener\">/qa/ friends</a>!"};
-        el = $.el('div', {className: 'fcx-announcement'}, announcement);
+        const announcement = { innerHTML: "Stay in touch with your <a href=\"https://www.4chan-x.net/qa_friends.html\" target=\"_blank\" rel=\"noopener\">/qa/ friends</a>!" };
+        el = $.el('div', { className: 'fcx-announcement' });
+        $.extend(el, announcement);
         $.onExists(doc, '.boardBanner', banner => $.after(banner, el));
       }
       if ('samachan.org' in Conf['siteProperties'] && !Conf['PSAseen'].includes('samachan')) {
-        el = $.el('span',
-          {innerHTML: "<a href=\"https://sushigirl.us/yakuza/res/776.html\" target=\"_blank\" rel=\"noopener\">Looking for a new home?<br>Some former Samachan users are regrouping on SushiChan.</a><br>(a message from 4chan X)"});
-        return $.on(d, '4chanXInitFinished', function() {
+        el = $.el('span', { innerHTML: "<a href=\"https://sushigirl.us/yakuza/res/776.html\" target=\"_blank\" rel=\"noopener\">Looking for a new home?<br>Some former Samachan users are regrouping on SushiChan.</a><br>(a message from 4chan X)" });
+        $.on(d$1, '4chanXInitFinished', function () {
           new Notice('info', el);
           Conf['PSAseen'].push('samachan');
-          return $.set('PSAseen', Conf['PSAseen']);});
+          $.set('PSAseen', Conf['PSAseen']);
+        });
       }
     }
   };
 
-  // @ts-nocheck
-  var PSAHiding = {
+  const PSAHiding = {
     init() {
-      if (!Conf['Announcement Hiding'] || !g.SITE.selectors.psa) { return; }
+      if (!Conf['Announcement Hiding'] || !g.SITE.selectors.psa) {
+        return;
+      }
       $.addClass(doc, 'hide-announcement');
       $.onExists(doc, g.SITE.selectors.psa, this.setup);
-      return $.ready(function() {
-        if (!$(g.SITE.selectors.psa)) { return $.rmClass(doc, 'hide-announcement'); }
+      $.ready(function () {
+        if (!$(g.SITE.selectors.psa)) {
+          $.rmClass(doc, 'hide-announcement');
+        }
       });
     },
-
     setup(psa) {
       let btn, hr;
       PSAHiding.psa = psa;
@@ -25903,27 +25969,23 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         PSAHiding.hr = hr;
       }
       PSAHiding.content = $.el('div');
-
       const entry = {
         el: $.el('a', {
           textContent: 'Show announcement',
           className: 'show-announcement',
           href: 'javascript:;'
-        }
-        ),
+        }),
         order: 50,
         open() { return psa.hidden; }
       };
       Header.menu.addEntry(entry);
       $.on(entry.el, 'click', PSAHiding.toggle);
-
       PSAHiding.btn = (btn = $.el('a', {
-        title:       'Mark announcement as read and hide.',
-        className:   'hide-announcement-button',
-        href:        'javascript:;',
-        textContent: 'âž–ï¸Ž',
-      }
-      ));
+        title: 'Mark announcement as read and hide.',
+        className: 'hide-announcement-button',
+        href: 'javascript:;',
+        textContent: '➖',
+      }));
       Icon.set(btn, 'squareMinus');
       $.on(btn, 'click', PSAHiding.toggle);
       if (psa.firstChild?.tagName === 'HR') {
@@ -25931,32 +25993,31 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       } else {
         $.prepend(psa, btn);
       }
-
       PSAHiding.sync(Conf['hiddenPSAList']);
       $.rmClass(doc, 'hide-announcement');
-
-      return $.sync('hiddenPSAList', PSAHiding.sync);
+      $.sync('hiddenPSAList', PSAHiding.sync);
     },
-
     toggle() {
       const hide = $.hasClass(this, 'hide-announcement-button');
-      const set = function(hiddenPSAList) {
+      const set = function (hiddenPSAList) {
         if (hide) {
-          return hiddenPSAList[g.SITE.ID] = PSAHiding.text;
+          hiddenPSAList[g.SITE.ID] = PSAHiding.text;
         } else {
-          return delete hiddenPSAList[g.SITE.ID];
+          delete hiddenPSAList[g.SITE.ID];
         }
       };
       set(Conf['hiddenPSAList']);
       PSAHiding.sync(Conf['hiddenPSAList']);
-      return $.get('hiddenPSAList', Conf['hiddenPSAList'], function({hiddenPSAList}) {
+      $.get('hiddenPSAList', Conf['hiddenPSAList'], function ({ hiddenPSAList }) {
         set(hiddenPSAList);
-        return $.set('hiddenPSAList', hiddenPSAList);
+        $.set('hiddenPSAList', hiddenPSAList);
       });
     },
-
     sync(hiddenPSAList) {
-      const {psa, content} = PSAHiding;
+      const { psa, content } = PSAHiding;
+      if (!psa || !content) {
+        return;
+      }
       psa.hidden = (hiddenPSAList[g.SITE.ID] === PSAHiding.text);
       // Remove content to prevent autoplaying sounds from hidden announcements
       if (psa.hidden) {
@@ -25964,81 +26025,78 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       } else {
         $.add(psa, [...content.childNodes]);
       }
-      if (PSAHiding.hr) PSAHiding.hr.hidden = psa.hidden;
+      if (PSAHiding.hr)
+        PSAHiding.hr.hidden = psa.hidden;
     }
   };
 
-  // @ts-nocheck
-
-  var RemoveSpoilers = {
+  const RemoveSpoilers = {
     init() {
       if (Conf['Reveal Spoilers']) {
         $.addClass(doc, 'reveal-spoilers');
       }
-
-      if (!Conf['Remove Spoilers']) { return; }
-
+      if (!Conf['Remove Spoilers']) {
+        return;
+      }
       Callbacks.Post.push({
         name: 'Reveal Spoilers',
-        cb:   this.node
+        cb: this.node
       });
-
       if (g.VIEW === 'archive') {
-        return $.ready(() => RemoveSpoilers.unspoiler($.id('arc-list')));
+        $.ready(() => RemoveSpoilers.unspoiler($.id('arc-list')));
       }
     },
-
     node() {
-      return RemoveSpoilers.unspoiler(this.nodes.comment);
+      RemoveSpoilers.unspoiler(this.nodes.comment);
     },
-
     unspoiler(el) {
+      if (!el) {
+        return;
+      }
       const spoilers = $$(g.SITE.selectors.spoiler, el);
-      for (var spoiler of spoilers) {
-        var span = $.el('span', {className: 'removed-spoiler'});
+      for (const spoiler of spoilers) {
+        const span = $.el('span', { className: 'removed-spoiler' });
         $.replace(spoiler, span);
         $.add(span, [...spoiler.childNodes]);
       }
     }
   };
 
-  // @ts-nocheck
-
-  var ThreadLinks = {
+  const ThreadLinks = {
     init() {
-      if ((g.VIEW !== 'index') || !Conf['Open Threads in New Tab']) { return; }
-
+      if ((g.VIEW !== 'index') || !Conf['Open Threads in New Tab']) {
+        return;
+      }
       Callbacks.Post.push({
         name: 'Thread Links',
-        cb:   this.node
+        cb: this.node
       });
-      return Callbacks.CatalogThread.push({
+      Callbacks.CatalogThread.push({
         name: 'Thread Links',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
     },
-
     node() {
-      if (this.isReply || this.isClone) { return; }
-      return ThreadLinks.process(this.nodes.reply);
+      if (this.isReply || this.isClone) {
+        return;
+      }
+      ThreadLinks.process(this.nodes.reply);
     },
-
     catalogNode() {
-      return ThreadLinks.process(this.nodes.thumb.parentNode);
+      ThreadLinks.process(this.nodes.thumb.parentNode);
     },
-
     process(link) {
-      return link.target = '_blank';
+      link.target = '_blank';
     }
   };
 
-  // @ts-nocheck
-
   const Tinyboard = {
     init() {
-      if (g.SITE.software !== 'tinyboard') { return; }
+      if (g.SITE.software !== 'tinyboard') {
+        return;
+      }
       if (g.VIEW === 'thread') {
-        return $.on(d, '4chanXInitFinished', () => $.global("initTinyBoard", { boardID: g.BOARD.ID, threadID: g.THREADID.toString() }));
+        $.on(d$1, '4chanXInitFinished', () => $.global("initTinyBoard", { boardID: g.BOARD.ID, threadID: g.THREADID.toString() }));
       }
     }
   };
@@ -26058,7 +26116,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     node() {
       MarkNewIPs.ipCount = this.ipCount;
       MarkNewIPs.postCount = this.posts.keys.length;
-      $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
+      $.on(d$1, 'ThreadUpdate', MarkNewIPs.onUpdate);
     },
     onUpdate(e) {
       let fullID;
@@ -26157,7 +26215,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           innerHTML: `<div class="move" title="${E(statsTitle)}">${statsHTML.innerHTML}</div>`
         }));
         $.addClass(doc, 'float');
-        $.ready(() => $.add(d.body, sc));
+        $.ready(() => $.add(d$1.body, sc));
       }
       this.postCountEl = $('#post-count', sc);
       this.fileCountEl = $('#file-count', sc);
@@ -26176,8 +26234,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       ThreadStats.count();
       ThreadStats.update();
       ThreadStats.fetchPage();
-      $.on(d, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
-      $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
+      $.on(d$1, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
+      $.on(d$1, 'ThreadUpdate', ThreadStats.onUpdate);
     },
     count() {
       const { posts } = ThreadStats.thread;
@@ -26312,7 +26370,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       if ((g.SITE.software !== 'yotsuba') || !Conf['Pass Link']) {
         return;
       }
-      $.on(d, '4chanXInitFinished', PassLink.ready);
+      $.on(d$1, '4chanXInitFinished', PassLink.ready);
     },
     ready() {
       let styleSelector;
@@ -26802,9 +26860,9 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-        if (platform === 'crx') {
+
           w = (w.wrappedJSObject || w);
-        }
+
         if (`${meta.name} antidup` in w) {
           return;
         }
@@ -26834,7 +26892,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       } catch (e) {
         console.error(e);
       }
-      $.on(d, '4chanXInitFinished', function () {
+      $.on(d$1, '4chanXInitFinished', function () {
         if (Main.expectInitFinished) {
           return delete Main.expectInitFinished;
         } else {
@@ -26844,7 +26902,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       });
       // Detect "mounted" event from Kissu
       const mountedCB = function () {
-        d.removeEventListener('mounted', mountedCB, true);
+        d$1.removeEventListener('mounted', mountedCB, true);
         Main.isMounted = true;
         Main.mountedCBs.map((cb) => (() => {
           try {
@@ -26852,7 +26910,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           } catch (error2) { }
         })());
       };
-      d.addEventListener('mounted', mountedCB, true);
+      d$1.addEventListener('mounted', mountedCB, true);
       // Flatten default values from Config into Conf
       const flatten = function (parent, obj) {
         if (obj instanceof Array) {
@@ -26900,7 +26958,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       if (/\.4chan(?:nel)?\.org$/.test(location.hostname) &&
         !SW.yotsuba.regexp.pass.test(location.href) &&
         !SW.yotsuba.regexp.captcha.test(location.href) &&
-        !$$('script:not([src])', d).filter(s => /this\[/.test(s.textContent)).length) {
+        !$$('script:not([src])', d$1).filter(s => /this\[/.test(s.textContent)).length) {
         ($.getSync || $.get)({ 'jsWhitelist': Conf['jsWhitelist'] }, ({ jsWhitelist }) => {
           const parsedList = jsWhitelist.replace(/^#.*$/mg, '').replace(/[\s;]+/g, ' ').trim();
           if (/\S/.test(parsedList))
@@ -26988,7 +27046,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       if (g.VIEW === 'file') {
-        $.asap((() => d.readyState !== 'loading'), function () {
+        $.asap((() => d$1.readyState !== 'loading'), function () {
           let video;
           if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect'] && g.SITE.is404?.()) {
             const pathname = location.pathname.split(/\/+/);
@@ -27038,7 +27096,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       // disable the mobile layout
-      const mobileLink = $('link[href*=mobile]', d.head);
+      const mobileLink = $('link[href*=mobile]', d$1.head);
       if (mobileLink)
         mobileLink.disabled = true;
       doc.dataset.host = location.host;
@@ -27049,7 +27107,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         $.addClass(doc, 'autohiding-scrollbar');
       }
       $.ready(function () {
-        if ((d.body.clientHeight > doc.clientHeight) && ((window.innerWidth === doc.clientWidth) !== Conf['Autohiding Scrollbar'])) {
+        if ((d$1.body.clientHeight > doc.clientHeight) && ((window.innerWidth === doc.clientWidth) !== Conf['Autohiding Scrollbar'])) {
           Conf['Autohiding Scrollbar'] = !Conf['Autohiding Scrollbar'];
           $.set('Autohiding Scrollbar', Conf['Autohiding Scrollbar']);
           return $.toggleClass(doc, 'autohiding-scrollbar');
@@ -27099,13 +27157,13 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         const div = g.SITE.bgColoredEl();
         div.style.position = 'absolute';
         div.style.visibility = 'hidden';
-        $.add(d.body, div);
+        $.add(d$1.body, div);
         let bgColor = window.getComputedStyle(div).backgroundColor;
         $.rm(div);
         const rgb = bgColor.match(/[\d.]+/g);
         // Use body background if reply background is transparent
         if (!/^rgb\(/.test(bgColor)) {
-          const s = window.getComputedStyle(d.body);
+          const s = window.getComputedStyle(d$1.body);
           bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
         }
         let css = `\
@@ -27122,8 +27180,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         Main.bgColorStyle.textContent = css;
         return $.after($.id('fourchanx-css'), Main.bgColorStyle);
       };
-      $.onExists(d.head, g.SITE.selectors.styleSheet, function () {
-        styleSheets = $$(g.SITE.selectors.styleSheet, d.head);
+      $.onExists(d$1.head, g.SITE.selectors.styleSheet, function () {
+        styleSheets = $$(g.SITE.selectors.styleSheet, d$1.head);
         if (g.SITE.software === 'yotsuba') {
           const observer = new MutationObserver(setStyle);
           for (const styleSheet of styleSheets) {
@@ -27409,7 +27467,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     handleErrors(errors) {
       // Detect conflicts with 4chan X v2
       let error;
-      if (d.body && $.hasClass(d.body, 'fourchan_x') && !$.hasClass(doc, 'tainted')) {
+      if (d$1.body && $.hasClass(d$1.body, 'fourchan_x') && !$.hasClass(doc, 'tainted')) {
         new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
         $.addClass(doc, 'tainted');
       }
