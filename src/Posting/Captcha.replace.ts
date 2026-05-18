@@ -22,7 +22,7 @@ const CaptchaReplace = {
 
   noscript() {
     let noscript: HTMLScriptElement | undefined, original: HTMLElement | null, toggle: HTMLElement | null;
-    if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode as ParentNode) as HTMLScriptElement))) { return; }
+    if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode as HTMLElement) as HTMLScriptElement))) { return; }
     const span = $.el('span', {id: 'captcha-forced-noscript'});
     $.replace(noscript, span);
     $.rm(original);

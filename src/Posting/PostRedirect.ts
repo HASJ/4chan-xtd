@@ -1,40 +1,41 @@
-﻿// @ts-nocheck
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
+interface QRPostSuccessfulEvent extends CustomEvent {
+  detail: {
+    redirect?: string;
+  };
+}
+
 const PostRedirect = {
+  event: null as QRPostSuccessfulEvent | null,
+  delays: 0,
+
   init() {
-    return $.on(d, 'QRPostSuccessful', e => {
-      if (!e.detail.redirect) { return; }
-      this.event = e;
-      this.delays = 0;
-      return $.queueTask(() => {
-        if ((e === this.event) && (this.delays === 0)) {
-          return location.href = e.detail.redirect;
+    $.on(d, 'QRPostSuccessful', (e: Event) => {
+      const customEvent = e as QRPostSuccessfulEvent;
+      if (!customEvent.detail.redirect) { return; }
+      PostRedirect.event = customEvent;
+      PostRedirect.delays = 0;
+      $.queueTask(() => {
+        if ((customEvent === PostRedirect.event) && (PostRedirect.delays === 0)) {
+          location.href = customEvent.detail.redirect!;
         }
       });
     });
   },
 
-  delays: 0,
-
-  delay() {
-    if (!this.event) { return null; }
-    const e = this.event;
-    this.delays++;
+  delay(): (() => void) | null {
+    if (!PostRedirect.event) { return null; }
+    const e = PostRedirect.event;
+    PostRedirect.delays++;
     return () => {
-      if (e !== this.event) { return; }
-      this.delays--;
-      if (this.delays === 0) {
-        return location.href = e.detail.redirect;
+      if (e !== PostRedirect.event) { return; }
+      PostRedirect.delays--;
+      if (PostRedirect.delays === 0) {
+        location.href = e.detail.redirect!;
       }
     };
   }
 };
 export default PostRedirect;
-
