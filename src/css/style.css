@@ -1651,6 +1651,18 @@ input.field.tripped:not(:hover):not(:focus) {
 .captcha-iframe .captcha-strip.selected {
   border-color: #000;
 }
+
+#qr .captcha-strips.is-odd-one-out,
+.captcha-iframe .captcha-strips.is-odd-one-out {
+  flex-direction: row;
+}
+
+#qr .captcha-strips.is-odd-one-out .captcha-strip,
+.captcha-iframe .captcha-strips.is-odd-one-out .captcha-strip {
+  width: auto;
+  flex: 1;
+  height: 80px;
+}
 #qr .captcha-container > div {
   margin: auto;
   width: 304px;

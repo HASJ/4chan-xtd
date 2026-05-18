@@ -159,7 +159,9 @@ const CaptchaT = {
     }
 
     // Create the strips container (acting as the custom UI marker)
-    const stripsContainer = $.el('div', {className: 'captcha-strips captcha-custom-ui'});
+    const stripsContainer = $.el('div', {
+      className: `captcha-strips captcha-custom-ui${isNotLikeOthers ? ' is-odd-one-out' : ''}`
+    });
     const tNextForStep = $('#t-next', mainDiv);
     if (tNextForStep) {
       stripsContainer.dataset.step = tNextForStep.textContent;
