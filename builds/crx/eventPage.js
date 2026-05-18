@@ -136,6 +136,34 @@ const PageContextFunctions = {
     if (autoLoad === '1')
       TCaptcha.load(boardID, threadID);
   },
+  captureTCaptchaStrips: () => {
+    const slider = document.querySelector('#qr #t-slider');
+    const task = document.querySelector('#qr #t-task');
+    const strips = document.querySelectorAll('#qr .captcha-strip');
+    if (!slider || !task || !strips.length)
+      return;
+    const max = parseInt(slider.getAttribute('max') || '3', 10);
+    const origVal = slider.value;
+    const step = (i) => {
+      if (i > max) {
+        slider.value = origVal;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      slider.value = '' + i;
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      setTimeout(() => {
+        const bg = task.style.backgroundImage;
+        if (strips[i] && bg) {
+          strips[i].style.backgroundImage = bg;
+          strips[i].style.backgroundSize = 'contain';
+          strips[i].style.backgroundPosition = 'center';
+        }
+        step(i + 1);
+      }, 100);
+    };
+    step(0);
+  },
   destroyTCaptcha: () => { window.TCaptcha.destroy(); },
   TCaptchaClearChallenge: () => { window.TCaptcha.clearChallenge(); },
   setupQR: () => {

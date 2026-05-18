@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import Redirect from "../Archive/Redirect";
 import PassMessage from "../Miscellaneous/PassMessage";
 import Report from "../Miscellaneous/Report";
@@ -189,6 +189,14 @@ $\
         return;
       case 'sys.4chan.org': case 'sys.4channel.org':
         var pathname = location.pathname.split(/\/+/);
+        if (pathname[1] === 'captcha') {
+          $.onExists(doc, 'body', () => {
+            $.addClass(doc, 'captcha-t', 'captcha-iframe');
+            $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
+            Captcha.t.setupIframe();
+          });
+          return;
+        }
         if (pathname[2] === 'imgboard.php') {
           let match;
           if (/\bmode=report\b/.test(location.search)) {

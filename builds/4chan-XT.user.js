@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XT
-// @version      2.24.2
+// @version      2.25.1
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XT
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.24.2",
-    "date": "2025-12-23T20:20:20Z"
+    "version": "2.25.1",
+    "date": "2026-05-18T06:00:00Z"
   };
 
   var meta = {
@@ -1683,6 +1683,34 @@ current-archive-text:"Archive"]
       })));
       if (autoLoad === '1')
         TCaptcha.load(boardID, threadID);
+    },
+    captureTCaptchaStrips: () => {
+      const slider = document.querySelector('#qr #t-slider');
+      const task = document.querySelector('#qr #t-task');
+      const strips = document.querySelectorAll('#qr .captcha-strip');
+      if (!slider || !task || !strips.length)
+        return;
+      const max = parseInt(slider.getAttribute('max') || '3', 10);
+      const origVal = slider.value;
+      const step = (i) => {
+        if (i > max) {
+          slider.value = origVal;
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+        slider.value = '' + i;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        setTimeout(() => {
+          const bg = task.style.backgroundImage;
+          if (strips[i] && bg) {
+            strips[i].style.backgroundImage = bg;
+            strips[i].style.backgroundSize = 'contain';
+            strips[i].style.backgroundPosition = 'center';
+          }
+          step(i + 1);
+        }, 100);
+      };
+      step(0);
     },
     destroyTCaptcha: () => { window.TCaptcha.destroy(); },
     TCaptchaClearChallenge: () => { window.TCaptcha.clearChallenge(); },
@@ -5164,6 +5192,83 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root {
   position: relative;
 }
+#qr .captcha-root.is-challenge > div,
+.captcha-iframe.is-challenge .captcha-root > div {
+  height: auto !important;
+  background-image: none !important;
+  padding-bottom: 4px;
+  overflow: visible !important;
+}
+#qr .captcha-root.is-challenge #t-task,
+.captcha-iframe.is-challenge #t-task,
+#qr .captcha-root.is-challenge #t-slider,
+.captcha-iframe.is-challenge #t-slider {
+  position: absolute !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#qr .captcha-root.is-challenge #t-ctrl,
+.captcha-iframe.is-challenge #t-ctrl {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+#qr .captcha-root.is-challenge #t-next,
+.captcha-iframe.is-challenge #t-next {
+  margin-left: 0 !important;
+}
+
+#qr .captcha-clue-image,
+.captcha-iframe .captcha-clue-image {
+  width: 80px;
+  height: 80px;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+#qr .captcha-strips,
+.captcha-iframe .captcha-strips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 4px;
+}
+#qr .captcha-strip,
+.captcha-iframe .captcha-strip {
+  height: 80px;
+  width: 100%;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 2px;
+  box-sizing: border-box;
+  transition: border-color 0.1s;
+}
+#qr .captcha-strip:hover,
+.captcha-iframe .captcha-strip:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+#qr .captcha-strip.selected,
+.captcha-iframe .captcha-strip.selected {
+  border-color: #000;
+}
+
+#qr .captcha-strips.is-odd-one-out,
+.captcha-iframe .captcha-strips.is-odd-one-out {
+  flex-direction: row;
+}
+
+#qr .captcha-strips.is-odd-one-out .captcha-strip,
+.captcha-iframe .captcha-strips.is-odd-one-out .captcha-strip {
+  width: auto;
+  flex: 1;
+  height: 80px;
+}
 #qr .captcha-container > div {
   margin: auto;
   width: 304px;
@@ -6610,35 +6715,45 @@ svg.icon {
 
   var empty = 'R0lGODlhEAAQAJEAAAAAAP///9vb2////yH5BAEAAAMALAAAAAAQABAAAAIvnI+pq+D9DBAUoFkPFnbs7lFZKIJOJJ3MyraoB14jFpOcVMpzrnF3OKlZYsMWowAAOw==';
 
-  // @ts-nocheck
-
-  var Favicon = {
+  const Favicon = {
+    el: null,
+    status: undefined,
+    isSFW: undefined,
+    default: undefined,
+    unreadDead: undefined,
+    unreadDeadY: undefined,
+    unreadSFW: undefined,
+    unreadSFWY: undefined,
+    unreadNSFW: undefined,
+    unreadNSFWY: undefined,
+    unread: undefined,
+    unreadY: undefined,
     init() {
-      return $.asap((() => d.head && (Favicon.el = $('link[rel="shortcut icon"]', d.head))), Favicon.initAsap);
+      $.asap(() => d.head && (Favicon.el = $('link[rel="shortcut icon"]', d.head)), Favicon.initAsap);
     },
-
     set(status) {
       Favicon.status = status;
       if (Favicon.el) {
-        Favicon.el.href = Favicon[status];
+        Favicon.el.href = Favicon[status] || Favicon.default || '';
         // `favicon.href = href` doesn't work on Firefox.
-        return $.add(d.head, Favicon.el);
+        $.add(d.head, Favicon.el);
       }
     },
-
     initAsap() {
+      if (!Favicon.el) {
+        return;
+      }
       Favicon.el.type = 'image/x-icon';
-      const {href}          = Favicon.el;
-      Favicon.isSFW   = /ws\.ico$/.test(href);
+      const { href } = Favicon.el;
+      Favicon.isSFW = /ws\.ico$/.test(href);
       Favicon.default = href;
       Favicon.switch();
       if (Favicon.status) {
-        return Favicon.set(Favicon.status);
+        Favicon.set(Favicon.status);
       }
     },
-
     switch() {
-      let items = {
+      let itemsDict = {
         ferongr: [
           ferongr_unreadDead,
           ferongr_unreadDeadY,
@@ -6688,31 +6803,28 @@ svg.icon {
           Metro_unreadNSFWY,
         ]
       };
-      items = $.getOwn(items, Conf['favicon']);
-
+      const items = $.getOwn(itemsDict, Conf['favicon']) || [];
       const f = Favicon;
       const t = 'data:image/png;base64,';
       let i = 0;
-      while (items[i]) {
-        items[i] = t + items[i++];
+      while (items[i] !== undefined) {
+        items[i] = t + items[i];
+        i++;
       }
-
       [f.unreadDead, f.unreadDeadY, f.unreadSFW, f.unreadSFWY, f.unreadNSFW, f.unreadNSFWY] = items;
-      return f.update();
+      f.update();
     },
-
     update() {
       if (this.isSFW) {
-        this.unread  = this.unreadSFW;
-        return this.unreadY = this.unreadSFWY;
+        this.unread = this.unreadSFW;
+        this.unreadY = this.unreadSFWY;
       } else {
-        this.unread  = this.unreadNSFW;
-        return this.unreadY = this.unreadNSFWY;
+        this.unread = this.unreadNSFW;
+        this.unreadY = this.unreadNSFWY;
       }
     },
-
-    SFW:   '//s.4cdn.org/image/favicon-ws.ico',
-    NSFW:  '//s.4cdn.org/image/favicon.ico',
+    SFW: '//s.4cdn.org/image/favicon-ws.ico',
+    NSFW: '//s.4cdn.org/image/favicon.ico',
     dead: `data:image/gif;base64,${dead}`,
     logo: `data:image/png;base64,${empty}`,
   };
@@ -6795,20 +6907,268 @@ svg.icon {
       if (!this.isEnabled) { return; }
 
       if (!this.nodes.container) {
+        // Create a child element for TCaptcha to use. TCaptcha.init() will
+        // clear its className and set inline styles on it, but our JS reference
+        // (this.nodes.container) remains valid. We observe captcha-root (the
+        // parent) since it retains its class and stays stable.
         this.nodes.container = $.el('div', {className: 'captcha-container'});
         $.prepend(this.nodes.root, this.nodes.container);
         CaptchaT.currentThread = CaptchaT.getThread();
         CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
+
+        this.observer = new MutationObserver(() => {
+          this.createStrips();
+        });
+        // Observe captcha-root, NOT captcha-container, because TCaptcha clears
+        // the container's className making class-based queries fail.
+        this.observer.observe(this.nodes.root, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+
         $.global('setupTCaptcha', CaptchaT.currentThread);
+
+        // Polling fallback for style changes that MutationObserver might miss.
+        if (!this.pollInterval) {
+          this.pollInterval = setInterval(() => {
+            if (!this.nodes.container) {
+              clearInterval(this.pollInterval);
+              delete this.pollInterval;
+              return;
+            }
+            this.createStrips();
+          }, 500);
+        }
       }
 
       if (focus) $('#t-resp').focus();
     },
 
+    createStrips() {
+      const mainDiv = this.nodes.container;
+      if (!mainDiv) return;
+
+      const slider = $('#t-slider', mainDiv);
+      const taskEl = $('#t-task', mainDiv);
+      let customUiExists = !!$('.captcha-custom-ui', mainDiv);
+
+      // If there's no slider or it has no max attribute, it's not a real puzzle
+      // (e.g., "Verification not required", "Captcha expired", or initializing)
+      if (!slider || !slider.hasAttribute('max')) {
+        $.rmClass(this.nodes.root, 'is-challenge');
+        this._isNotLikeOthers = false;
+        return;
+      }
+
+      const imgEl = taskEl ? $('img', taskEl) : null;
+
+      // Now we know it's a real puzzle because it has a max attribute.
+      // If it has no image clue, it must be the odd one out!
+      if (!imgEl) {
+        this._isNotLikeOthers = true;
+      } else if (imgEl && imgEl.src) {
+        this._isNotLikeOthers = false;
+      }
+      const isNotLikeOthers = !!this._isNotLikeOthers;
+
+      const taskBg = taskEl ? taskEl.style.backgroundImage : '';
+      let clueUrl = '';
+      if (imgEl && imgEl.src) {
+          clueUrl = `url("${imgEl.src}")`;
+      } else if (taskBg && taskBg.includes('url(')) {
+          clueUrl = taskBg;
+      }
+
+      // Safety check, though the max attribute check above already guarantees it's a challenge
+      const isChallenge = !!clueUrl || isNotLikeOthers;
+
+      if (!customUiExists && !isChallenge) {
+        $.rmClass(this.nodes.root, 'is-challenge');
+        return;
+      }
+
+      // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
+      if (customUiExists) {
+        const customUi = $('.captcha-custom-ui', mainDiv);
+        const oldStep = customUi ? customUi.dataset.step : '';
+        const tNextNode = $('#t-next', mainDiv);
+        const newStep = tNextNode ? tNextNode.textContent : '';
+
+        let isNewChallenge = false;
+        if (oldStep && newStep && oldStep !== newStep) {
+          isNewChallenge = true;
+        } else if (imgEl && imgEl.src) {
+          const existingClueImage = $('.captcha-clue-image', mainDiv);
+          if (existingClueImage && existingClueImage.style.backgroundImage !== `url("${imgEl.src}")`) {
+            isNewChallenge = true;
+          }
+        }
+
+        if (isNewChallenge) {
+          if (customUi) $.rm(customUi);
+          const existingClueImage = $('.captcha-clue-image', mainDiv);
+          if (existingClueImage) $.rm(existingClueImage);
+          customUiExists = false;
+          this.isCapturing = false;
+        }
+      }
+
+      // If we've already built the custom UI for this challenge, or we're building it, do nothing.
+      // The custom UI will naturally be destroyed when TCaptcha wipes the container on reload.
+      if (customUiExists || this.isCapturing || !slider || !taskEl) return;
+
+      // We are at the initial challenge state!
+      this.isCapturing = true;
+
+      // Create the clue image and insert it into #t-ctrl
+      const tCtrl = $('#t-ctrl', mainDiv);
+      if (tCtrl) {
+        const clueImage = $.el('div', {className: 'captcha-clue-image'});
+        if (isNotLikeOthers) {
+          clueImage.style.display = 'none';
+        } else {
+          clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
+        }
+        const tNextNode = $('#t-next', tCtrl);
+        if (tNextNode) {
+          $.before(tNextNode, clueImage);
+        } else {
+          $.add(tCtrl, clueImage);
+        }
+      }
+
+      // Create the strips container (acting as the custom UI marker)
+      const stripsContainer = $.el('div', {
+        className: `captcha-strips captcha-custom-ui${isNotLikeOthers ? ' is-odd-one-out' : ''}`
+      });
+      const tNextForStep = $('#t-next', mainDiv);
+      if (tNextForStep) {
+        stripsContainer.dataset.step = tNextForStep.textContent;
+      }
+      const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
+      const count = maxVal + 1;
+      const startIndex = isNotLikeOthers ? 1 : 0;
+
+      for (let i = startIndex; i < count; i++) {
+        const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
+        strip.dataset.index = '' + i;
+        $.on(strip, 'click', () => {
+          if (this.isCapturing) return;
+          slider.value = '' + i;
+          slider.dispatchEvent(new Event('change', { bubbles: true }));
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
+          $.addClass(strip, 'selected');
+        });
+        $.add(stripsContainer, strip);
+      }
+
+      const tBox = $('#t-box', mainDiv);
+      if (tBox) {
+        $.add(tBox, stripsContainer);
+      } else {
+        $.add(mainDiv, stripsContainer);
+      }
+
+      // Now capture the 4 puzzle images by programmatically moving the slider
+      const originalSliderValue = slider.value;
+
+      const runCapture = async () => {
+        let lastBg = taskEl.style.backgroundImage; // Track the actual style property
+        for (let i = startIndex; i < count; i++) {
+          await new Promise(resolve => {
+            let isResolved = false;
+
+            const observer = new MutationObserver(() => {
+               const currentBg = taskEl.style.backgroundImage;
+               if (currentBg && currentBg.includes('url(') && currentBg !== lastBg) {
+                   isResolved = true;
+                   observer.disconnect();
+                   resolve();
+               }
+            });
+            observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
+
+            slider.value = '' + i;
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            slider.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // Failsafe timeout
+            setTimeout(() => {
+               if (!isResolved) {
+                   observer.disconnect();
+                   resolve();
+               }
+            }, 1000);
+          });
+
+          const stripIndex = i - startIndex;
+          const strip = stripsContainer.children[stripIndex];
+          if (strip) {
+            lastBg = taskEl.style.backgroundImage;
+            strip.style.backgroundImage = lastBg;
+            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
+            strip.style.backgroundSize = taskEl.style.backgroundSize;
+            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
+          }
+        }
+
+        // Done capturing!
+        this.isCapturing = false;
+        // Restore slider and visually select the active strip
+        slider.value = originalSliderValue;
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const targetValue = parseInt(originalSliderValue, 10) || 0;
+        const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
+        if (targetStrip) targetStrip.click();
+      };
+
+      runCapture();
+
+      if (!this.keydownListener) {
+        this.keydownListener = (e) => {
+          if (!this.nodes.container || this.isCapturing) return;
+          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp') return;
+          const key = e.key;
+          if (key === ' ') {
+            const tNext = $('#t-next', this.nodes.container);
+            if (tNext && !tNext.disabled) {
+              e.preventDefault();
+              tNext.click();
+            }
+          } else if (key >= '1' && key <= '9') {
+            const index = parseInt(key, 10) - 1;
+            const stripElements = $$('.captcha-strip', this.nodes.root);
+            if (stripElements[index]) {
+              e.preventDefault();
+              stripElements[index].click();
+              stripElements[index].focus();
+            }
+          }
+        };
+        $.on(document, 'keydown', this.keydownListener);
+      }
+
+      // Apply CSS class to hide native elements
+      $.addClass(this.nodes.root, 'is-challenge');
+    },
+
     destroy() {
+      if (this.observer) {
+        this.observer.disconnect();
+        delete this.observer;
+      }
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+        delete this.pollInterval;
+      }
+      if (this.keydownListener) {
+        $.off(document, 'keydown', this.keydownListener);
+        delete this.keydownListener;
+      }
       if (!this.isEnabled || !this.nodes.container) { return; }
       $.global('destroyTCaptcha');
       $.rm(this.nodes.container);
+      $.rmClass(this.nodes.root, 'is-challenge');
       delete this.nodes.container;
     },
 
@@ -6844,6 +7204,108 @@ svg.icon {
 
     occupied() {
       return !!this.nodes.container;
+    },
+
+    setupIframe() {
+      this.isEnabled = true;
+      const mainDiv = $('#t-slider')?.parentNode;
+      if (!mainDiv) {
+        this.iframeObserver = new MutationObserver(() => {
+          const md = $('#t-slider')?.parentNode;
+          if (md) {
+            this.iframeObserver.disconnect();
+            this.initIframeTransformation(md);
+          }
+        });
+        this.iframeObserver.observe(document.body, { childList: true, subtree: true });
+      } else {
+        this.initIframeTransformation(mainDiv);
+      }
+    },
+
+    initIframeTransformation(mainDiv) {
+      const slider = $('#t-slider', mainDiv);
+      if (!slider) return;
+
+      this.observer = new MutationObserver(() => {
+        this.createIframeStrips(mainDiv, slider);
+      });
+      const taskEl = $('#t-task', mainDiv);
+      if (taskEl) {
+        this.observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
+      }
+
+      this.createIframeStrips(mainDiv, slider);
+
+      $.on(window, 'message', (e) => {
+        if (e.data && e.data.type === 'select-strip') {
+          const index = e.data.index;
+          const strips = $$('.captcha-strip', mainDiv);
+          if (strips[index]) {
+            strips[index].click();
+            strips[index].focus();
+          }
+        }
+      });
+
+      if (!this.keydownListener) {
+        this.keydownListener = (e) => {
+          if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp') return;
+          const key = e.key;
+          if (key >= '1' && key <= '9') {
+            const index = parseInt(key, 10) - 1;
+            const strips = $$('.captcha-strip', mainDiv);
+            if (strips[index]) {
+              e.preventDefault();
+              strips[index].click();
+              strips[index].focus();
+            }
+          }
+        };
+        $.on(document, 'keydown', this.keydownListener);
+      }
+    },
+
+    createIframeStrips(mainDiv, slider) {
+      let strips = $('.captcha-strips', mainDiv);
+      if (!strips) {
+        const maxStr = slider.getAttribute('max');
+        const max = maxStr ? parseInt(maxStr, 10) : 3;
+        const count = max + 1;
+
+        strips = $.el('div', {className: 'captcha-strips'});
+        for (let i = 0; i < count; i++) {
+          const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
+          strip.dataset.index = i;
+          strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
+          $.on(strip, 'click', () => {
+            slider.value = i;
+            slider.dispatchEvent(new Event('change', { bubbles: true }));
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+            $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
+            $.addClass(strip, 'selected');
+          });
+          $.add(strips, strip);
+        }
+        $.add(mainDiv, strips);
+      }
+
+      const taskEl = $('#t-task', mainDiv);
+      if (!taskEl) return;
+
+      const bg = taskEl.style.backgroundImage;
+      const isChallenge = bg && bg.includes('url(');
+      if (isChallenge) {
+        $$('.captcha-strip', strips).forEach(strip => {
+          strip.style.backgroundImage = bg;
+        });
+        taskEl.style.setProperty('background-image', 'none', 'important');
+        $.addClass(document.documentElement, 'is-challenge');
+        strips.style.display = '';
+      } else if (bg !== 'none') {
+        $.rmClass(document.documentElement, 'is-challenge');
+        strips.style.display = 'none';
+      }
     }
   };
 
@@ -10106,91 +10568,106 @@ svg.icon {
     }
   }
 
-  // @ts-nocheck
-
-  var Unread = {
+  const Unread = {
+    hr: null,
+    posts: null,
+    postsQuotingYou: null,
+    order: null,
+    position: null,
+    thread: null,
+    title: '',
+    lastReadPost: undefined,
+    readCount: 0,
+    linePosition: undefined,
     init() {
-      if ((g.VIEW !== 'thread') || (
-        !Conf['Unread Count'] &&
+      if ((g.VIEW !== 'thread') || (!Conf['Unread Count'] &&
         !Conf['Unread Favicon'] &&
         !Conf['Unread Line'] &&
         !Conf['Remember Last Read Post'] &&
         !Conf['Desktop Notifications'] &&
-        !Conf['Quote Threading']
-      )) { return; }
-
+        !Conf['Quote Threading'])) {
+        return;
+      }
       if (Conf['Remember Last Read Post']) {
-        $.sync('Remember Last Read Post', enabled => Conf['Remember Last Read Post'] = enabled);
+        $.sync('Remember Last Read Post', (enabled) => Conf['Remember Last Read Post'] = enabled);
         this.db = new DataBoard('lastReadPosts', this.sync);
       }
-
       this.hr = $.el('hr', {
         id: 'unread-line',
         className: 'unread-line'
-      }
-      );
+      });
       this.posts = new Set();
       this.postsQuotingYou = new Set();
       this.order = new RandomAccessList();
       this.position = null;
-
       Callbacks.Thread.push({
         name: 'Unread',
-        cb:   this.node
+        cb: this.node
       });
-
-      return Callbacks.Post.push({
+      Callbacks.Post.push({
         name: 'Unread',
-        cb:   this.addPost
+        cb: this.addPost
       });
     },
-
     node() {
       Unread.thread = this;
-      Unread.title  = d.title;
+      Unread.title = d.title;
       Unread.lastReadPost = Unread.db?.get({
         boardID: this.board.ID,
         threadID: this.ID
       }) || 0;
       Unread.readCount = 0;
-      for (var ID of this.posts.keys) { if (+ID <= Unread.lastReadPost) { Unread.readCount++; } }
+      for (const ID of this.posts.keys) {
+        if (+ID <= Unread.lastReadPost) {
+          Unread.readCount++;
+        }
+      }
       $.one(d, '4chanXInitFinished', Unread.ready);
-      $.on(d, 'PostsInserted',      Unread.onUpdate);
-      $.on(d, 'ThreadUpdate',       function(e) { if (e.detail[404]) { return Unread.update(); } });
+      $.on(d, 'PostsInserted', Unread.onUpdate);
+      $.on(d, 'ThreadUpdate', (e) => {
+        if (e.detail?.[404]) {
+          Unread.update();
+        }
+      });
       const resetLink = $.el('a', {
         href: 'javascript:;',
         className: 'unread-reset',
         textContent: 'Mark all unread'
-      }
-      );
+      });
       $.on(resetLink, 'click', Unread.reset);
-      return Header.menu.addEntry({
+      Header.menu.addEntry({
         el: resetLink,
         order: 70
       });
     },
-
     ready() {
-      if (Conf['Remember Last Read Post'] && Conf['Scroll to Last Read Post']) { Unread.scroll(); }
+      if (Conf['Remember Last Read Post'] && Conf['Scroll to Last Read Post']) {
+        Unread.scroll();
+      }
       Unread.setLine(true);
       Unread.read();
       Unread.update();
       $.on(d, 'scroll visibilitychange', Unread.read);
-      if (Conf['Unread Line']) { return $.on(d, 'visibilitychange',        Unread.setLine); }
+      if (Conf['Unread Line']) {
+        $.on(d, 'visibilitychange', Unread.setLine);
+      }
     },
-
     positionPrev() {
-      if (Unread.position) { return Unread.position.prev; } else { return Unread.order.last; }
+      if (Unread.position) {
+        return Unread.position.prev;
+      } else {
+        return Unread.order.last;
+      }
     },
-
     scroll() {
       // Let the header's onload callback handle it.
       let hash;
-      if ((hash = location.hash.match(/\d+/)) && hash[0] in Unread.thread.posts) { return; }
-
+      if ((hash = location.hash.match(/\d+/)) && hash[0] in Unread.thread.posts) {
+        return;
+      }
       let position = Unread.positionPrev();
       while (position) {
-        var {bottom} = position.data.nodes;
+        const { bottom } = position.data.nodes;
         if (!bottom.getBoundingClientRect().height) {
           // Don't try to scroll to posts with display: none
           position = position.prev;
@@ -10200,69 +10677,70 @@ svg.icon {
         }
       }
     },
-
     reset() {
-      if (Unread.lastReadPost == null) { return; }
-
+      if (Unread.lastReadPost == null) {
+        return;
+      }
       Unread.posts = new Set();
       Unread.postsQuotingYou = new Set();
       Unread.order = new RandomAccessList();
       Unread.position = null;
       Unread.lastReadPost = 0;
       Unread.readCount = 0;
-      Unread.thread.posts.forEach(post => Unread.addPost.call(post));
-
+      Unread.thread.posts.forEach((post) => Unread.addPost.call(post));
       $.forceSync('Remember Last Read Post');
       if (Conf['Remember Last Read Post'] && (!Unread.thread.isDead || Unread.thread.isArchived)) {
         Unread.db.set({
-          boardID:  Unread.thread.board.ID,
+          boardID: Unread.thread.board.ID,
           threadID: Unread.thread.ID,
-          val:      0
+          val: 0
         });
       }
-
       Unread.updatePosition();
       Unread.setLine();
-      return Unread.update();
+      Unread.update();
     },
-
     sync() {
-      if (Unread.lastReadPost == null) { return; }
+      if (Unread.lastReadPost == null) {
+        return;
+      }
       const lastReadPost = Unread.db.get({
         boardID: Unread.thread.board.ID,
         threadID: Unread.thread.ID,
         defaultValue: 0
       });
-      if (Unread.lastReadPost >= lastReadPost) { return; }
+      if (Unread.lastReadPost >= lastReadPost) {
+        return;
+      }
       Unread.lastReadPost = lastReadPost;
-
       const postIDs = Unread.thread.posts.keys;
       for (let i = Unread.readCount, end = postIDs.length; i < end; i++) {
-        var ID = +postIDs[i];
+        const ID = +postIDs[i];
         if (!Unread.thread.posts.get(ID).isFetchedQuote) {
-          if (ID > Unread.lastReadPost) { break; }
+          if (ID > Unread.lastReadPost) {
+            break;
+          }
           Unread.posts.delete(ID);
           Unread.postsQuotingYou.delete(ID);
         }
         Unread.readCount++;
       }
-
       Unread.updatePosition();
       Unread.setLine();
-      return Unread.update();
+      Unread.update();
     },
-
     addPost() {
-      if (this.isFetchedQuote || this.isClone) return;
+      if (this.isFetchedQuote || this.isClone)
+        return;
       Unread.order.push(this);
-      if ((this.ID <= Unread.lastReadPost) || this.isHidden || QuoteYou.isYou(this)) return;
+      if ((this.ID <= Unread.lastReadPost) || this.isHidden || QuoteYou.isYou(this))
+        return;
       Unread.posts.add((Unread.posts.last = this.ID));
       Unread.addPostQuotingYou(this);
       return Unread.position != null ? Unread.position : (Unread.position = Unread.order[this.ID]);
     },
-
     addPostQuotingYou(post) {
-      for (var quotelink of post.nodes.quotelinks) {
+      for (const quotelink of post.nodes.quotelinks) {
         if (QuoteYou.db?.get(Get.postDataFromLink(quotelink))) {
           Unread.postsQuotingYou.add((Unread.postsQuotingYou.last = post.ID));
           Unread.openNotification(post);
@@ -10270,141 +10748,144 @@ svg.icon {
         }
       }
     },
-
-    openNotification(post, predicate=' replied to you') {
-      if (!Header.areNotificationsEnabled) { return; }
+    openNotification(post, predicate = ' replied to you') {
+      if (!Header.areNotificationsEnabled) {
+        return;
+      }
       const notif = new Notification(`${post.info.nameBlock}${predicate}`, {
         body: post.commentDisplay(),
         icon: Favicon.logo
-      }
-      );
-      notif.onclick = function() {
+      });
+      notif.onclick = function () {
         Header.scrollToIfNeeded(post.nodes.bottom, true);
-        return window.focus();
+        window.focus();
       };
-      return notif.onshow = () => setTimeout(() => notif.close()
-      , 7 * SECOND);
+      notif.onshow = () => setTimeout(() => notif.close(), 7 * SECOND);
+      return notif;
     },
-
     onUpdate() {
-      return $.queueTask(function() { // ThreadUpdater may scroll immediately after inserting posts
+      $.queueTask(() => {
         Unread.setLine();
         Unread.read();
-        return Unread.update();
+        Unread.update();
       });
     },
-
     readSinglePost(post) {
-      const {ID} = post;
-      if (!Unread.posts.has(ID)) { return; }
+      const { ID } = post;
+      if (!Unread.posts.has(ID)) {
+        return;
+      }
       Unread.posts.delete(ID);
       Unread.postsQuotingYou.delete(ID);
       Unread.updatePosition();
       Unread.saveLastReadPost();
-      return Unread.update();
+      Unread.update();
     },
-
-    read: debounce(100, function(e) {
+    read: debounce(100, function (e) {
       // Update the lastReadPost when hidden posts are added to the thread.
       if (!Unread.posts.size && (Unread.readCount !== Unread.thread.posts.keys.length)) {
         Unread.saveLastReadPost();
       }
-
-      if (d.hidden || !Unread.posts.size) { return; }
-
+      if (d.hidden || !Unread.posts.size) {
+        return;
+      }
       let count = 0;
       while (Unread.position) {
-        var {ID, data} = Unread.position;
-        var {bottom} = data.nodes;
-        if (!!bottom.getBoundingClientRect().height && // post has been hidden
-          (Header.getBottomOf(bottom) <= -1)) { break; }                      // post is completely read
+        const { ID, data } = Unread.position;
+        const { bottom } = data.nodes;
+        if (bottom.getBoundingClientRect().height && // post has been hidden
+          (Header.getBottomOf(bottom) <= -1)) {
+          break;
+        } // post is completely read
         count++;
         Unread.posts.delete(ID);
         Unread.postsQuotingYou.delete(ID);
         Unread.position = Unread.position.next;
       }
-
-      if (!count) { return; }
+      if (!count) {
+        return;
+      }
       Unread.updatePosition();
       Unread.saveLastReadPost();
-      if (e) { return Unread.update(); }
+      if (e) {
+        Unread.update();
+      }
     }),
-
     updatePosition() {
       while (Unread.position && !Unread.posts.has(Unread.position.ID)) {
         Unread.position = Unread.position.next;
       }
     },
-
-    saveLastReadPost: debounce(2 * SECOND, function() {
+    saveLastReadPost: debounce(2 * SECOND, function () {
       let ID;
       $.forceSync('Remember Last Read Post');
-      if (!Conf['Remember Last Read Post'] || !Unread.db) { return; }
+      if (!Conf['Remember Last Read Post'] || !Unread.db) {
+        return;
+      }
       const postIDs = Unread.thread.posts.keys;
       for (let i = Unread.readCount, end = postIDs.length; i < end; i++) {
         ID = +postIDs[i];
         if (!Unread.thread.posts.get(ID).isFetchedQuote) {
-          if (Unread.posts.has(ID)) { break; }
+          if (Unread.posts.has(ID)) {
+            break;
+          }
           Unread.lastReadPost = ID;
         }
         Unread.readCount++;
       }
-      if (Unread.thread.isDead && !Unread.thread.isArchived) { return; }
-      return Unread.db.set({
-        boardID:  Unread.thread.board.ID,
+      if (Unread.thread.isDead && !Unread.thread.isArchived) {
+        return;
+      }
+      Unread.db.set({
+        boardID: Unread.thread.board.ID,
         threadID: Unread.thread.ID,
-        val:      Unread.lastReadPost
+        val: Unread.lastReadPost
       });
     }),
-
     setLine(force) {
-      if (!Conf['Unread Line']) { return; }
+      if (!Conf['Unread Line']) {
+        return;
+      }
       if (Unread.hr.hidden || d.hidden || (force === true)) {
         const oldPosition = Unread.linePosition;
-        if (Unread.linePosition = Unread.positionPrev()) {
+        if ((Unread.linePosition = Unread.positionPrev())) {
           if (Unread.linePosition !== oldPosition) {
             let node = Unread.linePosition.data.nodes.bottom;
-            if (node.nextSibling?.tagName === 'BR') { node = node.nextSibling; }
+            if (node.nextSibling?.tagName === 'BR') {
+              node = node.nextSibling;
+            }
             $.after(node, Unread.hr);
           }
         } else {
           $.rm(Unread.hr);
         }
       }
-      return Unread.hr.hidden = Unread.linePosition === Unread.order.last;
+      Unread.hr.hidden = Unread.linePosition === Unread.order.last;
     },
-
     update() {
       const count = Unread.posts.size;
       const countQuotingYou = Unread.postsQuotingYou.size;
-
       if (Conf['Unread Count']) {
         const titleQuotingYou = Conf['Quoted Title'] && countQuotingYou ? '(!) ' : '';
         const titleCount = count || !Conf['Hide Unread Count at (0)'] ? `(${count}) ` : '';
         const titleDead = Unread.thread.isDead ?
           Unread.title.replace('-', (Unread.thread.isArchived ? '- Archived -' : '- 404 -'))
-        :
-          Unread.title;
+          :
+            Unread.title;
         d.title = `${titleQuotingYou}${titleCount}${titleDead}`;
       }
-
       Unread.saveThreadWatcherCount();
-
       if (Conf['Unread Favicon'] && (g.SITE.software === 'yotsuba')) {
-        const {isDead} = Unread.thread;
-        return Favicon.set((
-          countQuotingYou ?
-            (isDead ? 'unreadDeadY' : 'unreadY')
+        const { isDead } = Unread.thread;
+        Favicon.set(countQuotingYou ?
+          (isDead ? 'unreadDeadY' : 'unreadY')
           : count ?
             (isDead ? 'unreadDead' : 'unread')
-          :
-            (isDead ? 'dead' : 'default')
-        )
-        );
+            :
+              (isDead ? 'dead' : 'default'));
       }
     },
-
-    saveThreadWatcherCount: debounce(2 * SECOND, function() {
+    saveThreadWatcherCount: debounce(2 * SECOND, function () {
       $.forceSync('Remember Last Read Post');
       if (Conf['Remember Last Read Post'] && (!Unread.thread.isDead || Unread.thread.isArchived)) {
         let posts;
@@ -10421,14 +10902,13 @@ svg.icon {
             }
           }
         }
-        return ThreadWatcher.update(g.SITE.ID, Unread.thread.board.ID, Unread.thread.ID, {
+        ThreadWatcher.update(g.SITE.ID, Unread.thread.board.ID, Unread.thread.ID, {
           last: Unread.thread.lastPost,
           isDead: Unread.thread.isDead,
           isArchived: Unread.thread.isArchived,
           unread: Unread.posts.size,
           quotingYou: (quotingYou.last || 0)
-        }
-        );
+        });
       }
     })
   };
@@ -10590,63 +11070,61 @@ svg.icon {
     }
   };
 
-  // @ts-nocheck
-
-  var UnreadIndex = {
+  const UnreadIndex = {
     lastReadPost: dict(),
-    hr:           dict(),
+    hr: dict(),
     markReadLink: dict(),
-
+    enabled: undefined,
     init() {
-      if ((g.VIEW !== 'index') || !Conf['Remember Last Read Post'] || !Conf['Unread Line in Index']) { return; }
-
+      if ((g.VIEW !== 'index') || !Conf['Remember Last Read Post'] || !Conf['Unread Line in Index']) {
+        return;
+      }
       this.enabled = true;
       this.db = new DataBoard('lastReadPosts', this.sync);
-
       Callbacks.Thread.push({
         name: 'Unread Line in Index',
-        cb:   this.node
+        cb: this.node
       });
-
       $.on(d, 'IndexRefreshInternal', this.onIndexRefresh);
-      return $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
+      $.on(d, 'PostsInserted PostsRemoved', this.onPostsInserted);
     },
-
     node() {
       UnreadIndex.lastReadPost[this.fullID] = UnreadIndex.db.get({
         boardID: this.board.ID,
         threadID: this.ID
       }) || 0;
       if (!Index.enabled) { // let onIndexRefresh handle JSON Index
-        return UnreadIndex.update(this);
+        UnreadIndex.update(this);
       }
     },
-
     onIndexRefresh(e) {
-      if (e.detail.isCatalog) { return; }
-      return (() => {
-        const result = [];
-        for (var threadID of e.detail.threadIDs) {
-          var thread = g.threads.get(threadID);
-          result.push(UnreadIndex.update(thread));
+      const detail = e.detail;
+      if (detail?.isCatalog) {
+        return;
+      }
+      for (const threadID of detail?.threadIDs || []) {
+        const thread = g.threads.get(threadID);
+        if (thread) {
+          UnreadIndex.update(thread);
         }
-        return result;
-      })();
+      }
     },
-
     onPostsInserted(e) {
-      if (e.target === Index.root) { return; } // onIndexRefresh handles this case
+      if (e.target === Index.root) {
+        return;
+      } // onIndexRefresh handles this case
       const thread = Get.threadFromNode(e.target);
-      if (!thread || (thread.nodes.root !== e.target)) { return; }
+      if (!thread || (thread.nodes.root !== e.target)) {
+        return;
+      }
       const wasVisible = !!UnreadIndex.hr[thread.fullID]?.parentNode;
       UnreadIndex.update(thread);
       if (Conf['Scroll to Last Read Post'] && (e.type === 'PostsInserted') && !wasVisible && !!UnreadIndex.hr[thread.fullID]?.parentNode) {
-        return Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
+        Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
       }
     },
-
     sync() {
-      return g.threads.forEach(function(thread) {
+      g.threads.forEach((thread) => {
         const lastReadPost = UnreadIndex.db.get({
           boardID: thread.board.ID,
           threadID: thread.ID
@@ -10654,121 +11132,124 @@ svg.icon {
         if (lastReadPost !== UnreadIndex.lastReadPost[thread.fullID]) {
           UnreadIndex.lastReadPost[thread.fullID] = lastReadPost;
           if (thread.nodes.root?.parentNode) {
-            return UnreadIndex.update(thread);
+            UnreadIndex.update(thread);
           }
         }
       });
     },
-
     update(thread) {
       let divider;
       const lastReadPost = UnreadIndex.lastReadPost[thread.fullID];
       let repliesShown = 0;
       let repliesRead = 0;
       let firstUnread = null;
-      thread.posts.forEach(function(post) {
+      thread.posts.forEach((post) => {
         if (post.isReply && thread.nodes.root.contains(post.nodes.root)) {
           repliesShown++;
           if (post.ID <= lastReadPost) {
-            return repliesRead++;
+            repliesRead++;
           } else if ((!firstUnread || (post.ID < firstUnread.ID)) && !post.isHidden && !QuoteYou.isYou(post)) {
-            return firstUnread = post;
+            firstUnread = post;
           }
         }
       });
-
       let hr = UnreadIndex.hr[thread.fullID];
       if (firstUnread && (repliesRead || ((lastReadPost === thread.OP.ID) && (!$(g.SITE.selectors.summary, thread.nodes.root) || thread.ID in ExpandThread.statuses)))) {
         if (!hr) {
-          hr = (UnreadIndex.hr[thread.fullID] = $.el('hr',
-            {className: 'unread-line'}));
+          hr = (UnreadIndex.hr[thread.fullID] = $.el('hr', { className: 'unread-line' }));
         }
         $.before(firstUnread.nodes.root, hr);
       } else {
         $.rm(hr);
       }
-
       const hasUnread = repliesShown ?
-        firstUnread || !repliesRead
-      : Index.enabled ?
-        thread.lastPost > lastReadPost
-      :
-        thread.OP.ID > lastReadPost;
-      thread.nodes.root.classList.toggle('unread-thread', hasUnread);
-
+        (firstUnread || !repliesRead)
+        : Index.enabled ?
+          (thread.lastPost > lastReadPost)
+          :
+            (thread.OP.ID > lastReadPost);
+      thread.nodes.root.classList.toggle('unread-thread', !!hasUnread);
       let link = UnreadIndex.markReadLink[thread.fullID];
       if (!link) {
         link = (UnreadIndex.markReadLink[thread.fullID] = $.el('a', {
           className: 'unread-mark-read brackets-wrap',
           href: 'javascript:;',
           textContent: 'Mark Read'
-        }
-        ));
+        }));
         $.on(link, 'click', UnreadIndex.markRead);
       }
-      if (divider = $(g.SITE.selectors.threadDivider, thread.nodes.root)) { // divider inside thread as in Tinyboard
-        return $.before(divider, link);
+      if ((divider = $(g.SITE.selectors.threadDivider, thread.nodes.root))) { // divider inside thread as in Tinyboard
+        $.before(divider, link);
       } else {
-        return $.add(thread.nodes.root, link);
+        $.add(thread.nodes.root, link);
       }
     },
-
     markRead() {
       const thread = Get.threadFromNode(this);
+      if (!thread) {
+        return;
+      }
       UnreadIndex.lastReadPost[thread.fullID] = thread.lastPost;
       UnreadIndex.db.set({
-        boardID:  thread.board.ID,
+        boardID: thread.board.ID,
         threadID: thread.ID,
-        val:      thread.lastPost
+        val: thread.lastPost
       });
       $.rm(UnreadIndex.hr[thread.fullID]);
       thread.nodes.root.classList.remove('unread-thread');
-      return ThreadWatcher.update(g.SITE.ID, thread.board.ID, thread.ID, {
+      ThreadWatcher.update(g.SITE.ID, thread.board.ID, thread.ID, {
         last: thread.lastPost,
         unread: 0,
         quotingYou: 0
-      }
-      );
+      });
     }
   };
 
-  // @ts-nocheck
-
-  var ThreadWatcher = {
+  const ThreadWatcher = {
+    shortcut: null,
+    db: null,
+    dbLM: null,
+    dialog: null,
+    status: null,
+    list: null,
+    refreshButton: null,
+    menuButton: null,
+    closeButton: null,
+    unreaddb: null,
+    unreadEnabled: false,
+    requests: [],
+    fetched: 0,
+    prefixes: {},
     init() {
       let sc;
-      if (!(this.enabled = Conf['Thread Watcher'])) { return; }
-
+      if (!(this.enabled = Conf['Thread Watcher'])) {
+        return;
+      }
       this.shortcut = (sc = $.el('a', {
-        id:    'watcher-link',
+        id: 'watcher-link',
         title: 'Thread Watcher',
-        href:  'javascript:;',
+        href: 'javascript:;',
       }));
       Icon.set(this.shortcut, 'eye', 'Watcher');
-
-      this.db     = new DataBoard('watchedThreads', this.refresh, true);
-      this.dbLM   = new DataBoard('watcherLastModified', null, true);
+      this.db = new DataBoard('watchedThreads', this.refresh, true);
+      this.dbLM = new DataBoard('watcherLastModified', null, true);
       this.dialog = UI.dialog('thread-watcher', { innerHTML: ThreadWatcherPage });
       this.status = $('#watcher-status', this.dialog);
-      this.list   = this.dialog.lastElementChild;
+      this.list = this.dialog.lastElementChild;
       this.refreshButton = $('.refresh', this.dialog);
       this.menuButton = $('.menu-button', this.dialog);
       this.closeButton = $('.move > .close', this.dialog);
       this.unreaddb = Unread.db || UnreadIndex.db || new DataBoard('lastReadPosts');
       this.unreadEnabled = Conf['Remember Last Read Post'];
-
       Icon.set(this.refreshButton, 'refresh');
       Icon.set(this.menuButton, 'caretDown');
       Icon.set(this.closeButton, 'xmark');
-
-      $.on(d, 'QRPostSuccessful',   this.cb.post);
+      $.on(d, 'QRPostSuccessful', this.cb.post);
       $.on(sc, 'click', this.toggleWatcher);
       $.on(this.refreshButton, 'click', this.buttonFetchAll);
       $.on(this.closeButton, 'click', this.toggleWatcher);
-
       this.menu.addHeaderMenuEntry();
       $.onExists(doc, 'body', this.addDialog);
-
       switch (g.VIEW) {
         case 'index':
           $.on(d, 'IndexUpdate', this.cb.onIndexUpdate);
@@ -10777,7 +11258,6 @@ svg.icon {
           $.on(d, 'ThreadUpdate', this.cb.onThreadRefresh);
           break;
       }
-
       if (Conf['Fixed Thread Watcher']) {
         $.addClass(doc, 'fixed-watcher');
       }
@@ -10785,66 +11265,64 @@ svg.icon {
         $.addClass(ThreadWatcher.shortcut, 'disabled');
         this.dialog.hidden = true;
       }
-
-      Header.addShortcut('watcher', sc, 510,);
-
+      Header.addShortcut('watcher', sc, 510);
       ThreadWatcher.initLastModified();
       ThreadWatcher.fetchAuto();
       $.on(window, 'visibilitychange focus', () => $.queueTask(ThreadWatcher.fetchAuto));
-
       if (Conf['Menu'] && Index.enabled) {
         Menu.menu.addEntry({
           el: $.el('a', {
-            href:      'javascript:;',
+            href: 'javascript:;',
             className: 'has-shortcut-text'
-          }
-          , {innerHTML: '<span></span><span class="shortcut-text">Alt+click</span>'}),
+          }, { innerHTML: '<span></span><span class="shortcut-text">Alt+click</span>' }),
           order: 6,
-          open({thread}) {
-            if (Conf['Index Mode'] !== 'catalog') { return false; }
+          open({ thread }) {
+            if (Conf['Index Mode'] !== 'catalog') {
+              return false;
+            }
             this.el.firstElementChild.textContent = ThreadWatcher.isWatched(thread) ?
               'Unwatch'
-            :
-              'Watch';
-            if (this.cb) { $.off(this.el, 'click', this.cb); }
-            this.cb = function() {
-              $.event('CloseMenu');
-              return ThreadWatcher.toggle(thread, true);
+              :
+                'Watch';
+            if (this.cb) {
+              $.off(this.el, 'click', this.cb);
+            }
+            this.cb = () => {
+              $.event('CloseMenu', undefined);
+              ThreadWatcher.toggle(thread, true);
             };
             $.on(this.el, 'click', this.cb);
             return true;
           }
         });
       }
-
-      if (!['index', 'thread'].includes(g.VIEW)) { return; }
-
+      if (!['index', 'thread'].includes(g.VIEW)) {
+        return;
+      }
       Callbacks.Post.push({
         name: 'Thread Watcher',
-        cb:   this.node
+        cb: this.node
       });
-      return Callbacks.CatalogThread.push({
+      Callbacks.CatalogThread.push({
         name: 'Thread Watcher',
-        cb:   this.catalogNode
+        cb: this.catalogNode
       });
     },
-
     isWatched(thread) {
-      return !!ThreadWatcher.db?.get({boardID: thread.board.ID, threadID: thread.ID});
+      return !!ThreadWatcher.db?.get({ boardID: thread.board.ID, threadID: thread.ID });
     },
-
     isWatchedRaw(boardID, threadID) {
-      return !!ThreadWatcher.db?.get({boardID, threadID});
+      return !!ThreadWatcher.db?.get({ boardID, threadID });
     },
-
     setToggler(toggler, isWatched) {
       toggler.classList.toggle('watched', isWatched);
       return toggler.title = `${isWatched ? 'Unwatch' : 'Watch'} Thread`;
     },
-
     node() {
       let toggler;
-      if (this.isReply) { return; }
+      if (this.isReply) {
+        return;
+      }
       if (this.isClone) {
         toggler = $('.watch-thread-link', this.nodes.info);
       } else {
@@ -10858,157 +11336,174 @@ svg.icon {
       const siteID = g.SITE.ID;
       const boardID = this.board.ID;
       const threadID = this.thread.ID;
-      const data = ThreadWatcher.db.get({siteID, boardID, threadID});
+      const data = ThreadWatcher.db.get({ siteID, boardID, threadID });
       ThreadWatcher.setToggler(toggler, !!data);
       $.on(toggler, 'click', ThreadWatcher.cb.toggle);
       // Add missing excerpt for threads added by Auto Watch
       if (data && (data.excerpt == null)) {
-        return $.queueTask(() => {
-          return ThreadWatcher.update(siteID, boardID, threadID, {excerpt: Get.threadExcerpt(this.thread)});
-      });
+        $.queueTask(() => {
+          ThreadWatcher.update(siteID, boardID, threadID, { excerpt: Get.threadExcerpt(this.thread) });
+        });
       }
     },
-
     catalogNode() {
-      if (ThreadWatcher.isWatched(this.thread)) { $.addClass(this.nodes.root, 'watched'); }
-      return $.on(this.nodes.root, 'mousedown click', e => {
-        if ((e.button !== 0) || !e.altKey) return;
-        if (e.type === 'click') ThreadWatcher.toggle(this.thread, true);
-        return e.preventDefault();
+      if (ThreadWatcher.isWatched(this.thread)) {
+        $.addClass(this.nodes.root, 'watched');
+      }
+      $.on(this.nodes.root, 'mousedown click', (e) => {
+        if ((e.button !== 0) || !e.altKey)
+          return;
+        if (e.type === 'click')
+          ThreadWatcher.toggle(this.thread, true);
+        e.preventDefault();
       });
-    }, // Also on mousedown to prevent highlighting thumbnail in Firefox.
-
-    addDialog() {
-      if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
-      ThreadWatcher.build();
-      return $.prepend(d.body, ThreadWatcher.dialog);
     },
-
+    addDialog() {
+      if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) {
+        return;
+      }
+      ThreadWatcher.build();
+      $.prepend(d.body, ThreadWatcher.dialog);
+    },
     toggleWatcher() {
       $.toggleClass(ThreadWatcher.shortcut, 'disabled');
-      return ThreadWatcher.dialog.hidden = !ThreadWatcher.dialog.hidden;
+      ThreadWatcher.dialog.hidden = !ThreadWatcher.dialog.hidden;
     },
-
     cb: {
       openAll() {
-        if ($.hasClass(this, 'disabled')) return;
-        for (var a of $$('a.watcher-link', ThreadWatcher.list)) {
+        if ($.hasClass(this, 'disabled'))
+          return;
+        for (const a of $$('a.watcher-link', ThreadWatcher.list)) {
           $.open(a.href);
         }
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       openUnread() {
-        if ($.hasClass(this, 'disabled')) return;
-        for (var a of $$('.replies-unread > a.watcher-link', ThreadWatcher.list)) {
+        if ($.hasClass(this, 'disabled'))
+          return;
+        for (const a of $$('.replies-unread > a.watcher-link', ThreadWatcher.list)) {
           $.open(a.href);
         }
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       openDeads() {
-        if ($.hasClass(this, 'disabled')) return;
-        for (var a of $$('.dead-thread.replies-unread > a.watcher-link', ThreadWatcher.list)) {
+        if ($.hasClass(this, 'disabled'))
+          return;
+        for (const a of $$('.dead-thread.replies-unread > a.watcher-link', ThreadWatcher.list)) {
           $.open(a.href);
         }
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       clear() {
-        if (!confirm("Delete ALL threads from watcher?")) return;
+        if (!confirm("Delete ALL threads from watcher?"))
+          return;
         const ref = ThreadWatcher.getAll();
         for (let i = 0, len = ref.length; i < len; i++) {
           const { siteID, boardID, threadID } = ref[i];
           ThreadWatcher.db.delete({ siteID, boardID, threadID });
         }
         ThreadWatcher.refresh(true);
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       pruneDeads() {
-        if ($.hasClass(this, 'disabled')) return;
-        for (var {siteID, boardID, threadID, data} of ThreadWatcher.getAll()) {
+        if ($.hasClass(this, 'disabled'))
+          return;
+        for (const { siteID, boardID, threadID, data } of ThreadWatcher.getAll()) {
           if (data.isDead) {
-            ThreadWatcher.db.delete({siteID, boardID, threadID});
+            ThreadWatcher.db.delete({ siteID, boardID, threadID });
           }
         }
         ThreadWatcher.refresh(true);
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       pruneReadDeads() {
-        if ($.hasClass(this, 'disabled')) return;
-        for (var { siteID, boardID, threadID, data } of ThreadWatcher.getAll()) {
+        if ($.hasClass(this, 'disabled'))
+          return;
+        for (const { siteID, boardID, threadID, data } of ThreadWatcher.getAll()) {
           if (data.isDead && !data.unread) {
             ThreadWatcher.db.delete({ siteID, boardID, threadID });
           }
         }
         ThreadWatcher.refresh(true);
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       dismiss() {
-        for (var {siteID, boardID, threadID, data} of ThreadWatcher.getAll()) {
+        for (const { siteID, boardID, threadID, data } of ThreadWatcher.getAll()) {
           if (data.quotingYou) {
-            ThreadWatcher.update(siteID, boardID, threadID, {dismiss: data.quotingYou || 0});
+            ThreadWatcher.update(siteID, boardID, threadID, { dismiss: data.quotingYou || 0 });
           }
         }
-        $.event('CloseMenu');
+        $.event('CloseMenu', undefined);
       },
       toggle() {
-        const {thread} = Get.postFromNode(this);
+        const { thread } = Get.postFromNode(this);
         ThreadWatcher.toggle(thread, true);
       },
       rm() {
-        const {siteID} = this.parentNode.dataset;
-        const [boardID, threadID] = this.parentNode.dataset.fullID.split('.');
+        const parent = this.parentNode;
+        const siteID = parent.dataset.siteID;
+        const [boardID, threadID] = parent.dataset.fullID.split('.');
         ThreadWatcher.rm(siteID, boardID, +threadID, undefined, true);
       },
       post(e) {
-        const {boardID, threadID, postID} = e.detail;
+        const detail = e.detail;
+        const { boardID, threadID, postID } = detail;
         const cb = PostRedirect.delay();
         if (postID === threadID) {
           if (Conf['Auto Watch']) {
             ThreadWatcher.addRaw(boardID, threadID, {}, cb, true);
           }
         } else if (Conf['Auto Watch Reply']) {
-          ThreadWatcher.add(
-            (g.threads.get(boardID + '.' + threadID) || new Thread(threadID, g.boards[boardID] || new Board(boardID))),
-            cb, true);
+          ThreadWatcher.add((g.threads.get(boardID + '.' + threadID) || new Thread(threadID, g.boards[boardID] || new Board(boardID))), cb, true);
         }
       },
       onIndexUpdate(e) {
-        const {db}    = ThreadWatcher;
-        const siteID  = g.SITE.ID;
+        const detail = e.detail;
+        const { db } = ThreadWatcher;
+        const siteID = g.SITE.ID;
         const boardID = g.BOARD.ID;
         let nKilled = 0;
-        for (var threadID in db.data[siteID].boards[boardID]) {
-          // Don't prune threads that have yet to appear in index.
-          var data = db.data[siteID].boards[boardID][threadID];
-          if (!data?.isDead && !e.detail.threads.includes(`${boardID}.${threadID}`)) {
-            if (!e.detail.threads.some(fullID => +fullID.split('.')[1] > threadID)) { continue; }
-            if (Conf['Auto Prune'] || !(data && (typeof data === 'object'))) { // corrupt data
-              db.delete({boardID, threadID});
-              nKilled++;
-            } else {
-              ThreadWatcher.fetchStatus({siteID, boardID, threadID, data});
+        const boardData = db.data[siteID]?.boards[boardID];
+        if (boardData) {
+          for (const threadID in boardData) {
+            // Don't prune threads that have yet to appear in index.
+            const data = boardData[threadID];
+            if (!data?.isDead && !detail.threads.includes(`${boardID}.${threadID}`)) {
+              if (!detail.threads.some((fullID) => +fullID.split('.')[1] > +threadID)) {
+                continue;
+              }
+              if (Conf['Auto Prune'] || !(data && (typeof data === 'object'))) { // corrupt data
+                db.delete({ boardID, threadID });
+                nKilled++;
+              } else {
+                ThreadWatcher.fetchStatus({ siteID, boardID, threadID, data });
+              }
             }
           }
         }
-        if (nKilled) { return ThreadWatcher.refresh(); }
+        if (nKilled) {
+          ThreadWatcher.refresh();
+        }
       },
       onThreadRefresh(e) {
-        const thread = g.threads.get(e.detail.threadID);
-        if (!e.detail[404] || !ThreadWatcher.isWatched(thread)) { return; }
+        const detail = e.detail;
+        const thread = g.threads.get(detail.threadID);
+        if (!detail[404] || !ThreadWatcher.isWatched(thread)) {
+          return;
+        }
         // Update dead status.
-        return ThreadWatcher.add(thread);
+        ThreadWatcher.add(thread);
       }
     },
-
-    requests: [],
-    fetched:  0,
-
-    fetch(url, {siteID, force}, args, cb) {
+    fetch(url, { siteID, force }, args, cb) {
       if (ThreadWatcher.requests.length === 0) {
         ThreadWatcher.status.textContent = '...';
         $.addClass(ThreadWatcher.refreshButton, 'spin');
       }
-      const onloadend = function() {
-        if (this.finished) { return; }
+      const onloadend = function () {
+        if (this.finished) {
+          return;
+        }
         this.finished = true;
         ThreadWatcher.fetched++;
         if (ThreadWatcher.fetched === ThreadWatcher.requests.length) {
@@ -11016,136 +11511,142 @@ svg.icon {
         } else {
           ThreadWatcher.status.textContent = `${Math.round((ThreadWatcher.fetched / ThreadWatcher.requests.length) * 100)}%`;
         }
-        return cb.apply(this, args);
+        cb.apply(this, args);
       };
       const ajax = siteID === g.SITE.ID ? $.ajax : CrossOrigin.ajax;
       if (force) {
-        delete $.lastModified.ThreadWatcher?.[url];
+        if ($.lastModified.ThreadWatcher) {
+          delete $.lastModified.ThreadWatcher[url];
+        }
       }
-      const req = $.whenModified(
-        url,
-        'ThreadWatcher',
-        onloadend,
-        { timeout: MINUTE, ajax }
-      );
-      return ThreadWatcher.requests.push(req);
+      const req = $.whenModified(url, 'ThreadWatcher', onloadend, { timeout: MINUTE, ajax });
+      ThreadWatcher.requests.push(req);
     },
-
     clearRequests() {
       ThreadWatcher.requests = [];
       ThreadWatcher.fetched = 0;
       ThreadWatcher.status.textContent = '';
-      return $.rmClass(ThreadWatcher.refreshButton, 'spin');
+      $.rmClass(ThreadWatcher.refreshButton, 'spin');
     },
-
     abort() {
       delete ThreadWatcher.syncing;
-      for (var req of ThreadWatcher.requests) {
+      for (const req of ThreadWatcher.requests) {
         if (!req.finished) {
           req.finished = true;
           req.abort();
         }
       }
-      return ThreadWatcher.clearRequests();
+      ThreadWatcher.clearRequests();
     },
-
     initLastModified() {
       const lm = ($.lastModified['ThreadWatcher'] || ($.lastModified['ThreadWatcher'] = dict()));
-      for (var siteID in ThreadWatcher.dbLM.data) {
-        var boards = ThreadWatcher.dbLM.data[siteID];
-        for (var boardID in boards.boards) {
-          var data = boards.boards[boardID];
-          if (ThreadWatcher.db.get({siteID, boardID})) {
-            for (var url in data) {
-              var date = data[url];
+      for (const siteID in ThreadWatcher.dbLM.data) {
+        const boards = ThreadWatcher.dbLM.data[siteID];
+        for (const boardID in boards.boards) {
+          const data = boards.boards[boardID];
+          if (ThreadWatcher.db.get({ siteID, boardID })) {
+            for (const url in data) {
+              const date = data[url];
               lm[url] = date;
             }
           } else {
-            ThreadWatcher.dbLM.delete({siteID, boardID});
+            ThreadWatcher.dbLM.delete({ siteID, boardID });
           }
         }
       }
     },
-
     fetchAuto() {
       let middle;
       clearTimeout(ThreadWatcher.timeout);
-      if (!Conf['Auto Update Thread Watcher']) { return; }
-      const {db} = ThreadWatcher;
+      if (!Conf['Auto Update Thread Watcher']) {
+        return;
+      }
+      const { db } = ThreadWatcher;
       const interval = Conf['Show Page'] || (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) ? 5 * MINUTE : 2 * HOUR;
       const now = Date.now();
-      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d.hidden && !!d.hasFocus()) {
+      if ((now - interval >= ((middle = db.data.lastChecked || 0)) || middle > now) && !d.hidden && d.hasFocus()) {
         ThreadWatcher.fetchAllStatus(interval);
       }
-      return ThreadWatcher.timeout = setTimeout(ThreadWatcher.fetchAuto, interval);
+      ThreadWatcher.timeout = setTimeout(ThreadWatcher.fetchAuto, interval);
     },
-
     buttonFetchAll() {
       if (ThreadWatcher.syncing || ThreadWatcher.requests.length) {
-        return ThreadWatcher.abort();
+        ThreadWatcher.abort();
       } else {
-        return ThreadWatcher.fetchAllStatus();
+        ThreadWatcher.fetchAllStatus();
       }
     },
-
-    fetchAllStatus(interval=0) {
+    fetchAllStatus(interval = 0) {
       ThreadWatcher.status.textContent = '...';
       $.addClass(ThreadWatcher.refreshButton, 'spin');
       ThreadWatcher.syncing = true;
       const dbs = [ThreadWatcher.db, ThreadWatcher.unreaddb, QuoteYou.db].filter(x => x);
       let n = 0;
-      return dbs.map((dbi) =>
-        dbi.forceSync(function() {
-          if ((++n) === dbs.length) {
-            let middle;
-            if (!ThreadWatcher.syncing) { return; } // aborted
-            delete ThreadWatcher.syncing;
-            if (0 > (middle = Date.now() - (ThreadWatcher.db.data.lastChecked || 0)) || middle >= interval) { // not checked in another tab
-              // XXX On vichan boards, last_modified field of threads.json does not account for sage posts.
-              // Occasionally check replies field of catalog.json to find these posts.
-              let middle1;
-              const {db} = ThreadWatcher;
-              const now = Date.now();
-              const deep = !(now - (2 * HOUR) < ((middle1 = db.data.lastChecked2 || 0)) && middle1 <= now);
-              const boards = ThreadWatcher.getAll(true);
-              for (var board of boards) {
-                ThreadWatcher.fetchBoard(board, deep);
-              }
-              db.setLastChecked();
-              if (deep) { db.setLastChecked('lastChecked2'); }
+      return dbs.map((dbi) => dbi.forceSync(() => {
+        if ((++n) === dbs.length) {
+          let middle;
+          if (!ThreadWatcher.syncing) {
+            return;
+          } // aborted
+          delete ThreadWatcher.syncing;
+          if (0 > (middle = Date.now() - (ThreadWatcher.db.data.lastChecked || 0)) || middle >= interval) { // not checked in another tab
+            // XXX On vichan boards, last_modified field of threads.json does not account for sage posts.
+            // Occasionally check replies field of catalog.json to find these posts.
+            let middle1;
+            const { db } = ThreadWatcher;
+            const now = Date.now();
+            const deep = !(now - (2 * HOUR) < ((middle1 = db.data.lastChecked2 || 0)) && middle1 <= now);
+            const boards = ThreadWatcher.getAll(true);
+            for (const board of boards) {
+              ThreadWatcher.fetchBoard(board, deep);
             }
-            if (ThreadWatcher.fetched === ThreadWatcher.requests.length) {
-              return ThreadWatcher.clearRequests();
+            db.setLastChecked();
+            if (deep) {
+              db.setLastChecked('lastChecked2');
             }
           }
-        }));
+          if (ThreadWatcher.fetched === ThreadWatcher.requests.length) {
+            ThreadWatcher.clearRequests();
+          }
+        }
+      }));
     },
-
     fetchBoard(board, deep) {
-      if (!board.some(thread => !thread.data.isDead)) { return; }
+      if (!board.some((thread) => !thread.data.isDead)) {
+        return;
+      }
       let force = false;
-      for (var thread of board) {
-        var {data} = thread;
+      for (const thread of board) {
+        const { data } = thread;
         if (!data.isDead && (data.last !== -1)) {
-          if (Conf['Show Page'] && (data.page == null)) { force = true; }
-          if ((data.modified == null)) { force = (thread.force = true); }
+          if (Conf['Show Page'] && (data.page == null)) {
+            force = true;
+          }
+          if (data.modified == null) {
+            force = (thread.force = true);
+          }
         }
       }
-      const {siteID, boardID} = board[0];
+      const { siteID, boardID } = board[0];
       const site = g.sites[siteID];
-      if (!site) { return; }
+      if (!site) {
+        return;
+      }
       const urlF = deep && site.threadModTimeIgnoresSage ? 'catalogJSON' : 'threadsListJSON';
-      const url = site.urls[urlF]?.({siteID, boardID});
-      if (!url) { return; }
-      return ThreadWatcher.fetch(url, {siteID, force}, [board, url], ThreadWatcher.parseBoard);
+      const url = site.urls[urlF]?.({ siteID, boardID });
+      if (!url) {
+        return;
+      }
+      ThreadWatcher.fetch(url, { siteID, force }, [board, url], ThreadWatcher.parseBoard);
     },
-
     parseBoard(board, url) {
       let page, thread;
-      if (this.status !== 200) { return; }
-      const {siteID, boardID} = board[0];
+      if (this.status !== 200) {
+        return;
+      }
+      const { siteID, boardID } = board[0];
       const lmDate = this.getResponseHeader('Last-Modified');
-      ThreadWatcher.dbLM.extend({siteID, boardID, val: $.item(url, lmDate)});
+      ThreadWatcher.dbLM.extend({ siteID, boardID, val: $.item(url, lmDate) });
       const threads = dict();
       let pageLength = 0;
       let nThreads = 0;
@@ -11154,7 +11655,7 @@ svg.icon {
         pageLength = this.response[0]?.threads.length || 0;
         for (let i = 0; i < this.response.length; i++) {
           page = this.response[i];
-          for (var item of page.threads) {
+          for (const item of page.threads) {
             threads[item.no] = {
               page: i + 1,
               index: nThreads,
@@ -11173,16 +11674,15 @@ svg.icon {
         }
       }
       for (thread of board) {
-        var {threadID, data} = thread;
+        const { threadID, data } = thread;
         if (threads[threadID]) {
-          var index, modified, replies;
-          ({page, index, modified, replies} = threads[threadID]);
+          const { page: p, index, modified, replies } = threads[threadID];
           if (Conf['Show Page']) {
-            var lastPage = g.sites[siteID].isPrunedByAge?.({siteID, boardID}) ?
+            const lastPage = g.sites[siteID].isPrunedByAge?.({ siteID, boardID }) ?
               threadID === oldest
-            :
-              index >= (nThreads - pageLength);
-            ThreadWatcher.update(siteID, boardID, threadID, {page, lastPage});
+              :
+                index >= (nThreads - pageLength);
+            ThreadWatcher.update(siteID, boardID, threadID, { page: p, lastPage });
           }
           if (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) {
             if ((modified !== data.modified) || ((replies != null) && (replies !== data.replies))) {
@@ -11195,128 +11695,139 @@ svg.icon {
         }
       }
     },
-
     fetchStatus(thread) {
-      const {siteID, boardID, threadID, data, force} = thread;
-      const url = g.sites[siteID]?.urls.threadJSON?.({siteID, boardID, threadID});
-      if (!url) { return; }
-      if (data.isDead && !force) { return; }
-      if (data.last === -1) { return; } // 404 or no JSON API
-      return ThreadWatcher.fetch(url, {siteID, force}, [thread], ThreadWatcher.parseStatus);
+      const { siteID, boardID, threadID, data, force } = thread;
+      const url = g.sites[siteID]?.urls.threadJSON?.({ siteID, boardID, threadID });
+      if (!url) {
+        return;
+      }
+      if (data.isDead && !force) {
+        return;
+      }
+      if (data.last === -1) {
+        return;
+      } // 404 or no JSON API
+      ThreadWatcher.fetch(url, { siteID, force }, [thread], ThreadWatcher.parseStatus);
     },
-
     parseStatus(thread, isArchiveURL) {
       let isDead, last;
-      let {siteID, boardID, threadID, data, newData, force} = thread;
+      const { siteID, boardID, threadID, data, force } = thread;
+      let { newData } = thread;
       const site = g.sites[siteID];
+      if (!site) {
+        return;
+      }
       if ((this.status === 200) && this.response) {
         let isArchived;
-        last = this.response.posts[this.response.posts.length-1].no;
-        const replies = this.response.posts.length-1;
+        last = this.response.posts[this.response.posts.length - 1].no;
+        const replies = this.response.posts.length - 1;
         isDead = (isArchived = !!(this.response.posts[0].archived || isArchiveURL));
         if (isDead && Conf['Auto Prune']) {
           ThreadWatcher.rm(siteID, boardID, threadID);
           return;
         }
-
-        if ((last === data.last) && (isDead === data.isDead) && (isArchived === data.isArchived)) { return; }
-
-        const lastReadPost = ThreadWatcher.unreaddb.get({siteID, boardID, threadID, defaultValue: 0});
+        if ((last === data.last) && (isDead === data.isDead) && (isArchived === data.isArchived)) {
+          return;
+        }
+        const lastReadPost = ThreadWatcher.unreaddb.get({ siteID, boardID, threadID, defaultValue: 0 });
         let unread = data.unread || 0;
         let quotingYou = data.quotingYou || 0;
-        const youOP = !!QuoteYou.db?.get({siteID, boardID, threadID, postID: threadID});
-
-        for (var postObj of this.response.posts) {
-          if ((postObj.no <= (data.last || 0)) || (postObj.no <= lastReadPost)) { continue; }
-          if (QuoteYou.db?.get({siteID, boardID, threadID, postID: postObj.no})) { continue; }
-
-          var quotesYou = false;
+        const youOP = !!QuoteYou.db?.get({ siteID, boardID, threadID, postID: threadID });
+        for (const postObj of this.response.posts) {
+          if ((postObj.no <= (data.last || 0)) || (postObj.no <= lastReadPost)) {
+            continue;
+          }
+          if (QuoteYou.db?.get({ siteID, boardID, threadID, postID: postObj.no })) {
+            continue;
+          }
+          let quotesYou = false;
           if (!Conf['Require OP Quote Link'] && youOP) {
             quotesYou = true;
           } else if (QuoteYou.db && postObj.com) {
-            var match;
-            var regexp = site.regexp.quotelinkHTML;
+            let match;
+            const regexp = site.regexp.quotelinkHTML;
             regexp.lastIndex = 0;
-            while (match = regexp.exec(postObj.com)) {
+            while ((match = regexp.exec(postObj.com))) {
               if (QuoteYou.db.get({
                 siteID,
-                boardID:  match[1] ? encodeURIComponent(match[1]) : boardID,
+                boardID: match[1] ? encodeURIComponent(match[1]) : boardID,
                 threadID: match[2] || threadID,
-                postID:   match[3] || match[2] || threadID
+                postID: match[3] || match[2] || threadID
               })) {
                 quotesYou = true;
                 break;
               }
             }
           }
-
           if (!unread || (!quotingYou && quotesYou)) {
-            if (Filter.isHidden(site.Build.parseJSON(postObj, {siteID, boardID}))) { continue; }
+            if (Filter.isHidden(site.Build.parseJSON(postObj, { siteID, boardID }))) {
+              continue;
+            }
           }
-
           unread++;
-          if (quotesYou) { quotingYou = postObj.no; }
+          if (quotesYou) {
+            quotingYou = postObj.no;
+          }
         }
-
-        if (!newData) { newData = {}; }
-        $.extend(newData, {last, replies, isDead, isArchived, unread, quotingYou});
-        return ThreadWatcher.update(siteID, boardID, threadID, newData);
-
+        if (!newData) {
+          newData = {};
+        }
+        $.extend(newData, { last, replies, isDead, isArchived, unread, quotingYou });
+        ThreadWatcher.update(siteID, boardID, threadID, newData);
       } else if (this.status === 404) {
-        const archiveURL = g.sites[siteID]?.urls.archivedThreadJSON?.({siteID, boardID, threadID});
+        const archiveURL = g.sites[siteID]?.urls.archivedThreadJSON?.({ siteID, boardID, threadID });
         if (!isArchiveURL && archiveURL) {
-          return ThreadWatcher.fetch(archiveURL, {siteID, force}, [thread, true], ThreadWatcher.parseStatus);
+          ThreadWatcher.fetch(archiveURL, { siteID, force }, [thread, true], ThreadWatcher.parseStatus);
         } else if (site.mayLackJSON && (data.last == null)) {
-          return ThreadWatcher.update(siteID, boardID, threadID, {last: -1});
+          ThreadWatcher.update(siteID, boardID, threadID, { last: -1 });
         } else {
-          return ThreadWatcher.update(siteID, boardID, threadID, {isDead: true});
+          ThreadWatcher.update(siteID, boardID, threadID, { isDead: true });
         }
       }
     },
-
     getAll(groupByBoard) {
       const all = [];
-      for (var siteID in ThreadWatcher.db.data) {
-        var boards = ThreadWatcher.db.data[siteID];
-        for (var boardID in boards.boards) {
-          var cont;
-          var threads = boards.boards[boardID];
+      for (const siteID in ThreadWatcher.db.data) {
+        const boards = ThreadWatcher.db.data[siteID];
+        for (const boardID in boards.boards) {
+          let cont;
+          const threads = boards.boards[boardID];
           if (Conf['Current Board'] && ((siteID !== g.SITE.ID) || (boardID !== g.BOARD.ID))) {
             continue;
           }
           if (groupByBoard) {
             all.push((cont = []));
           }
-          for (var threadID in threads) {
-            var data = threads[threadID];
+          for (const threadID in threads) {
+            const data = threads[threadID];
             if (data && (typeof data === 'object')) {
-              (groupByBoard ? cont : all).push({siteID, boardID, threadID, data});
+              (groupByBoard ? cont : all).push({ siteID, boardID, threadID: +threadID, data });
             }
           }
         }
       }
       return all;
     },
-
     makeLine(siteID, boardID, threadID, data) {
       let page;
       const x = $.el('a', {
-        textContent: 'âœ•',
+        textContent: '✕',
         href: 'javascript:;'
       });
       Icon.set(x, 'xmark');
       $.on(x, 'click', ThreadWatcher.cb.rm);
-
-      let {excerpt, isArchived} = data;
-      if (!excerpt) { excerpt = `/${boardID}/ - No.${threadID}`; }
-      if (Conf['Show Site Prefix']) { excerpt = ThreadWatcher.prefixes[siteID] + excerpt; }
-
+      let { excerpt, isArchived } = data;
+      if (!excerpt) {
+        excerpt = `/${boardID}/ - No.${threadID}`;
+      }
+      if (Conf['Show Site Prefix']) {
+        excerpt = (ThreadWatcher.prefixes[siteID] || '') + excerpt;
+      }
       const link = $.el('a', {
-        href: g.sites[siteID]?.urls.thread({siteID, boardID, threadID}, isArchived) || '',
+        href: g.sites[siteID]?.urls.thread({ siteID, boardID, threadID }, isArchived) || '',
         title: excerpt,
         className: 'watcher-link'
       });
-
       if (Conf['Show Page'] && (data.page != null)) {
         page = $.el('span', {
           textContent: `[${data.page}]`,
@@ -11324,7 +11835,6 @@ svg.icon {
         });
         $.add(link, page);
       }
-
       if (ThreadWatcher.unreadEnabled && Conf['Show Unread Count'] && (data.unread != null)) {
         const count = $.el('span', {
           textContent: `(${data.unread})`,
@@ -11332,44 +11842,57 @@ svg.icon {
         });
         $.add(link, count);
       }
-
       const title = $.el('span', {
         textContent: excerpt,
         className: 'watcher-title'
       });
       $.add(link, title);
-
       const div = $.el('div');
       const fullID = `${boardID}.${threadID}`;
       div.dataset.fullID = fullID;
       div.dataset.siteID = siteID;
-      if ((g.VIEW === 'thread') && (fullID === `${g.BOARD}.${g.THREADID}`)) { $.addClass(div, 'current'); }
-      if (data.isDead) { $.addClass(div, 'dead-thread'); }
+      if ((g.VIEW === 'thread') && (fullID === `${g.BOARD}.${g.THREADID}`)) {
+        $.addClass(div, 'current');
+      }
+      if (data.isDead) {
+        $.addClass(div, 'dead-thread');
+      }
       if (Conf['Show Page']) {
-        if (data.lastPage) { $.addClass(div, 'last-page'); }
-        if (data.page != null) { div.dataset.page = data.page; }
+        if (data.lastPage) {
+          $.addClass(div, 'last-page');
+        }
+        if (data.page != null) {
+          div.dataset.page = String(data.page);
+        }
       }
       if (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) {
-        if (data.unread === 0) { $.addClass(div, 'replies-read'); }
-        if (data.unread) { $.addClass(div, 'replies-unread'); }
-        if ((data.quotingYou || 0) > (data.dismiss || 0)) { $.addClass(div, 'replies-quoting-you'); }
+        if (data.unread === 0) {
+          $.addClass(div, 'replies-read');
+        }
+        if (data.unread) {
+          $.addClass(div, 'replies-unread');
+        }
+        if ((data.quotingYou || 0) > (data.dismiss || 0)) {
+          $.addClass(div, 'replies-quoting-you');
+        }
       }
       $.add(div, [x, $.tn(' '), link]);
       return div;
     },
-
     setPrefixes(threads) {
       const prefixes = dict();
-      for (var {siteID} of threads) {
-        if (siteID in prefixes) { continue; }
-        var len = 0;
-        var prefix = '';
-        var conflicts = Object.keys(prefixes);
+      for (const { siteID } of threads) {
+        if (siteID in prefixes) {
+          continue;
+        }
+        let len = 0;
+        let prefix = '';
+        let conflicts = Object.keys(prefixes);
         while (conflicts.length > 0) {
           len++;
           prefix = siteID.slice(0, len);
-          var conflicts2 = [];
-          for (var siteID2 of conflicts) {
+          const conflicts2 = [];
+          for (const siteID2 of conflicts) {
             if (siteID2.slice(0, len) === prefix) {
               conflicts2.push(siteID2);
             } else if (prefixes[siteID2].length < len) {
@@ -11382,62 +11905,59 @@ svg.icon {
       }
       return ThreadWatcher.prefixes = prefixes;
     },
-
     build() {
       const nodes = [];
       const threads = ThreadWatcher.getAll();
       ThreadWatcher.setPrefixes(threads);
-      for (var {siteID, boardID, threadID, data} of threads) {
+      for (const { siteID, boardID, threadID, data } of threads) {
         // Add missing excerpt for threads added by Auto Watch
-        var thread;
+        let thread;
         if ((data.excerpt == null) && (siteID === g.SITE.ID) && (thread = g.threads.get(`${boardID}.${threadID}`)) && thread.OP) {
-          ThreadWatcher.db.extend({boardID, threadID, val: {excerpt: Get.threadExcerpt(thread)}});
+          ThreadWatcher.db.extend({ boardID, threadID, val: { excerpt: Get.threadExcerpt(thread) } });
         }
         nodes.push(ThreadWatcher.makeLine(siteID, boardID, threadID, data));
       }
-      const {list} = ThreadWatcher;
+      const { list } = ThreadWatcher;
       $.rmAll(list);
       $.add(list, nodes);
-
-      return ThreadWatcher.refreshIcon();
+      ThreadWatcher.refreshIcon();
     },
-
     refresh(manual) {
       ThreadWatcher.build();
-
-      g.threads.forEach(function(thread) {
+      g.threads.forEach((thread) => {
         const isWatched = ThreadWatcher.isWatched(thread);
         if (thread.OP) {
-          for (var post of [thread.OP, ...thread.OP.clones]) {
-            var toggler;
-            if (toggler = $('.watch-thread-link', post.nodes.info)) {
+          for (const post of [thread.OP, ...thread.OP.clones]) {
+            let toggler;
+            if ((toggler = $('.watch-thread-link', post.nodes.info))) {
               ThreadWatcher.setToggler(toggler, isWatched);
             }
           }
         }
-        if (thread.catalogView) { return thread.catalogView.nodes.root.classList.toggle('watched', isWatched); }
+        if (thread.catalogView) {
+          thread.catalogView.nodes.root.classList.toggle('watched', isWatched);
+        }
       });
-
       if (Conf['Pin Watched Threads']) {
-        return $.event('SortIndex', {deferred: !(manual && Conf['Index Mode'] === 'catalog')});
+        $.event('SortIndex', { deferred: !(manual && Conf['Index Mode'] === 'catalog') });
       }
     },
-
     refreshIcon() {
-      for (var className of ['replies-unread', 'replies-quoting-you']) {
+      for (const className of ['replies-unread', 'replies-quoting-you']) {
         ThreadWatcher.shortcut.classList.toggle(className, !!$(`.${className}`, ThreadWatcher.dialog));
       }
     },
-
     update(siteID, boardID, threadID, newData) {
-      let data, key, line, val;
-      if (!(data = ThreadWatcher.db?.get({siteID, boardID, threadID}))) { return; }
+      let data, line;
+      if (!(data = ThreadWatcher.db?.get({ siteID, boardID, threadID }))) {
+        return;
+      }
       if (newData.isDead && Conf['Auto Prune']) {
         ThreadWatcher.rm(siteID, boardID, threadID);
         return;
       }
       if (newData.isDead || (newData.last === -1)) {
-        for (key of ['isArchived', 'page', 'lastPage', 'unread', 'quotingyou']) {
+        for (const key of ['isArchived', 'page', 'lastPage', 'unread', 'quotingyou']) {
           if (!(key in newData)) {
             newData[key] = undefined;
           }
@@ -11447,115 +11967,121 @@ svg.icon {
         newData.modified = undefined;
       }
       let n = 0;
-      for (key in newData) { val = newData[key]; if (data[key] !== val) { n++; } }
-      if (!n) { return; }
-      ThreadWatcher.db.extend({siteID, boardID, threadID, val: newData});
-      if (line = $(`#watched-threads > [data-site-i-d='${siteID}'][data-full-i-d='${boardID}.${threadID}']`, ThreadWatcher.dialog)) {
+      for (const key in newData) {
+        if (data[key] !== newData[key]) {
+          n++;
+        }
+      }
+      if (!n) {
+        return;
+      }
+      ThreadWatcher.db.extend({ siteID, boardID, threadID, val: newData });
+      if ((line = $(`#watched-threads > [data-site-i-d='${siteID}'][data-full-i-d='${boardID}.${threadID}']`, ThreadWatcher.dialog))) {
         const newLine = ThreadWatcher.makeLine(siteID, boardID, threadID, data);
         $.replace(line, newLine);
-        return ThreadWatcher.refreshIcon();
+        ThreadWatcher.refreshIcon();
       } else {
-        return ThreadWatcher.refresh();
+        ThreadWatcher.refresh();
       }
     },
-
     set404(boardID, threadID, cb) {
       let data;
-      if (!(data = ThreadWatcher.db?.get({boardID, threadID}))) { return cb(); }
-      if (Conf['Auto Prune']) {
-        ThreadWatcher.db.delete({boardID, threadID});
+      if (!(data = ThreadWatcher.db?.get({ boardID, threadID }))) {
         return cb();
       }
-      if (data.isDead && !((data.isArchived != null) || (data.page != null) || (data.lastPage != null) || (data.unread != null) || (data.quotingYou != null))) { return cb(); }
-      return ThreadWatcher.db.extend({boardID, threadID, val: {isDead: true, isArchived: undefined, page: undefined, lastPage: undefined, unread: undefined, quotingYou: undefined}}, cb);
+      if (Conf['Auto Prune']) {
+        ThreadWatcher.db.delete({ boardID, threadID });
+        return cb();
+      }
+      if (data.isDead && !((data.isArchived != null) || (data.page != null) || (data.lastPage != null) || (data.unread != null) || (data.quotingYou != null))) {
+        return cb();
+      }
+      ThreadWatcher.db.extend({ boardID, threadID, val: { isDead: true, isArchived: undefined, page: undefined, lastPage: undefined, unread: undefined, quotingYou: undefined } }, cb);
     },
-
     toggle(thread, manual) {
-      const siteID   = g.SITE.ID;
-      const boardID  = thread.board.ID;
+      const siteID = g.SITE.ID;
+      const boardID = thread.board.ID;
       const threadID = thread.ID;
-      if (ThreadWatcher.db.get({boardID, threadID})) {
-        return ThreadWatcher.rm(siteID, boardID, threadID, undefined, manual);
+      if (ThreadWatcher.db.get({ boardID, threadID })) {
+        ThreadWatcher.rm(siteID, boardID, threadID, undefined, manual);
       } else {
-        return ThreadWatcher.add(thread, undefined, manual);
+        ThreadWatcher.add(thread, undefined, manual);
       }
     },
-
     add(thread, cb, manual) {
-      const data     = {};
-      const siteID   = g.SITE.ID;
-      const boardID  = thread.board.ID;
+      const data = {};
+      const siteID = g.SITE.ID;
+      const boardID = thread.board.ID;
       const threadID = thread.ID;
       if (thread.isDead) {
-        if (Conf['Auto Prune'] && ThreadWatcher.db.get({boardID, threadID})) {
+        if (Conf['Auto Prune'] && ThreadWatcher.db.get({ boardID, threadID })) {
           ThreadWatcher.rm(siteID, boardID, threadID, cb);
           return;
         }
         data.isDead = true;
       }
-      if (thread.OP) { data.excerpt = Get.threadExcerpt(thread); }
-      return ThreadWatcher.addRaw(boardID, threadID, data, cb, manual);
+      if (thread.OP) {
+        data.excerpt = Get.threadExcerpt(thread);
+      }
+      ThreadWatcher.addRaw(boardID, threadID, data, cb, manual);
     },
-
     addRaw(boardID, threadID, data, cb, manual) {
       const oldData = ThreadWatcher.db.get({ boardID, threadID, defaultValue: dict() });
       delete oldData.last;
       delete oldData.modified;
       $.extend(oldData, data);
-      ThreadWatcher.db.set({boardID, threadID, val: oldData}, cb);
+      ThreadWatcher.db.set({ boardID, threadID, val: oldData }, cb);
       ThreadWatcher.refresh(manual);
-      const thread = {siteID: g.SITE.ID, boardID, threadID, data, force: true};
-      if (Conf['Show Page'] && !data.isDead) {
-        return ThreadWatcher.fetchBoard([thread]);
+      const thread = { siteID: g.SITE.ID, boardID, threadID, data: oldData, force: true };
+      if (Conf['Show Page'] && !oldData.isDead) {
+        ThreadWatcher.fetchBoard([thread]);
       } else if (ThreadWatcher.unreadEnabled && Conf['Show Unread Count']) {
-        return ThreadWatcher.fetchStatus(thread);
+        ThreadWatcher.fetchStatus(thread);
       }
     },
-
     rm(siteID, boardID, threadID, cb, manual) {
-      ThreadWatcher.db.delete({siteID, boardID, threadID}, cb);
-      return ThreadWatcher.refresh(manual);
+      ThreadWatcher.db.delete({ siteID, boardID, threadID }, cb);
+      ThreadWatcher.refresh(manual);
     },
-
     menu: {
+      menu: null,
       init() {
-        if (!Conf['Thread Watcher']) { return; }
+        if (!Conf['Thread Watcher']) {
+          return;
+        }
         const menu = (this.menu = new UI.Menu('thread watcher'));
-        $.on($('.menu-button', ThreadWatcher.dialog), 'click', function(e) {
-          return menu.toggle(e, this, ThreadWatcher);
+        $.on($('.menu-button', ThreadWatcher.dialog), 'click', function (e) {
+          menu.toggle(e, this, ThreadWatcher);
         });
-        return this.addMenuEntries();
+        this.addMenuEntries();
       },
-
       addHeaderMenuEntry() {
-        if (g.VIEW !== 'thread') { return; }
-        const entryEl = $.el('a',
-          {href: 'javascript:;'});
+        if (g.VIEW !== 'thread') {
+          return;
+        }
+        const entryEl = $.el('a', { href: 'javascript:;' });
         Header.menu.addEntry({
           el: entryEl,
           order: 60,
           open() {
-            const [addClass, rmClass, text] = !!ThreadWatcher.db.get({boardID: g.BOARD.ID, threadID: g.THREADID}) ?
+            const [addClass, rmClass, text] = !!ThreadWatcher.db.get({ boardID: g.BOARD.ID, threadID: g.THREADID }) ?
               ['unwatch-thread', 'watch-thread', 'Unwatch thread']
-            :
-              ['watch-thread', 'unwatch-thread', 'Watch thread'];
+              :
+                ['watch-thread', 'unwatch-thread', 'Watch thread'];
             $.addClass(entryEl, addClass);
             $.rmClass(entryEl, rmClass);
             entryEl.textContent = text;
             return true;
           }
         });
-        return $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads.get(`${g.BOARD}.${g.THREADID}`), true));
+        $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads.get(`${g.BOARD}.${g.THREADID}`), true));
       },
-
       addMenuEntries() {
         const toggleDisabledDead = function () {
           this.el.classList.toggle('disabled', !$('.dead-thread', ThreadWatcher.list));
           return true;
         };
-
         const entries = [
-          // `Open all` entry
           {
             text: 'Open all threads',
             cb: ThreadWatcher.cb.openAll,
@@ -11572,7 +12098,6 @@ svg.icon {
               return true;
             }
           },
-          // `Open Unread` entry
           {
             text: 'Open unread threads',
             cb: ThreadWatcher.cb.openUnread,
@@ -11581,25 +12106,21 @@ svg.icon {
               return true;
             }
           },
-          // `Open unread dead threads` entry
           {
             text: 'Open unread dead threads',
             cb: ThreadWatcher.cb.openDeads,
             open: toggleDisabledDead,
           },
-          // `Prune all dead threads` entry
           {
             text: 'Prune all dead threads',
             cb: ThreadWatcher.cb.pruneDeads,
             open: toggleDisabledDead,
           },
-          // `Prune read dead threads` entry
           {
             text: 'Prune read dead threads',
             cb: ThreadWatcher.cb.pruneReadDeads,
             open: toggleDisabledDead,
           },
-          // `Dismiss posts quoting you` entry
           {
             text: 'Dismiss posts quoting you',
             title: 'Unhighlight the thread watcher icon and threads until there are new replies quoting you.',
@@ -11610,28 +12131,26 @@ svg.icon {
             }
           },
         ];
-
-        for (var {text, title, cb, open} of entries) {
-          var entry = {
+        for (const { text, title, cb, open } of entries) {
+          const entry = {
             el: $.el('a', {
               textContent: text,
               href: 'javascript:;'
             })
           };
-          if (title) { entry.el.title = title; }
+          if (title) {
+            entry.el.title = title;
+          }
           $.on(entry.el, 'click', cb);
           entry.open = open.bind(entry);
           this.menu.addEntry(entry);
         }
-
         // Settings checkbox entries:
-        for (var name in Config.threadWatcher) {
-          var conf = Config.threadWatcher[name];
+        for (const name in Config.threadWatcher) {
+          const conf = Config.threadWatcher[name];
           this.addCheckbox(name, conf[1]);
         }
-
       },
-
       addCheckbox(name, desc) {
         const entry = {
           type: 'thread watcher',
@@ -11645,11 +12164,13 @@ svg.icon {
           entry.el.title += '\n[Remember Last Read Post is disabled.]';
         }
         $.on(input, 'change', $.cb.checked);
-        if (['Current Board', 'Show Page', 'Show Unread Count', 'Show Site Prefix'].includes(name))
+        if (['Current Board', 'Show Page', 'Show Unread Count', 'Show Site Prefix'].includes(name)) {
           $.on(input, 'change', () => ThreadWatcher.refresh());
-        if (['Show Page', 'Show Unread Count', 'Auto Update Thread Watcher'].includes(name))
+        }
+        if (['Show Page', 'Show Unread Count', 'Auto Update Thread Watcher'].includes(name)) {
           $.on(input, 'change', ThreadWatcher.fetchAuto);
-        return this.menu.addEntry(entry);
+        }
+        this.menu.addEntry(entry);
       }
     }
   };
@@ -11763,78 +12284,67 @@ svg.icon {
     return post;
   };
 
-  // @ts-nocheck
-
-  var ReplyPruning = {
-    init() {
-      if ((g.VIEW !== 'thread') || !Conf['Reply Pruning']) { return; }
-
-      this.container = $.frag();
-
-      this.summary = $.el('span', {
-        hidden:    true,
-        className: 'summary'
-      }
-      );
-      this.summary.style.cursor = 'pointer';
-      $.on(this.summary, 'click', () => {
-        this.inputs.enabled.checked = !this.inputs.enabled.checked;
-        return $.event('change', null, this.inputs.enabled);
-      });
-
-      const label = UI.checkbox('Prune Replies', 'Show Last', Conf['Prune All Threads']);
-      const el = $.el('span',
-        {title: 'Maximum number of replies to show.'}
-      ,
-        {innerHTML: " <input type=\"number\" name=\"Max Replies\" min=\"0\" step=\"1\" value=\"" + E(Conf["Max Replies"]) + "\" class=\"field\">"});
-      $.prepend(el, label);
-
-      this.inputs = {
-        enabled: label.firstElementChild,
-        replies: el.lastElementChild
-      };
-
-      this.setEnabled.call(this.inputs.enabled);
-      $.on(this.inputs.enabled, 'change', this.setEnabled);
-      $.on(this.inputs.replies, 'change', $.cb.value);
-
-      Header.menu.addEntry({
-        el,
-        order: 190
-      });
-
-      return Callbacks.Thread.push({
-        name: 'Reply Pruning',
-        cb:   this.node
-      });
-    },
-
+  const ReplyPruning = {
+    container: null,
+    summary: null,
+    inputs: null,
     position: 0,
     hidden: 0,
     hiddenFiles: 0,
     total: 0,
     totalFiles: 0,
-
+    thread: null,
+    active: false,
+    init() {
+      if ((g.VIEW !== 'thread') || !Conf['Reply Pruning']) {
+        return;
+      }
+      this.container = $.frag();
+      this.summary = $.el('span', {
+        hidden: true,
+        className: 'summary'
+      });
+      this.summary.style.cursor = 'pointer';
+      $.on(this.summary, 'click', () => {
+        this.inputs.enabled.checked = !this.inputs.enabled.checked;
+        $.event('change', null, this.inputs.enabled);
+      });
+      const label = UI.checkbox('Prune Replies', 'Show Last', Conf['Prune All Threads']);
+      const el = $.el('span', { title: 'Maximum number of replies to show.' }, { innerHTML: " <input type=\"number\" name=\"Max Replies\" min=\"0\" step=\"1\" value=\"" + E(Conf["Max Replies"]) + "\" class=\"field\">" });
+      $.prepend(el, label);
+      this.inputs = {
+        enabled: label.firstElementChild,
+        replies: el.lastElementChild
+      };
+      this.setEnabled.call(this.inputs.enabled);
+      $.on(this.inputs.enabled, 'change', this.setEnabled);
+      $.on(this.inputs.replies, 'change', $.cb.value);
+      Header.menu.addEntry({
+        el,
+        order: 190
+      });
+      Callbacks.Thread.push({
+        name: 'Reply Pruning',
+        cb: this.node
+      });
+    },
     setEnabled() {
       const other = QuoteThreading.input;
       if (this.checked && other?.checked) {
         other.checked = false;
         $.event('change', null, other);
       }
-      return ReplyPruning.active = this.checked;
+      ReplyPruning.active = this.checked;
     },
-
     showIfHidden(id) {
       if (ReplyPruning.container && $(`#${id}`, ReplyPruning.container)) {
         ReplyPruning.inputs.enabled.checked = false;
-        return $.event('change', null, ReplyPruning.inputs.enabled);
+        $.event('change', null, ReplyPruning.inputs.enabled);
       }
     },
-
     node() {
       let middle;
       ReplyPruning.thread = this;
-
       if (this.isSticky) {
         ReplyPruning.active = (ReplyPruning.inputs.enabled.checked = true);
         if (QuoteThreading.input) {
@@ -11842,89 +12352,89 @@ svg.icon {
           Conf['Thread Quotes'] = (QuoteThreading.input.checked = false);
         }
       }
-
-      this.posts.forEach(function(post) {
+      this.posts.forEach((post) => {
         if (post.isReply) {
           ReplyPruning.total++;
-          if (post.file) { return ReplyPruning.totalFiles++; }
+          if (post.file) {
+            ReplyPruning.totalFiles++;
+          }
         }
       });
-
       // If we're linked to a post that we would hide, don't hide the posts in the first place.
-      if (
-        ReplyPruning.active &&
+      if (ReplyPruning.active &&
         /^#p\d+$/.test(location.hash) &&
-        (1 <= (middle = this.posts.keys.indexOf(location.hash.slice(2))) && middle < 1 + Math.max(ReplyPruning.total - +Conf["Max Replies"], 0))
-      ) {
+        (1 <= (middle = this.posts.keys.indexOf(location.hash.slice(2))) && middle < 1 + Math.max(ReplyPruning.total - +Conf["Max Replies"], 0))) {
         ReplyPruning.active = (ReplyPruning.inputs.enabled.checked = false);
       }
-
       $.after(this.OP.nodes.root, ReplyPruning.summary);
-
       $.on(ReplyPruning.inputs.enabled, 'change', ReplyPruning.update);
       $.on(ReplyPruning.inputs.replies, 'change', ReplyPruning.update);
       $.on(d, 'ThreadUpdate', ReplyPruning.updateCount);
       $.on(d, 'ThreadUpdate', ReplyPruning.update);
-
-      return ReplyPruning.update();
+      ReplyPruning.update();
     },
-
     updateCount(e) {
-      if (e.detail[404]) { return; }
-      for (var fullID of e.detail.newPosts) {
+      const detail = e.detail;
+      if (detail?.[404]) {
+        return;
+      }
+      for (const fullID of detail?.newPosts || []) {
         ReplyPruning.total++;
-        if (g.posts.get(fullID).file) { ReplyPruning.totalFiles++; }
+        if (g.posts.get(fullID)?.file) {
+          ReplyPruning.totalFiles++;
+        }
       }
     },
-
     update() {
       let boardTop, node, post;
       const hidden1 = ReplyPruning.hidden;
       const hidden2 = ReplyPruning.active ?
         Math.max(ReplyPruning.total - +Conf["Max Replies"], 0)
-      :
-        0;
-
+        :
+          0;
       // Record position from bottom of document
       const oldPos = d.body.clientHeight - window.scrollY;
-
-      const {posts} = ReplyPruning.thread;
-
+      const { posts } = ReplyPruning.thread;
       if (ReplyPruning.hidden < hidden2) {
         while ((ReplyPruning.hidden < hidden2) && (ReplyPruning.position < posts.keys.length)) {
           post = posts.get(posts.keys[ReplyPruning.position++]);
           if (post.isReply && !post.isFetchedQuote) {
-            while ((node = ReplyPruning.summary.nextSibling) && (node !== post.nodes.root)) { $.add(ReplyPruning.container, node); }
+            while ((node = ReplyPruning.summary.nextSibling) && (node !== post.nodes.root)) {
+              $.add(ReplyPruning.container, node);
+            }
             $.add(ReplyPruning.container, post.nodes.root);
             ReplyPruning.hidden++;
-            if (post.file) { ReplyPruning.hiddenFiles++; }
+            if (post.file) {
+              ReplyPruning.hiddenFiles++;
+            }
           }
         }
-
       } else if (ReplyPruning.hidden > hidden2) {
         const frag = $.frag();
         while ((ReplyPruning.hidden > hidden2) && (ReplyPruning.position > 0)) {
           post = posts.get(posts.keys[--ReplyPruning.position]);
           if (post.isReply && !post.isFetchedQuote) {
-            while ((node = ReplyPruning.container.lastChild) && (node !== post.nodes.root)) { $.prepend(frag, node); }
+            while ((node = ReplyPruning.container.lastChild) && (node !== post.nodes.root)) {
+              $.prepend(frag, node);
+            }
             $.prepend(frag, post.nodes.root);
             ReplyPruning.hidden--;
-            if (post.file) { ReplyPruning.hiddenFiles--; }
+            if (post.file) {
+              ReplyPruning.hiddenFiles--;
+            }
           }
         }
         $.after(ReplyPruning.summary, frag);
         $.event('PostsInserted', null, ReplyPruning.summary.parentNode);
       }
-
       ReplyPruning.summary.textContent = ReplyPruning.active ?
         g.SITE.Build.summaryText('+', ReplyPruning.hidden, ReplyPruning.hiddenFiles)
-      :
-        g.SITE.Build.summaryText('-', ReplyPruning.total, ReplyPruning.totalFiles);
+        :
+          g.SITE.Build.summaryText('-', ReplyPruning.total, ReplyPruning.totalFiles);
       ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
-
       // Maintain position in thread when posts are added/removed above
       if ((hidden1 !== hidden2) && ((boardTop = Header.getTopOf($('.board'))) < 0)) {
-        return window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
+        window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
       }
     }
   };
@@ -20530,6 +21040,14 @@ $\
         case 'sys.4chan.org':
         case 'sys.4channel.org':
           var pathname = location.pathname.split(/\/+/);
+          if (pathname[1] === 'captcha') {
+            $.onExists(doc, 'body', () => {
+              $.addClass(doc, 'captcha-t', 'captcha-iframe');
+              $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
+              Captcha.t.setupIframe();
+            });
+            return;
+          }
           if (pathname[2] === 'imgboard.php') {
             let match;
             if (/\bmode=report\b/.test(location.search)) {
@@ -25636,209 +26154,217 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
   };
 
-  // @ts-nocheck
-
-  var MarkNewIPs = {
+  const MarkNewIPs = {
+    ipCount: 0,
+    postCount: 0,
     init() {
-      if ((g.SITE.software !== 'yotsuba') || (g.VIEW !== 'thread') || !Conf['Mark New IPs']) { return; }
-      return Callbacks.Thread.push({
+      if ((g.SITE.software !== 'yotsuba') || (g.VIEW !== 'thread') || !Conf['Mark New IPs']) {
+        return;
+      }
+      Callbacks.Thread.push({
         name: 'Mark New IPs',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       MarkNewIPs.ipCount = this.ipCount;
       MarkNewIPs.postCount = this.posts.keys.length;
-      return $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
+      $.on(d, 'ThreadUpdate', MarkNewIPs.onUpdate);
     },
-
     onUpdate(e) {
       let fullID;
-      const {ipCount, postCount, newPosts, deletedPosts} = e.detail;
-      if (ipCount == null) { return; }
-
+      const detail = e.detail;
+      if (!detail) {
+        return;
+      }
+      const { ipCount, postCount, newPosts, deletedPosts } = detail;
+      if (ipCount == null) {
+        return;
+      }
       switch (ipCount - MarkNewIPs.ipCount) {
-        case (postCount - MarkNewIPs.postCount) + deletedPosts.length:
-          var i = MarkNewIPs.ipCount;
+        case (postCount - MarkNewIPs.postCount) + deletedPosts.length: {
+          let i = MarkNewIPs.ipCount;
           for (fullID of newPosts) {
             MarkNewIPs.markNew(g.posts.get(fullID), ++i);
           }
           break;
-        case -deletedPosts.length:
+        }
+        case -deletedPosts.length: {
           for (fullID of newPosts) {
             MarkNewIPs.markOld(g.posts.get(fullID));
           }
           break;
+        }
       }
       MarkNewIPs.ipCount = ipCount;
-      return MarkNewIPs.postCount = postCount;
+      MarkNewIPs.postCount = postCount;
     },
-
     markNew(post, ipCount) {
       const suffix = ((Math.floor(ipCount / 10)) % 10) === 1 ?
         'th'
-      :
-        ['st', 'nd', 'rd'][(ipCount % 10) - 1] || 'th'; // fuck switches
+        :
+          ['st', 'nd', 'rd'][(ipCount % 10) - 1] || 'th'; // fuck switches
       const counter = $.el('span', {
         className: 'ip-counter',
         textContent: `(${ipCount})`
-      }
-      );
+      });
       post.nodes.nameBlock.title = `This is the ${ipCount}${suffix} IP in the thread.`;
       $.add(post.nodes.nameBlock, [$.tn(' '), counter]);
-      return $.addClass(post.nodes.root, 'new-ip');
+      $.addClass(post.nodes.root, 'new-ip');
     },
-
     markOld(post) {
       post.nodes.nameBlock.title = 'Not the first post from this IP.';
-      return $.addClass(post.nodes.root, 'old-ip');
+      $.addClass(post.nodes.root, 'old-ip');
     }
   };
 
-  // @ts-nocheck
-
-  var ThreadStats = {
+  const ThreadStats = {
     postCount: 0,
     fileCount: 0,
     postIndex: 0,
-
+    showPurgePos: undefined,
+    showPage: undefined,
+    dialog: null,
+    postCountEl: null,
+    fileCountEl: null,
+    ipCountEl: null,
+    pageCountEl: null,
+    thread: null,
+    timeout: undefined,
+    lastPageUpdate: undefined,
     init() {
       let sc;
-      if ((g.VIEW !== 'thread') || !Conf['Thread Stats']) { return; }
-
+      if ((g.VIEW !== 'thread') || !Conf['Thread Stats']) {
+        return;
+      }
       if (Conf['Page Count in Stats']) {
         this[g.SITE.isPrunedByAge?.(g.BOARD) ? 'showPurgePos' : 'showPage'] = true;
       }
-
-      const statsHTML = {innerHTML: "<span id=\"post-count\">?</span> / <span id=\"file-count\">?</span>" + ((Conf["IP Count in Stats"] && g.SITE.hasIPCount) ? " / <span id=\"ip-count\">?</span>" : "") + ((Conf["Page Count in Stats"]) ? " / <span id=\"page-count\">?</span>" : "")};
+      const statsHTML = {
+        innerHTML: `<span id="post-count">?</span> / <span id="file-count">?</span>${(Conf["IP Count in Stats"] && g.SITE.hasIPCount) ? " / <span id=\"ip-count\">?</span>" : ""}${(Conf["Page Count in Stats"]) ? " / <span id=\"page-count\">?</span>" : ""}`
+      };
       let statsTitle = 'Posts / Files';
-      if (Conf['IP Count in Stats'] && g.SITE.hasIPCount) { statsTitle += ' / IPs'; }
+      if (Conf['IP Count in Stats'] && g.SITE.hasIPCount) {
+        statsTitle += ' / IPs';
+      }
       if (Conf['Page Count in Stats']) {
         if (this.showPurgePos) {
           statsTitle += ' / Purge Position';
         } else {
           statsTitle += ' / Page';
-          if (Conf['Purge Position']) statsTitle += ' (Purge Position)';
+          if (Conf['Purge Position'])
+            statsTitle += ' (Purge Position)';
         }
       }
-
       if (Conf['Updater and Stats in Header']) {
         this.dialog = (sc = $.el('span', {
-          id:    'thread-stats',
+          id: 'thread-stats',
           title: statsTitle
-        }
-        ));
+        }));
         $.extend(sc, statsHTML);
         Header.addShortcut('stats', sc, 200);
-
       } else {
-        this.dialog = (sc = UI.dialog('thread-stats',
-          {innerHTML: "<div class=\"move\" title=\"" + E(statsTitle) + "\">" + (statsHTML).innerHTML + "</div>"}));
+        this.dialog = (sc = UI.dialog('thread-stats', {
+          innerHTML: `<div class="move" title="${E(statsTitle)}">${statsHTML.innerHTML}</div>`
+        }));
         $.addClass(doc, 'float');
         $.ready(() => $.add(d.body, sc));
       }
-
       this.postCountEl = $('#post-count', sc);
       this.fileCountEl = $('#file-count', sc);
-      this.ipCountEl   = $('#ip-count',   sc);
+      this.ipCountEl = $('#ip-count', sc);
       this.pageCountEl = $('#page-count', sc);
-
-      if (this.pageCountEl) { $.on(this.pageCountEl, 'click', ThreadStats.fetchPage); }
-
-      return Callbacks.Thread.push({
+      if (this.pageCountEl) {
+        $.on(this.pageCountEl, 'click', ThreadStats.fetchPage);
+      }
+      Callbacks.Thread.push({
         name: 'Thread Stats',
-        cb:   this.node
+        cb: this.node
       });
     },
-
     node() {
       ThreadStats.thread = this;
       ThreadStats.count();
       ThreadStats.update();
       ThreadStats.fetchPage();
       $.on(d, 'PostsInserted', () => $.queueTask(ThreadStats.onPostsInserted));
-      return $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
+      $.on(d, 'ThreadUpdate', ThreadStats.onUpdate);
     },
-
     count() {
-      const {posts} = ThreadStats.thread;
+      const { posts } = ThreadStats.thread;
       const n = posts.keys.length;
       for (let i = ThreadStats.postIndex, end = n; i < end; i++) {
-        var post = posts.get(posts.keys[i]);
-        if (!post.isFetchedQuote) {
+        const post = posts.get(posts.keys[i]);
+        if (post && !post.isFetchedQuote) {
           ThreadStats.postCount++;
           ThreadStats.fileCount += post.files.length;
         }
       }
       ThreadStats.postIndex = n;
     },
-
     onUpdate(e) {
-      if (e.detail[404]) { return; }
-      const {postCount, fileCount} = e.detail;
-      $.extend(ThreadStats, {postCount, fileCount});
+      const detail = e.detail;
+      if (detail?.[404]) {
+        return;
+      }
+      const { postCount, fileCount } = detail;
+      $.extend(ThreadStats, { postCount, fileCount });
       ThreadStats.postIndex = ThreadStats.thread.posts.keys.length;
       ThreadStats.update();
-      if (ThreadStats.showPage && (ThreadStats.pageCountEl.textContent !== '1')) {
-        return ThreadStats.fetchPage();
+      if (ThreadStats.showPage && ThreadStats.pageCountEl && (ThreadStats.pageCountEl.textContent !== '1')) {
+        ThreadStats.fetchPage();
       }
     },
-
     onPostsInserted() {
-      if (ThreadStats.thread.posts.keys.length <= ThreadStats.postIndex) { return; }
+      if (ThreadStats.thread.posts.keys.length <= ThreadStats.postIndex) {
+        return;
+      }
       ThreadStats.count();
       ThreadStats.update();
-      if (ThreadStats.showPage && (ThreadStats.pageCountEl.textContent !== '1')) {
-        return ThreadStats.fetchPage();
+      if (ThreadStats.showPage && ThreadStats.pageCountEl && (ThreadStats.pageCountEl.textContent !== '1')) {
+        ThreadStats.fetchPage();
       }
     },
-
     update() {
-      const {thread, postCountEl, fileCountEl, ipCountEl} = ThreadStats;
-      postCountEl.textContent = ThreadStats.postCount;
-      fileCountEl.textContent = ThreadStats.fileCount;
+      const { thread, postCountEl, fileCountEl, ipCountEl } = ThreadStats;
+      postCountEl.textContent = String(ThreadStats.postCount);
+      fileCountEl.textContent = String(ThreadStats.fileCount);
       if (ipCountEl) {
         if (thread.ipCount) {
-          ipCountEl.textContent = thread.ipCount;
-        } else if (g.BOARD?.config.user_ids) {
+          ipCountEl.textContent = String(thread.ipCount);
+        } else if (g.BOARD?.config?.user_ids) {
           const IDs = new Set();
-          g.posts.forEach(post => {
-            IDs.add(post.info.uniqueID);
+          g.posts.forEach((post) => {
+            if (post.info?.uniqueID) {
+              IDs.add(post.info.uniqueID);
+            }
           });
-          ipCountEl.textContent = IDs.size;
+          ipCountEl.textContent = String(IDs.size);
         } else {
           ipCountEl.textContent = '?';
         }
       }
-      postCountEl.classList.toggle('warning', (thread.postLimit && !thread.isSticky));
-      fileCountEl.classList.toggle('warning', (thread.fileLimit && !thread.isSticky));
+      postCountEl.classList.toggle('warning', !!(thread.postLimit && !thread.isSticky));
+      fileCountEl.classList.toggle('warning', !!(thread.fileLimit && !thread.isSticky));
     },
-
     fetchPage() {
-      if (!ThreadStats.pageCountEl) { return; }
+      if (!ThreadStats.pageCountEl) {
+        return;
+      }
       clearTimeout(ThreadStats.timeout);
       if (ThreadStats.thread.isDead) {
         ThreadStats.pageCountEl.textContent = 'Dead';
         $.addClass(ThreadStats.pageCountEl, 'warning');
         return;
       }
-      ThreadStats.timeout = setTimeout(
-        ThreadStats.fetchPage,
-        Conf['Purge Position'] && ThreadStats.pageCountEl.classList.contains('warning')
-          ? (5 * SECOND) : (2 * MINUTE)
-      );
-      $.whenModified(
-        g.SITE.urls.threadsListJSON(ThreadStats.thread),
-        'ThreadStats',
-        ThreadStats.onThreadsLoad
-      );
+      ThreadStats.timeout = setTimeout(ThreadStats.fetchPage, Conf['Purge Position'] && ThreadStats.pageCountEl.classList.contains('warning')
+        ? (5 * SECOND) : (2 * MINUTE));
+      $.whenModified(g.SITE.urls.threadsListJSON(ThreadStats.thread), 'ThreadStats', ThreadStats.onThreadsLoad);
     },
-
     onThreadsLoad() {
       if (this.status === 200) {
         let page, thread;
-        if (ThreadStats.showPurgePos) {
+        if (ThreadStats.showPurgePos && ThreadStats.pageCountEl) {
           let purgePos = 1;
           for (page of this.response) {
             for (thread of page.threads) {
@@ -25847,11 +26373,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
               }
             }
           }
-          ThreadStats.pageCountEl.textContent = purgePos;
+          ThreadStats.pageCountEl.textContent = String(purgePos);
           ThreadStats.pageCountEl.classList.toggle('warning', (purgePos === 1));
-        } else {
-          let nThreads;
-          let i = (nThreads = 0);
+        } else if (ThreadStats.pageCountEl) {
+          let nThreads = 0;
+          let i = 0;
           for (page of this.response) {
             nThreads += page.threads.length;
           }
@@ -25859,7 +26385,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             page = this.response[pageNum];
             for (thread of page.threads) {
               if (thread.no === ThreadStats.thread.ID) {
-                ThreadStats.pageCountEl.textContent = pageNum + 1;
+                ThreadStats.pageCountEl.textContent = String(pageNum + 1);
                 const hasWarning = (i >= (nThreads - this.response[0].threads.length));
                 ThreadStats.pageCountEl.classList.toggle('warning', hasWarning);
                 if (hasWarning && Conf['Purge Position']) {
@@ -25877,16 +26403,16 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         ThreadStats.retry();
       }
     },
-
     retry() {
       // If thread data is stale (modification date given < time of last post), try again.
-      // Skip this on vichan sites due to sage posts not updating modification time in threads.json.
-      if (
-        !ThreadStats.showPage ||
+      // Skip this on vichan sites due to sage posts not updating modification time in signatures.
+      if (!ThreadStats.showPage ||
+        !ThreadStats.pageCountEl ||
         (ThreadStats.pageCountEl.textContent === '1') ||
         !!g.SITE.threadModTimeIgnoresSage ||
-        (ThreadStats.thread.posts.get(ThreadStats.thread.lastPost).info.date <= ThreadStats.lastPageUpdate)
-      ) { return; }
+        (ThreadStats.thread.posts.get(ThreadStats.thread.lastPost).info.date <= ThreadStats.lastPageUpdate)) {
+        return;
+      }
       clearTimeout(ThreadStats.timeout);
       ThreadStats.timeout = setTimeout(ThreadStats.fetchPage, 5 * SECOND);
     }

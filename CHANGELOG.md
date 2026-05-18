@@ -3,6 +3,25 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.25.1 (2026-05-18)
+
+- Captcha UI Refactor for T-captchas (slider captcha):
+  - Render "not like the others" (odd-one-out) challenge strips horizontally side-by-side.
+  - Skip empty index 0 strip for "not like the others" challenges, mapping key '1' directly to the first image.
+  - Map browser Space key to proceed to the next challenge phase (preventing page scroll).
+  - Robustly detect subsequent challenges (e.g. Next 1/2 -> 2/2) using button phase tracking.
+
+### 2.25.0 (2026-05-18)
+
+- Captcha UI Refactor for T-captchas (slider captcha):
+  - Automatically display all puzzle options in a stacked vertical layout instead of using a slider.
+  - Dynamically support a variable number of puzzle combinations based on the captcha constraints.
+  - Added keyboard shortcut support (number keys `1-9` and Numpad `1-9`) to quickly select the matching solution.
+  - Ensure native verification-passed and expired messages remain visible when challenges are inactive.
+- Added "Download All Media" thread downloader enhancements:
+  - Implemented persistent download tracking to automatically skip previously downloaded files.
+  - Enabled background downloading using `GM_download` to ensure tasks continue running even if the tab is closed or navigated away.
+
 ### 2.24.2 (2025-12-23 🎅🏻)
 
 I'm officially stopping XT since I don't use 4chan anymore. This update removes the update URL, and merges the last two
