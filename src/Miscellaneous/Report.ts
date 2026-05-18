@@ -1,6 +1,6 @@
 import Redirect from "../Archive/Redirect";
 import $ from "../platform/$";
-import ReportPage from './Report/ArchiveReport.html';
+import { ArchiveReportHTML } from "./Report/ArchiveReport";
 import CSS from "../css/CSS";
 import Captcha from "../Posting/Captcha";
 import { Conf, d, doc, g } from "../globals/globals";
@@ -59,7 +59,7 @@ const Report: ReportType = {
       id: 'archive-report',
       hidden: true
     }) as HTMLFieldSetElement;
-    $.extend(fieldset, { innerHTML: ReportPage });
+    $.extend(fieldset, ArchiveReportHTML);
     const enabled = $('#archive-report-enabled', fieldset) as HTMLInputElement;
     const reason  = $('#archive-report-reason',  fieldset) as HTMLTextAreaElement;
     const submit  = $('#archive-report-submit',  fieldset) as HTMLButtonElement;

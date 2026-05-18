@@ -1,0 +1,10 @@
+import h, { hFragment } from "../../globals/jsx";
+
+export const ArchiveReportHTML = (
+  <>
+    <legend><label><input id="archive-report-enabled" type="checkbox" />Report illegal content to archives</label></legend>
+    <label for="archive-report-reason">Details</label>
+    <textarea id="archive-report-reason" disabled>Illegal content</textarea>
+    <button id="archive-report-submit" hidden>Submit</button>
+  </>
+);
