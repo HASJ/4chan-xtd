@@ -24,6 +24,15 @@ export interface EscapedHtml {
   [isEscaped]: true,
 }
 
+declare global {
+  namespace JSX {
+    interface Element extends EscapedHtml {}
+    interface IntrinsicElements {
+      [elemName: string]: any;
+    }
+  }
+}
+
 const voidElements = new Set(
   ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr',]
 );

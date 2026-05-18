@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "module": "ES2022",
-    "noImplicitAny": false,
+    "noImplicitAny": true,
+    "strict": true,
     "removeComments": false,
     "sourceMap": true,
     "target": "ES2020",

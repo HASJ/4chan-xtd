@@ -2,9 +2,29 @@ import { g } from "../../globals/globals";
 import h, { EscapedHtml } from "../../globals/jsx";
 
 export default function generatePostInfoHtml(
-  ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon,
-  capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID,
-  threadID,
+  ID: string | number,
+  o: any,
+  subject: string | undefined,
+  capcode: string | undefined,
+  email: string | undefined,
+  name: string | undefined,
+  tripcode: string | undefined,
+  pass: string | number | undefined,
+  capcodeLC: string | undefined,
+  capcodePlural: string | undefined,
+  staticPath: string,
+  gifIcon: string,
+  capcodeDescription: string | undefined,
+  uniqueID: string | undefined,
+  flag: string | undefined,
+  flagCode: string | undefined,
+  flagCodeTroll: string | undefined,
+  dateUTC: number | string | undefined,
+  dateText: string | undefined,
+  postLink: string,
+  quoteLink: string,
+  boardID: string,
+  threadID: string | number,
 ): EscapedHtml {
   const nameHtml: (EscapedHtml | string)[] = [<span class={`name${capcode ? ' capcode' : ''}`}>{name}</span>];
   if (tripcode) nameHtml.push(' ', <span class="postertrip">{tripcode}</span>);

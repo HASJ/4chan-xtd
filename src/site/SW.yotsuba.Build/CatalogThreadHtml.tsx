@@ -1,7 +1,15 @@
 import h, { hFragment, EscapedHtml } from "../../globals/jsx";
 
 export default function generateCatalogThreadHtml(
-  thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon,
+  thread: any,
+  src: string,
+  imgClass: string | undefined,
+  data: any,
+  postCount: number,
+  fileCount: number,
+  pageCount: number,
+  staticPath: string,
+  gifIcon: string,
 ): EscapedHtml {
   return <>
     <a class="catalog-link" href={`/${thread.board}/thread/${thread.ID}`}>
