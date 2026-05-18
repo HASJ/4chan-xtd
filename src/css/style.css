@@ -1586,6 +1586,71 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root {
   position: relative;
 }
+#qr .captcha-root.is-challenge > div,
+.captcha-iframe.is-challenge .captcha-root > div {
+  height: auto !important;
+  background-image: none !important;
+  padding-bottom: 4px;
+  overflow: visible !important;
+}
+#qr .captcha-root.is-challenge #t-task,
+.captcha-iframe.is-challenge #t-task,
+#qr .captcha-root.is-challenge #t-slider,
+.captcha-iframe.is-challenge #t-slider {
+  position: absolute !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#qr .captcha-root.is-challenge #t-ctrl,
+.captcha-iframe.is-challenge #t-ctrl {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+#qr .captcha-root.is-challenge #t-next,
+.captcha-iframe.is-challenge #t-next {
+  margin-left: 0 !important;
+}
+
+#qr .captcha-clue-image,
+.captcha-iframe .captcha-clue-image {
+  width: 80px;
+  height: 80px;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+#qr .captcha-strips,
+.captcha-iframe .captcha-strips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 4px;
+}
+#qr .captcha-strip,
+.captcha-iframe .captcha-strip {
+  height: 80px;
+  width: 100%;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 2px;
+  box-sizing: border-box;
+  transition: border-color 0.1s;
+}
+#qr .captcha-strip:hover,
+.captcha-iframe .captcha-strip:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+#qr .captcha-strip.selected,
+.captcha-iframe .captcha-strip.selected {
+  border-color: #000;
+}
 #qr .captcha-container > div {
   margin: auto;
   width: 304px;
