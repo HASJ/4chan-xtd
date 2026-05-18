@@ -1,11 +1,11 @@
 // @ts-nocheck
 import SettingsPage from './Settings/SettingsHtml';
-import FilterGuidePage from './Settings/Filter-guide.html';
-import SaucePage from './Settings/Sauce.html';
-import AdvancedPage from './Settings/Advanced.html';
-import KeybindsPage from './Settings/Keybinds.html';
-import FilterSelectPage from './Settings/Filter-select.html';
-import ExportDialog from './Settings/Export.html';
+import FilterGuidePage from './Settings/FilterGuide';
+import SaucePage from './Settings/Sauce';
+import AdvancedPage from './Settings/Advanced';
+import KeybindsPage from './Settings/Keybinds';
+import FilterSelectPage from './Settings/FilterSelect';
+import ExportDialog from './Settings/Export';
 import Redirect from '../Archive/Redirect';
 import Config from '../config/Config';
 import ImageHost from '../Images/ImageHost';

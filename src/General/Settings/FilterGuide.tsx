@@ -1,0 +1,65 @@
+import h, { hFragment, EscapedHtml } from '../../globals/jsx';
+
+const FilterGuideHtml: EscapedHtml = (
+  <>
+    <div class="warning"><code>Filter</code> is disabled.</div>
+    <p>
+      Use <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions" target="_blank">regular expressions</a>, one per line.<br />
+      Lines starting with a <code>#</code> will be ignored.<br />
+      For example, <code>/weeaboo/i</code> will filter posts containing the string `<code>weeaboo</code>`, case-insensitive.<br />
+      MD5 and Unique ID filtering use exact string matching, not regular expressions.
+    </p>
+    <ul>You can use these settings with each regular expression, separate them with semicolons:
+      <li>
+        Per boards, separate them with commas. It is global if not specified. Use <code>sfw</code> and <code>nsfw</code> to reference all worksafe or not-worksafe boards.<br />
+        For example: <code>boards:a,jp;</code>.<br />
+        To specify boards on a particular site, put the beginning of the domain and a slash character before the list.<br />
+        Any initial <code>www.</code> should not be included, and all 4chan domains are considered <code>4chan.org</code>.<br />
+        For example: <code>boards:4:a,jp,sama:a,z;</code>.<br />
+        An asterisk can be used to specify all boards on a site.<br />
+        For example: <code>boards:4:*;</code>.<br />
+      </li>
+      <li>
+        Show a custom reason in the stub. If not given, the type and regex will be shown.<br />
+        For example: <code>reason:This is bait;</code>
+      </li>
+      <li>
+        Select boards to be excluded from the filter. The syntax is the same as for the <code>boards:</code> option above.<br />
+        For example: <code>exclude:vg,v;</code>.
+      </li>
+      <li>
+        Filter OPs only along with their threads (`only`) or replies only (`no`).<br />
+        For example: <code>op:only;</code> or <code>op:no;</code>.
+      </li>
+      <li>
+        Filter only posts with files (`only`) or only posts without files (`no`).<br />
+        For example: <code>file:only;</code> or <code>file:no;</code>.
+      </li>
+      <li>
+        Overrule the `Show Stubs` setting if specified: create a stub (`yes`) or not (`no`).<br />
+        For example: <code>stub:yes;</code> or <code>stub:no;</code>.
+      </li>
+      <li>
+        Highlight instead of hiding. You can specify a class name to use with a userstyle.<br />
+        For example: <code>highlight;</code> or <code>highlight:wallpaper;</code>.
+      </li>
+      <li>
+        Highlighted OPs will have their threads put on top of the board index by default.<br />
+        For example: <code>top:yes;</code> or <code>top:no;</code>.
+      </li>
+      <li>Show a desktop notification instead of hiding: <code>notify;</code>.</li>
+      <li>Hide all posts from this poster: <code>poster;</code>.</li>
+      <li>Recursively hide replies: <code>replies;</code>.</li>
+      <li>Hide anyway even if highlighting. The highlight class will be applied to the stub: <code>hide;</code>.</li>
+      <li>
+        Filters in the "General" section apply to multiple fields, by default <code>subject,name,filename,comment</code>.<br />
+        The fields can be specified with the <code>type</code> option, separated by commas.<br />
+        For example: <code id="filterTypes"></code>.<br />
+        Types can also be combined with a <code>+</code> sign; this indicates the filter applies to the given fields joined by newlines.<br />
+        For example: <code>type:filename+filesize+dimensions;</code>.<br />
+      </li>
+    </ul>
+  </>
+);
+
+export default FilterGuideHtml;

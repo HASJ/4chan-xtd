@@ -1,0 +1,13 @@
+import h, { EscapedHtml } from '../../globals/jsx';
+
+const ExportHtml: EscapedHtml = (
+  <form id="export-form">
+    <div class="move">Export settings</div>
+    <label><input name="history" type="checkbox" />Export history (last read, your posts, etc)</label><br />
+    <label><input name="ask" type="checkbox" checked />Ask every time.</label><br />
+    <button type="submit">Export</button>
+    <button type="button" id="cancel-export">Cancel</button>
+  </form>
+);
+
+export default ExportHtml;
