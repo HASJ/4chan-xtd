@@ -3,6 +3,14 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.25.2 (2026-05-18)
+
+- Core architecture migration to TypeScript:
+  - Completed the 100% full conversion of the entire core codebase from JavaScript to TypeScript.
+  - Successfully migrated and typed 38 modules across multiple domains, including Filtering, Menu, General UI, Linkification, and all remaining Miscellaneous components.
+  - Ported and typed Chrome Extension background compilation layer `eventPage.ts` for clean building.
+  - Resolved compiler-wide type system constraints and ensured seamless compilation on all targets (Standard userscript, Chrome extension, and minified bundles).
+
 ### 2.25.1 (2026-05-18)
 
 - Captcha UI Refactor for T-captchas (slider captcha):
