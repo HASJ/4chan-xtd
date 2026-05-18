@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 // #region tests_enabled
 import Test from "../General/Test";
@@ -10,14 +9,18 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Embedding from "./Embedding";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Linkify = {
+interface LinkifyType {
+  init(): void;
+  node(this: any): void;
+  process(node: Node): HTMLAnchorElement[];
+  regString: RegExp;
+  makeRange(startNode: Node, endNode: Node, startOffset: number, endOffset: number): Range;
+  makeLink(range: Range): HTMLAnchorElement;
+}
+
+const Linkify: LinkifyType = {
   init() {
-    if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }
+    if (!['index', 'thread', 'archive'].includes(g.VIEW!) || !Conf['Linkify']) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);
@@ -28,15 +31,14 @@ var Linkify = {
       cb:   this.node
     });
 
-    return Embedding.init();
+    Embedding.init();
   },
 
-  node() {
-    let link;
+  node(this: any) {
     if (this.isClone) { return Embedding.events(this); }
     if (!Linkify.regString.test(this.info.comment)) { return; }
-    for (link of $$('a', this.nodes.comment)) {
-      if (g.SITE.isLinkified?.(link)) {
+    for (const link of $$('a', this.nodes.comment) as HTMLAnchorElement[]) {
+      if (g.SITE!.isLinkified?.(link)) {
         $.addClass(link, 'linkify');
         if (ImageHost.useFaster) { ImageHost.fixLinks([link]); }
         Embedding.process(link, this);
@@ -44,7 +46,7 @@ var Linkify = {
     }
     const links = Linkify.process(this.nodes.comment);
     if (ImageHost.useFaster) { ImageHost.fixLinks(links); }
-    for (link of links) { Embedding.process(link, this); }
+    for (const link of links) { Embedding.process(link, this); }
   },
 
   process(node) {
@@ -53,29 +55,30 @@ var Linkify = {
     const space    = /[\s"]/;
     const snapshot = $.X('.//br|.//text()', node);
     let i = 0;
-    const links = [];
-    while ((node = snapshot.snapshotItem(i++))) {
-      var result;
-      var {data} = node;
-      if (!data || (node.parentElement.nodeName === "A")) { continue; }
+    const links: Range[] = [];
+    let currNode: Node | null;
+    while ((currNode = snapshot.snapshotItem(i++))) {
+      let result;
+      let {data} = currNode as any;
+      if (!data || (currNode.parentElement!.nodeName === "A")) { continue; }
 
       while ((result = test.exec(data))) {
-        var {index} = result;
-        var endNode = node;
-        var word    = result[0];
+        const {index} = result;
+        let endNode = currNode;
+        let word    = result[0];
         // End of node, not necessarily end of space-delimited string
         if ((length = index + word.length) === data.length) {
-          var saved;
+          let saved;
           test.lastIndex = 0;
 
           while (saved = snapshot.snapshotItem(i++)) {
-            var end;
-            if ((saved.nodeName === 'BR') || ((saved.parentElement.nodeName === 'P') && !saved.previousSibling)) {
-              var part1, part2;
+            let end;
+            if ((saved.nodeName === 'BR') || ((saved.parentElement!.nodeName === 'P') && !saved.previousSibling)) {
+              let part1, part2;
               if (
                 // link deliberately split
                 (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
-                (part2 = snapshot.snapshotItem(i)?.data?.match(/^(\.[a-z\d-]+)*\//i)) &&
+                (part2 = (snapshot.snapshotItem(i) as any)?.data?.match(/^(\.[a-z\d-]+)*\//i)) &&
                 ((part1[0] + part2[0]).search(Linkify.regString) === 0)
               ) {
                 continue;
@@ -84,12 +87,12 @@ var Linkify = {
               }
             }
 
-            if ((saved.parentElement.nodeName === "A") && !Linkify.regString.test(word)) {
+            if ((saved.parentElement!.nodeName === "A") && !Linkify.regString.test(word)) {
               break;
             }
 
             endNode  = saved;
-            ({data}   = saved);
+            ({data}   = saved as any);
 
             if (end = space.exec(data)) {
               // Set our snapshot and regex to start on this node at this position when the loop resumes
@@ -105,7 +108,7 @@ var Linkify = {
         }
 
         if (Linkify.regString.test(word)) {
-          links.push(Linkify.makeRange(node, endNode, index, length));
+          links.push(Linkify.makeRange(currNode, endNode, index, length));
 
           // #region tests_enabled
           if (links.length) {
@@ -114,15 +117,16 @@ var Linkify = {
           // #endregion
         }
 
-        if (!test.lastIndex || (node !== endNode)) { break; }
+        if (!test.lastIndex || (currNode !== endNode)) { break; }
       }
     }
 
+    const aLinks: HTMLAnchorElement[] = [];
     i = links.length;
     while (i--) {
-      links[i] = Linkify.makeLink(links[i]);
+      aLinks[i] = Linkify.makeLink(links[i]);
     }
-    return links;
+    return aLinks;
   },
 
   regString: new RegExp(`(\
@@ -157,7 +161,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 
     if (i > 0) {
       text = text.slice(i);
-      while ((range.startOffset + i) >= range.startContainer.data.length) { i--; }
+      while ((range.startOffset + i) >= (range.startContainer as any).data.length) { i--; }
 
       if (i) { range.setStart(range.startContainer, range.startOffset + i); }
     }
@@ -165,7 +169,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     // Clean end of range
     i = 0;
     while (/[)\]}>.,]/.test(t = text.charAt(text.length - (1 + i)))) {
-      if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) { break; }
+      if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)!).length % 2)) { break; }
       i++;
     }
 
@@ -200,8 +204,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       rel:       'noreferrer noopener',
       target:    '_blank',
       href:      text
-    }
-    );
+    }) as HTMLAnchorElement;
 
     // Insert the range into the anchor, the anchor into the range's DOM location, and destroy the range.
     $.add(a, range.extractContents());
@@ -210,5 +213,5 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     return a;
   }
 };
-export default Linkify;
 
+export default Linkify;

@@ -1,14 +1,18 @@
-﻿// @ts-nocheck
 import { Conf, g } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Get = {
+interface GetType {
+  url(type: string, IDs: any, ...args: any[]): string | undefined;
+  threadExcerpt(thread: any): string;
+  threadFromRoot(root: HTMLElement | null): any;
+  threadFromNode(node: Node): any;
+  postFromRoot(root: HTMLElement | null): any;
+  postFromNode(root: Node): any;
+  postDataFromLink(link: HTMLAnchorElement): { boardID: string, threadID: number, postID: number };
+  allQuotelinksLinkingTo(post: any): HTMLAnchorElement[];
+}
+
+const Get: GetType = {
   url(type, IDs, ...args) {
     let f, site;
     if ((site = g.sites[IDs.siteID]) && (f = $.getOwn(site.urls, type))) {
@@ -17,6 +21,7 @@ var Get = {
       return undefined;
     }
   },
+
   threadExcerpt(thread) {
     const {OP} = thread;
     const excerpt = (`/${decodeURIComponent(thread.board.ID)}/ - `) + (
@@ -27,32 +32,44 @@ var Get = {
     if (excerpt.length > 73) { return `${excerpt.slice(0, 70)}...`; }
     return excerpt;
   },
+
   threadFromRoot(root) {
     if (root == null) { return null; }
     const {board} = root.dataset;
-    return g.threads.get(`${board ? encodeURIComponent(board) : g.BOARD.ID}.${root.id.match(/\d*$/)[0]}`);
+    return g.threads!.get(`${board ? encodeURIComponent(board) : g.BOARD!.ID}.${root.id.match(/\d*$/)![0]}`);
   },
+
   threadFromNode(node) {
-    return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.thread}`, node));
+    return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE!.xpath.thread}`, node) as HTMLElement);
   },
+
   postFromRoot(root) {
     if (root == null) { return null; }
-    const post  = g.posts.get(root.dataset.fullID);
+    const post  = g.posts!.get(root.dataset.fullID!);
+    if (!post) { return null; }
     const index = root.dataset.clone;
     if (index) { return post.clones[+index]; } else { return post; }
   },
+
   postFromNode(root) {
-    return Get.postFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.postContainer}[1]`, root));
+    return Get.postFromRoot($.x(`ancestor-or-self::${g.SITE!.xpath.postContainer}[1]`, root) as HTMLElement);
   },
+
   postDataFromLink(link) {
-    let boardID, postID, threadID;
+    let boardID: string, postID: string, threadID: string;
     if (link.dataset.postID) { // resurrected quote
-      ({boardID, threadID, postID} = link.dataset);
-      if (!threadID) { threadID = 0; }
+      ({boardID, threadID, postID} = link.dataset as any);
+      if (!threadID) { threadID = '0'; }
     } else {
-      const match = link.href.match(g.SITE.regexp.quotelink);
-      [boardID, threadID, postID] = match.slice(1);
-      if (!postID) { postID = threadID; }
+      const match = link.href.match(g.SITE!.regexp.quotelink);
+      if (match) {
+        [boardID, threadID, postID] = match.slice(1);
+        if (!postID) { postID = threadID; }
+      } else {
+        boardID = '';
+        threadID = '0';
+        postID = '0';
+      }
     }
     return {
       boardID,
@@ -60,22 +77,23 @@ var Get = {
       postID:   +postID
     };
   },
+
   allQuotelinksLinkingTo(post) {
     // Get quotelinks & backlinks linking to the given post.
-    const quotelinks = [];
-    const {posts} = g;
+    const quotelinks: HTMLAnchorElement[] = [];
+    const posts = g.posts!;
     const {fullID} = post;
-    const handleQuotes = function(qPost, type) {
+    const handleQuotes = function(qPost: any, type: 'quotelinks' | 'backlinks') {
       quotelinks.push(...(qPost.nodes[type] || []));
-      for (var clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
+      for (const clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
     };
     // First:
     //   In every posts,
     //   if it did quote this post,
     //   get all their backlinks.
-    posts.forEach(function(qPost) {
+    posts.forEach(function(qPost: any) {
       if (qPost.quotes.includes(fullID)) {
-        return handleQuotes(qPost, 'quotelinks');
+        handleQuotes(qPost, 'quotelinks');
       }
     });
 
@@ -85,8 +103,10 @@ var Get = {
     //   and their clones,
     //   get all of their backlinks.
     if (Conf['Quote Backlinks']) {
-      for (var quote of post.quotes) { var qPost;
-      if ((qPost = posts.get(quote))) { handleQuotes(qPost, 'backlinks'); } }
+      for (const quote of post.quotes) {
+        let qPost;
+        if ((qPost = posts.get(quote))) { handleQuotes(qPost, 'backlinks'); }
+      }
     }
 
     // Third:
@@ -97,5 +117,5 @@ var Get = {
     });
   }
 };
-export default Get;
 
+export default Get;
