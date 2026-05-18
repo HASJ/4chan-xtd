@@ -13,9 +13,9 @@ no affiliation with it.
 
 4chan XT was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for
 [this PR](https://github.com/ccd0/4chan-x/pull/3341), It is a migration of 4chan X from coffeescript to
-TypeScript/JavaScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. The goals of this
-project is to first get a working bundle from js/ts files, and then gradually convert js files to ts and add types as
-needed.
+TypeScript/JavaScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. The codebase has
+successfully achieved a 100% complete migration of all modules to TypeScript, fully resolving and decoupling legacy
+circular dependency loops (such as decoupling `Notice` and `CatalogLinks` from `Header`) for a robust modular architecture.
 
 New features since the fork include:
 
@@ -30,6 +30,7 @@ New features since the fork include:
 - A button to un-randomize a filename in the quick reply
 - Showing the reason a post was filtered in the stub
 - Marking replies to your post on the scroll bar
+- 100% codebase migration to TypeScript, completely sorting out and decoupling legacy circular dependency loops
 
 4chan X was previously developed by [ccd0](https://github.com/ccd0/4chan-x),
 [aeosynth](https://github.com/aeosynth/4chan-x), [Mayhem](https://github.com/MayhemYDG/4chan-x),

@@ -10,6 +10,7 @@ and import them in XT.
   - Successfully migrated and typed 38 modules across multiple domains, including Filtering, Menu, General UI, Linkification, and all remaining Miscellaneous components.
   - Ported and typed Chrome Extension background compilation layer `eventPage.ts` for clean building.
   - Resolved compiler-wide type system constraints and ensured seamless compilation on all targets (Standard userscript, Chrome extension, and minified bundles).
+  - Sorted out and decoupled legacy circular dependency loops (e.g., decoupling `Notice` and `CatalogLinks` from `Header`) to enable a clean, modular structure.
 
 ### 2.25.1 (2026-05-18)
 
