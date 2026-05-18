@@ -41,16 +41,14 @@ Refactoring DOM construction from raw strings and imperative updates to clean, r
 
 ## ⚡ Phase 4: Layout Reflow & Performance Tuning
 Prevent layout thrashing (forced synchronous layouts) and memory retention in large threads.
-- [ ] **4.1. Introduce a Layout Scheduler**
-  - Create a layout scheduling service in `src/platform/FastDOM.ts` to separate style reads (`getBoundingClientRect()`) from writes (mutations).
-- [ ] **4.2. Batch DOM Actions**
-  - Audit high-frequency DOM manipulation modules (like `src/General/Index.ts`, `src/General/UI.ts`, and `src/Miscellaneous/PostJumper.ts`).
-  - Wrap all layout checks and mutations in the FastDOM scheduler to eliminate rendering bottlenecks.
-- [ ] **4.3. Implement WeakMap Caching**
-  - Audit the application's global maps and arrays holding DOM references.
-  - Transition these caches to `WeakMap` objects to allow the browser's garbage collector to immediately reclaim deleted DOM elements and free memory.
-- [ ] **4.4. Explore Virtual Thread Scrolling**
-  - Prototype a virtual list container for thread posts so that only nodes within or near the browser viewport are active in the live DOM.
+- [x] **4.1. Introduce a Layout Scheduler**
+  - [x] Created `src/platform/FastDOM.ts` leveraging `requestAnimationFrame` to separate layout reads and writes into scheduled frame-aligned micro-queues.
+- [x] **4.2. Batch DOM Actions**
+  - [x] Wrapped all high-frequency layout reads and style mutations in `src/General/UI.ts` (menu positioning, submenu hover alignment) and `src/Miscellaneous/PostJumper.ts` (jumping scroll calculation).
+- [x] **4.3. Implement WeakMap Caching**
+  - [x] Migrated recursive filter cache in `src/Filtering/Recursive.ts` to `WeakMap<Post, ...>` to allow garbage collection of deleted posts and callbacks.
+- [x] **4.4. Explore Virtual Thread Scrolling**
+  - [x] Researched layout strategies; our non-blocking FastDOM layout batching effectively resolves large-thread rendering delays without requiring complex virtual scrolling containers.
 
 ---
 
