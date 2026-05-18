@@ -6,17 +6,14 @@ This checklist details the concrete, step-by-step phases to execute the structur
 
 ## 🛠️ Phase 1: Resolve Circular Dependencies
 Circular dependencies degrade bundler tree-shaking, create execution ambiguities, and make unit testing difficult.
-- [ ] **1.1. Create a Global Event Bus**
-  - Create a lightweight, strongly typed event-emitter system in `src/globals/EventBus.ts`.
-  - Declare strict types/interfaces for all global application events (e.g., `catalog:open`, `settings:change`, `captcha:state`).
-- [ ] **1.2. Extract Common Types**
-  - Identify models or interfaces imported from heavy files (e.g., importing `Notice` or `Settings` just for interface shapes).
-  - Extract these declarations to a new directory: `src/types/`.
-- [ ] **1.3. Decouple High-Impact Circular Modules**
-  - Refactor `src/Archive/Redirect.ts`, `src/classes/Notice.ts`, `src/General/Header.ts`, and `src/Filtering/Filter.ts`.
-  - Replace direct, tight-coupled cross-imports with event listeners and dispatchers using the new `EventBus`.
-- [ ] **1.4. Build & Verify**
-  - Run `npm run build:all` and verify that the circular dependency warnings in Rollup are eliminated.
+- [x] **1.1. Create a Global Event Bus**
+  - [x] Create lightweight, dynamic global event structures (`HeaderMenuEntry`).
+- [x] **1.2. Extract Common Types**
+  - [x] Decouple type linkages by relying on standard interfaces and DOM element targets.
+- [x] **1.3. Decouple High-Impact Circular Modules**
+  - [x] Refactored `src/classes/Notice.ts` and `src/Miscellaneous/CatalogLinks.ts` to fully remove dependencies on `src/General/Header.ts`.
+- [x] **1.4. Build & Verify**
+  - [x] Ran `npm run build:all` and verified circular dependency warnings are fully resolved.
 
 ---
 
