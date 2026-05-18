@@ -5,7 +5,6 @@ import $$ from "../platform/$$";
 import meta from '../../package.json';
 import Index from "../General/Index";
 import Site from "../site/Site";
-import Header from "../General/Header";
 import { g, Conf } from "../globals/globals";
 import UI from "../General/UI";
 import Get from "../General/Get";
@@ -73,7 +72,7 @@ const CatalogLinks: CatalogLinksType = {
       const input = $('input', el) as HTMLInputElement;
       $.on(input, 'change', this.toggle);
       $.sync('Header catalog links', CatalogLinks.set);
-      Header.menu.addEntry({
+      $.event('HeaderMenuEntry', {
         el,
         order: 95
       });
@@ -97,8 +96,8 @@ const CatalogLinks: CatalogLinksType = {
 
   set(useCatalog) {
     Conf['Header catalog links'] = useCatalog;
-    CatalogLinks.setLinks(Header.boardList);
-    CatalogLinks.setLinks(Header.bottomBoardList);
+    CatalogLinks.setLinks($.id('board-list'));
+    CatalogLinks.setLinks($(g.SITE.selectors.boardListBottom) as HTMLElement);
     CatalogLinks.el!.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
     ($('input', CatalogLinks.el!) as HTMLInputElement).checked = useCatalog;
   },

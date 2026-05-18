@@ -1,4 +1,3 @@
-import Header from "../General/Header";
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 import { SECOND } from "../platform/helpers";
@@ -47,7 +46,7 @@ export default class Notice {
       return;
     }
     $.off(d, 'visibilitychange', this.add);
-    $.add(Header.noticesRoot, this.el);
+    $.add($.id('notifications') || d.body, this.el);
     this.el.clientHeight; // force reflow
     this.el.style.opacity = '1';
     if (this.timeout) {

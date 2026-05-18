@@ -112,6 +112,7 @@ var Header: any = {
       ]});
 
     $.on(d, 'CreateNotification', this.createNotification);
+    $.on(d, 'HeaderMenuEntry', (e: CustomEvent) => Header.menu.addEntry(e.detail));
 
     this.setBoardList();
 
