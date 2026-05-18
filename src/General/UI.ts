@@ -4,6 +4,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Header from "./Header";
 import Icon from "../Icons/icon";
+import { FastDOM } from "../platform/FastDOM";
 
 const dialog = function(id: string, properties?: any) {
   const el = $.el('div', {
@@ -100,20 +101,28 @@ class MenuClass {
 
   setPosition() {
     if (!this.menu || !Menu.lastToggledButton) { return; }
-    const mRect   = this.menu.getBoundingClientRect();
-    const bRect   = Menu.lastToggledButton.getBoundingClientRect();
-    const cHeight = doc.clientHeight;
-    const cWidth  = doc.clientWidth;
-    const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
-      [`${bRect.bottom}px`, '']
-    :
-      ['', `${cHeight - bRect.top}px`];
-    const [left, right] = (bRect.left + mRect.width) < cWidth ?
-      [`${bRect.left}px`, '']
-    :
-      ['', `${cWidth - bRect.right}px`];
-    $.extend(this.menu.style, {top, right, bottom, left});
-    this.menu.classList.toggle('left', !!right);
+    const menuEl = this.menu;
+    const buttonEl = Menu.lastToggledButton;
+    FastDOM.read(() => {
+      if (!this.menu || !Menu.lastToggledButton) { return; }
+      const mRect   = menuEl.getBoundingClientRect();
+      const bRect   = buttonEl.getBoundingClientRect();
+      const cHeight = doc.clientHeight;
+      const cWidth  = doc.clientWidth;
+      const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
+        [`${bRect.bottom}px`, '']
+      :
+        ['', `${cHeight - bRect.top}px`];
+      const [left, right] = (bRect.left + mRect.width) < cWidth ?
+        [`${bRect.left}px`, '']
+      :
+        ['', `${cWidth - bRect.right}px`];
+      FastDOM.write(() => {
+        if (!this.menu || !Menu.lastToggledButton) { return; }
+        $.extend(menuEl.style, {top, right, bottom, left});
+        menuEl.classList.toggle('left', !!right);
+      });
+    });
   }
 
   insertEntry(entry: any, parent: HTMLElement, data: any) {
@@ -227,23 +236,29 @@ class MenuClass {
     $.addClass(entry, 'focused');
 
     if (!(submenu = $('.submenu', entry))) { return; }
-    const sRect   = submenu.getBoundingClientRect();
-    const eRect   = entry.getBoundingClientRect();
-    const cHeight = doc.clientHeight;
-    const cWidth  = doc.clientWidth;
-    const [top, bottom] = (eRect.top + sRect.height) < cHeight ?
-      ['0px', 'auto']
-    :
-      ['auto', '0px'];
-    const [left, right] = (eRect.right + sRect.width) < (cWidth - 150) ?
-      ['100%', 'auto']
-    :
-      ['auto', '100%'];
-    const {style} = submenu as HTMLElement;
-    style.top    = top;
-    style.bottom = bottom;
-    style.left   = left;
-    style.right  = right;
+    const submenuEl = submenu;
+    const entryEl = entry;
+    FastDOM.read(() => {
+      const sRect   = submenuEl.getBoundingClientRect();
+      const eRect   = entryEl.getBoundingClientRect();
+      const cHeight = doc.clientHeight;
+      const cWidth  = doc.clientWidth;
+      const [top, bottom] = (eRect.top + sRect.height) < cHeight ?
+        ['0px', 'auto']
+      :
+        ['auto', '0px'];
+      const [left, right] = (eRect.right + sRect.width) < (cWidth - 150) ?
+        ['100%', 'auto']
+      :
+        ['auto', '100%'];
+      FastDOM.write(() => {
+        const {style} = submenuEl as HTMLElement;
+        style.top    = top;
+        style.bottom = bottom;
+        style.left   = left;
+        style.right  = right;
+      });
+    });
   }
 
   addEntry(entry: any) {

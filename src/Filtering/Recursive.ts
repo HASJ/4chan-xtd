@@ -5,7 +5,7 @@ import { g } from "../globals/globals";
 type DropFirst<T extends unknown[]> = T extends [any, ...infer U] ? U : never;
 
 var Recursive = {
-  recursives: new Map<string, { recursives: ((...args: any) => void)[], args: any[][] }>(),
+  recursives: new WeakMap<Post, { recursives: ((...args: any) => void)[], args: any[][] }>(),
 
   init() {
     if (!['index', 'thread'].includes(g.VIEW)) return;
@@ -18,27 +18,30 @@ var Recursive = {
   node(this: Post) {
     if (this.isClone || this.isFetchedQuote) return;
     for (var quote of this.quotes) {
-      const obj = Recursive.recursives.get(quote);
-      if (obj) {
-        for (var i = 0; i < obj.recursives.length; i++) {
-          obj.recursives[i](this, ...obj.args[i]);
+      const qPost = g.posts?.get(quote);
+      if (qPost) {
+        const obj = Recursive.recursives.get(qPost);
+        if (obj) {
+          for (var i = 0; i < obj.recursives.length; i++) {
+            obj.recursives[i](this, ...obj.args[i]);
+          }
         }
       }
     }
   },
 
-  add<Fn extends (post: Post, ...args: any[]) => void>(recursive: Fn, post, ...args: DropFirst<Parameters<Fn>>) {
-    let obj = Recursive.recursives.get(post.fullID);
+  add<Fn extends (post: Post, ...args: any[]) => void>(recursive: Fn, post: Post, ...args: DropFirst<Parameters<Fn>>) {
+    let obj = Recursive.recursives.get(post);
     if (!obj) {
       obj = { recursives: [], args: [] };
-      Recursive.recursives.set(post.fullID, obj);
+      Recursive.recursives.set(post, obj);
     }
     obj.recursives.push(recursive);
     obj.args.push(args);
   },
 
   rm(recursive: (...args: any[]) => void, post: Post) {
-    const obj = Recursive.recursives.get(post.fullID);
+    const obj = Recursive.recursives.get(post);
     if (!obj) return;
     for (let i = obj.recursives.length - 1; i >= 0; --i) {
       if (obj.recursives[i] === recursive) {
@@ -54,7 +57,7 @@ var Recursive = {
     ...args: DropFirst<Parameters<Fn>>
   ) {
     const {fullID} = post;
-    g.posts.forEach(function(post) {
+    g.posts?.forEach(function(post) {
       if (post.quotes.includes(fullID)) {
         recursive(post, ...args);
       }

@@ -3,6 +3,7 @@ import { Conf, g, E } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Icon from "../Icons/icon";
+import { FastDOM } from "../platform/FastDOM";
 
 interface PostJumperType {
   buttons?: HTMLElement;
@@ -96,9 +97,13 @@ const PostJumper: PostJumperType = {
   },
 
   scroll(fromJumper, toJumper) {
-    const prevPos = fromJumper.getBoundingClientRect().top;
-    const destPos = toJumper.getBoundingClientRect().top;
-    window.scrollBy(0, destPos-prevPos);
+    FastDOM.read(() => {
+      const prevPos = fromJumper.getBoundingClientRect().top;
+      const destPos = toJumper.getBoundingClientRect().top;
+      FastDOM.write(() => {
+        window.scrollBy(0, destPos - prevPos);
+      });
+    });
   }
 };
 
