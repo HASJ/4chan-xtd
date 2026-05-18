@@ -1,6 +1,6 @@
-﻿// @ts-nocheck
 import { d } from "../globals/globals";
 
-const $$ = (selector, root = d.body) => Array.from(root.querySelectorAll(selector));
-export default $$;
+const $$ = <T extends Element = Element>(selector: string, root: ParentNode = d.body): T[] =>
+  Array.from(root.querySelectorAll(selector)) as T[];
 
+export default $$;
