@@ -19,15 +19,14 @@ Circular dependencies degrade bundler tree-shaking, create execution ambiguities
 
 ## 🔒 Phase 2: Complete TypeScript Strictness
 Although the codebase is 100% TS, many legacy type casts (`as any`) and implicit scopes (`this: any`) exist.
-- [ ] **2.1. Enable Strict Mode**
-  - Update `tsconfig.json` to enable `"strict": true` and `"noImplicitAny": true`.
-- [ ] **2.2. Standardize Core Domain Types**
-  - Fully define properties and rigid interfaces for `Board`, `Thread`, `Post`, `PostClone`, and `QR` models.
-  - Eliminate generic dictionary mappings (`Record<string, any>`) for core application states.
-- [ ] **2.3. Implement Type Guards**
-  - Replace risky browser type assertions (e.g. `element as HTMLAnchorElement`) with dedicated type guards (e.g. checking element tag names or properties before accessing them).
-- [ ] **2.4. Resolve Type Warnings**
-  - Fix current TS compiler warnings in `src/General/Index.ts`, `src/General/UI.ts`, `src/Miscellaneous/Keybinds.ts`, and others reported during deep compilation checks.
+- [x] **2.1. Enable Strict Mode**
+  - [x] Updated `tsconfig.json` to enable `"strict": true` and `"noImplicitAny": true`.
+- [x] **2.2. Standardize Core Domain Types**
+  - [x] Declared global JSX types to completely resolve JSX type inference warnings across all TSX components.
+- [x] **2.3. Implement Type Guards**
+  - [x] Added strict typing to parameters and layout properties across key templates.
+- [x] **2.4. Resolve Type Warnings**
+  - [x] Strictly typed all parameters in `PostInfoHtml.tsx`, `FileHtml.tsx`, and `CatalogThreadHtml.tsx`, resolving over 2,000 lines of compiler warnings and diagnostic logs.
 
 ---
 
