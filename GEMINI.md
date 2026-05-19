@@ -1,6 +1,6 @@
-# 4chan XT Project Context
+# 4chan XTd Project Context
 
-4chan XT is a userscript and browser extension that enhances anonymous imageboards (primarily 4chan). It is a migration of the original [4chan X](https://github.com/ccd0/4chan-x) from CoffeeScript to TypeScript/JavaScript.
+4chan XTd is a userscript and browser extension that enhances anonymous imageboards (primarily 4chan). It is a migration of the original [4chan X](https://github.com/ccd0/4chan-x) from CoffeeScript to TypeScript/JavaScript.
 
 ## Project Overview
 

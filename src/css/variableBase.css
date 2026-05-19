@@ -18,7 +18,7 @@
 
 /* Header */
 #header-bar.dialog {
-  background-color: var(--xt-header-dialog-bg);
+  background-color: var(--xt-header-dialog-bg, var(--xt-background, inherit));
 }
 :root:not(.fixed) #header-bar, #notifications {
   font-size: var(--xt-notification-size, 9pt);
