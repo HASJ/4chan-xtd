@@ -180,6 +180,12 @@ const CaptchaT = {
         slider.dispatchEvent(new Event('input', { bubbles: true }));
         $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
         $.addClass(strip, 'selected');
+        if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
+          const tNext = $('#t-next', mainDiv);
+          if (tNext && !tNext.disabled) {
+            tNext.click();
+          }
+        }
       });
       $.add(stripsContainer, strip);
     }
@@ -236,6 +242,7 @@ const CaptchaT = {
 
       // Done capturing!
       this.isCapturing = false;
+      this.isRestoring = true;
       // Restore slider and visually select the active strip
       slider.value = originalSliderValue;
       slider.dispatchEvent(new Event('change', { bubbles: true }));
@@ -244,6 +251,7 @@ const CaptchaT = {
       const targetValue = parseInt(originalSliderValue, 10) || 0;
       const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
       if (targetStrip) targetStrip.click();
+      this.isRestoring = false;
     };
 
     runCapture();
@@ -408,6 +416,12 @@ const CaptchaT = {
           slider.dispatchEvent(new Event('input', { bubbles: true }));
           $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
           $.addClass(strip, 'selected');
+          if (Conf['Next challenge on captcha selection']) {
+            const tNext = $('#t-next', mainDiv);
+            if (tNext && !tNext.disabled) {
+              tNext.click();
+            }
+          }
         });
         $.add(strips, strip);
       }

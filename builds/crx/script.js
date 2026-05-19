@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.25.1",
-    "date": "2026-05-18T06:00:00Z"
+    "version": "2.25.2",
+    "date": "2026-05-19T12:20:00Z"
   };
 
   var meta = {
@@ -772,6 +772,11 @@ div.boardTitle {
         'Post on Captcha Completion': [
           false,
           'Submit the post immediately when the captcha is completed.',
+          1
+        ],
+        'Next challenge on captcha selection': [
+          false,
+          'Automatically go to the next challenge when a captcha answer is selected.',
           1
         ],
         'Avoid OffscreenCanvas': [
@@ -6972,6 +6977,12 @@ svg.icon {
           slider.dispatchEvent(new Event('input', { bubbles: true }));
           $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
           $.addClass(strip, 'selected');
+          if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
+            const tNext = $('#t-next', mainDiv);
+            if (tNext && !tNext.disabled) {
+              tNext.click();
+            }
+          }
         });
         $.add(stripsContainer, strip);
       }
@@ -7028,6 +7039,7 @@ svg.icon {
 
         // Done capturing!
         this.isCapturing = false;
+        this.isRestoring = true;
         // Restore slider and visually select the active strip
         slider.value = originalSliderValue;
         slider.dispatchEvent(new Event('change', { bubbles: true }));
@@ -7036,6 +7048,7 @@ svg.icon {
         const targetValue = parseInt(originalSliderValue, 10) || 0;
         const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
         if (targetStrip) targetStrip.click();
+        this.isRestoring = false;
       };
 
       runCapture();
@@ -7200,6 +7213,12 @@ svg.icon {
             slider.dispatchEvent(new Event('input', { bubbles: true }));
             $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
             $.addClass(strip, 'selected');
+            if (Conf['Next challenge on captcha selection']) {
+              const tNext = $('#t-next', mainDiv);
+              if (tNext && !tNext.disabled) {
+                tNext.click();
+              }
+            }
           });
           $.add(strips, strip);
         }

@@ -3,6 +3,12 @@
 4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XT.
 
+### 2.25.2 (2026-05-19)
+
+- Captcha option to auto-advance challenges on selection:
+  - Added new option `'Next challenge on captcha selection'` under Posting and Captchas settings.
+  - Automatically click the next challenge button when a captcha answer strip is selected.
+
 ### 2.25.1 (2026-05-18)
 
 - Captcha UI Refactor for T-captchas (slider captcha):

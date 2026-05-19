@@ -560,6 +560,11 @@ const Config = {
         'Submit the post immediately when the captcha is completed.',
         1
       ],
+      'Next challenge on captcha selection': [
+        false,
+        'Automatically go to the next challenge when a captcha answer is selected.',
+        1
+      ],
       'Avoid OffscreenCanvas': [
         false,
         'Do not use OffscreenCanvas when converting images, workaround for ' +

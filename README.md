@@ -28,6 +28,7 @@ New features since the fork include:
 - A button to un-randomize a filename in the quick reply
 - Showing the reason a post was filtered in the stub
 - Marking replies to your post on the scroll bar
+- An option in captcha settings to automatically go to the next challenge when a captcha answer is selected
 
 4chan X was previously developed by [ccd0](https://github.com/ccd0/4chan-x),
 [aeosynth](https://github.com/aeosynth/4chan-x), [Mayhem](https://github.com/MayhemYDG/4chan-x),
