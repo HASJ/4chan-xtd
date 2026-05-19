@@ -1,8 +1,8 @@
 {
-  "name": "4chan XT",
-  "version": "2.25.2",
+  "name": "4chan XTd",
+  "version": "2.26.0",
   "manifest_version": 2,
-  "description": "4chan XT is a script that adds various features to anonymous imageboards.",
+  "description": "4chan XTd is a script that adds various features to anonymous imageboards.",
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -58,7 +58,7 @@
     ],
     "persistent": false
   },
-  "homepage_url": "https://github.com/TuxedoTako/4chan-xt",
+  "homepage_url": "https://github.com/TuxedoTako/4chan-xtd",
   "minimum_chrome_version": "90",
   "applications": {
     "gecko": {

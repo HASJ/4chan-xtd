@@ -568,7 +568,7 @@ const Config = {
       'Avoid OffscreenCanvas': [
         false,
         'Do not use OffscreenCanvas when converting images, workaround for ' +
-          '<a href="https://github.com/TuxedoTako/4chan-xt/issues/132">this LibreWolf bug</a>',
+          '<a href="https://github.com/TuxedoTako/4chan-xtd/issues/132">this LibreWolf bug</a>',
         1
       ],
       'Force Noscript Captcha': [

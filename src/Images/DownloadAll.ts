@@ -16,7 +16,7 @@ const DownloadAll = {
 
   getDownloadedSet(threadID: number): Set<string> {
     try {
-      const stored = localStorage.getItem(`4chan-xt-downloaded-${threadID}`);
+      const stored = localStorage.getItem(`4chan-xtd-downloaded-${threadID}`) || localStorage.getItem(`4chan-xt-downloaded-${threadID}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return new Set(parsed);
@@ -29,7 +29,7 @@ const DownloadAll = {
     const downloadedSet = DownloadAll.getDownloadedSet(threadID);
     downloadedSet.add(url);
     try {
-      localStorage.setItem(`4chan-xt-downloaded-${threadID}`, JSON.stringify(Array.from(downloadedSet)));
+      localStorage.setItem(`4chan-xtd-downloaded-${threadID}`, JSON.stringify(Array.from(downloadedSet)));
     } catch (e) {}
   },
 

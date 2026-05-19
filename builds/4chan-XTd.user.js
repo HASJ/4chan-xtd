@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         4chan XT
-// @version      2.25.2
+// @name         4chan XTd
+// @version      2.26.0
 // @minGMVer     1.14
 // @minFFVer     78
-// @namespace    4chan-XT
-// @description  4chan XT is a script that adds various features to anonymous imageboards.
-// @license      MIT; https://github.com/TuxedoTako/4chan-xt/blob/project-XT/LICENSE
+// @namespace    4chan-XTd
+// @description  4chan XTd is a script that adds various features to anonymous imageboards.
+// @license      MIT; https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/LICENSE
 // @include      https://boards.4chan.org/*
 // @include      https://sys.4chan.org/*
 // @include      https://www.4chan.org/*
@@ -169,25 +169,25 @@
   'use strict';
 
   var version = {
-    "version": "2.25.2",
-    "date": "2026-05-19T12:20:00Z"
+    "version": "2.26.0",
+    "date": "2026-05-19T14:56:00Z"
   };
 
   var meta = {
-   "name": "4chan XT",
-   "path": "4chan-XT",
+   "name": "4chan XTd",
+   "path": "4chan-XTd",
    "fork": "TuxedoTako",
-   "page": "https://github.com/TuxedoTako/4chan-xt",
-   "downloads": "https://github.com/TuxedoTako/4chan-xt/releases",
+   "page": "https://github.com/TuxedoTako/4chan-xtd",
+   "downloads": "https://github.com/TuxedoTako/4chan-xtd/releases",
    "oldVersions": "https://raw.githubusercontent.com/ccd0/4chan-x/",
-   "faq": "https://github.com/TuxedoTako/4chan-xt/wiki/Frequently-Asked-Questions",
+   "faq": "https://github.com/TuxedoTako/4chan-xtd/wiki/Frequently-Asked-Questions",
    "upstreamFaq": "https://github.com/ccd0/4chan-x/wiki/Frequently-Asked-Questions",
    "captchaFAQ": "https://github.com/ccd0/4chan-x/wiki/Captcha-FAQ",
    "cssGuide": "https://github.com/ccd0/4chan-x/wiki/Styling-Guide",
-   "license": "https://github.com/TuxedoTako/4chan-xt/blob/project-XT/LICENSE",
-   "changelog": "https://github.com/TuxedoTako/4chan-xt/blob/project-XT/CHANGELOG.md",
-   "issues": "https://github.com/TuxedoTako/4chan-xt/issues",
-   "newIssue": "https://github.com/TuxedoTako/4chan-xt/issues",
+   "license": "https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/LICENSE",
+   "changelog": "https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/CHANGELOG.md",
+   "issues": "https://github.com/TuxedoTako/4chan-xtd/issues",
+   "newIssue": "https://github.com/TuxedoTako/4chan-xtd/issues",
    "newIssueMaxLength": 8181,
    "alternatives": "https://www.4chan-x.net/4chan_alternatives.html",
    "appid": "lacclbnghgdicfifcamcmcnilckjamag",
@@ -866,7 +866,7 @@ div.boardTitle {
         'Avoid OffscreenCanvas': [
           false,
           'Do not use OffscreenCanvas when converting images, workaround for ' +
-            '<a href="https://github.com/TuxedoTako/4chan-xt/issues/132">this LibreWolf bug</a>',
+            '<a href="https://github.com/TuxedoTako/4chan-xtd/issues/132">this LibreWolf bug</a>',
           1
         ],
         'Force Noscript Captcha': [
@@ -1581,12 +1581,17 @@ current-archive-text:"Archive"]
     },
     exposeVersion: ({ buildDate, version }) => {
       const date = +buildDate;
+      const value = Object.freeze({
+        version,
+        // Getter to prevent mutations.
+        get buildDate() { return new Date(date); },
+      });
+      Object.defineProperty(window, 'fourchanXTd', {
+        value,
+        writable: false,
+      });
       Object.defineProperty(window, 'fourchanXT', {
-        value: Object.freeze({
-          version,
-          // Getter to prevent mutations.
-          get buildDate() { return new Date(date); },
-        }),
+        value,
         writable: false,
       });
     },
@@ -2086,7 +2091,7 @@ current-archive-text:"Archive"]
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-  if (platform === 'userscript') {
+
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -2115,7 +2120,7 @@ current-archive-text:"Archive"]
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-  }
+
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -2162,16 +2167,7 @@ current-archive-text:"Archive"]
       Promise.resolve().then(execTask);
     };
   })();
-  if (platform === 'crx') {
-    const callbacks = new Map();
-    chrome.runtime.onMessage.addListener(({ id, data }) => {
-      callbacks.get(id)(data);
-      callbacks.delete(id);
-    });
-    $.eventPageRequest = (params) => new Promise(resolve => {
-      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
-    });
-  }
+
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -2280,178 +2276,7 @@ current-archive-text:"Archive"]
       return delete data['Redirect to HTTPS'];
     }
   };
-  if (platform === 'crx') {
-    // https://developer.chrome.com/extensions/storage.html
-    $.oldValue = {
-      local: dict(),
-      sync: dict()
-    };
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      for (var key in changes) {
-        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        $.oldValue[area][key] = dict.clone(changes[key].newValue);
-        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        var cb = $.syncing[key];
-        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
-          cb(newValue, key);
-        }
-      }
-    });
-    $.sync = (key, cb) => $.syncing[key] = cb;
-    $.forceSync = function () { };
-    $.crxWorking = function () {
-      try {
-        if (chrome.runtime.getManifest()) {
-          return true;
-        }
-      } catch (error) { }
-      if (!$.crxWarningShown) {
-        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
-        $.on($('a', msg), 'click', () => location.reload());
-        new Notice('warning', msg);
-        $.crxWarningShown = true;
-      }
-      return false;
-    };
-    $.get = $.oneItemSugar(function (data, cb) {
-      if (!$.crxWorking()) {
-        return;
-      }
-      const results = {};
-      const get = function (area) {
-        let keys = Object.keys(data);
-        // XXX slow performance in Firefox
-        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
-          keys = null;
-        }
-        return chrome.storage[area].get(keys, function (result) {
-          let key;
-          result = dict.clone(result);
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (keys === null) {
-            const result2 = dict();
-            for (key in result) {
-              var val = result[key];
-              if ($.hasOwn(data, key)) {
-                result2[key] = val;
-              }
-            }
-            result = result2;
-          }
-          for (key in data) {
-            $.oldValue[area][key] = result[key];
-          }
-          results[area] = result;
-          if (results.local && results.sync) {
-            $.extend(data, results.sync);
-            $.extend(data, results.local);
-            return cb(data);
-          }
-        });
-      };
-      get('local');
-      return get('sync');
-    });
-    (function () {
-      const items = {
-        local: dict(),
-        sync: dict()
-      };
-      const exceedsQuota = (key, value) => // bytes in UTF-8
-      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
-      $.delete = function (keys) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        if (typeof keys === 'string') {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          delete items.local[key];
-          delete items.sync[key];
-        }
-        chrome.storage.local.remove(keys);
-        return chrome.storage.sync.remove(keys);
-      };
-      const timeout = {};
-      var setArea = function (area, cb) {
-        const data = dict();
-        $.extend(data, items[area]);
-        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
-          return;
-        }
-        return chrome.storage[area].set(data, function () {
-          let err;
-          let key;
-          if (err = chrome.runtime.lastError) {
-            c.error(err.message);
-            setTimeout(setArea, MINUTE, area);
-            timeout[area] = Date.now() + MINUTE;
-            return cb?.(err);
-          }
-          delete timeout[area];
-          for (key in data) {
-            if (items[area][key] === data[key]) {
-              delete items[area][key];
-            }
-          }
-          if (area === 'local') {
-            for (key in data) {
-              var val = data[key];
-              if (!exceedsQuota(key, val)) {
-                items.sync[key] = val;
-              }
-            }
-            setSync();
-          } else {
-            chrome.storage.local.remove(((() => {
-              const result = [];
-              for (key in data) {
-                if (!(key in items.local)) {
-                  result.push(key);
-                }
-              }
-              return result;
-            })()));
-          }
-          return cb?.();
-        });
-      };
-      var setSync = debounce(SECOND, () => setArea('sync'));
-      $.set = $.oneItemSugar(function (data, cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        $.securityCheck(data);
-        $.extend(items.local, data);
-        return setArea('local', cb);
-      });
-      return $.clear = function (cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        items.local = dict();
-        items.sync = dict();
-        let count = 2;
-        let err = null;
-        const done = function () {
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (err == null) {
-            err = chrome.runtime.lastError;
-          }
-          if (!--count) {
-            return cb?.(err);
-          }
-        };
-        chrome.storage.local.clear(done);
-        return chrome.storage.sync.clear(done);
-      };
-    })();
-  } else {
+
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -2668,7 +2493,6 @@ current-archive-text:"Archive"]
         return cb?.();
       };
     }
-  }
 
   // @ts-nocheck
 
@@ -3358,7 +3182,7 @@ current-archive-text:"Archive"]
 
 /* Header */
 #header-bar.dialog {
-  background-color: var(--xt-header-dialog-bg);
+  background-color: var(--xt-header-dialog-bg, var(--xt-background, inherit));
 }
 :root:not(.fixed) #header-bar, #notifications {
   font-size: var(--xt-notification-size, 9pt);
@@ -20220,14 +20044,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      if (platform === 'crx') {
-        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
-          .then(({ response, responseHeaderString }) => {
-          if (response)
-            response = new Uint8Array(response);
-          cb(response, responseHeaderString);
-        });
-      } else {
+
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -20279,7 +20096,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } catch (error) {
           return fallback();
         }
-      }
+
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20351,7 +20168,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-      if (platform === 'userscript') {
+
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -20399,14 +20216,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             } catch (error1) { }
           };
         }
-      } else {
-        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
-          if (result.status) {
-            $.extend(req, result);
-          }
-          return req.onloadend();
-        });
-      }
+
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20421,15 +20231,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-      if (platform === 'crx') {
-        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
-          if (result) {
-            return cb();
-          } else {
-            return cbFail();
-          }
-        });
-      }
+
       return cb();
     },
   };
@@ -24600,7 +24402,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     isDownloading: false,
     getDownloadedSet(threadID) {
       try {
-        const stored = localStorage.getItem(`4chan-xt-downloaded-${threadID}`);
+        const stored = localStorage.getItem(`4chan-xtd-downloaded-${threadID}`) || localStorage.getItem(`4chan-xt-downloaded-${threadID}`);
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed))
@@ -24613,7 +24415,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       const downloadedSet = DownloadAll.getDownloadedSet(threadID);
       downloadedSet.add(url);
       try {
-        localStorage.setItem(`4chan-xt-downloaded-${threadID}`, JSON.stringify(Array.from(downloadedSet)));
+        localStorage.setItem(`4chan-xtd-downloaded-${threadID}`, JSON.stringify(Array.from(downloadedSet)));
       } catch (e) { }
     },
     init() {
@@ -26933,9 +26735,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-        if (platform === 'crx') {
-          w = (w.wrappedJSObject || w);
-        }
+
         if (`${meta.name} antidup` in w) {
           return;
         }
@@ -26952,7 +26752,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return;
       }
       $.asap(docSet, function () {
-        $.addClass(doc, 'fourchan-xt', 'fourchan-x', 'seaweedchan');
+        $.addClass(doc, 'fourchan-xtd', 'fourchan-xt', 'fourchan-x', 'seaweedchan');
         if ($.engine)
           $.addClass(doc, `ua-${$.engine}`);
         BoardConfig.ready(() => {
@@ -27240,6 +27040,10 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
         }
         let css = `\
+:root {
+  --xt-background: ${bgColor};
+  --xt-header-dialog-bg: ${bgColor};
+}
 .dialog, .suboption-list > div:last-of-type, :root.catalog-hover-expand .catalog-container:hover > .post {
   background: ${bgColor};
 }

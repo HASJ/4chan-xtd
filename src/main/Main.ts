@@ -139,7 +139,7 @@ var Main = {
     // Detect multiple copies of 4chan X
     if (doc && $.hasClass(doc, 'fourchan-x')) { return; }
     $.asap(docSet, function() {
-      $.addClass(doc, 'fourchan-xt', 'fourchan-x', 'seaweedchan');
+      $.addClass(doc, 'fourchan-xtd', 'fourchan-xt', 'fourchan-x', 'seaweedchan');
       if ($.engine) $.addClass(doc, `ua-${$.engine}`);
       BoardConfig.ready(() => {
         if (g.BOARD?.config.ws_board != null) $.addClass(doc, g.BOARD.config.ws_board ? 'ws' : 'nws');
@@ -444,6 +444,10 @@ var Main = {
         bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
       }
       let css = `\
+:root {
+  --xt-background: ${bgColor};
+  --xt-header-dialog-bg: ${bgColor};
+}
 .dialog, .suboption-list > div:last-of-type, :root.catalog-hover-expand .catalog-container:hover > .post {
   background: ${bgColor};
 }

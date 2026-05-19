@@ -31,12 +31,17 @@ const PageContextFunctions = {
 
   exposeVersion: ({ buildDate, version }) => {
       const date = +buildDate;
+      const value = Object.freeze({
+        version,
+        // Getter to prevent mutations.
+        get buildDate() { return new Date(date) },
+      });
+      Object.defineProperty(window, 'fourchanXTd', {
+        value,
+        writable: false,
+      });
       Object.defineProperty(window, 'fourchanXT', {
-        value: Object.freeze({
-          version,
-          // Getter to prevent mutations.
-          get buildDate() { return new Date(date) },
-        }),
+        value,
         writable: false,
       });
   },

@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         4chan XT
-// @version      2.25.2
+// @name         4chan XTd
+// @version      2.26.0
 // @minGMVer     1.14
 // @minFFVer     78
-// @namespace    4chan-XT
-// @description  4chan XT is a script that adds various features to anonymous imageboards.
-// @license      MIT; https://github.com/TuxedoTako/4chan-xt/blob/project-XT/LICENSE
+// @namespace    4chan-XTd
+// @description  4chan XTd is a script that adds various features to anonymous imageboards.
+// @license      MIT; https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/LICENSE
 // @include      https://boards.4chan.org/*
 // @include      https://sys.4chan.org/*
 // @include      https://www.4chan.org/*
@@ -78,7 +78,7 @@
 // @grant        GM.xmlHttpRequest
 // @run-at       document-start
 // @updateURL    none
-// @downloadURL  https://github.com/TuxedoTako/4chan-xt/releases/latest/download/4chan-XT.user.js
+// @downloadURL  https://github.com/TuxedoTako/4chan-xtd/releases/latest/download/4chan-XTd.min.user.js
 // @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAACVBMVEUAAGcAAABmzDNZt9VtAAAAAXRSTlMAQObYZgAAAF5JREFUeNrtkTESABAQxPD/R6tsE2dUGYUtFJvLDKf93KevHJAjpBorAQWSBIKqFASC4G0pCAkm4GfaEvgYXl0T6HBaE97f0vmnfYHbZOMLZCx9ISdKWwjOWZSC8GYm4SUGwfYgqI4AAAAASUVORK5CYII=
 // @license      MIT
 // ==/UserScript==

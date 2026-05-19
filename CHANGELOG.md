@@ -1,7 +1,20 @@
-## 4chan XT changelog
+## 4chan XTd changelog
 
-4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
-and import them in XT.
+4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
+and import them in XTd.
+
+### 2.26.0 (2026-05-19)
+
+- Declared project as active and alive in `README.md`.
+- Complete migration/branding from 4chan XT to 4chan XTd:
+  - Renamed namespace, homepage, downloads, and documentation references across the codebase.
+  - Exposed `window.fourchanXTd` for user scripts while keeping `window.fourchanXT` as a getter for backward compatibility.
+  - Switched media downloader cache to use `4chan-xtd-downloaded` storage keys with backward-compatible legacy fallbacks.
+
+- Bugfixes
+  - Fixed transparent header bar and text overlapping bugs:
+    - Added robust fallback rules in CSS custom properties.
+    - Dynamically set `--xt-background` and `--xt-header-dialog-bg` on `:root` when compiling computed custom/native themes.
 
 ### 2.25.2 (2026-05-19)
 
@@ -91,10 +104,10 @@ bug fix pull requests that were open.
 
 - Fix notification padding. [#146](https://github.com/TuxedoTako/4chan-xt/issues/146),
   [#147](https://github.com/TuxedoTako/4chan-xt/pull/147)
-- Fix shortcuts getting squished in the non-4chan-XT catalog. [#148](https://github.com/TuxedoTako/4chan-xt/issues/148),
+- Fix shortcuts getting squished in the non-4chan-XTd catalog. [#148](https://github.com/TuxedoTako/4chan-xt/issues/148),
   [#149](https://github.com/TuxedoTako/4chan-xt/pull/149)
 - Fix not being able to clear keybinds with backspace.
-  [Greasy Fork comment](https://greasyfork.org/en/scripts/489508-4chan-xt/discussions/274072)
+  [Greasy Fork comment](https://greasyfork.org/en/scripts/489508-4chan-xtd/discussions/274072)
 
 ### 2.21.1 (2025-01-12)
 
@@ -305,7 +318,7 @@ bug fix pull requests that were open.
   - Move some settings to the advanced setting: you can now choose which language to translate into instead of English
     or nothing.
 - Remember QR size option is no longer Firefox only. [#61](https://github.com/TuxedoTako/4chan-xt/pull/61)
-- CSS custom properties, also known as CSS variables, used by 4chan XT are now documented in
+- CSS custom properties, also known as CSS variables, used by 4chan XTd are now documented in
   [src/css/README.md](./src/css/README.md).
 - Now that 4chan redirects to https, http support is dropped.
   [#61 \(comment\)](https://github.com/TuxedoTako/4chan-xt/pull/61#issuecomment-2119154714)
@@ -431,7 +444,7 @@ bug fix pull requests that were open.
 ### v2.4.1 (2024-01-21)
 
 - Fixed new Relative dates settings' interaction with elements that aren't the date info on posts, like the refresh
-  button on the 4chan-XT catalog.
+  button on the 4chan-XTd catalog.
 
 ### v2.4.0 (2024-01-21)
 
@@ -463,7 +476,7 @@ bug fix pull requests that were open.
 
 ### v2.3.2 (2023-12-27)
 
-- Fixed the settings import mistaking a 4chan XT config for a [loadletter/4chan-x](https://github.com/loadletter/4chan-x)
+- Fixed the settings import mistaking a 4chan XTd config for a [loadletter/4chan-x](https://github.com/loadletter/4chan-x)
   one and failing. [#16](https://github.com/TuxedoTako/4chan-xt/issues/16)
 
 ### v2.3.1 (2023-12-26)
@@ -474,7 +487,7 @@ bug fix pull requests that were open.
 ### v2.3.0 (2023-12-25) (Merry Christmas)
 
 - Added `.fourchan-xt` class. [#11](https://github.com/TuxedoTako/4chan-xt/issues/11)
-- Added `window.fourchanXT` with the version number in `version` and a `buildDate` `Date` object.
+- Added `window.fourchanXTd` with the version number in `version` and a `buildDate` `Date` object.
 - Version number is no longer prefixed with "XT ", and will now follow major.minor.bugfix.
 - Fixed "Expand All Images" shortcut in the header. [#13](https://github.com/TuxedoTako/4chan-xt/issues/13)
 - Ran the chrome extension version, and fixed a problem with the ajax function. How long has that been down? I use the
