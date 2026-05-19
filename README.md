@@ -21,6 +21,7 @@ New features since the fork include:
 - Stacked new captcha challenge with keyboard number keys support
 
 4chan X was previously developed by [ccd0](https://github.com/ccd0/4chan-x), [aeosynth](https://github.com/aeosynth/4chan-x), [Mayhem](https://github.com/MayhemYDG/4chan-x), [ihavenoface](https://github.com/ihavenoface/4chan-x), [Zixaphir](https://github.com/zixaphir/appchan-x), [Seaweed](https://github.com/seaweedchan/4chan-x), and [Spittie](https://github.com/Spittie/4chan-x), with contributions from many others.
+4chan XT was previosly developed by [TuxedoTako](https://github.com/TuxedoTako/4chan-xt).
 
 ## Please note
 **Uninstalling**: 4chan XTd disables the native extension, so if you uninstall 4chan XTd, you'll need to re-enable it. To do this, click the `[Settings]` link in the top right corner, uncheck "`Disable the native extension`" in the panel that appears, and click the "`Save Settings`" button. If you don't see a "`Save Settings`" button, it may be being hidden by your ad blocker.
