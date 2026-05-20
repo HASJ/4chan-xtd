@@ -395,32 +395,44 @@ var Main = {
   },
 
   setClass(): void {
-    let mainStyleSheet, style, styleSheets;
+    let mainStyleSheet: HTMLLinkElement | null = null;
+    let style: string | null = null;
+    let styleSheets: HTMLLinkElement[] | null = null;
     const knownStyles = ['yotsuba', 'yotsuba-b', 'futaba', 'burichan', 'photon', 'tomorrow', 'spooky'];
 
     if ((g.SITE.software === 'yotsuba') && (g.VIEW === 'catalog')) {
-      if (mainStyleSheet = $.id('base-css')) {
-        style = mainStyleSheet.href.match(/catalog_(\w+)/)?.[1].replace('_new', '').replace(/_+/g, '-');
-        if (knownStyles.includes(style)) {
+      const baseCss = $.id('base-css') as HTMLLinkElement | null;
+      if (baseCss) {
+        mainStyleSheet = baseCss;
+        const match = mainStyleSheet.href.match(/catalog_(\w+)/);
+        style = match?.[1].replace('_new', '').replace(/_+/g, '-') || null;
+        if (style && knownStyles.includes(style)) {
           $.addClass(doc, style);
           return;
         }
       }
     }
 
-    style = (mainStyleSheet = (styleSheets = null));
+    style = null;
 
     const setStyle = function() {
       // Use preconfigured CSS for 4chan's default themes.
       if (g.SITE.software === 'yotsuba') {
-        $.rmClass(doc, style);
+        if (style) {
+          $.rmClass(doc, style);
+        }
         style = null;
-        for (var styleSheet of styleSheets) {
-          if (!styleSheet.disabled) {
-            style = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
-            if (style === '_special') { style = styleSheet.href.match(/[a-z]*(?=[^/]*$)/)[0]; }
-            if (!knownStyles.includes(style)) { style = null; }
-            break;
+        if (styleSheets) {
+          for (const styleSheet of styleSheets) {
+            if (styleSheet.href === mainStyleSheet?.href) {
+              style = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
+              if (style === '_special') {
+                const match = styleSheet.href.match(/[a-z]*(?=[^/]*$)/);
+                style = match ? match[0] : null;
+              }
+              if (style && !knownStyles.includes(style)) { style = null; }
+              break;
+            }
           }
         }
         if (style) {
@@ -439,10 +451,11 @@ var Main = {
       $.rm(div);
       const rgb = bgColor.match(/[\d.]+/g);
       // Use body background if reply background is transparent
-      if (!/^rgb\(/.test(bgColor)) {
+      if (!rgb || !/^rgb\(/.test(bgColor)) {
         const s = window.getComputedStyle(d.body);
         bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
       }
+      const parsedRgb = bgColor.match(/[\d.]+/g) || ['255', '255', '255', '1'];
       let css = `\
 :root {
   --xt-background: ${bgColor};
@@ -452,30 +465,35 @@ var Main = {
   background: ${bgColor};
 }
 .unread-mark-read {
-  background-color: rgba(${rgb.slice(0, 3).join(', ')}, ${0.5*(parseFloat(rgb[3]) || 1)});
+  background-color: rgba(${parsedRgb.slice(0, 3).join(', ')}, ${0.5*(parseFloat(parsedRgb[3]) || 1)});
 }\
 `;
-      if ($.luma(rgb) < 100) {
+      if ($.luma(parsedRgb) < 100) {
         css += '.watch-thread-link { --xt-watcher: #c8c8c8 }';
       }
       Main.bgColorStyle.textContent = css;
       return $.after($.id('fourchanx-css'), Main.bgColorStyle);
     };
 
-    $.onExists(d.head, g.SITE.selectors.styleSheet, function() {
-      styleSheets = $$(g.SITE.selectors.styleSheet, d.head);
+    $.onExists(d.head, g.SITE.selectors.styleSheet, function(el: HTMLLinkElement) {
+      mainStyleSheet = el;
       if (g.SITE.software === 'yotsuba') {
-        const observer = new MutationObserver(setStyle);
-        for (const styleSheet of styleSheets) {
-          $.on(styleSheet, 'load', setStyle);
-          observer.observe(styleSheet, {
-            attributes: true,
-            attributeFilter: ['disabled']
-          });
-        }
+        styleSheets = $$('link[rel="alternate stylesheet"]', d.head) as HTMLLinkElement[];
       }
+      new MutationObserver(setStyle).observe(mainStyleSheet, {
+        attributes: true,
+        attributeFilter: ['href']
+      });
+      $.on(mainStyleSheet, 'load', setStyle);
       return setStyle();
     });
+    if (!mainStyleSheet) {
+      const sheets = $$('link[rel="stylesheet"]', d.head) as HTMLLinkElement[];
+      for (const styleSheet of sheets) {
+        $.on(styleSheet, 'load', setStyle);
+      }
+      return setStyle();
+    }
   },
 
   initReady(): void {

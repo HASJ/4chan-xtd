@@ -1680,6 +1680,110 @@ input.field.tripped:not(:hover):not(:focus) {
   height: 99%;
   width: 100%;
 }
+
+/* T-Captcha Theme Integration */
+#qr .captcha-root,
+.captcha-iframe {
+  color: var(--xt-header-dialog-fg);
+}
+
+/* Target container structurally: TCaptcha clears the .captcha-container
+   className and sets inline background on it, so class selectors fail. */
+#qr .captcha-root > div,
+.captcha-iframe .captcha-container {
+  background: transparent !important;
+}
+
+#qr #t-root,
+.captcha-iframe #t-root,
+#qr #t-box,
+#qr #t-ctrl,
+.captcha-iframe #t-box,
+.captcha-iframe #t-ctrl {
+  background: transparent !important;
+  border: none !important;
+  color: var(--xt-header-dialog-fg) !important;
+}
+
+#qr #t-resp,
+.captcha-iframe #t-resp {
+  background-color: var(--xt-background) !important;
+  color: var(--xt-header-dialog-fg) !important;
+  border: 1px solid var(--xt-border) !important;
+}
+
+/* Slider track and thumb for dark themes */
+#qr #t-slider,
+.captcha-iframe #t-slider {
+  accent-color: var(--xt-border-highlight);
+}
+#qr #t-slider::-webkit-slider-runnable-track,
+.captcha-iframe #t-slider::-webkit-slider-runnable-track {
+  background: var(--xt-border, #555) !important;
+  border-radius: 3px;
+}
+#qr #t-slider::-moz-range-track,
+.captcha-iframe #t-slider::-moz-range-track {
+  background: var(--xt-border, #555) !important;
+  border-radius: 3px;
+}
+#qr #t-slider::-webkit-slider-thumb,
+.captcha-iframe #t-slider::-webkit-slider-thumb {
+  background: var(--xt-header-dialog-fg, #ccc) !important;
+}
+#qr #t-slider::-moz-range-thumb,
+.captcha-iframe #t-slider::-moz-range-thumb {
+  background: var(--xt-header-dialog-fg, #ccc) !important;
+  border: none;
+}
+
+/* Captcha message text */
+#qr #t-msg,
+.captcha-iframe #t-msg {
+  color: var(--xt-header-dialog-fg) !important;
+}
+
+#qr #t-root input[type="button"],
+#qr #t-root button,
+.captcha-iframe #t-root input[type="button"],
+.captcha-iframe #t-root button,
+#qr #t-next,
+#qr #t-load,
+.captcha-iframe #t-next,
+.captcha-iframe #t-load {
+  background: var(--xt-background) !important;
+  color: var(--xt-header-dialog-fg) !important;
+  border: 1px solid var(--xt-border) !important;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 3px 8px;
+}
+
+#qr #t-root input[type="button"]:hover,
+#qr #t-root button:hover,
+.captcha-iframe #t-root input[type="button"]:hover,
+.captcha-iframe #t-root button:hover,
+#qr #t-next:hover,
+#qr #t-load:hover,
+.captcha-iframe #t-next:hover,
+.captcha-iframe #t-load:hover {
+  background: var(--xt-border) !important;
+}
+
+#qr .captcha-strip.selected,
+.captcha-iframe .captcha-strip.selected {
+  border-color: var(--xt-border-highlight, #000) !important;
+}
+
+#qr .captcha-strip:hover,
+.captcha-iframe .captcha-strip:hover {
+  border-color: var(--xt-border-highlight, rgba(0, 0, 0, 0.3)) !important;
+}
+
+#qr .captcha-clue-image,
+.captcha-iframe .captcha-clue-image {
+  border-color: var(--xt-border) !important;
+}
 #qr .captcha-counter {
   display: block;
   width: 100%;

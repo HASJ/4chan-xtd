@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.0
+// @version      2.26.1
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.0",
-    "date": "2026-05-19T14:56:00Z"
+    "version": "2.26.1",
+    "date": "2026-05-20T13:00:00Z"
   };
 
   var meta = {
@@ -2091,7 +2091,7 @@ current-archive-text:"Archive"]
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-
+  if (platform === 'userscript') {
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -2120,7 +2120,7 @@ current-archive-text:"Archive"]
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-
+  }
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -2167,7 +2167,16 @@ current-archive-text:"Archive"]
       Promise.resolve().then(execTask);
     };
   })();
-
+  if (platform === 'crx') {
+    const callbacks = new Map();
+    chrome.runtime.onMessage.addListener(({ id, data }) => {
+      callbacks.get(id)(data);
+      callbacks.delete(id);
+    });
+    $.eventPageRequest = (params) => new Promise(resolve => {
+      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
+    });
+  }
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -2276,7 +2285,178 @@ current-archive-text:"Archive"]
       return delete data['Redirect to HTTPS'];
     }
   };
-
+  if (platform === 'crx') {
+    // https://developer.chrome.com/extensions/storage.html
+    $.oldValue = {
+      local: dict(),
+      sync: dict()
+    };
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      for (var key in changes) {
+        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        $.oldValue[area][key] = dict.clone(changes[key].newValue);
+        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        var cb = $.syncing[key];
+        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
+          cb(newValue, key);
+        }
+      }
+    });
+    $.sync = (key, cb) => $.syncing[key] = cb;
+    $.forceSync = function () { };
+    $.crxWorking = function () {
+      try {
+        if (chrome.runtime.getManifest()) {
+          return true;
+        }
+      } catch (error) { }
+      if (!$.crxWarningShown) {
+        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
+        $.on($('a', msg), 'click', () => location.reload());
+        new Notice('warning', msg);
+        $.crxWarningShown = true;
+      }
+      return false;
+    };
+    $.get = $.oneItemSugar(function (data, cb) {
+      if (!$.crxWorking()) {
+        return;
+      }
+      const results = {};
+      const get = function (area) {
+        let keys = Object.keys(data);
+        // XXX slow performance in Firefox
+        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
+          keys = null;
+        }
+        return chrome.storage[area].get(keys, function (result) {
+          let key;
+          result = dict.clone(result);
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (keys === null) {
+            const result2 = dict();
+            for (key in result) {
+              var val = result[key];
+              if ($.hasOwn(data, key)) {
+                result2[key] = val;
+              }
+            }
+            result = result2;
+          }
+          for (key in data) {
+            $.oldValue[area][key] = result[key];
+          }
+          results[area] = result;
+          if (results.local && results.sync) {
+            $.extend(data, results.sync);
+            $.extend(data, results.local);
+            return cb(data);
+          }
+        });
+      };
+      get('local');
+      return get('sync');
+    });
+    (function () {
+      const items = {
+        local: dict(),
+        sync: dict()
+      };
+      const exceedsQuota = (key, value) => // bytes in UTF-8
+      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
+      $.delete = function (keys) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        if (typeof keys === 'string') {
+          keys = [keys];
+        }
+        for (var key of keys) {
+          delete items.local[key];
+          delete items.sync[key];
+        }
+        chrome.storage.local.remove(keys);
+        return chrome.storage.sync.remove(keys);
+      };
+      const timeout = {};
+      var setArea = function (area, cb) {
+        const data = dict();
+        $.extend(data, items[area]);
+        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
+          return;
+        }
+        return chrome.storage[area].set(data, function () {
+          let err;
+          let key;
+          if (err = chrome.runtime.lastError) {
+            c.error(err.message);
+            setTimeout(setArea, MINUTE, area);
+            timeout[area] = Date.now() + MINUTE;
+            return cb?.(err);
+          }
+          delete timeout[area];
+          for (key in data) {
+            if (items[area][key] === data[key]) {
+              delete items[area][key];
+            }
+          }
+          if (area === 'local') {
+            for (key in data) {
+              var val = data[key];
+              if (!exceedsQuota(key, val)) {
+                items.sync[key] = val;
+              }
+            }
+            setSync();
+          } else {
+            chrome.storage.local.remove(((() => {
+              const result = [];
+              for (key in data) {
+                if (!(key in items.local)) {
+                  result.push(key);
+                }
+              }
+              return result;
+            })()));
+          }
+          return cb?.();
+        });
+      };
+      var setSync = debounce(SECOND, () => setArea('sync'));
+      $.set = $.oneItemSugar(function (data, cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        $.securityCheck(data);
+        $.extend(items.local, data);
+        return setArea('local', cb);
+      });
+      return $.clear = function (cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        items.local = dict();
+        items.sync = dict();
+        let count = 2;
+        let err = null;
+        const done = function () {
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (err == null) {
+            err = chrome.runtime.lastError;
+          }
+          if (!--count) {
+            return cb?.(err);
+          }
+        };
+        chrome.storage.local.clear(done);
+        return chrome.storage.sync.clear(done);
+      };
+    })();
+  } else {
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -2493,6 +2673,7 @@ current-archive-text:"Archive"]
         return cb?.();
       };
     }
+  }
 
   // @ts-nocheck
 
@@ -5114,6 +5295,110 @@ input.field.tripped:not(:hover):not(:focus) {
   padding-right: 30px;
   height: 99%;
   width: 100%;
+}
+
+/* T-Captcha Theme Integration */
+#qr .captcha-root,
+.captcha-iframe {
+  color: var(--xt-header-dialog-fg);
+}
+
+/* Target container structurally: TCaptcha clears the .captcha-container
+   className and sets inline background on it, so class selectors fail. */
+#qr .captcha-root > div,
+.captcha-iframe .captcha-container {
+  background: transparent !important;
+}
+
+#qr #t-root,
+.captcha-iframe #t-root,
+#qr #t-box,
+#qr #t-ctrl,
+.captcha-iframe #t-box,
+.captcha-iframe #t-ctrl {
+  background: transparent !important;
+  border: none !important;
+  color: var(--xt-header-dialog-fg) !important;
+}
+
+#qr #t-resp,
+.captcha-iframe #t-resp {
+  background-color: var(--xt-background) !important;
+  color: var(--xt-header-dialog-fg) !important;
+  border: 1px solid var(--xt-border) !important;
+}
+
+/* Slider track and thumb for dark themes */
+#qr #t-slider,
+.captcha-iframe #t-slider {
+  accent-color: var(--xt-border-highlight);
+}
+#qr #t-slider::-webkit-slider-runnable-track,
+.captcha-iframe #t-slider::-webkit-slider-runnable-track {
+  background: var(--xt-border, #555) !important;
+  border-radius: 3px;
+}
+#qr #t-slider::-moz-range-track,
+.captcha-iframe #t-slider::-moz-range-track {
+  background: var(--xt-border, #555) !important;
+  border-radius: 3px;
+}
+#qr #t-slider::-webkit-slider-thumb,
+.captcha-iframe #t-slider::-webkit-slider-thumb {
+  background: var(--xt-header-dialog-fg, #ccc) !important;
+}
+#qr #t-slider::-moz-range-thumb,
+.captcha-iframe #t-slider::-moz-range-thumb {
+  background: var(--xt-header-dialog-fg, #ccc) !important;
+  border: none;
+}
+
+/* Captcha message text */
+#qr #t-msg,
+.captcha-iframe #t-msg {
+  color: var(--xt-header-dialog-fg) !important;
+}
+
+#qr #t-root input[type="button"],
+#qr #t-root button,
+.captcha-iframe #t-root input[type="button"],
+.captcha-iframe #t-root button,
+#qr #t-next,
+#qr #t-load,
+.captcha-iframe #t-next,
+.captcha-iframe #t-load {
+  background: var(--xt-background) !important;
+  color: var(--xt-header-dialog-fg) !important;
+  border: 1px solid var(--xt-border) !important;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 3px 8px;
+}
+
+#qr #t-root input[type="button"]:hover,
+#qr #t-root button:hover,
+.captcha-iframe #t-root input[type="button"]:hover,
+.captcha-iframe #t-root button:hover,
+#qr #t-next:hover,
+#qr #t-load:hover,
+.captcha-iframe #t-next:hover,
+.captcha-iframe #t-load:hover {
+  background: var(--xt-border) !important;
+}
+
+#qr .captcha-strip.selected,
+.captcha-iframe .captcha-strip.selected {
+  border-color: var(--xt-border-highlight, #000) !important;
+}
+
+#qr .captcha-strip:hover,
+.captcha-iframe .captcha-strip:hover {
+  border-color: var(--xt-border-highlight, rgba(0, 0, 0, 0.3)) !important;
+}
+
+#qr .captcha-clue-image,
+.captcha-iframe .captcha-clue-image {
+  border-color: var(--xt-border) !important;
 }
 #qr .captcha-counter {
   display: block;
@@ -20044,7 +20329,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-
+      if (platform === 'crx') {
+        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
+          .then(({ response, responseHeaderString }) => {
+          if (response)
+            response = new Uint8Array(response);
+          cb(response, responseHeaderString);
+        });
+      } else {
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -20096,7 +20388,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } catch (error) {
           return fallback();
         }
-
+      }
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20168,7 +20460,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-
+      if (platform === 'userscript') {
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -20216,7 +20508,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             } catch (error1) { }
           };
         }
-
+      } else {
+        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
+          if (result.status) {
+            $.extend(req, result);
+          }
+          return req.onloadend();
+        });
+      }
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20231,7 +20530,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-
+      if (platform === 'crx') {
+        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
+          if (result) {
+            return cb();
+          } else {
+            return cbFail();
+          }
+        });
+      }
       return cb();
     },
   };
@@ -20788,7 +21095,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       },
       boardList: '#boardNavDesktop > .boardList',
       boardListBottom: '#boardNavDesktopFoot > .boardList',
-      styleSheet: 'link[rel*="stylesheet"][title]',
+      styleSheet: 'link[title=switch]',
       psa: '#globalMessage',
       psaTop: '#globalToggle',
       searchBox: '#search-box',
@@ -26735,7 +27042,9 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-
+        if (platform === 'crx') {
+          w = (w.wrappedJSObject || w);
+        }
         if (`${meta.name} antidup` in w) {
           return;
         }
@@ -26991,33 +27300,43 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return Main.setClass();
     },
     setClass() {
-      let mainStyleSheet, style, styleSheets;
+      let mainStyleSheet = null;
+      let style = null;
+      let styleSheets = null;
       const knownStyles = ['yotsuba', 'yotsuba-b', 'futaba', 'burichan', 'photon', 'tomorrow', 'spooky'];
       if ((g.SITE.software === 'yotsuba') && (g.VIEW === 'catalog')) {
-        if (mainStyleSheet = $.id('base-css')) {
-          style = mainStyleSheet.href.match(/catalog_(\w+)/)?.[1].replace('_new', '').replace(/_+/g, '-');
-          if (knownStyles.includes(style)) {
+        const baseCss = $.id('base-css');
+        if (baseCss) {
+          mainStyleSheet = baseCss;
+          const match = mainStyleSheet.href.match(/catalog_(\w+)/);
+          style = match?.[1].replace('_new', '').replace(/_+/g, '-') || null;
+          if (style && knownStyles.includes(style)) {
             $.addClass(doc, style);
             return;
           }
         }
       }
-      style = (mainStyleSheet = (styleSheets = null));
+      style = null;
       const setStyle = function () {
         // Use preconfigured CSS for 4chan's default themes.
         if (g.SITE.software === 'yotsuba') {
-          $.rmClass(doc, style);
+          if (style) {
+            $.rmClass(doc, style);
+          }
           style = null;
-          for (var styleSheet of styleSheets) {
-            if (!styleSheet.disabled) {
-              style = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
-              if (style === '_special') {
-                style = styleSheet.href.match(/[a-z]*(?=[^/]*$)/)[0];
+          if (styleSheets) {
+            for (const styleSheet of styleSheets) {
+              if (styleSheet.href === mainStyleSheet?.href) {
+                style = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
+                if (style === '_special') {
+                  const match = styleSheet.href.match(/[a-z]*(?=[^/]*$)/);
+                  style = match ? match[0] : null;
+                }
+                if (style && !knownStyles.includes(style)) {
+                  style = null;
+                }
+                break;
               }
-              if (!knownStyles.includes(style)) {
-                style = null;
-              }
-              break;
             }
           }
           if (style) {
@@ -27035,10 +27354,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         $.rm(div);
         const rgb = bgColor.match(/[\d.]+/g);
         // Use body background if reply background is transparent
-        if (!/^rgb\(/.test(bgColor)) {
+        if (!rgb || !/^rgb\(/.test(bgColor)) {
           const s = window.getComputedStyle(d.body);
           bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
         }
+        const parsedRgb = bgColor.match(/[\d.]+/g) || ['255', '255', '255', '1'];
         let css = `\
 :root {
   --xt-background: ${bgColor};
@@ -27048,29 +27368,34 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
   background: ${bgColor};
 }
 .unread-mark-read {
-  background-color: rgba(${rgb.slice(0, 3).join(', ')}, ${0.5 * (parseFloat(rgb[3]) || 1)});
+  background-color: rgba(${parsedRgb.slice(0, 3).join(', ')}, ${0.5 * (parseFloat(parsedRgb[3]) || 1)});
 }\
 `;
-        if ($.luma(rgb) < 100) {
+        if ($.luma(parsedRgb) < 100) {
           css += '.watch-thread-link { --xt-watcher: #c8c8c8 }';
         }
         Main.bgColorStyle.textContent = css;
         return $.after($.id('fourchanx-css'), Main.bgColorStyle);
       };
-      $.onExists(d.head, g.SITE.selectors.styleSheet, function () {
-        styleSheets = $$(g.SITE.selectors.styleSheet, d.head);
+      $.onExists(d.head, g.SITE.selectors.styleSheet, function (el) {
+        mainStyleSheet = el;
         if (g.SITE.software === 'yotsuba') {
-          const observer = new MutationObserver(setStyle);
-          for (const styleSheet of styleSheets) {
-            $.on(styleSheet, 'load', setStyle);
-            observer.observe(styleSheet, {
-              attributes: true,
-              attributeFilter: ['disabled']
-            });
-          }
+          styleSheets = $$('link[rel="alternate stylesheet"]', d.head);
         }
+        new MutationObserver(setStyle).observe(mainStyleSheet, {
+          attributes: true,
+          attributeFilter: ['href']
+        });
+        $.on(mainStyleSheet, 'load', setStyle);
         return setStyle();
       });
+      if (!mainStyleSheet) {
+        const sheets = $$('link[rel="stylesheet"]', d.head);
+        for (const styleSheet of sheets) {
+          $.on(styleSheet, 'load', setStyle);
+        }
+        return setStyle();
+      }
     },
     initReady() {
       if (g.SITE.is404?.()) {

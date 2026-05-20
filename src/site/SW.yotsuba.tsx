@@ -103,7 +103,7 @@ const SWYotsuba = {
     },
     boardList: '#boardNavDesktop > .boardList',
     boardListBottom: '#boardNavDesktopFoot > .boardList',
-    styleSheet: 'link[rel*="stylesheet"][title]',
+    styleSheet: 'link[title=switch]',
     psa:       '#globalMessage',
     psaTop:    '#globalToggle',
     searchBox: '#search-box',
