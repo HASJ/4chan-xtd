@@ -1801,6 +1801,16 @@ input.field.tripped:not(:hover):not(:focus) {
 :root.spooky .captcha-iframe #t-task {
   color: #C5C8C6 !important;
 }
+:root.oneechan #qr #t-load,
+:root.oneechan #qr #t-next,
+:root.oneechan #qr #t-msg,
+:root.oneechan #qr #t-task,
+:root.oneechan .captcha-iframe #t-load,
+:root.oneechan .captcha-iframe #t-next,
+:root.oneechan .captcha-iframe #t-msg,
+:root.oneechan .captcha-iframe #t-task {
+  color: inherit !important;
+}
 #qr .captcha-counter {
   display: block;
   width: 100%;
