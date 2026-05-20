@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.4 (2026-05-20)
+
+- Bugfixes
+  - Fixed TCaptcha "find" challenge empty first strip bug by skipping the empty index 0 (unselected/default slider position) and starting keyboard shortcuts at index 1.
+  - Optimized slider options capturing logic by observing changes to `backgroundPosition` in addition to `backgroundImage`, making the transition loop run instantly instead of waiting for safety timeouts.
+
 ### 2.26.3 (2026-05-20)
 
 - Bugfixes

@@ -170,7 +170,7 @@ const CaptchaT = {
     const minVal = parseInt(slider.getAttribute('min') || '0', 10);
     const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
     const count = maxVal + 1;
-    const startIndex = minVal;
+    const startIndex = Math.max(1, minVal);
 
     for (let i = startIndex; i < count; i++) {
       const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
@@ -204,13 +204,15 @@ const CaptchaT = {
     
     const runCapture = async () => {
       let lastBg = taskEl.style.backgroundImage; // Track the actual style property
+      let lastPos = taskEl.style.backgroundPosition;
       for (let i = startIndex; i < count; i++) {
         await new Promise(resolve => {
           let isResolved = false;
           
           const observer = new MutationObserver(() => {
              const currentBg = taskEl.style.backgroundImage;
-             if (currentBg && currentBg.includes('url(') && currentBg !== lastBg) {
+             const currentPos = taskEl.style.backgroundPosition;
+             if (currentBg && currentBg.includes('url(') && (currentBg !== lastBg || currentPos !== lastPos)) {
                  isResolved = true;
                  observer.disconnect();
                  resolve();
@@ -235,8 +237,9 @@ const CaptchaT = {
         const strip = stripsContainer.children[stripIndex];
         if (strip) {
           lastBg = taskEl.style.backgroundImage;
+          lastPos = taskEl.style.backgroundPosition;
           strip.style.backgroundImage = lastBg;
-          strip.style.backgroundPosition = taskEl.style.backgroundPosition;
+          strip.style.backgroundPosition = lastPos;
           strip.style.backgroundSize = taskEl.style.backgroundSize;
           strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
         }
@@ -404,7 +407,8 @@ const CaptchaT = {
     let strips = $('.captcha-strips', mainDiv);
     if (!strips) {
       const minStr = slider.getAttribute('min');
-      const min = minStr ? parseInt(minStr, 10) : 0;
+      const minVal = minStr ? parseInt(minStr, 10) : 0;
+      const min = Math.max(1, minVal);
       const maxStr = slider.getAttribute('max');
       const max = maxStr ? parseInt(maxStr, 10) : 3;
       const count = max + 1;
