@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.2
+// @version      2.26.3
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.2",
-    "date": "2026-05-20T18:30:00Z"
+    "version": "2.26.3",
+    "date": "2026-05-20T19:50:00Z"
   };
 
   var meta = {
