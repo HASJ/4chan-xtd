@@ -1681,76 +1681,78 @@ input.field.tripped:not(:hover):not(:focus) {
   width: 100%;
 }
 
-/* T-Captcha Theme Integration */
-#qr .captcha-root,
-.captcha-iframe {
+/* T-Captcha Theme Integration (only when "Theme Captcha" is enabled) */
+:root.themed-captcha #qr .captcha-root,
+:root.themed-captcha .captcha-iframe {
   color: var(--xt-header-dialog-fg);
 }
 
 /* Target container structurally: TCaptcha clears the .captcha-container
    className and sets inline background on it, so class selectors fail. */
-#qr .captcha-root > div,
-.captcha-iframe .captcha-container {
+:root.themed-captcha #qr .captcha-root > div,
+:root.themed-captcha .captcha-iframe .captcha-container {
   background: transparent !important;
 }
 
-#qr #t-root,
-.captcha-iframe #t-root,
-#qr #t-box,
-#qr #t-ctrl,
-.captcha-iframe #t-box,
-.captcha-iframe #t-ctrl {
+:root.themed-captcha #qr #t-root,
+:root.themed-captcha .captcha-iframe #t-root,
+:root.themed-captcha #qr #t-box,
+:root.themed-captcha #qr #t-ctrl,
+:root.themed-captcha .captcha-iframe #t-box,
+:root.themed-captcha .captcha-iframe #t-ctrl {
   background: transparent !important;
   border: none !important;
   color: var(--xt-header-dialog-fg) !important;
 }
 
-#qr #t-resp,
-.captcha-iframe #t-resp {
+:root.themed-captcha #qr #t-resp,
+:root.themed-captcha .captcha-iframe #t-resp {
   background-color: var(--xt-background) !important;
   color: var(--xt-header-dialog-fg) !important;
   border: 1px solid var(--xt-border) !important;
 }
 
 /* Slider track and thumb for dark themes */
-#qr #t-slider,
-.captcha-iframe #t-slider {
+:root.themed-captcha #qr #t-slider,
+:root.themed-captcha .captcha-iframe #t-slider {
   accent-color: var(--xt-border-highlight);
 }
-#qr #t-slider::-webkit-slider-runnable-track,
-.captcha-iframe #t-slider::-webkit-slider-runnable-track {
+:root.themed-captcha #qr #t-slider::-webkit-slider-runnable-track,
+:root.themed-captcha .captcha-iframe #t-slider::-webkit-slider-runnable-track {
   background: var(--xt-border, #555) !important;
   border-radius: 3px;
 }
-#qr #t-slider::-moz-range-track,
-.captcha-iframe #t-slider::-moz-range-track {
+:root.themed-captcha #qr #t-slider::-moz-range-track,
+:root.themed-captcha .captcha-iframe #t-slider::-moz-range-track {
   background: var(--xt-border, #555) !important;
   border-radius: 3px;
 }
-#qr #t-slider::-webkit-slider-thumb,
-.captcha-iframe #t-slider::-webkit-slider-thumb {
+:root.themed-captcha #qr #t-slider::-webkit-slider-thumb,
+:root.themed-captcha .captcha-iframe #t-slider::-webkit-slider-thumb {
   background: var(--xt-header-dialog-fg, #ccc) !important;
 }
-#qr #t-slider::-moz-range-thumb,
-.captcha-iframe #t-slider::-moz-range-thumb {
+:root.themed-captcha #qr #t-slider::-moz-range-thumb,
+:root.themed-captcha .captcha-iframe #t-slider::-moz-range-thumb {
   background: var(--xt-header-dialog-fg, #ccc) !important;
   border: none;
 }
 
-/* Captcha message text */
-#qr #t-msg,
-.captcha-iframe #t-msg {
+/* Captcha message and task instructions text (themed) */
+:root.themed-captcha #qr #t-msg,
+:root.themed-captcha #qr #t-task,
+:root.themed-captcha .captcha-iframe #t-msg,
+:root.themed-captcha .captcha-iframe #t-task {
   color: var(--xt-header-dialog-fg) !important;
 }
 
-#qr #t-root input[type="button"],
-#qr #t-root button,
-.captcha-iframe #t-root input[type="button"],
-.captcha-iframe #t-root button,
-#qr #t-next,
-#qr #t-load,
-.captcha-iframe #t-next,
-.captcha-iframe #t-load {
+:root.themed-captcha #qr #t-root input[type="button"],
+:root.themed-captcha #qr #t-root button,
+:root.themed-captcha .captcha-iframe #t-root input[type="button"],
+:root.themed-captcha .captcha-iframe #t-root button,
+:root.themed-captcha #qr #t-next,
+:root.themed-captcha #qr #t-load,
+:root.themed-captcha .captcha-iframe #t-next,
+:root.themed-captcha .captcha-iframe #t-load {
   background: var(--xt-background) !important;
   color: var(--xt-header-dialog-fg) !important;
   border: 1px solid var(--xt-border) !important;
@@ -1759,30 +1761,45 @@ input.field.tripped:not(:hover):not(:focus) {
   padding: 3px 8px;
 }
 
-#qr #t-root input[type="button"]:hover,
-#qr #t-root button:hover,
-.captcha-iframe #t-root input[type="button"]:hover,
-.captcha-iframe #t-root button:hover,
-#qr #t-next:hover,
-#qr #t-load:hover,
-.captcha-iframe #t-next:hover,
-.captcha-iframe #t-load:hover {
+:root.themed-captcha #qr #t-root input[type="button"]:hover,
+:root.themed-captcha #qr #t-root button:hover,
+:root.themed-captcha .captcha-iframe #t-root input[type="button"]:hover,
+:root.themed-captcha .captcha-iframe #t-root button:hover,
+:root.themed-captcha #qr #t-next:hover,
+:root.themed-captcha #qr #t-load:hover,
+:root.themed-captcha .captcha-iframe #t-next:hover,
+:root.themed-captcha .captcha-iframe #t-load:hover {
   background: var(--xt-border) !important;
 }
 
-#qr .captcha-strip.selected,
-.captcha-iframe .captcha-strip.selected {
+:root.themed-captcha #qr .captcha-strip.selected,
+:root.themed-captcha .captcha-iframe .captcha-strip.selected {
   border-color: var(--xt-border-highlight, #000) !important;
 }
 
-#qr .captcha-strip:hover,
-.captcha-iframe .captcha-strip:hover {
+:root.themed-captcha #qr .captcha-strip:hover,
+:root.themed-captcha .captcha-iframe .captcha-strip:hover {
   border-color: var(--xt-border-highlight, rgba(0, 0, 0, 0.3)) !important;
 }
 
-#qr .captcha-clue-image,
-.captcha-iframe .captcha-clue-image {
+:root.themed-captcha #qr .captcha-clue-image,
+:root.themed-captcha .captcha-iframe .captcha-clue-image {
   border-color: var(--xt-border) !important;
+}
+
+/* Captcha status text readability on dark themes (always active).
+   Ensures "Verification not required", "Captcha expired", etc.
+   are readable when using Tomorrow or Spooky themes, even with
+   Theme Captcha disabled. */
+:root.tomorrow #qr #t-msg,
+:root.tomorrow #qr #t-task,
+:root.spooky #qr #t-msg,
+:root.spooky #qr #t-task,
+:root.tomorrow .captcha-iframe #t-msg,
+:root.tomorrow .captcha-iframe #t-task,
+:root.spooky .captcha-iframe #t-msg,
+:root.spooky .captcha-iframe #t-task {
+  color: #C5C8C6 !important;
 }
 #qr .captcha-counter {
   display: block;

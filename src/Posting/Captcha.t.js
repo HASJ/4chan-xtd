@@ -14,6 +14,7 @@ const CaptchaT = {
     this.nodes = {root};
 
     $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
+    if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
     $.after(QR.nodes.com.parentNode, root);
   },
 

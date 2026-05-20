@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.2 (2026-05-20)
+
+- Captcha theming improvements
+  - Added a new config option `'Theme Captcha'` (default `true`) under Posting and Captchas settings. When enabled, the captcha will follow the active theme (e.g., custom colors/borders on Tomorrow or Spooky themes). When disabled, the captcha retains its default native styling.
+  - Ensured status messages like "Verification not required" and "Captcha expired" are always readable on Tomorrow and Spooky dark themes by using a brighter text color even if Theme Captcha is disabled.
+
 ### 2.26.1 (2026-05-20)
 
 - Bugfixes
