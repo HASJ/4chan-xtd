@@ -19,6 +19,7 @@ New features since the fork include:
 - Showing the reason a post was filtered in the stub
 - Marking replies to your post on the scroll bar
 - Stacked new captcha challenge with keyboard number keys support
+- Captcha dark theme support in the Quick Reply dialog
 
 4chan X was previously developed by [ccd0](https://github.com/ccd0/4chan-x), [aeosynth](https://github.com/aeosynth/4chan-x), [Mayhem](https://github.com/MayhemYDG/4chan-x), [ihavenoface](https://github.com/ihavenoface/4chan-x), [Zixaphir](https://github.com/zixaphir/appchan-x), [Seaweed](https://github.com/seaweedchan/4chan-x), and [Spittie](https://github.com/Spittie/4chan-x), with contributions from many others.
 

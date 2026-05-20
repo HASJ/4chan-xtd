@@ -3,6 +3,23 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.1 (2026-05-20)
+
+- Bugfixes
+  - Fixed dynamic theme switching not working without a page refresh (e.g. switching from Tomorrow to Yotsuba).
+    - Reverted the stylesheet selector to `link[title=switch]` to correctly identify the main stylesheet, matching the behavior of the original 4chan XT.
+    - Restored `MutationObserver` on the main stylesheet's `href` attribute instead of watching `disabled` on all stylesheets, which never fired for 4chan's native theme-switching mechanism.
+    - Matched alternate stylesheets by comparing `href` values instead of checking the `disabled` attribute.
+  - Fixed brief red highlight flash on page load when using dark themes (e.g. Tomorrow).
+  - Fixed potential null reference in `setClass()` when computing background color for non-standard themes.
+
+- Captcha dark theme integration
+  - The T-Captcha (slider captcha) in the Quick Reply dialog now fully follows the active theme.
+  - Made `#t-root`, `#t-box`, and `#t-ctrl` containers transparent and borderless so the QR dialog background flows through seamlessly.
+  - Styled the native range slider track and thumb using theme CSS variables for dark mode compatibility.
+  - Themed captcha buttons, response input field, clue image borders, and strip selection highlights using `--xt-border-highlight`.
+  - Used structural CSS selectors (`#qr .captcha-root > div`) instead of class-based selectors to work around TCaptcha clearing the `.captcha-container` class name at initialization.
+
 ### 2.26.0 (2026-05-19)
 
 - Declared project as active and alive in `README.md`.
