@@ -43,7 +43,21 @@ export default function h(
       if (!value && value !== 0) continue;
       innerHTML += ` ${attribute}`;
       if (value === true) continue;
-      innerHTML += `="${E(value.toString())}"`;
+      let valStr = value.toString();
+      if (attribute === 'href' || attribute === 'src') {
+        const valTrim = valStr.trim().toLowerCase();
+        if (valTrim.startsWith('javascript:')) {
+          const isSafeJsUri = valTrim === 'javascript:;' ||
+                              /^javascript:void\([0-9]*\);?$/.test(valTrim) ||
+                              /^javascript:quote\([0-9]+\);?$/.test(valTrim);
+          if (!isSafeJsUri) {
+            valStr = 'about:invalid';
+          }
+        } else if (/^(?:data|vbscript):/i.test(valTrim) && !valTrim.startsWith('data:image/')) {
+          valStr = 'about:invalid';
+        }
+      }
+      innerHTML += `="${E(valStr)}"`;
     }
   }
   if (tag !== hFragment) innerHTML += '>';

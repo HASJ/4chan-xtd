@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import PageContextFunctions from "../PageContext/pageContext";
 
 // This requestId workaround isn't needed in manifest V3, since returning true in the event listener works.
@@ -51,6 +51,9 @@ var handlers = {
   },
 
   async runInPageContext(request, sender) {
+    if (typeof PageContextFunctions[request.fn] !== 'function' || !Object.prototype.hasOwnProperty.call(PageContextFunctions, request.fn)) {
+      throw new Error("Invalid page context function requested");
+    }
     const results = await chrome.scripting.executeScript({
       func: PageContextFunctions[request.fn],
       args: request.data ? [request.data] : [],
