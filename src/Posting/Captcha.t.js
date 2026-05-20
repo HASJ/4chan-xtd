@@ -167,9 +167,10 @@ const CaptchaT = {
     if (tNextForStep) {
       stripsContainer.dataset.step = tNextForStep.textContent;
     }
+    const minVal = parseInt(slider.getAttribute('min') || '0', 10);
     const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
     const count = maxVal + 1;
-    const startIndex = isNotLikeOthers ? 1 : 0;
+    const startIndex = minVal;
 
     for (let i = startIndex; i < count; i++) {
       const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
@@ -402,12 +403,14 @@ const CaptchaT = {
   createIframeStrips(mainDiv, slider) {
     let strips = $('.captcha-strips', mainDiv);
     if (!strips) {
+      const minStr = slider.getAttribute('min');
+      const min = minStr ? parseInt(minStr, 10) : 0;
       const maxStr = slider.getAttribute('max');
       const max = maxStr ? parseInt(maxStr, 10) : 3;
       const count = max + 1;
 
       strips = $.el('div', {className: 'captcha-strips'});
-      for (let i = 0; i < count; i++) {
+      for (let i = min; i < count; i++) {
         const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
         strip.dataset.index = i;
         strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;

@@ -312,6 +312,9 @@ var handlers = {
   },
 
   async runInPageContext(request, sender) {
+    if (typeof PageContextFunctions[request.fn] !== 'function' || !Object.prototype.hasOwnProperty.call(PageContextFunctions, request.fn)) {
+      throw new Error("Invalid page context function requested");
+    }
     const results = await chrome.scripting.executeScript({
       func: PageContextFunctions[request.fn],
       args: request.data ? [request.data] : [],
