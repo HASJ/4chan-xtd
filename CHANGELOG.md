@@ -3,6 +3,15 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.3 (2026-05-20)
+
+- Bugfixes
+  - Fixed TCaptcha "find" challenge bug where the first option rectangle was empty and keyboard shortcuts started with "2" instead of "1". The selection index is now determined dynamically using the range slider's `min` attribute.
+  - Fixed TCaptcha control buttons ("Get Captcha", "Next"), status messages, and challenge instructions having black, unreadable text on OneeChan themes by inheriting OneeChan's text color.
+
+- Security
+  - Hardened userscript and extension security posture, covering input validation, script execution boundaries, and safe URI schemes.
+
 ### 2.26.2 (2026-05-20)
 
 - Captcha theming improvements
