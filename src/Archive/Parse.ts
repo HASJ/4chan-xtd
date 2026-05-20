@@ -80,6 +80,19 @@ export interface RawArchivePost {
 
 
 export const parseArchivePost = (data: RawArchivePost, url: string) => {
+  if (!data || typeof data !== 'object') {
+    throw new TypeError("Invalid post data from archive");
+  }
+  const postNum = parseInt(data.num, 10);
+  const threadNum = parseInt(data.thread_num, 10);
+  if (isNaN(postNum) || isNaN(threadNum) || postNum <= 0 || threadNum <= 0) {
+    throw new Error("Invalid post or thread ID from archive");
+  }
+  const boardShortName = data.board?.shortname;
+  if (typeof boardShortName !== 'string' || !boardShortName) {
+    throw new Error("Invalid board identifier from archive");
+  }
+
   // https://github.com/eksopl/asagi/blob/v0.4.0b74/src/main/java/net/easymodo/asagi/YotsubaAbstract.java#L82-L129
   // https://github.com/FoolCode/FoolFuuka/blob/800bd090835489e7e24371186db6e336f04b85c0/src/Model/Comment.php#L368-L428
   // https://github.com/bstats/b-stats/blob/6abe7bffaf6e5f523498d760e54b110df5331fbb/inc/classes/Yotsuba.php#L157-L168
