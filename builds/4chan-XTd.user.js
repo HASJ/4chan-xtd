@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.1
+// @version      2.26.2
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.1",
-    "date": "2026-05-20T13:00:00Z"
+    "version": "2.26.2",
+    "date": "2026-05-20T18:30:00Z"
   };
 
   var meta = {
@@ -861,6 +861,11 @@ div.boardTitle {
         'Next challenge on captcha selection': [
           false,
           'Automatically go to the next challenge when a captcha answer is selected.',
+          1
+        ],
+        'Theme Captcha': [
+          true,
+          'Apply the current theme colors to the captcha. Disable to use the default captcha appearance.',
           1
         ],
         'Avoid OffscreenCanvas': [
@@ -2091,7 +2096,7 @@ current-archive-text:"Archive"]
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-  if (platform === 'userscript') {
+
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -2120,7 +2125,7 @@ current-archive-text:"Archive"]
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-  }
+
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -2167,16 +2172,7 @@ current-archive-text:"Archive"]
       Promise.resolve().then(execTask);
     };
   })();
-  if (platform === 'crx') {
-    const callbacks = new Map();
-    chrome.runtime.onMessage.addListener(({ id, data }) => {
-      callbacks.get(id)(data);
-      callbacks.delete(id);
-    });
-    $.eventPageRequest = (params) => new Promise(resolve => {
-      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
-    });
-  }
+
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -2285,178 +2281,7 @@ current-archive-text:"Archive"]
       return delete data['Redirect to HTTPS'];
     }
   };
-  if (platform === 'crx') {
-    // https://developer.chrome.com/extensions/storage.html
-    $.oldValue = {
-      local: dict(),
-      sync: dict()
-    };
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      for (var key in changes) {
-        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        $.oldValue[area][key] = dict.clone(changes[key].newValue);
-        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        var cb = $.syncing[key];
-        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
-          cb(newValue, key);
-        }
-      }
-    });
-    $.sync = (key, cb) => $.syncing[key] = cb;
-    $.forceSync = function () { };
-    $.crxWorking = function () {
-      try {
-        if (chrome.runtime.getManifest()) {
-          return true;
-        }
-      } catch (error) { }
-      if (!$.crxWarningShown) {
-        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
-        $.on($('a', msg), 'click', () => location.reload());
-        new Notice('warning', msg);
-        $.crxWarningShown = true;
-      }
-      return false;
-    };
-    $.get = $.oneItemSugar(function (data, cb) {
-      if (!$.crxWorking()) {
-        return;
-      }
-      const results = {};
-      const get = function (area) {
-        let keys = Object.keys(data);
-        // XXX slow performance in Firefox
-        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
-          keys = null;
-        }
-        return chrome.storage[area].get(keys, function (result) {
-          let key;
-          result = dict.clone(result);
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (keys === null) {
-            const result2 = dict();
-            for (key in result) {
-              var val = result[key];
-              if ($.hasOwn(data, key)) {
-                result2[key] = val;
-              }
-            }
-            result = result2;
-          }
-          for (key in data) {
-            $.oldValue[area][key] = result[key];
-          }
-          results[area] = result;
-          if (results.local && results.sync) {
-            $.extend(data, results.sync);
-            $.extend(data, results.local);
-            return cb(data);
-          }
-        });
-      };
-      get('local');
-      return get('sync');
-    });
-    (function () {
-      const items = {
-        local: dict(),
-        sync: dict()
-      };
-      const exceedsQuota = (key, value) => // bytes in UTF-8
-      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
-      $.delete = function (keys) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        if (typeof keys === 'string') {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          delete items.local[key];
-          delete items.sync[key];
-        }
-        chrome.storage.local.remove(keys);
-        return chrome.storage.sync.remove(keys);
-      };
-      const timeout = {};
-      var setArea = function (area, cb) {
-        const data = dict();
-        $.extend(data, items[area]);
-        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
-          return;
-        }
-        return chrome.storage[area].set(data, function () {
-          let err;
-          let key;
-          if (err = chrome.runtime.lastError) {
-            c.error(err.message);
-            setTimeout(setArea, MINUTE, area);
-            timeout[area] = Date.now() + MINUTE;
-            return cb?.(err);
-          }
-          delete timeout[area];
-          for (key in data) {
-            if (items[area][key] === data[key]) {
-              delete items[area][key];
-            }
-          }
-          if (area === 'local') {
-            for (key in data) {
-              var val = data[key];
-              if (!exceedsQuota(key, val)) {
-                items.sync[key] = val;
-              }
-            }
-            setSync();
-          } else {
-            chrome.storage.local.remove(((() => {
-              const result = [];
-              for (key in data) {
-                if (!(key in items.local)) {
-                  result.push(key);
-                }
-              }
-              return result;
-            })()));
-          }
-          return cb?.();
-        });
-      };
-      var setSync = debounce(SECOND, () => setArea('sync'));
-      $.set = $.oneItemSugar(function (data, cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        $.securityCheck(data);
-        $.extend(items.local, data);
-        return setArea('local', cb);
-      });
-      return $.clear = function (cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        items.local = dict();
-        items.sync = dict();
-        let count = 2;
-        let err = null;
-        const done = function () {
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (err == null) {
-            err = chrome.runtime.lastError;
-          }
-          if (!--count) {
-            return cb?.(err);
-          }
-        };
-        chrome.storage.local.clear(done);
-        return chrome.storage.sync.clear(done);
-      };
-    })();
-  } else {
+
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -2673,7 +2498,6 @@ current-archive-text:"Archive"]
         return cb?.();
       };
     }
-  }
 
   // @ts-nocheck
 
@@ -5297,76 +5121,78 @@ input.field.tripped:not(:hover):not(:focus) {
   width: 100%;
 }
 
-/* T-Captcha Theme Integration */
-#qr .captcha-root,
-.captcha-iframe {
+/* T-Captcha Theme Integration (only when "Theme Captcha" is enabled) */
+:root.themed-captcha #qr .captcha-root,
+:root.themed-captcha .captcha-iframe {
   color: var(--xt-header-dialog-fg);
 }
 
 /* Target container structurally: TCaptcha clears the .captcha-container
    className and sets inline background on it, so class selectors fail. */
-#qr .captcha-root > div,
-.captcha-iframe .captcha-container {
+:root.themed-captcha #qr .captcha-root > div,
+:root.themed-captcha .captcha-iframe .captcha-container {
   background: transparent !important;
 }
 
-#qr #t-root,
-.captcha-iframe #t-root,
-#qr #t-box,
-#qr #t-ctrl,
-.captcha-iframe #t-box,
-.captcha-iframe #t-ctrl {
+:root.themed-captcha #qr #t-root,
+:root.themed-captcha .captcha-iframe #t-root,
+:root.themed-captcha #qr #t-box,
+:root.themed-captcha #qr #t-ctrl,
+:root.themed-captcha .captcha-iframe #t-box,
+:root.themed-captcha .captcha-iframe #t-ctrl {
   background: transparent !important;
   border: none !important;
   color: var(--xt-header-dialog-fg) !important;
 }
 
-#qr #t-resp,
-.captcha-iframe #t-resp {
+:root.themed-captcha #qr #t-resp,
+:root.themed-captcha .captcha-iframe #t-resp {
   background-color: var(--xt-background) !important;
   color: var(--xt-header-dialog-fg) !important;
   border: 1px solid var(--xt-border) !important;
 }
 
 /* Slider track and thumb for dark themes */
-#qr #t-slider,
-.captcha-iframe #t-slider {
+:root.themed-captcha #qr #t-slider,
+:root.themed-captcha .captcha-iframe #t-slider {
   accent-color: var(--xt-border-highlight);
 }
-#qr #t-slider::-webkit-slider-runnable-track,
-.captcha-iframe #t-slider::-webkit-slider-runnable-track {
+:root.themed-captcha #qr #t-slider::-webkit-slider-runnable-track,
+:root.themed-captcha .captcha-iframe #t-slider::-webkit-slider-runnable-track {
   background: var(--xt-border, #555) !important;
   border-radius: 3px;
 }
-#qr #t-slider::-moz-range-track,
-.captcha-iframe #t-slider::-moz-range-track {
+:root.themed-captcha #qr #t-slider::-moz-range-track,
+:root.themed-captcha .captcha-iframe #t-slider::-moz-range-track {
   background: var(--xt-border, #555) !important;
   border-radius: 3px;
 }
-#qr #t-slider::-webkit-slider-thumb,
-.captcha-iframe #t-slider::-webkit-slider-thumb {
+:root.themed-captcha #qr #t-slider::-webkit-slider-thumb,
+:root.themed-captcha .captcha-iframe #t-slider::-webkit-slider-thumb {
   background: var(--xt-header-dialog-fg, #ccc) !important;
 }
-#qr #t-slider::-moz-range-thumb,
-.captcha-iframe #t-slider::-moz-range-thumb {
+:root.themed-captcha #qr #t-slider::-moz-range-thumb,
+:root.themed-captcha .captcha-iframe #t-slider::-moz-range-thumb {
   background: var(--xt-header-dialog-fg, #ccc) !important;
   border: none;
 }
 
-/* Captcha message text */
-#qr #t-msg,
-.captcha-iframe #t-msg {
+/* Captcha message and task instructions text (themed) */
+:root.themed-captcha #qr #t-msg,
+:root.themed-captcha #qr #t-task,
+:root.themed-captcha .captcha-iframe #t-msg,
+:root.themed-captcha .captcha-iframe #t-task {
   color: var(--xt-header-dialog-fg) !important;
 }
 
-#qr #t-root input[type="button"],
-#qr #t-root button,
-.captcha-iframe #t-root input[type="button"],
-.captcha-iframe #t-root button,
-#qr #t-next,
-#qr #t-load,
-.captcha-iframe #t-next,
-.captcha-iframe #t-load {
+:root.themed-captcha #qr #t-root input[type="button"],
+:root.themed-captcha #qr #t-root button,
+:root.themed-captcha .captcha-iframe #t-root input[type="button"],
+:root.themed-captcha .captcha-iframe #t-root button,
+:root.themed-captcha #qr #t-next,
+:root.themed-captcha #qr #t-load,
+:root.themed-captcha .captcha-iframe #t-next,
+:root.themed-captcha .captcha-iframe #t-load {
   background: var(--xt-background) !important;
   color: var(--xt-header-dialog-fg) !important;
   border: 1px solid var(--xt-border) !important;
@@ -5375,30 +5201,45 @@ input.field.tripped:not(:hover):not(:focus) {
   padding: 3px 8px;
 }
 
-#qr #t-root input[type="button"]:hover,
-#qr #t-root button:hover,
-.captcha-iframe #t-root input[type="button"]:hover,
-.captcha-iframe #t-root button:hover,
-#qr #t-next:hover,
-#qr #t-load:hover,
-.captcha-iframe #t-next:hover,
-.captcha-iframe #t-load:hover {
+:root.themed-captcha #qr #t-root input[type="button"]:hover,
+:root.themed-captcha #qr #t-root button:hover,
+:root.themed-captcha .captcha-iframe #t-root input[type="button"]:hover,
+:root.themed-captcha .captcha-iframe #t-root button:hover,
+:root.themed-captcha #qr #t-next:hover,
+:root.themed-captcha #qr #t-load:hover,
+:root.themed-captcha .captcha-iframe #t-next:hover,
+:root.themed-captcha .captcha-iframe #t-load:hover {
   background: var(--xt-border) !important;
 }
 
-#qr .captcha-strip.selected,
-.captcha-iframe .captcha-strip.selected {
+:root.themed-captcha #qr .captcha-strip.selected,
+:root.themed-captcha .captcha-iframe .captcha-strip.selected {
   border-color: var(--xt-border-highlight, #000) !important;
 }
 
-#qr .captcha-strip:hover,
-.captcha-iframe .captcha-strip:hover {
+:root.themed-captcha #qr .captcha-strip:hover,
+:root.themed-captcha .captcha-iframe .captcha-strip:hover {
   border-color: var(--xt-border-highlight, rgba(0, 0, 0, 0.3)) !important;
 }
 
-#qr .captcha-clue-image,
-.captcha-iframe .captcha-clue-image {
+:root.themed-captcha #qr .captcha-clue-image,
+:root.themed-captcha .captcha-iframe .captcha-clue-image {
   border-color: var(--xt-border) !important;
+}
+
+/* Captcha status text readability on dark themes (always active).
+   Ensures "Verification not required", "Captcha expired", etc.
+   are readable when using Tomorrow or Spooky themes, even with
+   Theme Captcha disabled. */
+:root.tomorrow #qr #t-msg,
+:root.tomorrow #qr #t-task,
+:root.spooky #qr #t-msg,
+:root.spooky #qr #t-task,
+:root.tomorrow .captcha-iframe #t-msg,
+:root.tomorrow .captcha-iframe #t-task,
+:root.spooky .captcha-iframe #t-msg,
+:root.spooky .captcha-iframe #t-task {
+  color: #C5C8C6 !important;
 }
 #qr .captcha-counter {
   display: block;
@@ -7004,6 +6845,7 @@ svg.icon {
       this.nodes = {root};
 
       $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
+      if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
       $.after(QR.nodes.com.parentNode, root);
     },
 
@@ -20329,14 +20171,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      if (platform === 'crx') {
-        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
-          .then(({ response, responseHeaderString }) => {
-          if (response)
-            response = new Uint8Array(response);
-          cb(response, responseHeaderString);
-        });
-      } else {
+
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -20388,7 +20223,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } catch (error) {
           return fallback();
         }
-      }
+
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20460,7 +20295,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-      if (platform === 'userscript') {
+
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -20508,14 +20343,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             } catch (error1) { }
           };
         }
-      } else {
-        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
-          if (result.status) {
-            $.extend(req, result);
-          }
-          return req.onloadend();
-        });
-      }
+
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20530,15 +20358,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-      if (platform === 'crx') {
-        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
-          if (result) {
-            return cb();
-          } else {
-            return cbFail();
-          }
-        });
-      }
+
       return cb();
     },
   };
@@ -21171,6 +20991,8 @@ $\
           if (pathname[1] === 'captcha') {
             $.onExists(doc, 'body', () => {
               $.addClass(doc, 'captcha-t', 'captcha-iframe');
+              if (Conf['Theme Captcha'])
+                $.addClass(doc, 'themed-captcha');
               $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
               Captcha.t.setupIframe();
             });
@@ -27042,9 +26864,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-        if (platform === 'crx') {
-          w = (w.wrappedJSObject || w);
-        }
+
         if (`${meta.name} antidup` in w) {
           return;
         }

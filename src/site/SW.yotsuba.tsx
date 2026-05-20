@@ -192,6 +192,7 @@ $\
         if (pathname[1] === 'captcha') {
           $.onExists(doc, 'body', () => {
             $.addClass(doc, 'captcha-t', 'captcha-iframe');
+            if (Conf['Theme Captcha']) $.addClass(doc, 'themed-captcha');
             $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
             Captcha.t.setupIframe();
           });

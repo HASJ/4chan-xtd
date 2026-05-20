@@ -565,6 +565,11 @@ const Config = {
         'Automatically go to the next challenge when a captcha answer is selected.',
         1
       ],
+      'Theme Captcha': [
+        true,
+        'Apply the current theme colors to the captcha. Disable to use the default captcha appearance.',
+        1
+      ],
       'Avoid OffscreenCanvas': [
         false,
         'Do not use OffscreenCanvas when converting images, workaround for ' +
