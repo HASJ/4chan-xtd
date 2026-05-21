@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.4
+// @version      2.26.5
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.4",
-    "date": "2026-05-20T20:00:00Z"
+    "version": "2.26.5",
+    "date": "2026-05-21T12:00:00Z"
   };
 
   var meta = {
@@ -7067,6 +7067,8 @@ svg.icon {
     setup(focus) {
       if (!this.isEnabled) { return; }
 
+      this.isCompleted = false;
+
       if (!this.nodes.container) {
         // Create a child element for TCaptcha to use. TCaptcha.init() will
         // clear its className and set inline styles on it, but our JS reference
@@ -7079,6 +7081,7 @@ svg.icon {
 
         this.observer = new MutationObserver(() => {
           this.createStrips();
+          this.checkCompletion();
         });
         // Observe captcha-root, NOT captcha-container, because TCaptcha clears
         // the container's className making class-based queries fail.
@@ -7095,6 +7098,7 @@ svg.icon {
               return;
             }
             this.createStrips();
+            this.checkCompletion();
           }, 500);
         }
       }
@@ -7181,17 +7185,19 @@ svg.icon {
       // Create the clue image and insert it into #t-ctrl
       const tCtrl = $('#t-ctrl', mainDiv);
       if (tCtrl) {
-        const clueImage = $.el('div', {className: 'captcha-clue-image'});
-        if (isNotLikeOthers) {
-          clueImage.style.display = 'none';
-        } else {
-          clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
-        }
-        const tNextNode = $('#t-next', tCtrl);
-        if (tNextNode) {
-          $.before(tNextNode, clueImage);
-        } else {
-          $.add(tCtrl, clueImage);
+        if (!$('.captcha-clue-image', tCtrl)) {
+          const clueImage = $.el('div', {className: 'captcha-clue-image'});
+          if (isNotLikeOthers) {
+            clueImage.style.display = 'none';
+          } else {
+            clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
+          }
+          const tNextNode = $('#t-next', tCtrl);
+          if (tNextNode) {
+            $.before(tNextNode, clueImage);
+          } else {
+            $.add(tCtrl, clueImage);
+          }
         }
       }
 
@@ -7316,6 +7322,38 @@ svg.icon {
               stripElements[index].click();
               stripElements[index].focus();
             }
+          } else if (key === 'ArrowLeft') {
+            const stripElements = $$('.captcha-strip', this.nodes.root);
+            if (stripElements.length) {
+              e.preventDefault();
+              const selectedIndex = stripElements.findIndex(s => $.hasClass(s, 'selected'));
+              let newIndex = selectedIndex - 1;
+              if (selectedIndex === -1) {
+                newIndex = 0;
+              } else if (newIndex < 0) {
+                newIndex = 0;
+              }
+              if (stripElements[newIndex]) {
+                stripElements[newIndex].click();
+                stripElements[newIndex].focus();
+              }
+            }
+          } else if (key === 'ArrowRight') {
+            const stripElements = $$('.captcha-strip', this.nodes.root);
+            if (stripElements.length) {
+              e.preventDefault();
+              const selectedIndex = stripElements.findIndex(s => $.hasClass(s, 'selected'));
+              let newIndex = selectedIndex + 1;
+              if (selectedIndex === -1) {
+                newIndex = 0;
+              } else if (newIndex >= stripElements.length) {
+                newIndex = stripElements.length - 1;
+              }
+              if (stripElements[newIndex]) {
+                stripElements[newIndex].click();
+                stripElements[newIndex].focus();
+              }
+            }
           }
         };
         $.on(document, 'keydown', this.keydownListener);
@@ -7326,6 +7364,7 @@ svg.icon {
     },
 
     destroy() {
+      this.isCompleted = false;
       if (this.observer) {
         this.observer.disconnect();
         delete this.observer;
@@ -7369,7 +7408,22 @@ svg.icon {
       return response;
     },
 
+    checkCompletion() {
+      if (!this.isEnabled || !this.nodes.container) return;
+      const response = this.getOne();
+      if (response && response['t-response']) {
+        if (this.isCompleted) return;
+        this.isCompleted = true;
+        if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
+          QR.submit();
+        }
+      } else {
+        this.isCompleted = false;
+      }
+    },
+
     setUsed() {
+      this.isCompleted = false;
       if (this.isEnabled && this.nodes.container) {
         $.global('TCaptchaClearChallenge');
       }
@@ -7433,6 +7487,38 @@ svg.icon {
               strips[index].click();
               strips[index].focus();
             }
+          } else if (key === 'ArrowLeft') {
+            const strips = $$('.captcha-strip', mainDiv);
+            if (strips.length) {
+              e.preventDefault();
+              const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
+              let newIndex = selectedIndex - 1;
+              if (selectedIndex === -1) {
+                newIndex = 0;
+              } else if (newIndex < 0) {
+                newIndex = 0;
+              }
+              if (strips[newIndex]) {
+                strips[newIndex].click();
+                strips[newIndex].focus();
+              }
+            }
+          } else if (key === 'ArrowRight') {
+            const strips = $$('.captcha-strip', mainDiv);
+            if (strips.length) {
+              e.preventDefault();
+              const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
+              let newIndex = selectedIndex + 1;
+              if (selectedIndex === -1) {
+                newIndex = 0;
+              } else if (newIndex >= strips.length) {
+                newIndex = strips.length - 1;
+              }
+              if (strips[newIndex]) {
+                strips[newIndex].click();
+                strips[newIndex].focus();
+              }
+            }
           }
         };
         $.on(document, 'keydown', this.keydownListener);
@@ -7440,6 +7526,7 @@ svg.icon {
     },
 
     createIframeStrips(mainDiv, slider) {
+
       let strips = $('.captcha-strips', mainDiv);
       if (!strips) {
         const minStr = slider.getAttribute('min');
