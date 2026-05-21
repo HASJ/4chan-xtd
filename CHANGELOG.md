@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.5 (2026-05-21)
+
+- Features
+  - Added Left (`ArrowLeft`) and Right (`ArrowRight`) keyboard shortcut navigation support to the native slider captcha (TCaptcha) puzzle strips, allowing seamless Back/Forward selection of answer options.
+
 ### 2.26.4 (2026-05-20)
 
 - Bugfixes
