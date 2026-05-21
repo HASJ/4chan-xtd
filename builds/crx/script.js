@@ -85,8 +85,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.6",
-    "date": "2026-05-21T12:47:00Z"
+    "version": "2.26.7",
+    "date": "2026-05-21T12:56:00Z"
   };
 
   var meta = {
@@ -7083,7 +7083,7 @@ svg.icon {
       if (response && response['t-response']) {
         // Check if there is an active/visible "Next" button for intermediate challenges
         const tNext = $('#t-next', this.nodes.container);
-        if (tNext && tNext.style.display !== 'none' && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
+        if (tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
           return;
         }
         if (this.isCompleted) return;

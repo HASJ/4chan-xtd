@@ -378,7 +378,7 @@ const CaptchaT = {
     if (response && response['t-response']) {
       // Check if there is an active/visible "Next" button for intermediate challenges
       const tNext = $('#t-next', this.nodes.container);
-      if (tNext && tNext.style.display !== 'none' && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
+      if (tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
         return;
       }
       if (this.isCompleted) return;
