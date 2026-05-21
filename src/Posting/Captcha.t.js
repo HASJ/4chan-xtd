@@ -376,6 +376,11 @@ const CaptchaT = {
     if (!this.isEnabled || !this.nodes.container) return;
     const response = this.getOne();
     if (response && response['t-response']) {
+      // Check if there is an active/visible "Next" button for intermediate challenges
+      const tNext = $('#t-next', this.nodes.container);
+      if (tNext && tNext.style.display !== 'none' && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
+        return;
+      }
       if (this.isCompleted) return;
       this.isCompleted = true;
       if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
