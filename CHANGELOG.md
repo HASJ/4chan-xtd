@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.6 (2026-05-21)
+
+- Bugfixes
+  - Fixed "Post on Captcha Completion" auto-submitting before the captcha sequence is actually completed during multi-step slider challenges (TCaptcha) by deferring submission if the intermediate next-step button (`#t-next`) is active/visible.
+
 ### 2.26.5 (2026-05-21)
 
 - Features
