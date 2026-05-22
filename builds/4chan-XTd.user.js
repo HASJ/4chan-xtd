@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.7
+// @version      2.26.8
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.7",
-    "date": "2026-05-21T12:56:00Z"
+    "version": "2.26.8",
+    "date": "2026-05-22T10:00:00Z"
   };
 
   var meta = {
@@ -12381,7 +12381,9 @@ svg.icon {
       new Thread(o.threadID, board);
     const post = new Post(g.SITE.Build.post(o), thread, board);
     post.resurrect();
-    post.markAsFromArchive();
+    if (data.deleted === '1') {
+      post.markAsFromArchive();
+    }
     if (post.file) {
       post.file.thumbURL = o.file.thumbURL;
     }
@@ -12768,7 +12770,7 @@ svg.icon {
             let nrRestored = 0;
             const archivePosts = this.response[g.threadID.toString()].posts;
             for (const [postID, raw] of Object.entries(archivePosts)) {
-              if (RestoreDeletedFromArchive.insert(raw)[1]) {
+              if (RestoreDeletedFromArchive.insert(raw, url)[1]) {
                 ++nrRestored;
               }
             }
@@ -12804,17 +12806,16 @@ svg.icon {
     * Inserts a post from the archive in the thread. Will automatically skip posts from other threads and posts already
     * in the thread.
     * @param raw The raw data returned from the archive
+    * @param url The URL the data was fetched from
     * @returns A tuple with as first value the new post, and the second value a boolean whether is was inserted into the
     * page.
     */
-    insert(raw) {
+    insert(raw, url = "") {
       const key = `${raw.board.shortname}.${raw.num}`;
       if (g.posts.keys.includes(key))
         return [undefined, false];
       let inserted = false;
-      const post = parseArchivePost(raw, "");
-      post.resurrect();
-      post.markAsFromArchive();
+      const post = parseArchivePost(raw, url);
       if (post.threadID === g.threadID && g.VIEW === 'thread') {
         const newPostIndex = g.posts.insert(key, post, key => +(key.split('.')[1]) < post.ID);
         if (Conf['Thread Quotes']) {
@@ -13004,7 +13005,7 @@ svg.icon {
         this.root.textContent = data.error;
         return;
       }
-      return this.insert(RestoreDeletedFromArchive.insert(data)[0]);
+      return this.insert(RestoreDeletedFromArchive.insert(data, url)[0]);
     }
   }
   Fetcher.archiveTags = {

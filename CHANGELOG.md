@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.8 (2026-05-22)
+
+- Bugfixes
+  - Fixed cross-thread quotes being incorrectly labeled as "[Deleted, restored from external archive]" by only applying the archive label if the post is actually marked as deleted in the archive data.
+  - Fixed relative thumbnail URLs in restored archive posts by correctly passing the archive's base URL during parsing.
+
 ### 2.26.7 (2026-05-21)
 
 - Bugfixes
