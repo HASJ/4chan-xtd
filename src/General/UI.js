@@ -3,7 +3,7 @@ import { Conf, d, doc } from "../globals/globals";
 import Callbacks from "../classes/Callbacks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import Header from "./Header";
+import UIState from "../globals/UIState";
 import Icon from "../Icons/icon";
 
 /*
@@ -316,9 +316,9 @@ export var dragstart = function (e) {
   [o.topBorder, o.bottomBorder] = Conf['Header auto-hide'] || !Conf['Fixed Header'] ?
     [0, 0]
   : Conf['Bottom Header'] ?
-    [0, Header.bar.getBoundingClientRect().height]
+    [0, UIState.headerBar.getBoundingClientRect().height]
   :
-    [Header.bar.getBoundingClientRect().height, 0];
+    [UIState.headerBar.getBoundingClientRect().height, 0];
 
   if (isTouching) {
     o.identifier = e.identifier;

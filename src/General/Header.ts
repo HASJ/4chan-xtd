@@ -10,6 +10,7 @@ import Settings from "./Settings";
 import UI from "./UI";
 import meta from '../../package.json';
 import Icon from "../Icons/icon";
+import UIState from "../globals/UIState";
 
 /*
  * decaffeinate suggestions:
@@ -156,20 +157,17 @@ var Header: any = {
     return this.enableDesktopNotifications();
   },
 
-  bar: $.el('div',
-    {id: 'header-bar'}),
+  bar: UIState.headerBar,
 
   bottomBoardList: undefined as HTMLElement | undefined,
   boardList: undefined as HTMLElement | undefined,
 
-  noticesRoot: $.el('div',
-    {id: 'notifications'}),
+  noticesRoot: UIState.noticesRoot,
 
   shortcuts: $.el('span',
     {id: 'shortcuts'}),
 
-  hover: $.el('div',
-    {id: 'hoverUI'}),
+  hover: UIState.hoverUI,
 
   toggle: $.el('div',
     {id: 'scroll-marker'}),
@@ -509,7 +507,7 @@ var Header: any = {
 
     $.addClass(doc, args[0]);
     $.rmClass(doc, args[1]);
-    return $[args[2]](Header.bar, Header.noticesRoot);
+    return $[args[2]](Header.bar, UIState.noticesRoot);
   },
 
   toggleBarPosition() {

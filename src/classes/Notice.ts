@@ -1,4 +1,4 @@
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 import { SECOND } from "../platform/helpers";
@@ -47,7 +47,7 @@ export default class Notice {
       return;
     }
     $.off(d, 'visibilitychange', this.add);
-    $.add(Header.noticesRoot, this.el);
+    $.add(UIState.noticesRoot, this.el);
     this.el.clientHeight; // force reflow
     this.el.style.opacity = '1';
     if (this.timeout) {
