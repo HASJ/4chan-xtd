@@ -1,8 +1,7 @@
-// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Thread from "../classes/Thread";
-import Index from "../General/Index";
+import IndexState from "../globals/IndexState";
 import UI from "../General/UI";
 import { g, Conf, d, doc } from "../globals/globals";
 import Menu from "../Menu/Menu";
@@ -11,12 +10,7 @@ import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 import Icon from '../Icons/icon';
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var ThreadHiding = {
+var ThreadHiding: any = {
   init() {
     if (!['index', 'catalog'].includes(g.VIEW) || (!Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index'])) { return; }
     this.db = new DataBoard('hiddenThreads');
@@ -137,7 +131,7 @@ var ThreadHiding = {
         textContent: 'Show',
         href: 'javascript:;'
       }
-      );
+      ) as any;
       $.on(div, 'click', ThreadHiding.menu.show);
 
       Menu.menu.addEntry({
@@ -172,18 +166,18 @@ var ThreadHiding = {
     },
 
     hide() {
-      const makeStub = $('input', this.parentNode).checked;
+      const makeStub = ($('input', this.parentNode as HTMLElement) as HTMLInputElement).checked;
       const {thread} = ThreadHiding.menu;
       ThreadHiding.hide(thread, makeStub, 'Hidden manually');
       ThreadHiding.saveHiddenState(thread, makeStub);
-      return $.event('CloseMenu');
+      return $.event('CloseMenu', undefined);
     },
 
     show() {
       const {thread} = ThreadHiding.menu;
       ThreadHiding.show(thread);
       ThreadHiding.saveHiddenState(thread);
-      return $.event('CloseMenu');
+      return $.event('CloseMenu', undefined);
     },
 
     hideStub() {
@@ -191,7 +185,7 @@ var ThreadHiding = {
       ThreadHiding.show(thread);
       ThreadHiding.hide(thread, false);
       ThreadHiding.saveHiddenState(thread, false);
-      $.event('CloseMenu');
+      $.event('CloseMenu', undefined);
     }
   },
 
@@ -289,10 +283,10 @@ var ThreadHiding = {
     if (thread.isHidden) { return; }
     const threadRoot = thread.nodes.root;
     thread.isHidden = true;
-    Index.updateHideLabel();
-    if (thread.catalogView && !Index.showHiddenThreads) {
+    $.event('ThreadHidingUpdate', undefined);
+    if (thread.catalogView && !IndexState.showHiddenThreads) {
       $.rm(thread.catalogView.nodes.root);
-      $.event('PostsRemoved', null, Index.root);
+      $.event('PostsRemoved', null, IndexState.root as HTMLElement);
     }
 
     if (!makeStub) { return threadRoot.hidden = true; }
@@ -307,22 +301,22 @@ var ThreadHiding = {
     }
     const threadRoot = thread.nodes.root;
     threadRoot.hidden = (thread.isHidden = false);
-    Index.updateHideLabel();
+    $.event('ThreadHidingUpdate', undefined);
     if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
       const { root } = thread.catalogView.nodes;
 
-      if (Index.showHiddenThreads) {
+      if (IndexState.showHiddenThreads) {
         $.rm(root);
-        $.event('PostsRemoved', null, Index.root);
+        $.event('PostsRemoved', null, IndexState.root as HTMLElement);
       } else {
-        let i = Index.sortedThreadIDs.indexOf(thread.ID) - 1;
+        let i = IndexState.sortedThreadIDs.indexOf(thread.ID) - 1;
 
         while (true) {
           if (i < 0) {
             $('.board').insertAdjacentElement('afterbegin', root);
             break;
           }
-          const rootPrevious = d.getElementById(`t${Index.sortedThreadIDs[i]}`);
+          const rootPrevious = d.getElementById(`t${IndexState.sortedThreadIDs[i]}`);
           if (rootPrevious) {
             rootPrevious.insertAdjacentElement('afterend', root)
             break;
@@ -330,7 +324,7 @@ var ThreadHiding = {
           --i;
         }
 
-        $.event('PostsInserted', null, Index.root);
+        $.event('PostsInserted', null, IndexState.root as HTMLElement);
       }
     }
   }

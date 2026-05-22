@@ -9,15 +9,18 @@
 - [x] Task: Convert `src/platform/$$.js` to TypeScript and ensure it has no upstream dependencies causing circular loops. 16d5699
     - [x] Write Tests
     - [x] Implement Feature
-- [ ] Task: Identify a shared "helpers" or "types" module to extract common logic and break circular dependencies discovered in Phase 1.
-    - [ ] Write Tests
-    - [ ] Implement Feature
-- [ ] Task: Conductor - User Manual Verification 'Foundation & Dependency Refactoring' (Protocol in workflow.md)
+- [x] Task: Identify a shared "helpers" or "types" module to extract common logic and break circular dependencies discovered in Phase 1. 37414f2
+    - [x] Write Tests
+    - [x] Implement Feature
+- [x] Task: Conductor - User Manual Verification 'Foundation & Dependency Refactoring' (Protocol in workflow.md)
 
 ## Phase 3: UI/Core Migration
-- [ ] Task: Convert `src/General/UI.js` to TypeScript while resolving any circular dependencies with other core modules.
-    - [ ] Write Tests
-    - [ ] Implement Feature
+- [x] Task: Convert `src/General/UI.js` to TypeScript while resolving any circular dependencies with other core modules.
+    - [x] Write Tests
+    - [x] Implement Feature
+- [x] Task: Convert `src/General/Index.js` to TypeScript while resolving circular dependencies with core modules.
+    - [x] Write Tests
+    - [x] Implement Feature
 - [ ] Task: Conductor - User Manual Verification 'UI/Core Migration' (Protocol in workflow.md)
 
 ## Phase 4: Finalization
