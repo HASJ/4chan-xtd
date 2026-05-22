@@ -1,8 +1,8 @@
 # Implementation Plan - TypeScript Migration & Circular Dependency Resolution
 
 ## Phase 1: Analysis & Branch Setup
-- [ ] Task: Audit `src/` to finalize the first migration targets and map existing circular dependency chains.
-- [ ] Task: Create a new feature branch `feat/ts-migration-circular-fix`.
+- [x] Task: Audit `src/` to finalize the first migration targets and map existing circular dependency chains.
+- [x] Task: Create a new feature branch `feat/ts-migration-circular-fix`.
 - [ ] Task: Conductor - User Manual Verification 'Analysis & Branch Setup' (Protocol in workflow.md)
 
 ## Phase 2: Foundation & Dependency Refactoring
