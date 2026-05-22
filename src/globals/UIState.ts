@@ -1,20 +1,22 @@
-import $ from "../platform/$";
-
 const UIState = {
   /**
    * Root element for notifications/notices.
    */
-  noticesRoot: $.el('div', { id: 'notifications' }),
+  noticesRoot: document.createElement('div'),
 
   /**
    * Root element for the header bar.
    */
-  headerBar: $.el('div', { id: 'header-bar' }),
+  headerBar: document.createElement('div'),
 
   /**
    * Root element for hover UI.
    */
-  hoverUI: $.el('div', { id: 'hoverUI' }),
+  hoverUI: document.createElement('div'),
 };
+
+UIState.noticesRoot.id = 'notifications';
+UIState.headerBar.id = 'header-bar';
+UIState.hoverUI.id = 'hoverUI';
 
 export default UIState;

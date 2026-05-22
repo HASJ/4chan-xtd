@@ -17,6 +17,7 @@ import Get from '../General/Get';
 import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
+import * as MimeTypes from '../globals/MimeTypes';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -96,31 +97,13 @@ var QR = {
   req: undefined as (XMLHttpRequest & { isUploadFinished: boolean, progress: string }) | undefined,
   selected: undefined as post,
 
-  mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'application/vnd.adobe.flash.movie', 'application/x-shockwave-flash', 'video/webm', 'video/mp4'],
+  mimeTypes: MimeTypes.mimeTypes,
 
-  validExtension: /\.(jpe?g|png|gif|pdf|swf|webm|mp4)$/i,
+  validExtension: MimeTypes.validExtension,
 
-  typeFromExtension: {
-    'jpg':  'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png':  'image/png',
-    'gif':  'image/gif',
-    'pdf':  'application/pdf',
-    'swf':  'application/vnd.adobe.flash.movie',
-    'webm': 'video/webm',
-    'mp4': 'video/mp4'
-  },
+  typeFromExtension: MimeTypes.typeFromExtension,
 
-  extensionFromType: {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/gif': 'gif',
-    'application/pdf': 'pdf',
-    'application/vnd.adobe.flash.movie': 'swf',
-    'application/x-shockwave-flash': 'swf',
-    'video/webm': 'webm',
-    'video/mp4': 'mp4'
-  },
+  extensionFromType: MimeTypes.extensionFromType,
 
   init() {
     let sc;
