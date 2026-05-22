@@ -4,5 +4,5 @@
   "status": "new",
   "created_at": "2026-05-22T16:45:00Z",
   "updated_at": "2026-05-22T16:45:00Z",
-  "description": "Identify urgent TypeScript migration targets and begin conversion on a new branch"
+  "description": "Identify urgent TypeScript migration targets and resolve circular dependencies on a new branch"
 }

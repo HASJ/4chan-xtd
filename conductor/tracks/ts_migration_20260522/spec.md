@@ -1,15 +1,18 @@
-# Specification: TypeScript Migration: Identify and Convert Urgent Modules
+# Specification: TypeScript Migration & Circular Dependency Resolution
 
 ## Goal
-Identify the most critical remaining JavaScript modules in the `src/` directory and convert them to TypeScript. This improves type safety, maintainability, and aligns with the project's core objective of a full TS migration.
+Identify the most critical remaining JavaScript modules in the `src/` directory and convert them to TypeScript. Simultaneously, identify and resolve circular dependencies to improve architectural stability and ensure correct initialization order.
 
 ## Scope
 - Audit of remaining `.js` files in `src/`.
-- Selection of at least 2 high-priority targets.
+- Identification of modules involved in circular dependencies.
+- Selection of high-priority targets for migration and dependency refactoring.
 - Full conversion of selected targets to `.ts`.
-- Verification of build integrity and basic functionality.
+- Refactoring to break circular chains (e.g., using dependency injection or shared helper modules).
+- Verification of build integrity and functional correctness.
 
 ## Success Criteria
 - Selected modules are successfully converted to `.ts`.
+- Circular dependency chains involving the migrated modules are broken.
 - The project builds without errors using `npm run build`.
-- Functional tests (if applicable) for the migrated modules pass.
+- Functional tests for the migrated modules pass.
