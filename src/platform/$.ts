@@ -9,7 +9,6 @@
 // loosely follows the jquery api:
 // http://api.jquery.com/
 
-import Notice from "../classes/Notice";
 import { c, Conf, d, doc, g } from "../globals/globals";
 import { debounce, dict, MINUTE, platform, SECOND } from "./helpers";
 import meta from '../../package.json';
@@ -546,7 +545,7 @@ if (platform === 'crx') {
       const msg = $.el('div',
         {innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.`});
       $.on($('a', msg), 'click', () => location.reload());
-      new Notice('warning', msg);
+      $.event('CreateNotification', {type: 'warning', content: msg});
       $.crxWarningShown = true;
     }
     return false;

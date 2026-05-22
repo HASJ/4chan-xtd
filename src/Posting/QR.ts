@@ -8,7 +8,7 @@ import $$ from '../platform/$$';
 import CrossOrigin from '../platform/CrossOrigin';
 import Captcha from './Captcha';
 import meta from '../../package.json';
-import Header from '../General/Header';
+import UIState from '../globals/UIState';
 import { Conf, E, d, doc, g } from '../globals/globals';
 import Menu from '../Menu/Menu';
 import UI from '../General/UI';
@@ -18,6 +18,7 @@ import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import * as MimeTypes from '../globals/MimeTypes';
+import QRState from '../globals/QRState';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -31,10 +32,12 @@ interface ConvertOptions {
 };
 
 var QR = {
-  postingIsEnabled: false,
+  get postingIsEnabled() { return QRState.postingIsEnabled; },
+  set postingIsEnabled(val) { QRState.postingIsEnabled = val; },
 
-  // will be set at init
-  captcha: undefined as typeof Captcha.v2 | typeof Captcha.t,
+  get captcha() { return QRState.captcha; },
+  set captcha(val) { QRState.captcha = val; },
+
   min_width: 0,
   min_height: 0,
   max_width: 0,
@@ -49,53 +52,17 @@ var QR = {
   spoiler: false,
   link: undefined as HTMLElement,
   post: undefined as typeof post,
-  posts: undefined as post[],
-  nodes: undefined as {
-    el: HTMLDivElement,
-    move: HTMLDivElement,
-    autohide: HTMLInputElement,
-    close: HTMLAnchorElement,
-    thread: HTMLSelectElement,
-    form: HTMLFormElement,
-    sjisToggle: HTMLButtonElement,
-    texButton: HTMLButtonElement,
-    name: HTMLInputElement,
-    email: HTMLInputElement,
-    sub: HTMLInputElement,
-    com: HTMLTextAreaElement,
-    charCount: HTMLSpanElement,
-    texPreview: HTMLDivElement,
-    dumpList: HTMLDivElement,
-    addPost: HTMLAnchorElement,
-    oekaki: HTMLDivElement,
-    drawButton: HTMLInputElement,
-    fileSubmit: HTMLDivElement,
-    fileButton: HTMLInputElement,
-    noFile: HTMLSpanElement,
-    filename: HTMLInputElement,
-    spoiler: HTMLInputElement,
-    oekakiButton: HTMLAnchorElement,
-    randomizeButton: HTMLAnchorElement,
-    compress: HTMLAnchorElement,
-    view: HTMLAnchorElement,
-    restoreNameButton: HTMLAnchorElement,
-    fileRM: HTMLAnchorElement,
-    urlButton: HTMLAnchorElement,
-    pasteArea: HTMLAnchorElement,
-    customCooldown: HTMLAnchorElement,
-    dumpButton: HTMLAnchorElement,
-    status: HTMLInputElement,
-    flashTag: HTMLSelectElement,
-    fileInput: HTMLInputElement,
-    flag?: HTMLSelectElement,
-    preview?: HTMLDivElement;
-    splitPost?: HTMLAnchorElement;
-  },
+  get posts() { return QRState.posts; },
+  set posts(val) { QRState.posts = val; },
+  get nodes() { return QRState.nodes; },
+  set nodes(val) { QRState.nodes = val; },
   shortcut: undefined as HTMLAnchorElement,
   hasFocus: false,
 
-  req: undefined as (XMLHttpRequest & { isUploadFinished: boolean, progress: string }) | undefined,
-  selected: undefined as post,
+  get req() { return QRState.req; },
+  set req(val) { QRState.req = val; },
+  get selected() { return QRState.selected; },
+  set selected(val) { QRState.selected = val; },
 
   mimeTypes: MimeTypes.mimeTypes,
 
@@ -106,6 +73,18 @@ var QR = {
   extensionFromType: MimeTypes.extensionFromType,
 
   init() {
+    QRState.submit = QR.submit;
+    QRState.focus = QR.focus;
+    QRState.open = QR.open;
+    QRState.close = QR.close;
+    QRState.error = QR.error;
+    QRState.captcha = QR.captcha;
+    QRState.cooldown = QR.cooldown;
+    QRState.post = QR.post;
+
+    const captchaVersion = $('#g-recaptcha, #captcha-forced-noscript') ? 'v2' : 't';
+    QR.captcha = Captcha[captchaVersion];
+
     let sc;
     if (!Conf['Quick Reply']) { return; }
 
@@ -134,7 +113,7 @@ var QR = {
       }
     });
 
-    Header.addShortcut('qr', sc, 540);
+    UIState.addShortcut('qr', sc, 540);
 
     window.addEventListener('message', event => {
       if (event.data?.twister?.error) {
@@ -145,8 +124,6 @@ var QR = {
 
   initReady() {
     let origToggle;
-    const captchaVersion = $('#g-recaptcha, #captcha-forced-noscript') ? 'v2' : 't';
-    QR.captcha = Captcha[captchaVersion];
     QR.postingIsEnabled = true;
 
     const {config} = g.BOARD;
@@ -357,7 +334,7 @@ var QR = {
     }
     const notice = new Notice('warning', el);
     QR.notifications.push(notice);
-    if (!Header.areNotificationsEnabled) {
+    if (!UIState.areNotificationsEnabled) {
       if (d.hidden && !QR.cooldown.auto) { return alert(el.textContent); }
     } else if (d.hidden || !(focusOverride || d.hasFocus())) {
       const notif = new Notification(el.textContent, {

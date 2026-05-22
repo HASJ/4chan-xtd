@@ -212,7 +212,7 @@ var Index: any = {
           }
         });
         $.addClass(doc, 'hats-enabled');
-        $.addStyle(`.catalog-thread::after {background-image: url(${g.SITE.Build.hat.src});}`);
+        $.addStyle(`.catalog-thread::after {background-image: url(${g.SITE.Build.hat.src});}`, undefined);
       }
 
       const board = $('.board') as HTMLElement;
@@ -844,7 +844,7 @@ var Index: any = {
   },
 
   parse(pages: any[]) {
-    ($.cleanCache as any)((url: string) => /^https?:\/\/a\.4cdn\.org\//.test(url));
+    ($.constructor.prototype.cleanCache || ($ as any).cleanCache)((url: string) => /^https?:\/\/a\.4cdn\.org\//.test(url));
     Index.parseThreadList(pages);
     Index.changed.threads = true;
     return Index.pageLoad();
@@ -935,7 +935,7 @@ var Index: any = {
         } else {
           var obj = Index.parsedThreads[ID];
           opRoot = g.SITE.Build.post(obj);
-          OP = new Post(opRoot!, thread, g.BOARD);
+          OP = new Post(opRoot!, thread, g.BOARD as any);
           OP.filterResults = obj.filterResults;
           newPosts.push(OP);
         }

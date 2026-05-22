@@ -2,8 +2,8 @@
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import QR from "./QR";
-import { isPassEnabled } from "../platform/helpers";
+import QRState from "../globals/QRState";
+import { isPassEnabled, keyCode } from "../platform/helpers";
 
 const CaptchaT = {
   init() {
@@ -13,9 +13,9 @@ const CaptchaT = {
     const root = $.el('div', {className: 'captcha-root'});
     this.nodes = {root};
 
-    $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
+    $.addClass(QRState.nodes.el, 'has-captcha', 'captcha-t');
     if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
-    $.after(QR.nodes.com.parentNode, root);
+    $.after(QRState.nodes.com.parentNode, root);
   },
 
   moreNeeded() {
@@ -24,7 +24,7 @@ const CaptchaT = {
   getThread() {
     return {
       boardID: g.BOARD.ID,
-      threadID: QR.posts[0].thread === 'new' ? '0' : ('' + QR.posts[0].thread),
+      threadID: QRState.posts[0].thread === 'new' ? '0' : ('' + QRState.posts[0].thread),
     };
   },
 
@@ -383,8 +383,8 @@ const CaptchaT = {
       }
       if (this.isCompleted) return;
       this.isCompleted = true;
-      if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
-        QR.submit();
+      if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
+        QRState.submit();
       }
     } else {
       this.isCompleted = false;

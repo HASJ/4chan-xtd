@@ -86,7 +86,7 @@ var Header: any = {
     $.sync('Centered links',             this.setLinkJustify);
     $.sync('Bottom Board List',          this.setFooterVisibility);
 
-    this.addShortcut('menu', menuButton, 900);
+    UIState.addShortcut('menu', menuButton, 900);
 
     this.menu.addEntry({
       el: $.el('span',
@@ -132,9 +132,9 @@ var Header: any = {
         $.before(absbot, footer);
         $.global('stubCloneTopNav');
       }
-      if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
+      if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
         for (var a of $$('a', Header.bottomBoardList)) {
-          if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
+          if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
         }
         return CatalogLinks.setLinks(Header.bottomBoardList);
       }
@@ -145,11 +145,11 @@ var Header: any = {
       if (g.VIEW === 'catalog') {
         cs.title = (cs.textContent = 'Catalog Settings');
         Icon.set(cs, 'bookOpen', 'Catalog Settings');
-        this.addShortcut('native', cs, 810);
+        UIState.addShortcut('native', cs, 810);
       } else {
         cs.title = (cs.textContent = '4chan Settings');
         cs.className = 'native-settings';
-        this.addShortcut('native', cs, 810);
+        UIState.addShortcut('native', cs, 810);
       }
       $.on(cs, 'click', () => $.id('settingsWindowLink').click());
     }
@@ -164,8 +164,7 @@ var Header: any = {
 
   noticesRoot: UIState.noticesRoot,
 
-  shortcuts: $.el('span',
-    {id: 'shortcuts'}),
+  shortcuts: UIState.shortcutsRoot,
 
   hover: UIState.hoverUI,
 
@@ -200,7 +199,7 @@ var Header: any = {
     const fullBoardList = $('.boardList', Header.boardList);
     $.add(fullBoardList, nodes);
     for (var a of $$('a', fullBoardList)) {
-      if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
+      if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
     }
     return CatalogLinks.setLinks(fullBoardList);
   },
@@ -618,25 +617,9 @@ var Header: any = {
     } else {
       return top < 0;
     }
-  },
+    },
 
-  addShortcut(id: string, el: HTMLElement, index: number) {
-    const shortcut = $.el('span', {
-      id: `shortcut-${id}`,
-      className: 'shortcut brackets-wrap'
-    });
-    $.add(shortcut, el);
-    shortcut.dataset.index = index.toString();
-    for (var item of $$('[data-index]', Header.shortcuts)) {
-      if (+item.dataset.index > +index) {
-        $.before(item, shortcut);
-        return;
-      }
-    }
-    return $.add(Header.shortcuts, shortcut);
-  },
-
-  rmShortcut(el) {
+    rmShortcut(el) {
     return $.rm(el.parentElement);
   },
 
@@ -648,15 +631,14 @@ var Header: any = {
     let notice;
     const {type, content, lifetime} = e.detail;
     return notice = new Notice(type, content, lifetime);
-  },
+    },
 
-  areNotificationsEnabled: false,
-  enableDesktopNotifications() {
+    enableDesktopNotifications() {
     let notice;
     if (!window.Notification || !Conf['Desktop Notifications']) { return; }
     switch (Notification.permission) {
       case 'granted':
-        Header.areNotificationsEnabled = true;
+        UIState.areNotificationsEnabled = true;
         return;
         break;
       case 'denied':
@@ -674,7 +656,7 @@ var Header: any = {
     });
     const [authorize, disable] = $$('button', el);
     $.on(authorize, 'click', () => Notification.requestPermission(function(status) {
-      Header.areNotificationsEnabled = status === 'granted';
+      UIState.areNotificationsEnabled = status === 'granted';
       if (status === 'default') { return; }
       return notice.close();
     }));

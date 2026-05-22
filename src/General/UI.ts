@@ -163,7 +163,7 @@ export const Menu = class Menu {
       href:      'javascript:;'
     });
     a.dataset.fullID = post.fullID;
-    Icon.set(a, 'angleDown' as any);
+    Icon.set(a, 'caretDown');
     $.on(a, 'click', (e: MouseEvent) => {
       return this.open(e, a, post);
     });
