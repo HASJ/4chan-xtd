@@ -4,5 +4,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: TypeScript Migration: Identify and Convert Urgent Modules**
+- [ ] **Track: TypeScript Migration & Circular Dependency Resolution**
   *Link: [./tracks/ts_migration_20260522/](./tracks/ts_migration_20260522/)*

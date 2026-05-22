@@ -16,6 +16,20 @@ const CaptchaT = {
     $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
     if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
     $.after(QR.nodes.com.parentNode, root);
+
+    root.addEventListener('focus', (e) => {
+      if (this.isInitializing && e.target.id === 't-resp') {
+        this.isInitializing = false;
+        if (!this.shouldFocus) {
+          e.preventDefault();
+          if (e.relatedTarget && QR.nodes.el.contains(e.relatedTarget)) {
+            e.relatedTarget.focus();
+          } else if (QR.nodes && !QR.nodes.el.hidden) {
+            QR.nodes.com.focus();
+          }
+        }
+      }
+    }, true);
   },
 
   moreNeeded() {
@@ -32,6 +46,7 @@ const CaptchaT = {
     if (!this.isEnabled) { return; }
 
     this.isCompleted = false;
+    this.shouldFocus = focus;
 
     if (!this.nodes.container) {
       // Create a child element for TCaptcha to use. TCaptcha.init() will
@@ -43,7 +58,9 @@ const CaptchaT = {
       CaptchaT.currentThread = CaptchaT.getThread();
       CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
 
+      this.isInitializing = true;
       this.observer = new MutationObserver(() => {
+        this.isInitializing = false;
         this.createStrips();
         this.checkCompletion();
       });

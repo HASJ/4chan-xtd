@@ -17,3 +17,5 @@ node_modules/
 /builds/crx/crx.7z
 /builds/*.js.map
 4chan thread.html
+*.log
+main_diff.txt
