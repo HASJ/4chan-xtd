@@ -227,6 +227,6 @@ export default class Fetcher {
       return;
     }
 
-    return this.insert(RestoreDeletedFromArchive.insert(data)[0]);
+    return this.insert(RestoreDeletedFromArchive.insert(data, url)[0]);
   }
 }

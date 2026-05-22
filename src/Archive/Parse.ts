@@ -183,7 +183,9 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
     new Thread(o.threadID, board);
   const post = new Post(g.SITE.Build.post(o), thread, board);
   post.resurrect();
-  post.markAsFromArchive();
+  if (data.deleted === '1') {
+    post.markAsFromArchive();
+  }
   if (post.file) { post.file.thumbURL = o.file.thumbURL; }
   Callbacks.Post.execute(post);
   return post;
