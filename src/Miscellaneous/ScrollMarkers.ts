@@ -1,5 +1,5 @@
 ﻿// @ts-nocheck
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import { debounce } from "../platform/helpers";
@@ -18,7 +18,7 @@ const ScrollMarkers = {
     doc.insertAdjacentElement('afterbegin', ScrollMarkers.container);
     $.on(ScrollMarkers.container, 'click', (e) => {
       const { postId } = (e.target as HTMLElement).dataset;
-      if (postId) Header.scrollTo(g.posts[postId].nodes.root);
+      if (postId) UIState.scrollTo(g.posts[postId].nodes.root);
     });
     new ResizeObserver(ScrollMarkers.markScroll).observe(doc)
   },

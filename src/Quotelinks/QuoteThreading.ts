@@ -2,7 +2,7 @@
 import Callbacks from "../classes/Callbacks";
 import type Post from "../classes/Post";
 import RandomAccessList from "../classes/RandomAccessList";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { Conf, d, g } from "../globals/globals";
 import ReplyPruning from "../Monitoring/ReplyPruning";
 import Unread from "../Monitoring/Unread";
@@ -35,7 +35,7 @@ var QuoteThreading = {
     $.on(this.threadNewLink.firstElementChild, 'click', this.rethread);
     $.on(d, '4chanXInitFinished', () => { this.ready = true; });
 
-    Header.menu.addEntry(this.entry = {
+    UIState.headerMenu.addEntry(this.entry = {
       el:    this.controls,
       order: 99
     }

@@ -2,7 +2,6 @@
 import Callbacks from "../classes/Callbacks";
 import Config from "../config/Config";
 import Get from "../General/Get";
-import Header from "../General/Header";
 import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { Conf, d, doc, g } from "../globals/globals";
@@ -91,7 +90,7 @@ var ImageExpand = {
         if (ImageExpand.on &&
           ((!Conf['Expand spoilers']  && file.isSpoiler) ||
           (!Conf['Expand videos']     && file.isVideo) ||
-          (Conf['Expand from here']   && (Header.getTopOf(file.thumb) < 0)) ||
+          (Conf['Expand from here']   && (UIState.getTopOf(file.thumb) < 0)) ||
           (Conf['Expand thread only'] && (g.VIEW === 'index') && !threadRoot?.contains(file.thumb)))) {
             return;
           }
@@ -122,7 +121,7 @@ var ImageExpand = {
           if (!file || !file.isVideo || !file.isExpanded) { continue; }
 
           var video = file.fullImage;
-          var visible = ($.hasAudio(video) && !video.muted) || Header.isNodeVisible(video);
+          var visible = ($.hasAudio(video) && !video.muted) || UIState.isNodeVisible(video);
           if (visible && file.wasPlaying) {
             delete file.wasPlaying;
             video.play();
@@ -154,7 +153,7 @@ var ImageExpand = {
         if (!$('.stub', next) && (next.offsetHeight !== 0)) { break; }
       }
       if (next) {
-        return Header.scrollTo(next);
+        return UIState.scrollTo(next);
       }
     }
   },
@@ -164,7 +163,7 @@ var ImageExpand = {
     const {file} = post;
 
     if (el = file.fullImage) {
-      const top = Header.getTopOf(el);
+      const top = UIState.getTopOf(el);
       bottom = top + el.getBoundingClientRect().height;
       oldHeight = d.body.clientHeight;
       ({scrollY} = window);
@@ -187,7 +186,7 @@ var ImageExpand = {
         window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
       } else {
         // For images not above us that would be moved above us, scroll to the thumbnail.
-        Header.scrollToIfNeeded(post.nodes.root);
+        UIState.scrollToIfNeeded(post.nodes.root);
       }
       if (window.scrollX > 0) {
         // If we have scrolled right viewing an expanded image, return to the left.
@@ -301,7 +300,7 @@ var ImageExpand = {
     const {file} = post;
     if (!file.isExpanding) { return; } // contracted before the image loaded
 
-    const bottom = Header.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
+    const bottom = UIState.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
     const oldHeight = d.body.clientHeight;
     const {scrollY} = window;
 
@@ -318,9 +317,9 @@ var ImageExpand = {
     // Scroll to display full image.
     if (file.scrollIntoView) {
       delete file.scrollIntoView;
-      const imageBottom = Math.min(doc.clientHeight - file.fullImage.getBoundingClientRect().bottom - 25, Header.getBottomOf(file.fullImage));
+      const imageBottom = Math.min(doc.clientHeight - file.fullImage.getBoundingClientRect().bottom - 25, UIState.getBottomOf(file.fullImage));
       if (imageBottom < 0) {
-        window.scrollBy(0, Math.min(-imageBottom, Header.getTopOf(file.fullImage)));
+        window.scrollBy(0, Math.min(-imageBottom, UIState.getTopOf(file.fullImage)));
       }
     }
 
@@ -338,7 +337,7 @@ var ImageExpand = {
     }
     fullImage.controls = false;
     $.asap((() => doc.contains(fullImage)), function() {
-      if (!d.hidden && Header.isNodeVisible(fullImage)) {
+      if (!d.hidden && UIState.isNodeVisible(fullImage)) {
         fullImage.play();
       } else {
         post.file.wasPlaying = true;
@@ -409,7 +408,7 @@ var ImageExpand = {
         subEntries.push(createSubEntry(name, conf[1]));
       }
 
-      return Header.menu.addEntry({
+      return UIState.headerMenu.addEntry({
         el,
         order: 105,
         subEntries

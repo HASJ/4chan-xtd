@@ -1,5 +1,4 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
 import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { Conf, doc, g } from "../globals/globals";
@@ -38,7 +37,7 @@ const FappeTyme: FappeTymeType = {
         if (Conf[lc]) { this.set(lc, true); }
         $.on(this.nodes[lc], 'change', this.toggle.bind(this, lc));
 
-        Header.menu.addEntry({
+        UIState.headerMenu.addEntry({
           el,
           order: 97
         });

@@ -1,5 +1,4 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
 import UIState from "../globals/UIState";
 import { g, Conf, d, doc } from "../globals/globals";
 import Icon from "../Icons/icon";
@@ -140,7 +139,7 @@ const ImageLoader: ImageLoaderType = {
         for (const file of p.files) {
           if (file.videoThumb) {
             const { thumb } = file;
-            if (Header.isNodeVisible(thumb) || (p.nodes.root === qpClone)) {
+            if (UIState.isNodeVisible(thumb) || (p.nodes.root === qpClone)) {
               thumb.play();
             } else {
               thumb.pause();

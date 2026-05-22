@@ -1,5 +1,5 @@
 ﻿// @ts-nocheck
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
@@ -37,7 +37,7 @@ var PSAHiding = {
       order: 50,
       open() { return psa.hidden; }
     };
-    Header.menu.addEntry(entry);
+    UIState.headerMenu.addEntry(entry);
     $.on(entry.el, 'click', PSAHiding.toggle);
 
     PSAHiding.btn = (btn = $.el('a', {

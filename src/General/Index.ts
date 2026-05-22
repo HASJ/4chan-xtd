@@ -14,10 +14,9 @@ import $$ from '../platform/$$';
 import $ from '../platform/$';
 import QuotePreview from '../Quotelinks/QuotePreview';
 import { c, Conf, d, doc, g } from '../globals/globals';
-import Header from './Header';
+import UIState from '../globals/UIState';
 import UI from './UI';
 import Menu from '../Menu/Menu';
-import UIState from '../globals/UIState';
 
 import NavLinksPage from './Index/NavLinks.html';
 import PageList from './Index/PageList.html';
@@ -133,7 +132,7 @@ var Index: any = {
     $.on(sortEntry.firstChild!, 'change', this.cb.perBoardSort);
     entries.splice(3, 0, {el: sortEntry});
 
-    Header.menu.addEntry({
+    UIState.headerMenu.addEntry({
       el: $.el('span',
         {textContent: 'Index Navigation'}),
       order: 100,
@@ -505,7 +504,7 @@ var Index: any = {
 
   scrollToIndex() {
     // Scroll to navlinks, or top of board if navlinks are hidden.
-    return Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
+    return UIState.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
   },
 
   getCurrentPage() {
@@ -1123,7 +1122,7 @@ var Index: any = {
     }
     delete Index.pageNum;
     $.rmAll(Index.root);
-    $.rmAll(Header.hover);
+    $.rmAll(UIState.hoverUI);
     if (Index.loaded && Index.root.parentNode) {
       ($.event as any)('PostsRemoved', null, Index.root);
     }

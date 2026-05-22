@@ -8,7 +8,6 @@ import $$ from '../platform/$$';
 import ImageCommon from './ImageCommon';
 import Sauce from './Sauce';
 import Volume from './Volume';
-import Header from '../General/Header';
 import UIState from '../globals/UIState';
 import { Conf, d, doc, g } from '../globals/globals';
 import UI from '../General/UI';
@@ -197,7 +196,7 @@ const Gallery: GalleryType = {
           // If no image to open is given, pick image we have scrolled to.
           if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
             const candidate = file.thumbLink;
-            if ((Header.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
+            if ((UIState.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
               image = candidate;
             }
           }
@@ -320,7 +319,7 @@ const Gallery: GalleryType = {
 
     // Scroll to post
     if (Conf['Scroll to Post'] && (post = g.posts.get(file.dataset.post))) {
-      Header.scrollTo(post.nodes.root);
+      UIState.scrollTo(post.nodes.root);
     }
 
     // Preload next image
@@ -571,7 +570,7 @@ const Gallery: GalleryType = {
         className: 'gallery-link'
       });
 
-      Header.menu.addEntry({
+      UIState.headerMenu.addEntry({
         el,
         order: 105,
         subEntries: Gallery.menu.createSubEntries()

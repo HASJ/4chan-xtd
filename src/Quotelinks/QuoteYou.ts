@@ -2,7 +2,7 @@ import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Notice from "../classes/Notice";
 import Get from "../General/Get";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { Conf, d, doc, g } from "../globals/globals";
 import Menu from "../Menu/Menu";
 import ExpandComment from "../Miscellaneous/ExpandComment";
@@ -183,7 +183,7 @@ const QuoteYou: QuoteYouType = {
       } else {
         QuoteYou.lastRead = root;
         location.href = Get.url('post', post);
-        Header.scrollTo(post.nodes.post);
+        UIState.scrollTo(post.nodes.post);
         if (post.isReply) {
           const sel = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
           let node = post.nodes.root;

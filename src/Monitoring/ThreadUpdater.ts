@@ -90,7 +90,7 @@ var ThreadUpdater = {
 
     subEntries.push({el: this.settings});
 
-    Header.menu.addEntry(this.entry = {
+    UIState.headerMenu.addEntry(this.entry = {
       el: $.el('span',
         {textContent: 'Updater'}),
       order: 110,
@@ -443,7 +443,7 @@ var ThreadUpdater = {
         if (Conf['Bottom Scroll']) {
           window.scrollTo(0, d.body.clientHeight);
         } else {
-          if (firstPost) { Header.scrollTo(firstPost); }
+          if (firstPost) { UIState.scrollTo(firstPost); }
         }
       }
     }

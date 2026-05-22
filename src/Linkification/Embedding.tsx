@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Get from '../General/Get';
-import Header from '../General/Header';
+import UIState from "../globals/UIState";
 import UI from '../General/UI';
 import { g, Conf, d, doc, E } from '../globals/globals';
 import ImageHost from '../Images/ImageHost';
@@ -133,7 +133,7 @@ var Embedding = {
     $.on(close, 'click',     Embedding.closeFloat);
     $.on($('.move',  Embedding.dialog), 'mousedown', Embedding.dragEmbed);
     $.on(jump, 'click', function() {
-      if (doc.contains(Embedding.lastEmbed)) return Header.scrollTo(Embedding.lastEmbed);
+      if (doc.contains(Embedding.lastEmbed)) return UIState.scrollTo(Embedding.lastEmbed);
     });
     Icon.set(jump, 'arrowRightLong');
     Icon.set(close, 'xmark');
@@ -199,7 +199,7 @@ var Embedding = {
       }
       );
       el.setAttribute("referrerpolicy", "no-referrer")
-      $.add(Header.hover, el);
+      $.add(UIState.hoverUI, el);
       return UI.hover({
         root: link,
         el,

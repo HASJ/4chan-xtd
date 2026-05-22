@@ -24,11 +24,11 @@ var Header: any = {
       if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
       $.add(this.bar, [this.noticesRoot, this.toggle]);
       $.prepend(d.body, this.bar);
-      $.add(d.body, Header.hover);
+      $.add(d.body, UIState.hoverUI);
       return this.setBarPosition(Conf['Bottom Header']);
   });
 
-    this.menu = new UI.Menu('header');
+    this.menu = (UIState.headerMenu = new UI.Menu('header'));
 
     const menuButton = $.el('span',
       {className: 'menu-button'}
@@ -116,7 +116,7 @@ var Header: any = {
 
     this.setBoardList();
 
-    $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
+    $.onExists(doc, `${g.SITE.selectors.boardList} + *`, this.generateFullBoardList);
 
     $.ready(function() {
       const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
@@ -132,11 +132,11 @@ var Header: any = {
         $.before(absbot, footer);
         $.global('stubCloneTopNav');
       }
-      if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
-        for (var a of $$('a', Header.bottomBoardList)) {
+      if (this.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
+        for (var a of $$('a', this.bottomBoardList)) {
           if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
         }
-        return CatalogLinks.setLinks(Header.bottomBoardList);
+        return CatalogLinks.setLinks(this.bottomBoardList);
       }
     });
 
@@ -166,27 +166,24 @@ var Header: any = {
 
   shortcuts: UIState.shortcutsRoot,
 
-  hover: UIState.hoverUI,
-
-  toggle: $.el('div',
-    {id: 'scroll-marker'}),
+  toggle: UIState.scrollMarkerRoot,
 
   setBoardList() {
     let boardList;
-    Header.boardList = (boardList = $.el('span',
+    this.boardList = (boardList = $.el('span',
       {id: 'board-list'}));
     $.extend(boardList, {innerHTML: "<span id=\"custom-board-list\"></span><span id=\"full-board-list\" hidden><span class=\"hide-board-list-container brackets-wrap\"><a href=\"javascript:;\" class=\"hide-board-list-button\">&nbsp;-&nbsp;</a></span> <span class=\"boardList\"></span></span>"});
 
     const btn = $('.hide-board-list-button', boardList);
-    $.on(btn, 'click', Header.toggleBoardList);
+    $.on(btn, 'click', this.toggleBoardList);
 
-    $.prepend(Header.bar, [Header.boardList, Header.shortcuts]);
+    $.prepend(this.bar, [this.boardList, this.shortcuts]);
 
-    Header.setCustomNav(Conf['Custom Board Navigation']);
-    Header.generateBoardList(Conf['boardnav']);
+    this.setCustomNav(Conf['Custom Board Navigation']);
+    this.generateBoardList(Conf['boardnav']);
 
-    $.sync('Custom Board Navigation', Header.setCustomNav);
-    return $.sync('boardnav', Header.generateBoardList);
+    $.sync('Custom Board Navigation', this.setCustomNav);
+    return $.sync('boardnav', this.generateBoardList);
   },
 
   generateFullBoardList() {
@@ -196,7 +193,7 @@ var Header: any = {
     } else {
       nodes = [...$(g.SITE.selectors.boardList).cloneNode(true).childNodes];
     }
-    const fullBoardList = $('.boardList', Header.boardList);
+    const fullBoardList = $('.boardList', this.boardList);
     $.add(fullBoardList, nodes);
     for (var a of $$('a', fullBoardList)) {
       if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
@@ -205,7 +202,7 @@ var Header: any = {
   },
 
   generateBoardList(boardnav: string) {
-    const list = $('#custom-board-list', Header.boardList);
+    const list = $('#custom-board-list', this.boardList);
     $.rmAll(list);
     if (!boardnav) return;
     boardnav = boardnav.replace(/(\r\n|\n|\r)/g, ' ');
@@ -224,7 +221,7 @@ var Header: any = {
         currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
       } else {
         const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
-        const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
+        const segmentNodes = (segment.match(re) || []).map((t) => this.mapCustomNavigation(t));
         segmentNodes.forEach(node => currentContainer.appendChild(node));
       }
     });
@@ -258,7 +255,7 @@ var Header: any = {
         href: 'javascript:;'
       }
       );
-      $.on(a, 'click', Header.toggleBoardList);
+      $.on(a, 'click', this.toggleBoardList);
       return a;
     }
 
@@ -387,7 +384,7 @@ var Header: any = {
   },
 
   setLinkJustify(centered) {
-    Header.linkJustifyToggler.checked = centered;
+    this.linkJustifyToggler.checked = centered;
     if (centered) {
       return $.addClass(doc, 'centered-links');
     } else {
@@ -399,32 +396,32 @@ var Header: any = {
     $.event('CloseMenu', null);
     const centered = this.nodeName === 'INPUT' ?
       this.checked : undefined;
-    Header.setLinkJustify(centered);
+    this.setLinkJustify(centered);
     return $.set('Centered links', centered);
   },
 
   setBarFixed(fixed) {
-    Header.barFixedToggler.checked = fixed;
+    this.barFixedToggler.checked = fixed;
     if (fixed) {
       $.addClass(doc, 'fixed');
-      return $.addClass(Header.bar, 'dialog');
+      return $.addClass(this.bar, 'dialog');
     } else {
       $.rmClass(doc, 'fixed');
-      return $.rmClass(Header.bar, 'dialog');
+      return $.rmClass(this.bar, 'dialog');
     }
   },
 
   toggleBarFixed() {
     $.event('CloseMenu', null);
 
-    Header.setBarFixed(this.checked);
+    this.setBarFixed(this.checked);
 
     Conf['Fixed Header'] = this.checked;
     return $.set('Fixed Header',  this.checked);
   },
 
   setShortcutIcons(show) {
-    Header.shortcutToggler.checked = show;
+    this.shortcutToggler.checked = show;
     if (show) {
       return $.addClass(doc, 'shortcut-icons');
     } else {
@@ -435,16 +432,16 @@ var Header: any = {
   toggleShortcutIcons() {
     $.event('CloseMenu', null);
 
-    Header.setShortcutIcons(this.checked);
+    this.setShortcutIcons(this.checked);
 
     Conf['Shortcut Icons'] = this.checked;
     return $.set('Shortcut Icons',  this.checked);
   },
 
   setBarVisibility(hide) {
-    Header.headerToggler.checked = hide;
+    this.headerToggler.checked = hide;
     $.event('CloseMenu', null);
-    (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
+    (hide ? $.addClass : $.rmClass)(this.bar, 'autohide');
     return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
   },
 
@@ -452,11 +449,11 @@ var Header: any = {
     const hide = this.nodeName === 'INPUT' ?
       this.checked
     :
-      !$.hasClass(Header.bar, 'autohide');
+      !$.hasClass(this.bar, 'autohide');
 
     Conf['Header auto-hide'] = hide;
     $.set('Header auto-hide', hide);
-    Header.setBarVisibility(hide);
+    this.setBarVisibility(hide);
     const message = `The header bar will ${hide ?
       'automatically hide itself.'
     :
@@ -465,34 +462,34 @@ var Header: any = {
   },
 
   setHideBarOnScroll(hide) {
-    Header.scrollHeaderToggler.checked = hide;
+    this.scrollHeaderToggler.checked = hide;
     if (hide) {
-      $.on(window, 'scroll', Header.hideBarOnScroll);
+      $.on(window, 'scroll', this.hideBarOnScroll);
       return;
     }
-    $.off(window, 'scroll', Header.hideBarOnScroll);
-    $.rmClass(Header.bar, 'scroll');
-    return Header.bar.classList.toggle('autohide', Conf['Header auto-hide']);
+    $.off(window, 'scroll', this.hideBarOnScroll);
+    $.rmClass(this.bar, 'scroll');
+    return this.bar.classList.toggle('autohide', Conf['Header auto-hide']);
   },
 
   toggleHideBarOnScroll() {
     const hide = this.checked;
     $.cb.checked.call(this);
-    return Header.setHideBarOnScroll(hide);
+    return this.setHideBarOnScroll(hide);
   },
 
   hideBarOnScroll() {
     const offsetY = window.pageYOffset;
-    if (offsetY > (Header.previousOffset || 0)) {
-      $.addClass(Header.bar, 'autohide', 'scroll');
+    if (offsetY > (this.previousOffset || 0)) {
+      $.addClass(this.bar, 'autohide', 'scroll');
     } else {
-      $.rmClass(Header.bar,  'autohide', 'scroll');
+      $.rmClass(this.bar,  'autohide', 'scroll');
     }
-    return Header.previousOffset = offsetY;
+    return this.previousOffset = offsetY;
   },
 
   setBarPosition(bottom) {
-    if (Header.barPositionToggler) Header.barPositionToggler.checked = bottom;
+    if (this.barPositionToggler) this.barPositionToggler.checked = bottom;
     $.event('CloseMenu', null);
     const args = bottom ? [
       'bottom-header',
@@ -506,16 +503,16 @@ var Header: any = {
 
     $.addClass(doc, args[0]);
     $.rmClass(doc, args[1]);
-    return $[args[2]](Header.bar, UIState.noticesRoot);
+    return $[args[2]](this.bar, UIState.noticesRoot);
   },
 
   toggleBarPosition() {
     $.cb.checked.call(this);
-    return Header.setBarPosition(this.checked);
+    return this.setBarPosition(this.checked);
   },
 
   setFooterVisibility(hide) {
-    Header.footerToggler.checked = hide;
+    this.footerToggler.checked = hide;
     return doc.classList.toggle('hide-bottom-board-list', hide);
   },
 
@@ -525,7 +522,7 @@ var Header: any = {
       this.checked
     :
       $.hasClass(doc, 'hide-bottom-board-list');
-    Header.setFooterVisibility(hide);
+    this.setFooterVisibility(hide);
     $.set('Bottom Board List', hide);
     const message = hide ?
       'The bottom navigation will now be hidden.'
@@ -535,16 +532,16 @@ var Header: any = {
   },
 
   setCustomNav(show) {
-    Header.customNavToggler.checked = show;
-    const cust = $('#custom-board-list', Header.bar);
-    const full = $('#full-board-list',   Header.bar);
+    this.customNavToggler.checked = show;
+    const cust = $('#custom-board-list', this.bar);
+    const full = $('#full-board-list',   this.bar);
     const btn = $('.hide-board-list-container', full);
     return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
   },
 
   toggleCustomNav() {
     $.cb.checked.call(this);
-    return Header.setCustomNav(this.checked);
+    return this.setCustomNav(this.checked);
   },
 
   editCustomNav() {
@@ -554,73 +551,31 @@ var Header: any = {
   },
 
   scrollTo(root: HTMLElement, down = false, needed = false) {
-    let height, x;
-    if (!root.offsetParent) { return; } // hidden or fixed
-    if (down) {
-      x = Header.getBottomOf(root);
-      if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && Conf['Bottom header']) {
-        ({height} = Header.bar.getBoundingClientRect());
-        if (x <= 0) {
-          if (!Header.isHidden()) { x += height; }
-        } else {
-          if  (Header.isHidden()) { x -= height; }
-        }
-      }
-      if (!needed || (x < 0)) { return window.scrollBy(0, -x); }
-    } else {
-      x = Header.getTopOf(root);
-      if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && !Conf['Bottom header']) {
-        ({height} = Header.bar.getBoundingClientRect());
-        if (x >= 0) {
-          if (!Header.isHidden()) { x += height; }
-        } else {
-          if  (Header.isHidden()) { x -= height; }
-        }
-      }
-      if (!needed || (x < 0)) { return window.scrollBy(0,  x); }
-    }
+    return UIState.scrollTo(root, down, needed);
   },
 
   scrollToIfNeeded(root, down) {
-    return Header.scrollTo(root, down, true);
+    return UIState.scrollToIfNeeded(root, down);
   },
 
   getTopOf(root) {
-    let {top} = root.getBoundingClientRect();
-    if (Conf['Fixed Header'] && !Conf['Bottom Header']) {
-      const headRect = Header.toggle.getBoundingClientRect();
-      top     -= headRect.top + headRect.height;
-    }
-    return top;
+    return UIState.getTopOf(root);
   },
 
   getBottomOf(root) {
-    const {clientHeight} = doc;
-    let bottom = clientHeight - root.getBoundingClientRect().bottom;
-    if (Conf['Fixed Header'] && Conf['Bottom Header']) {
-      const headRect = Header.toggle.getBoundingClientRect();
-      bottom  -= (clientHeight - headRect.bottom) + headRect.height;
-    }
-    return bottom;
+    return UIState.getBottomOf(root);
   },
 
   isNodeVisible(node) {
-    if (d.hidden || !doc.contains(node)) { return false; }
-    const {height} = node.getBoundingClientRect();
-    return ((Header.getTopOf(node) + height) >= 0) && ((Header.getBottomOf(node) + height) >= 0);
+    return UIState.isNodeVisible(node);
   },
 
   isHidden() {
-    const {top} = Header.bar.getBoundingClientRect();
-    if (Conf['Bottom header']) {
-      return top === doc.clientHeight;
-    } else {
-      return top < 0;
-    }
+    return UIState.isHeaderHidden();
   },
 
   menuToggle(e) {
-    return Header.menu.toggle(e, this, g);
+    return UIState.headerMenu.toggle(e, this, g);
   },
 
   createNotification(e) {
