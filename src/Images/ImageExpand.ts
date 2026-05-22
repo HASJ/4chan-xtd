@@ -3,6 +3,7 @@ import Callbacks from "../classes/Callbacks";
 import Config from "../config/Config";
 import Get from "../General/Get";
 import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { Conf, d, doc, g } from "../globals/globals";
 import Nav from "../Miscellaneous/Nav";
@@ -31,7 +32,7 @@ var ImageExpand = {
     Icon.set(this.EAI, 'expand', 'Expand All Images');
 
     $.on(this.EAI, 'click', this.cb.toggleAll);
-    Header.addShortcut('expand-all', this.EAI, 520);
+    UIState.addShortcut('expand-all', this.EAI, 520);
     $.on(d, 'scroll visibilitychange', this.cb.playVideos);
     this.videoControls = $.el('span', {className: 'video-controls'});
     $.extend(this.videoControls, {innerHTML: " <a href=\"javascript:;\" title=\"You can also contract the video by dragging it to the left.\">contract</a>"});

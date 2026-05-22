@@ -39,6 +39,15 @@ const UIState = {
   },
 
   /**
+   * Removes a shortcut from the header bar.
+   */
+  rmShortcut(el: HTMLElement) {
+    if (el.parentElement) {
+      el.parentElement.remove();
+    }
+  },
+
+  /**
    * Whether desktop notifications are enabled.
    */
   areNotificationsEnabled: false,

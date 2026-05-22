@@ -1,5 +1,6 @@
 import Callbacks from "../classes/Callbacks";
 import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { g, Conf, d, doc } from "../globals/globals";
 import Icon from "../Icons/icon";
 import $ from "../platform/$";
@@ -49,7 +50,7 @@ const ImageLoader: ImageLoaderType = {
 
     $.on(el, 'click', this.toggle);
 
-    Header.addShortcut('prefetch', el, 525);
+    UIState.addShortcut('prefetch', el, 525);
   },
 
   node(this: any) {

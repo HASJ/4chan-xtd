@@ -9,6 +9,7 @@ import ImageCommon from './ImageCommon';
 import Sauce from './Sauce';
 import Volume from './Volume';
 import Header from '../General/Header';
+import UIState from '../globals/UIState';
 import { Conf, d, doc, g } from '../globals/globals';
 import UI from '../General/UI';
 import Get from '../General/Get';
@@ -89,7 +90,7 @@ const Gallery: GalleryType = {
 
     $.on(el, 'click', this.cb.toggle);
 
-    Header.addShortcut('gallery', el, 530);
+    UIState.addShortcut('gallery', el, 530);
 
     Callbacks.Post.push({
       name: 'Gallery',

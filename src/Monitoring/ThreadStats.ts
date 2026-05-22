@@ -1,5 +1,5 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { g, Conf, E, doc, d } from "../globals/globals";
 import $ from "../platform/$";
@@ -74,7 +74,7 @@ const ThreadStats: ThreadStatsType = {
         title: statsTitle
       }));
       $.extend(sc, statsHTML);
-      Header.addShortcut('stats', sc, 200);
+      UIState.addShortcut('stats', sc, 200);
     } else {
       this.dialog = (sc = UI.dialog('thread-stats', {
         innerHTML: `<div class="move" title="${E(statsTitle) as string}">${statsHTML.innerHTML}</div>`

@@ -120,6 +120,14 @@
         UIState.shortcutsRoot.appendChild(shortcut);
       },
       /**
+      * Removes a shortcut from the header bar.
+      */
+      rmShortcut(el) {
+        if (el.parentElement) {
+          el.parentElement.remove();
+        }
+      },
+      /**
       * Whether desktop notifications are enabled.
       */
       areNotificationsEnabled: false,
@@ -8407,8 +8415,8 @@ svg.icon {
         };
         $.on(this.inputs.unmute, 'change', $.cb.checked);
         $.on(this.inputs.volume, 'change', $.cb.value);
-        Header.menu.addEntry({ el: unmuteEntry, order: 200 });
-        Header.menu.addEntry({ el: volumeEntry, order: 201 });
+        Header$1.menu.addEntry({ el: unmuteEntry, order: 200 });
+        Header$1.menu.addEntry({ el: volumeEntry, order: 201 });
       },
       setup(video) {
         video.muted = !Conf['Allow Sound'];
@@ -8441,7 +8449,7 @@ svg.icon {
         for (const file of this.files) {
           if (file.isVideo) {
             if (file.thumb) {
-              $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+              $.on(file.thumb, 'wheel', Volume.wheel.bind(Header$1.hover));
             }
             $.on(($('.file-info', file.text) || file.link), 'wheel', Volume.wheel.bind(file.thumbLink));
           }
@@ -8452,7 +8460,7 @@ svg.icon {
         if (!file?.isVideo) {
           return;
         }
-        $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+        $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header$1.hover));
       },
       wheel(e) {
         let el;
@@ -8720,6 +8728,8 @@ svg.icon {
       nodes: null,
       selected: null,
       postingIsEnabled: false,
+      captcha: null,
+      cooldown: null,
     };
 
     // @ts-nocheck
@@ -12054,7 +12064,7 @@ $\
         $.on(ScrollMarkers.container, 'click', (e) => {
           const { postId } = e.target.dataset;
           if (postId)
-            Header.scrollTo(g.posts[postId].nodes.root);
+            Header$1.scrollTo(g.posts[postId].nodes.root);
         });
         new ResizeObserver(ScrollMarkers.markScroll).observe(doc);
       },
@@ -12266,7 +12276,7 @@ $\
           } else {
             QuoteYou.lastRead = root;
             location.href = Get.url('post', post);
-            Header.scrollTo(post.nodes.post);
+            Header$1.scrollTo(post.nodes.post);
             if (post.isReply) {
               const sel = `${g.SITE.selectors.postContainer}${g.SITE.selectors.highlightable.reply}`;
               let node = post.nodes.root;
@@ -12656,7 +12666,7 @@ $\
           textContent: 'Mark all unread'
         });
         $.on(resetLink, 'click', Unread.reset);
-        Header.menu.addEntry({
+        Header$1.menu.addEntry({
           el: resetLink,
           order: 70
         });
@@ -12693,7 +12703,7 @@ $\
             // Don't try to scroll to posts with display: none
             position = position.prev;
           } else {
-            Header.scrollToIfNeeded(bottom, true);
+            Header$1.scrollToIfNeeded(bottom, true);
             break;
           }
         }
@@ -12770,7 +12780,7 @@ $\
         }
       },
       openNotification(post, predicate = ' replied to you') {
-        if (!Header.areNotificationsEnabled) {
+        if (!Header$1.areNotificationsEnabled) {
           return;
         }
         const notif = new Notification(`${post.info.nameBlock}${predicate}`, {
@@ -12778,7 +12788,7 @@ $\
           icon: Favicon.logo
         });
         notif.onclick = function () {
-          Header.scrollToIfNeeded(post.nodes.bottom, true);
+          Header$1.scrollToIfNeeded(post.nodes.bottom, true);
           window.focus();
         };
         notif.onshow = () => setTimeout(() => notif.close(), 7 * SECOND);
@@ -12815,7 +12825,7 @@ $\
           const { ID, data } = Unread.position;
           const { bottom } = data.nodes;
           if (bottom.getBoundingClientRect().height && // post has been hidden
-            (Header.getBottomOf(bottom) <= -1)) {
+            (Header$1.getBottomOf(bottom) <= -1)) {
             break;
           } // post is completely read
           count++;
@@ -13141,7 +13151,7 @@ $\
         const wasVisible = !!UnreadIndex.hr[thread.fullID]?.parentNode;
         UnreadIndex.update(thread);
         if (Conf['Scroll to Last Read Post'] && (e.type === 'PostsInserted') && !wasVisible && !!UnreadIndex.hr[thread.fullID]?.parentNode) {
-          Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
+          Header$1.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
         }
       },
       sync() {
@@ -13286,7 +13296,7 @@ $\
           $.addClass(ThreadWatcher.shortcut, 'disabled');
           this.dialog.hidden = true;
         }
-        Header.addShortcut('watcher', sc, 510);
+        UIState.addShortcut('watcher', sc, 510);
         ThreadWatcher.initLastModified();
         ThreadWatcher.fetchAuto();
         $.on(window, 'visibilitychange focus', () => $.queueTask(ThreadWatcher.fetchAuto));
@@ -14081,7 +14091,7 @@ $\
             return;
           }
           const entryEl = $.el('a', { href: 'javascript:;' });
-          Header.menu.addEntry({
+          Header$1.menu.addEntry({
             el: entryEl,
             order: 60,
             open() {
@@ -14354,7 +14364,7 @@ $\
         this.setEnabled.call(this.inputs.enabled);
         $.on(this.inputs.enabled, 'change', this.setEnabled);
         $.on(this.inputs.replies, 'change', $.cb.value);
-        Header.menu.addEntry({
+        Header$1.menu.addEntry({
           el,
           order: 190
         });
@@ -14468,7 +14478,7 @@ $\
             g.SITE.Build.summaryText('-', ReplyPruning.total, ReplyPruning.totalFiles);
         ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
         // Maintain position in thread when posts are added/removed above
-        if ((hidden1 !== hidden2) && ((boardTop = Header.getTopOf($('.board'))) < 0)) {
+        if ((hidden1 !== hidden2) && ((boardTop = Header$1.getTopOf($('.board'))) < 0)) {
           window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
         }
       }
@@ -14495,7 +14505,7 @@ $\
         $.on(this.input, 'change', this.rethread);
         $.on(this.threadNewLink.firstElementChild, 'click', this.rethread);
         $.on(d, '4chanXInitFinished', () => { this.ready = true; });
-        Header.menu.addEntry(this.entry = {
+        Header$1.menu.addEntry(this.entry = {
           el: this.controls,
           order: 99
         });
@@ -14723,9 +14733,9 @@ $\
         });
         $.on(menuEntry, 'click', () => {
           RestoreDeletedFromArchive.restore();
-          Header.menu.close();
+          Header$1.menu.close();
         });
-        Header.menu.addEntry({
+        Header$1.menu.addEntry({
           el: menuEntry,
           order: 10,
         });
@@ -14999,7 +15009,7 @@ $\
           id: 'qp',
           className: 'dialog'
         });
-        $.add(Header.hover, qp);
+        $.add(Header$1.hover, qp);
         new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
         UI.hover({
           root: this,
@@ -15023,7 +15033,7 @@ $\
         if (!(root = this.el.firstElementChild)) {
           return;
         }
-        $.event('PostsRemoved', null, Header.hover);
+        $.event('PostsRemoved', null, Header$1.hover);
         const clone = Get.postFromRoot(root);
         let post = clone.origin;
         post.rmClone(root.dataset.clone);
@@ -15142,7 +15152,7 @@ $\
         });
         Icon.set(this.button, 'refresh', 'Refresh');
         $.on(this.button, 'click', () => Index.update());
-        Header.addShortcut('index-refresh', this.button, 590);
+        UIState.addShortcut('index-refresh', this.button, 590);
         // Header "Index Navigation" submenu
         const entries = [];
         this.inputs = (inputs = dict());
@@ -15172,7 +15182,7 @@ $\
         sortEntry.title = 'Set the sorting order of each board independently.';
         $.on(sortEntry.firstChild, 'change', this.cb.perBoardSort);
         entries.splice(3, 0, { el: sortEntry });
-        Header.menu.addEntry({
+        Header$1.menu.addEntry({
           el: $.el('span', { textContent: 'Index Navigation' }),
           order: 100,
           subEntries: entries
@@ -15542,7 +15552,7 @@ $\
       },
       scrollToIndex() {
         // Scroll to navlinks, or top of board if navlinks are hidden.
-        return Header.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
+        return Header$1.scrollToIfNeeded((Index.navLinks.getBoundingClientRect().height ? Index.navLinks : Index.root));
       },
       getCurrentPage() {
         return +window.location.pathname.split(/\/+/)[2] || 1;
@@ -16186,7 +16196,7 @@ $\
         }
         delete Index.pageNum;
         $.rmAll(Index.root);
-        $.rmAll(Header.hover);
+        $.rmAll(Header$1.hover);
         if (Index.loaded && Index.root.parentNode) {
           $.event('PostsRemoved', null, Index.root);
         }
@@ -16337,7 +16347,7 @@ $\
               this.set(lc, true);
             }
             $.on(this.nodes[lc], 'change', this.toggle.bind(this, lc));
-            Header.menu.addEntry({
+            Header$1.menu.addEntry({
               el,
               order: 97
             });
@@ -16351,7 +16361,7 @@ $\
               check.checked = !check.checked;
               $.event('change', null, check);
             });
-            Header.addShortcut(lc, indicator, 410);
+            UIState.addShortcut(lc, indicator, 410);
           }
         }
         if (Conf['Werk Tyme']) {
@@ -16622,7 +16632,7 @@ $\
         });
         Icon.set(el, 'image', 'Gallery');
         $.on(el, 'click', this.cb.toggle);
-        Header.addShortcut('gallery', el, 530);
+        UIState.addShortcut('gallery', el, 530);
         Callbacks.Post.push({
           name: 'Gallery',
           cb: this.node
@@ -16717,7 +16727,7 @@ $\
               // If no image to open is given, pick image we have scrolled to.
               if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
                 const candidate = file.thumbLink;
-                if ((Header.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
+                if ((Header$1.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
                   image = candidate;
                 }
               }
@@ -16836,7 +16846,7 @@ $\
         }
         // Scroll to post
         if (Conf['Scroll to Post'] && (post = g.posts.get(file.dataset.post))) {
-          Header.scrollTo(post.nodes.root);
+          Header$1.scrollTo(post.nodes.root);
         }
         // Preload next image
         if (isNaN(oldID) || (newID === ((oldID + 1) % Gallery.images.length))) {
@@ -17079,7 +17089,7 @@ $\
             textContent: 'Gallery',
             className: 'gallery-link'
           });
-          Header.menu.addEntry({
+          Header$1.menu.addEntry({
             el,
             order: 105,
             subEntries: Gallery.menu.createSubEntries()
@@ -17714,7 +17724,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         $.on($('.move', Embedding.dialog), 'mousedown', Embedding.dragEmbed);
         $.on(jump, 'click', function () {
           if (doc.contains(Embedding.lastEmbed))
-            return Header.scrollTo(Embedding.lastEmbed);
+            return Header$1.scrollTo(Embedding.lastEmbed);
         });
         Icon.set(jump, 'arrowRightLong');
         Icon.set(close, 'xmark');
@@ -17782,7 +17792,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             id: 'ihover'
           });
           el.setAttribute("referrerpolicy", "no-referrer");
-          $.add(Header.hover, el);
+          $.add(Header$1.hover, el);
           return UI.hover({
             root: link,
             el,
@@ -18305,7 +18315,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (Conf['Updater and Stats in Header']) {
           this.dialog = (sc = $.el('span', { id: 'updater' }));
           $.extend(sc, { innerHTML: '<span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' });
-          Header.addShortcut('updater', sc, 100);
+          UIState.addShortcut('updater', sc, 100);
         } else {
           this.dialog = (sc = UI.dialog('updater', { innerHTML: '<div class="move"></div><span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>' }));
           $.addClass(doc, 'float');
@@ -21260,7 +21270,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         for (var threadRoot of $$(g.SITE.selectors.thread)) {
           var thread = Get.threadFromRoot(threadRoot);
           if (thread.isHidden && !thread.stub) { continue; }
-          if (Header.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
+          if (Header$1.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
             return threadRoot;
           }
         }
@@ -21279,14 +21289,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           // Unless we're not at the beginning of the current thread,
           // and thus wanting to move to beginning,
           // or we're above the first thread and don't want to skip it.
-          const top = Header.getTopOf(thread);
+          const top = Header$1.getTopOf(thread);
           if (((delta === +1) && (top < 5)) || ((delta === -1) && (top > -5))) { thread = next; }
         }
         // Add extra space to the end of the page if necessary so that all threads can be selected by keybinds.
-        const extra = (Header.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
+        const extra = (Header$1.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
         if (extra > 0) { d.body.style.marginBottom = `${extra}px`; }
 
-        Header.scrollTo(thread);
+        Header$1.scrollTo(thread);
 
         if ((extra > 0) && !Nav.haveExtra) {
           Nav.haveExtra = true;
@@ -21345,11 +21355,11 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         let hasAction = false;
         // QR & Options
         if (key === Conf['Toggle board list'] && Conf['Custom Board Navigation']) {
-          Header.toggleBoardList();
+          Header$1.toggleBoardList();
           hasAction = true;
         }
         if (key === Conf['Toggle header']) {
-          Header.toggleBarVisibility();
+          Header$1.toggleBarVisibility();
           hasAction = true;
         }
         if (key === Conf['Open empty QR'] && QR.postingIsEnabled) {
@@ -21520,7 +21530,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           :
             undefined;
           if (searchInput) {
-            Header.scrollToIfNeeded(searchInput);
+            Header$1.scrollToIfNeeded(searchInput);
             searchInput.focus();
             hasAction = true;
           }
@@ -21553,7 +21563,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot) {
           ExpandThread.toggle(thread);
           // Keep thread from moving off screen when contracted.
-          Header.scrollTo(threadRoot);
+          Header$1.scrollTo(threadRoot);
           hasAction = true;
         }
         if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot) {
@@ -21578,7 +21588,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
           hasAction = true;
         }
         if (key === Conf['Hide'] && thread && ThreadHiding.db) {
-          Header.scrollTo(threadRoot);
+          Header$1.scrollTo(threadRoot);
           ThreadHiding.toggle(thread);
           hasAction = true;
         }
@@ -21724,7 +21734,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 
         if (postEl) {
           const {height} = postEl.getBoundingClientRect();
-          if ((Header.getTopOf(postEl) >= -height) && (Header.getBottomOf(postEl) >= -height)) { // We're at least partially visible
+          if ((Header$1.getTopOf(postEl) >= -height) && (Header$1.getBottomOf(postEl) >= -height)) { // We're at least partially visible
             let next;
             const {root} = Get.postFromNode(postEl).nodes;
             const axis = delta === +1 ?
@@ -21733,7 +21743,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
               'preceding';
             if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
             if (!next.matches(replySelector)) { next = $(replySelector, next); }
-            Header.scrollToIfNeeded(next, delta === +1);
+            Header$1.scrollToIfNeeded(next, delta === +1);
             $.addClass(next, highlight);
             $.rmClass(postEl, highlight);
             return;
@@ -21744,7 +21754,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         const replies = $$(replySelector, thread);
         if (delta === -1) { replies.reverse(); }
         for (var reply of replies) {
-          if (((delta === +1) && (Header.getTopOf(reply) > 0)) || ((delta === -1) && (Header.getBottomOf(reply) > 0))) {
+          if (((delta === +1) && (Header$1.getTopOf(reply) > 0)) || ((delta === -1) && (Header$1.getBottomOf(reply) > 0))) {
             $.addClass(reply, highlight);
             return;
           }
@@ -21764,7 +21774,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         });
         Icon.set(link, 'wrench', 'Settings');
         $.on(link, 'click', Settings.open);
-        Header.addShortcut('settings', link, 820);
+        UIState.addShortcut('settings', link, 820);
         const add = this.addSection;
         add('Main', this.main);
         add('Filter', this.filter);
@@ -22413,7 +22423,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         });
       },
       boardnav() {
-        Header.generateBoardList(this.value);
+        Header$1.generateBoardList(this.value);
       },
       time() {
         this.nextElementSibling.textContent = Time.format(new Date(), this.value);
@@ -23236,7 +23246,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           const input = $('input', el);
           $.on(input, 'change', this.toggle);
           $.sync('Header catalog links', CatalogLinks.set);
-          return Header.menu.addEntry({
+          return Header$1.menu.addEntry({
             el,
             order: 95
           });
@@ -23260,8 +23270,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
       set(useCatalog) {
         Conf['Header catalog links'] = useCatalog;
-        CatalogLinks.setLinks(Header.boardList);
-        CatalogLinks.setLinks(Header.bottomBoardList);
+        CatalogLinks.setLinks(Header$1.boardList);
+        CatalogLinks.setLinks(Header$1.bottomBoardList);
         CatalogLinks.el.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
         return $('input', CatalogLinks.el).checked = useCatalog;
       },
@@ -23348,7 +23358,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       }
     };
 
-    var Header = {
+    var Header$1 = {
       init() {
         $.onExists(doc, 'body', () => {
           if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) {
@@ -23356,7 +23366,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           }
           $.add(this.bar, [this.noticesRoot, this.toggle]);
           $.prepend(d.body, this.bar);
-          $.add(d.body, Header.hover);
+          $.add(d.body, Header$1.hover);
           return this.setBarPosition(Conf['Bottom Header']);
         });
         this.menu = new UI.Menu('header');
@@ -23424,7 +23434,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         });
         $.on(d, 'CreateNotification', this.createNotification);
         this.setBoardList();
-        $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
+        $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header$1.generateFullBoardList);
         $.ready(function () {
           const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
           if (!isPageLegit) {
@@ -23443,13 +23453,13 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             $.before(absbot, footer);
             $.global('stubCloneTopNav');
           }
-          if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
-            for (var a of $$('a', Header.bottomBoardList)) {
+          if (Header$1.bottomBoardList = $(g.SITE.selectors.boardListBottom)) {
+            for (var a of $$('a', Header$1.bottomBoardList)) {
               if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
                 a.className = 'current';
               }
             }
-            return CatalogLinks.setLinks(Header.bottomBoardList);
+            return CatalogLinks.setLinks(Header$1.bottomBoardList);
           }
         });
         if ((g.SITE.software === 'yotsuba') && ((g.VIEW === 'catalog') || !Conf['Disable Native Extension'])) {
@@ -23476,15 +23486,15 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       toggle: $.el('div', { id: 'scroll-marker' }),
       setBoardList() {
         let boardList;
-        Header.boardList = (boardList = $.el('span', { id: 'board-list' }));
+        Header$1.boardList = (boardList = $.el('span', { id: 'board-list' }));
         $.extend(boardList, { innerHTML: "<span id=\"custom-board-list\"></span><span id=\"full-board-list\" hidden><span class=\"hide-board-list-container brackets-wrap\"><a href=\"javascript:;\" class=\"hide-board-list-button\">&nbsp;-&nbsp;</a></span> <span class=\"boardList\"></span></span>" });
         const btn = $('.hide-board-list-button', boardList);
-        $.on(btn, 'click', Header.toggleBoardList);
-        $.prepend(Header.bar, [Header.boardList, Header.shortcuts]);
-        Header.setCustomNav(Conf['Custom Board Navigation']);
-        Header.generateBoardList(Conf['boardnav']);
-        $.sync('Custom Board Navigation', Header.setCustomNav);
-        return $.sync('boardnav', Header.generateBoardList);
+        $.on(btn, 'click', Header$1.toggleBoardList);
+        $.prepend(Header$1.bar, [Header$1.boardList, Header$1.shortcuts]);
+        Header$1.setCustomNav(Conf['Custom Board Navigation']);
+        Header$1.generateBoardList(Conf['boardnav']);
+        $.sync('Custom Board Navigation', Header$1.setCustomNav);
+        return $.sync('boardnav', Header$1.generateBoardList);
       },
       generateFullBoardList() {
         let nodes;
@@ -23493,7 +23503,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         } else {
           nodes = [...$(g.SITE.selectors.boardList).cloneNode(true).childNodes];
         }
-        const fullBoardList = $('.boardList', Header.boardList);
+        const fullBoardList = $('.boardList', Header$1.boardList);
         $.add(fullBoardList, nodes);
         for (var a of $$('a', fullBoardList)) {
           if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) {
@@ -23503,7 +23513,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return CatalogLinks.setLinks(fullBoardList);
       },
       generateBoardList(boardnav) {
-        const list = $('#custom-board-list', Header.boardList);
+        const list = $('#custom-board-list', Header$1.boardList);
         $.rmAll(list);
         if (!boardnav)
           return;
@@ -23524,7 +23534,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
           } else {
             const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
-            const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
+            const segmentNodes = (segment.match(re) || []).map((t) => Header$1.mapCustomNavigation(t));
             segmentNodes.forEach(node => currentContainer.appendChild(node));
           }
         });
@@ -23553,7 +23563,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             textContent: text || '+',
             href: 'javascript:;'
           });
-          $.on(a, 'click', Header.toggleBoardList);
+          $.on(a, 'click', Header$1.toggleBoardList);
           return a;
         }
         if (/^external/.test(t)) {
@@ -23661,7 +23671,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return a;
       },
       toggleBoardList() {
-        const { bar } = Header;
+        const { bar } = Header$1;
         const custom = $('#custom-board-list', bar);
         const full = $('#full-board-list', bar);
         const showBoardList = !full.hidden;
@@ -23669,7 +23679,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return full.hidden = showBoardList;
       },
       setLinkJustify(centered) {
-        Header.linkJustifyToggler.checked = centered;
+        Header$1.linkJustifyToggler.checked = centered;
         if (centered) {
           return $.addClass(doc, 'centered-links');
         } else {
@@ -23680,27 +23690,27 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         $.event('CloseMenu', null);
         const centered = this.nodeName === 'INPUT' ?
           this.checked : undefined;
-        Header.setLinkJustify(centered);
+        Header$1.setLinkJustify(centered);
         return $.set('Centered links', centered);
       },
       setBarFixed(fixed) {
-        Header.barFixedToggler.checked = fixed;
+        Header$1.barFixedToggler.checked = fixed;
         if (fixed) {
           $.addClass(doc, 'fixed');
-          return $.addClass(Header.bar, 'dialog');
+          return $.addClass(Header$1.bar, 'dialog');
         } else {
           $.rmClass(doc, 'fixed');
-          return $.rmClass(Header.bar, 'dialog');
+          return $.rmClass(Header$1.bar, 'dialog');
         }
       },
       toggleBarFixed() {
         $.event('CloseMenu', null);
-        Header.setBarFixed(this.checked);
+        Header$1.setBarFixed(this.checked);
         Conf['Fixed Header'] = this.checked;
         return $.set('Fixed Header', this.checked);
       },
       setShortcutIcons(show) {
-        Header.shortcutToggler.checked = show;
+        Header$1.shortcutToggler.checked = show;
         if (show) {
           return $.addClass(doc, 'shortcut-icons');
         } else {
@@ -23709,24 +23719,24 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       },
       toggleShortcutIcons() {
         $.event('CloseMenu', null);
-        Header.setShortcutIcons(this.checked);
+        Header$1.setShortcutIcons(this.checked);
         Conf['Shortcut Icons'] = this.checked;
         return $.set('Shortcut Icons', this.checked);
       },
       setBarVisibility(hide) {
-        Header.headerToggler.checked = hide;
+        Header$1.headerToggler.checked = hide;
         $.event('CloseMenu', null);
-        (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
+        (hide ? $.addClass : $.rmClass)(Header$1.bar, 'autohide');
         return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
       },
       toggleBarVisibility() {
         const hide = this.nodeName === 'INPUT' ?
           this.checked
           :
-            !$.hasClass(Header.bar, 'autohide');
+            !$.hasClass(Header$1.bar, 'autohide');
         Conf['Header auto-hide'] = hide;
         $.set('Header auto-hide', hide);
-        Header.setBarVisibility(hide);
+        Header$1.setBarVisibility(hide);
         const message = `The header bar will ${hide ?
       'automatically hide itself.'
       :
@@ -23734,32 +23744,32 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return new Notice('info', message, 2);
       },
       setHideBarOnScroll(hide) {
-        Header.scrollHeaderToggler.checked = hide;
+        Header$1.scrollHeaderToggler.checked = hide;
         if (hide) {
-          $.on(window, 'scroll', Header.hideBarOnScroll);
+          $.on(window, 'scroll', Header$1.hideBarOnScroll);
           return;
         }
-        $.off(window, 'scroll', Header.hideBarOnScroll);
-        $.rmClass(Header.bar, 'scroll');
-        return Header.bar.classList.toggle('autohide', Conf['Header auto-hide']);
+        $.off(window, 'scroll', Header$1.hideBarOnScroll);
+        $.rmClass(Header$1.bar, 'scroll');
+        return Header$1.bar.classList.toggle('autohide', Conf['Header auto-hide']);
       },
       toggleHideBarOnScroll() {
         const hide = this.checked;
         $.cb.checked.call(this);
-        return Header.setHideBarOnScroll(hide);
+        return Header$1.setHideBarOnScroll(hide);
       },
       hideBarOnScroll() {
         const offsetY = window.pageYOffset;
-        if (offsetY > (Header.previousOffset || 0)) {
-          $.addClass(Header.bar, 'autohide', 'scroll');
+        if (offsetY > (Header$1.previousOffset || 0)) {
+          $.addClass(Header$1.bar, 'autohide', 'scroll');
         } else {
-          $.rmClass(Header.bar, 'autohide', 'scroll');
+          $.rmClass(Header$1.bar, 'autohide', 'scroll');
         }
-        return Header.previousOffset = offsetY;
+        return Header$1.previousOffset = offsetY;
       },
       setBarPosition(bottom) {
-        if (Header.barPositionToggler)
-          Header.barPositionToggler.checked = bottom;
+        if (Header$1.barPositionToggler)
+          Header$1.barPositionToggler.checked = bottom;
         $.event('CloseMenu', null);
         const args = bottom ? [
           'bottom-header',
@@ -23772,14 +23782,14 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         ];
         $.addClass(doc, args[0]);
         $.rmClass(doc, args[1]);
-        return $[args[2]](Header.bar, UIState.noticesRoot);
+        return $[args[2]](Header$1.bar, UIState.noticesRoot);
       },
       toggleBarPosition() {
         $.cb.checked.call(this);
-        return Header.setBarPosition(this.checked);
+        return Header$1.setBarPosition(this.checked);
       },
       setFooterVisibility(hide) {
-        Header.footerToggler.checked = hide;
+        Header$1.footerToggler.checked = hide;
         return doc.classList.toggle('hide-bottom-board-list', hide);
       },
       toggleFooterVisibility() {
@@ -23788,7 +23798,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           this.checked
           :
             $.hasClass(doc, 'hide-bottom-board-list');
-        Header.setFooterVisibility(hide);
+        Header$1.setFooterVisibility(hide);
         $.set('Bottom Board List', hide);
         const message = hide ?
           'The bottom navigation will now be hidden.'
@@ -23797,15 +23807,15 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         return new Notice('info', message, 2);
       },
       setCustomNav(show) {
-        Header.customNavToggler.checked = show;
-        const cust = $('#custom-board-list', Header.bar);
-        const full = $('#full-board-list', Header.bar);
+        Header$1.customNavToggler.checked = show;
+        const cust = $('#custom-board-list', Header$1.bar);
+        const full = $('#full-board-list', Header$1.bar);
         const btn = $('.hide-board-list-container', full);
         return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
       },
       toggleCustomNav() {
         $.cb.checked.call(this);
-        return Header.setCustomNav(this.checked);
+        return Header$1.setCustomNav(this.checked);
       },
       editCustomNav() {
         Settings.open('Advanced');
@@ -23818,15 +23828,15 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return;
         } // hidden or fixed
         if (down) {
-          x = Header.getBottomOf(root);
+          x = Header$1.getBottomOf(root);
           if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && Conf['Bottom header']) {
-            ({ height } = Header.bar.getBoundingClientRect());
+            ({ height } = Header$1.bar.getBoundingClientRect());
             if (x <= 0) {
-              if (!Header.isHidden()) {
+              if (!Header$1.isHidden()) {
                 x += height;
               }
             } else {
-              if (Header.isHidden()) {
+              if (Header$1.isHidden()) {
                 x -= height;
               }
             }
@@ -23835,15 +23845,15 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             return window.scrollBy(0, -x);
           }
         } else {
-          x = Header.getTopOf(root);
+          x = Header$1.getTopOf(root);
           if (Conf['Fixed Header'] && Conf['Header auto-hide on scroll'] && !Conf['Bottom header']) {
-            ({ height } = Header.bar.getBoundingClientRect());
+            ({ height } = Header$1.bar.getBoundingClientRect());
             if (x >= 0) {
-              if (!Header.isHidden()) {
+              if (!Header$1.isHidden()) {
                 x += height;
               }
             } else {
-              if (Header.isHidden()) {
+              if (Header$1.isHidden()) {
                 x -= height;
               }
             }
@@ -23854,12 +23864,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
       },
       scrollToIfNeeded(root, down) {
-        return Header.scrollTo(root, down, true);
+        return Header$1.scrollTo(root, down, true);
       },
       getTopOf(root) {
         let { top } = root.getBoundingClientRect();
         if (Conf['Fixed Header'] && !Conf['Bottom Header']) {
-          const headRect = Header.toggle.getBoundingClientRect();
+          const headRect = Header$1.toggle.getBoundingClientRect();
           top -= headRect.top + headRect.height;
         }
         return top;
@@ -23868,7 +23878,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         const { clientHeight } = doc;
         let bottom = clientHeight - root.getBoundingClientRect().bottom;
         if (Conf['Fixed Header'] && Conf['Bottom Header']) {
-          const headRect = Header.toggle.getBoundingClientRect();
+          const headRect = Header$1.toggle.getBoundingClientRect();
           bottom -= (clientHeight - headRect.bottom) + headRect.height;
         }
         return bottom;
@@ -23878,21 +23888,18 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           return false;
         }
         const { height } = node.getBoundingClientRect();
-        return ((Header.getTopOf(node) + height) >= 0) && ((Header.getBottomOf(node) + height) >= 0);
+        return ((Header$1.getTopOf(node) + height) >= 0) && ((Header$1.getBottomOf(node) + height) >= 0);
       },
       isHidden() {
-        const { top } = Header.bar.getBoundingClientRect();
+        const { top } = Header$1.bar.getBoundingClientRect();
         if (Conf['Bottom header']) {
           return top === doc.clientHeight;
         } else {
           return top < 0;
         }
       },
-      rmShortcut(el) {
-        return $.rm(el.parentElement);
-      },
       menuToggle(e) {
-        return Header.menu.toggle(e, this, g);
+        return Header$1.menu.toggle(e, this, g);
       },
       createNotification(e) {
         let notice;
@@ -23980,7 +23987,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         });
         Icon.set(this.EAI, 'expand', 'Expand All Images');
         $.on(this.EAI, 'click', this.cb.toggleAll);
-        Header.addShortcut('expand-all', this.EAI, 520);
+        UIState.addShortcut('expand-all', this.EAI, 520);
         $.on(d, 'scroll visibilitychange', this.cb.playVideos);
         this.videoControls = $.el('span', { className: 'video-controls' });
         $.extend(this.videoControls, { innerHTML: " <a href=\"javascript:;\" title=\"You can also contract the video by dragging it to the left.\">contract</a>" });
@@ -24040,7 +24047,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             if (ImageExpand.on &&
               ((!Conf['Expand spoilers'] && file.isSpoiler) ||
                 (!Conf['Expand videos'] && file.isVideo) ||
-                (Conf['Expand from here'] && (Header.getTopOf(file.thumb) < 0)) ||
+                (Conf['Expand from here'] && (Header$1.getTopOf(file.thumb) < 0)) ||
                 (Conf['Expand thread only'] && (g.VIEW === 'index') && !threadRoot?.contains(file.thumb)))) {
               return;
             }
@@ -24071,7 +24078,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
                 continue;
               }
               var video = file.fullImage;
-              var visible = ($.hasAudio(video) && !video.muted) || Header.isNodeVisible(video);
+              var visible = ($.hasAudio(video) && !video.muted) || Header$1.isNodeVisible(video);
               if (visible && file.wasPlaying) {
                 delete file.wasPlaying;
                 video.play();
@@ -24101,7 +24108,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             }
           }
           if (next) {
-            return Header.scrollTo(next);
+            return Header$1.scrollTo(next);
           }
         }
       },
@@ -24109,7 +24116,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         let bottom, el, oldHeight, scrollY;
         const { file } = post;
         if (el = file.fullImage) {
-          const top = Header.getTopOf(el);
+          const top = Header$1.getTopOf(el);
           bottom = top + el.getBoundingClientRect().height;
           oldHeight = d.body.clientHeight;
           ({ scrollY } = window);
@@ -24131,7 +24138,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             window.scrollBy(0, ((scrollY - window.scrollY) + d.body.clientHeight) - oldHeight);
           } else {
             // For images not above us that would be moved above us, scroll to the thumbnail.
-            Header.scrollToIfNeeded(post.nodes.root);
+            Header$1.scrollToIfNeeded(post.nodes.root);
           }
           if (window.scrollX > 0) {
             // If we have scrolled right viewing an expanded image, return to the left.
@@ -24243,7 +24250,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         if (!file.isExpanding) {
           return;
         } // contracted before the image loaded
-        const bottom = Header.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
+        const bottom = Header$1.getTopOf(file.thumb) + file.thumb.getBoundingClientRect().height;
         const oldHeight = d.body.clientHeight;
         const { scrollY } = window;
         $.addClass(post.nodes.root, 'expanded-image');
@@ -24257,9 +24264,9 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         // Scroll to display full image.
         if (file.scrollIntoView) {
           delete file.scrollIntoView;
-          const imageBottom = Math.min(doc.clientHeight - file.fullImage.getBoundingClientRect().bottom - 25, Header.getBottomOf(file.fullImage));
+          const imageBottom = Math.min(doc.clientHeight - file.fullImage.getBoundingClientRect().bottom - 25, Header$1.getBottomOf(file.fullImage));
           if (imageBottom < 0) {
-            window.scrollBy(0, Math.min(-imageBottom, Header.getTopOf(file.fullImage)));
+            window.scrollBy(0, Math.min(-imageBottom, Header$1.getTopOf(file.fullImage)));
           }
         }
         if (file.isVideo) {
@@ -24275,7 +24282,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         }
         fullImage.controls = false;
         $.asap((() => doc.contains(fullImage)), function () {
-          if (!d.hidden && Header.isNodeVisible(fullImage)) {
+          if (!d.hidden && Header$1.isNodeVisible(fullImage)) {
             fullImage.play();
           } else {
             post.file.wasPlaying = true;
@@ -24350,7 +24357,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             var conf = Config.imageExpansion[name];
             subEntries.push(createSubEntry(name, conf[1]));
           }
-          return Header.menu.addEntry({
+          return Header$1.menu.addEntry({
             el,
             order: 105,
             subEntries
@@ -24861,7 +24868,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             if (thread)
               DownloadAll.queueThread(thread);
           });
-          Header.addShortcut('download-all', el, 526);
+          UIState.addShortcut('download-all', el, 526);
         }
       },
       queueThread(thread) {
@@ -25006,7 +25013,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             ImageCommon.rewind(this);
           }
           el.id = 'ihover';
-          $.add(Header.hover, el);
+          $.add(Header$1.hover, el);
           if (isVideo) {
             const video = el;
             video.loop = true;
@@ -25097,7 +25104,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         });
         Icon.set(el, 'bolt', 'Prefetch');
         $.on(el, 'click', this.toggle);
-        Header.addShortcut('prefetch', el, 525);
+        UIState.addShortcut('prefetch', el, 525);
       },
       node() {
         if (this.isClone) {
@@ -25200,7 +25207,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             for (const file of p.files) {
               if (file.videoThumb) {
                 const { thumb } = file;
-                if (Header.isNodeVisible(thumb) || (p.nodes.root === qpClone)) {
+                if (Header$1.isNodeVisible(thumb) || (p.nodes.root === qpClone)) {
                   thumb.play();
                 } else {
                   thumb.pause();
@@ -26273,7 +26280,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           order: 50,
           open() { return psa.hidden; }
         };
-        Header.menu.addEntry(entry);
+        Header$1.menu.addEntry(entry);
         $.on(entry.el, 'click', PSAHiding.toggle);
 
         PSAHiding.btn = (btn = $.el('a', {
@@ -26510,7 +26517,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
             title: statsTitle
           }));
           $.extend(sc, statsHTML);
-          Header.addShortcut('stats', sc, 200);
+          UIState.addShortcut('stats', sc, 200);
         } else {
           this.dialog = (sc = UI.dialog('thread-stats', {
             innerHTML: `<div class="move" title="${E(statsTitle)}">${statsHTML.innerHTML}</div>`
@@ -27909,7 +27916,7 @@ User agent: ${navigator.userAgent}\
         ['Captcha Configuration', CaptchaReplace],
         ['Image Host Rewriting', ImageHost],
         ['Redirect', Redirect],
-        ['Header', Header],
+        ['Header', Header$1],
         ['Catalog Links', CatalogLinks],
         ['Settings', Settings],
         ['Index Generator', Index],

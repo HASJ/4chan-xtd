@@ -617,10 +617,6 @@ var Header: any = {
     } else {
       return top < 0;
     }
-    },
-
-    rmShortcut(el) {
-    return $.rm(el.parentElement);
   },
 
   menuToggle(e) {
@@ -631,9 +627,9 @@ var Header: any = {
     let notice;
     const {type, content, lifetime} = e.detail;
     return notice = new Notice(type, content, lifetime);
-    },
+  },
 
-    enableDesktopNotifications() {
+  enableDesktopNotifications() {
     let notice;
     if (!window.Notification || !Conf['Desktop Notifications']) { return; }
     switch (Notification.permission) {

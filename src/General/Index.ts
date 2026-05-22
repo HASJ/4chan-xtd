@@ -17,6 +17,7 @@ import { c, Conf, d, doc, g } from '../globals/globals';
 import Header from './Header';
 import UI from './UI';
 import Menu from '../Menu/Menu';
+import UIState from '../globals/UIState';
 
 import NavLinksPage from './Index/NavLinks.html';
 import PageList from './Index/PageList.html';
@@ -98,7 +99,7 @@ var Index: any = {
     });
     Icon.set(this.button, 'refresh', 'Refresh')
     $.on(this.button, 'click', () => Index.update());
-    Header.addShortcut('index-refresh', this.button, 590);
+    UIState.addShortcut('index-refresh', this.button, 590);
 
     // Header "Index Navigation" submenu
     const entries: any[] = [];

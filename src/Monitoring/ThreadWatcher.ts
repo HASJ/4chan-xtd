@@ -13,6 +13,7 @@ import QuoteYou from '../Quotelinks/QuoteYou';
 import Unread from './Unread';
 import UnreadIndex from './UnreadIndex';
 import Header from '../General/Header';
+import UIState from '../globals/UIState';
 import IndexState from '../globals/IndexState';
 import { Conf, d, doc, g } from '../globals/globals';
 import Menu from '../Menu/Menu';
@@ -161,7 +162,7 @@ const ThreadWatcher: ThreadWatcherType = {
       this.dialog.hidden = true;
     }
 
-    Header.addShortcut('watcher', sc, 510);
+    UIState.addShortcut('watcher', sc, 510);
 
     ThreadWatcher.initLastModified();
     ThreadWatcher.fetchAuto();
