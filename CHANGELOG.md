@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.10 (2026-06-23)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA initialization after cookies are cleared but stale 4chan CAPTCHA/pass data remains in local storage. TCaptcha now requests a challenge through the native API after initialization.
+
 ### 2.26.9 (2026-06-23)
 
 - Bugfixes

@@ -40,11 +40,7 @@ const Captcha = {
 
     haveCookie() {
       const hasCT = /\b_ct=/.test(d.cookie);
-      let hasTicket = false;
-      try {
-        hasTicket = !!(localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'));
-      } catch (e) {}
-      return (hasCT || hasTicket) && (QR.posts[0].thread !== 'new');
+      return hasCT && (QR.posts[0].thread !== 'new');
     },
 
     getOne() {
@@ -370,4 +366,3 @@ const Captcha = {
   }
 };
 export default Captcha;
-
