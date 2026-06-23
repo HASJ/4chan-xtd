@@ -19,6 +19,32 @@ const CaptchaT = {
   },
 
   moreNeeded() {
+    const post = QR.posts[0];
+    if (!this.isEnabled || !post) { return; }
+
+    // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge
+    // for an empty QR, but fetch one as soon as the queued post needs it.
+    if (
+      (QR.posts.length > 1) ||
+      Conf['Auto-load captcha'] ||
+      !post.isOnlyQuotes() ||
+      post.file
+    ) {
+      this.shouldLoad = true;
+      this.load();
+    }
+  },
+
+  load() {
+    if (!this.shouldLoad || !this.nodes?.container) { return; }
+
+    // TCaptcha exposes its normal on-demand fetch through #t-load. Clicking
+    // that control preserves its own request and rate-limit handling.
+    const load = $('#t-load', this.nodes.container);
+    if (load && !load.disabled) {
+      this.shouldLoad = false;
+      load.click();
+    }
   },
 
   getThread() {
@@ -46,6 +72,7 @@ const CaptchaT = {
       this.observer = new MutationObserver(() => {
         this.createStrips();
         this.checkCompletion();
+        this.load();
       });
       // Observe captcha-root, NOT captcha-container, because TCaptcha clears
       // the container's className making class-based queries fail.
@@ -63,6 +90,7 @@ const CaptchaT = {
           }
           this.createStrips();
           this.checkCompletion();
+          this.load();
         }, 500);
       }
     }

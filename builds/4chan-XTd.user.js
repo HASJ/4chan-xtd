@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.8
+// @version      2.26.9
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.8",
-    "date": "2026-05-22T10:00:00Z"
+    "version": "2.26.9",
+    "date": "2026-06-23T00:00:00Z"
   };
 
   var meta = {
@@ -6874,6 +6874,21 @@ svg.icon {
     },
 
     moreNeeded() {
+      const post = QR.posts[0];
+      if (!this.isEnabled || !post) { return; }
+      if ((QR.posts.length > 1) || Conf['Auto-load captcha'] || !post.isOnlyQuotes() || post.file) {
+        this.shouldLoad = true;
+        this.load();
+      }
+    },
+
+    load() {
+      if (!this.shouldLoad || !this.nodes?.container) { return; }
+      const load = $('#t-load', this.nodes.container);
+      if (load && !load.disabled) {
+        this.shouldLoad = false;
+        load.click();
+      }
     },
 
     getThread() {
@@ -6901,6 +6916,7 @@ svg.icon {
         this.observer = new MutationObserver(() => {
           this.createStrips();
           this.checkCompletion();
+          this.load();
         });
         // Observe captcha-root, NOT captcha-container, because TCaptcha clears
         // the container's className making class-based queries fail.
@@ -6918,6 +6934,7 @@ svg.icon {
             }
             this.createStrips();
             this.checkCompletion();
+            this.load();
           }, 500);
         }
       }
