@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.9 (2026-06-23)
+
+- Bugfixes
+  - Fixed native Quick Reply CAPTCHA loading after 4chan CAPTCHA/bypass cookies are cleared. A challenge now loads when the queued reply requires verification, while empty Quick Reply forms still respect the Auto-load captcha setting.
+
 ### 2.26.8 (2026-05-22)
 
 - Bugfixes
