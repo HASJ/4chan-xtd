@@ -50,15 +50,12 @@ const CaptchaT = {
   },
 
   load() {
-    if (!this.shouldLoad || !this.nodes?.container) { return; }
+    if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread) { return; }
 
-    // TCaptcha exposes its normal on-demand fetch through #t-load. Clicking
-    // that control preserves its own request and rate-limit handling.
-    const load = $('#t-load', this.nodes.container);
-    if (load && !load.disabled) {
-      this.shouldLoad = false;
-      load.click();
-    }
+    // Request directly from the native API. The #t-load control is not
+    // consistently rendered after a fresh-cookie session.
+    this.shouldLoad = false;
+    $.global('loadTCaptcha', CaptchaT.currentThread);
   },
 
   getThread() {
@@ -95,7 +92,10 @@ const CaptchaT = {
       // the container's className making class-based queries fail.
       this.observer.observe(this.nodes.root, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
 
-      $.global('setupTCaptcha', CaptchaT.currentThread);
+      $.global('setupTCaptcha', CaptchaT.currentThread).then(() => {
+        this.isInitialized = true;
+        this.load();
+      });
 
       // Polling fallback for style changes that MutationObserver might miss.
       if (!this.pollInterval) {
@@ -374,6 +374,7 @@ const CaptchaT = {
 
   destroy() {
     this.isCompleted = false;
+    delete this.isInitialized;
     if (this.observer) {
       this.observer.disconnect();
       delete this.observer;

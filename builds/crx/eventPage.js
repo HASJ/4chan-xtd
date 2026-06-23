@@ -141,6 +141,9 @@ const PageContextFunctions = {
     if (autoLoad === '1')
       TCaptcha.load(boardID, threadID);
   },
+  loadTCaptcha: ({ boardID, threadID }) => {
+    window.TCaptcha.load(boardID, +threadID);
+  },
   captureTCaptchaStrips: () => {
     const slider = document.querySelector('#qr #t-slider');
     const task = document.querySelector('#qr #t-task');

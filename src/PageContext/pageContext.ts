@@ -153,6 +153,9 @@ const PageContextFunctions = {
     })));
     if (autoLoad === '1') TCaptcha.load(boardID, threadID);
   },
+  loadTCaptcha: ({ boardID, threadID }) => {
+    (window as any).TCaptcha.load(boardID, +threadID);
+  },
 
   captureTCaptchaStrips: () => {
     const slider = document.querySelector('#qr #t-slider') as HTMLInputElement;
