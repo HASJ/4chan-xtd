@@ -85,7 +85,7 @@
   'use strict';
 
   var version = {
-    "version": "2.26.11",
+    "version": "2.26.12",
     "date": "2026-06-24T00:00:00Z"
   }
   ;
@@ -7210,43 +7210,19 @@ svg.icon {
       const originalSliderValue = slider.value;
 
       const runCapture = async () => {
-        let lastBg = taskEl.style.backgroundImage; // Track the actual style property
-        let lastPos = taskEl.style.backgroundPosition;
         for (let i = startIndex; i < count; i++) {
-          await new Promise(resolve => {
-            let isResolved = false;
-
-            const observer = new MutationObserver(() => {
-               const currentBg = taskEl.style.backgroundImage;
-               const currentPos = taskEl.style.backgroundPosition;
-               if (currentBg && currentBg.includes('url(') && (currentBg !== lastBg || currentPos !== lastPos)) {
-                   isResolved = true;
-                   observer.disconnect();
-                   resolve();
-               }
-            });
-            observer.observe(taskEl, { attributes: true, attributeFilter: ['style'] });
-
+          if (slider.value !== '' + i) {
             slider.value = '' + i;
             slider.dispatchEvent(new Event('input', { bubbles: true }));
             slider.dispatchEvent(new Event('change', { bubbles: true }));
-
-            // Failsafe timeout
-            setTimeout(() => {
-               if (!isResolved) {
-                   observer.disconnect();
-                   resolve();
-               }
-            }, 1000);
-          });
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
 
           const stripIndex = i - startIndex;
           const strip = stripsContainer.children[stripIndex];
           if (strip) {
-            lastBg = taskEl.style.backgroundImage;
-            lastPos = taskEl.style.backgroundPosition;
-            strip.style.backgroundImage = lastBg;
-            strip.style.backgroundPosition = lastPos;
+            strip.style.backgroundImage = taskEl.style.backgroundImage;
+            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
             strip.style.backgroundSize = taskEl.style.backgroundSize;
             strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
           }
