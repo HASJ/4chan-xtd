@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.10
+// @version      2.26.11
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.10",
-    "date": "2026-06-23T00:00:00Z"
+    "version": "2.26.11",
+    "date": "2026-06-24T00:00:00Z"
   }
   ;
 
@@ -2097,7 +2097,7 @@ current-archive-text:"Archive"]
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-
+  if (platform === 'userscript') {
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -2126,7 +2126,7 @@ current-archive-text:"Archive"]
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-
+  }
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -2173,7 +2173,16 @@ current-archive-text:"Archive"]
       Promise.resolve().then(execTask);
     };
   })();
-
+  if (platform === 'crx') {
+    const callbacks = new Map();
+    chrome.runtime.onMessage.addListener(({ id, data }) => {
+      callbacks.get(id)(data);
+      callbacks.delete(id);
+    });
+    $.eventPageRequest = (params) => new Promise(resolve => {
+      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
+    });
+  }
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -2282,7 +2291,178 @@ current-archive-text:"Archive"]
       return delete data['Redirect to HTTPS'];
     }
   };
-
+  if (platform === 'crx') {
+    // https://developer.chrome.com/extensions/storage.html
+    $.oldValue = {
+      local: dict(),
+      sync: dict()
+    };
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      for (var key in changes) {
+        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        $.oldValue[area][key] = dict.clone(changes[key].newValue);
+        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        var cb = $.syncing[key];
+        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
+          cb(newValue, key);
+        }
+      }
+    });
+    $.sync = (key, cb) => $.syncing[key] = cb;
+    $.forceSync = function () { };
+    $.crxWorking = function () {
+      try {
+        if (chrome.runtime.getManifest()) {
+          return true;
+        }
+      } catch (error) { }
+      if (!$.crxWarningShown) {
+        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
+        $.on($('a', msg), 'click', () => location.reload());
+        new Notice('warning', msg);
+        $.crxWarningShown = true;
+      }
+      return false;
+    };
+    $.get = $.oneItemSugar(function (data, cb) {
+      if (!$.crxWorking()) {
+        return;
+      }
+      const results = {};
+      const get = function (area) {
+        let keys = Object.keys(data);
+        // XXX slow performance in Firefox
+        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
+          keys = null;
+        }
+        return chrome.storage[area].get(keys, function (result) {
+          let key;
+          result = dict.clone(result);
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (keys === null) {
+            const result2 = dict();
+            for (key in result) {
+              var val = result[key];
+              if ($.hasOwn(data, key)) {
+                result2[key] = val;
+              }
+            }
+            result = result2;
+          }
+          for (key in data) {
+            $.oldValue[area][key] = result[key];
+          }
+          results[area] = result;
+          if (results.local && results.sync) {
+            $.extend(data, results.sync);
+            $.extend(data, results.local);
+            return cb(data);
+          }
+        });
+      };
+      get('local');
+      return get('sync');
+    });
+    (function () {
+      const items = {
+        local: dict(),
+        sync: dict()
+      };
+      const exceedsQuota = (key, value) => // bytes in UTF-8
+      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
+      $.delete = function (keys) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        if (typeof keys === 'string') {
+          keys = [keys];
+        }
+        for (var key of keys) {
+          delete items.local[key];
+          delete items.sync[key];
+        }
+        chrome.storage.local.remove(keys);
+        return chrome.storage.sync.remove(keys);
+      };
+      const timeout = {};
+      var setArea = function (area, cb) {
+        const data = dict();
+        $.extend(data, items[area]);
+        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
+          return;
+        }
+        return chrome.storage[area].set(data, function () {
+          let err;
+          let key;
+          if (err = chrome.runtime.lastError) {
+            c.error(err.message);
+            setTimeout(setArea, MINUTE, area);
+            timeout[area] = Date.now() + MINUTE;
+            return cb?.(err);
+          }
+          delete timeout[area];
+          for (key in data) {
+            if (items[area][key] === data[key]) {
+              delete items[area][key];
+            }
+          }
+          if (area === 'local') {
+            for (key in data) {
+              var val = data[key];
+              if (!exceedsQuota(key, val)) {
+                items.sync[key] = val;
+              }
+            }
+            setSync();
+          } else {
+            chrome.storage.local.remove(((() => {
+              const result = [];
+              for (key in data) {
+                if (!(key in items.local)) {
+                  result.push(key);
+                }
+              }
+              return result;
+            })()));
+          }
+          return cb?.();
+        });
+      };
+      var setSync = debounce(SECOND, () => setArea('sync'));
+      $.set = $.oneItemSugar(function (data, cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        $.securityCheck(data);
+        $.extend(items.local, data);
+        return setArea('local', cb);
+      });
+      return $.clear = function (cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        items.local = dict();
+        items.sync = dict();
+        let count = 2;
+        let err = null;
+        const done = function () {
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (err == null) {
+            err = chrome.runtime.lastError;
+          }
+          if (!--count) {
+            return cb?.(err);
+          }
+        };
+        chrome.storage.local.clear(done);
+        return chrome.storage.sync.clear(done);
+      };
+    })();
+  } else {
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -2499,6 +2679,7 @@ current-archive-text:"Archive"]
         return cb?.();
       };
     }
+  }
 
   // @ts-nocheck
 
@@ -6906,11 +7087,13 @@ svg.icon {
     },
 
     load() {
-      if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread) { return; }
+      if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
+      if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
 
       // Request directly from the native API. The #t-load control is not
       // consistently rendered after a fresh-cookie session.
       this.shouldLoad = false;
+      this.hasRequested = true;
       $.global('loadTCaptcha', CaptchaT.currentThread);
     },
 
@@ -6928,6 +7111,7 @@ svg.icon {
       this.shouldFocus = focus;
 
       if (!this.nodes.container) {
+        this.hasRequested = !!Conf['Auto-load captcha'];
         // Create a child element for TCaptcha to use. TCaptcha.init() will
         // clear its className and set inline styles on it, but our JS reference
         // (this.nodes.container) remains valid. We observe captcha-root (the
@@ -7231,6 +7415,7 @@ svg.icon {
     destroy() {
       this.isCompleted = false;
       delete this.isInitialized;
+      delete this.hasRequested;
       if (this.observer) {
         this.observer.disconnect();
         delete this.observer;
@@ -7295,6 +7480,8 @@ svg.icon {
 
     setUsed() {
       this.isCompleted = false;
+      delete this.hasRequested;
+      this.shouldLoad = true;
       if (this.isEnabled && this.nodes.container) {
         $.global('TCaptchaClearChallenge');
       }
@@ -20350,7 +20537,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-
+      if (platform === 'crx') {
+        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
+          .then(({ response, responseHeaderString }) => {
+          if (response)
+            response = new Uint8Array(response);
+          cb(response, responseHeaderString);
+        });
+      } else {
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -20402,7 +20596,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         } catch (error) {
           return fallback();
         }
-
+      }
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -20474,7 +20668,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-
+      if (platform === 'userscript') {
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -20522,7 +20716,14 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
             } catch (error1) { }
           };
         }
-
+      } else {
+        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
+          if (result.status) {
+            $.extend(req, result);
+          }
+          return req.onloadend();
+        });
+      }
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -20537,7 +20738,15 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       });
     },
     permission(cb, cbFail, origins) {
-
+      if (platform === 'crx') {
+        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
+          if (result) {
+            return cb();
+          } else {
+            return cbFail();
+          }
+        });
+      }
       return cb();
     },
   };
@@ -27043,7 +27252,9 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-
+        if (platform === 'crx') {
+          w = (w.wrappedJSObject || w);
+        }
         if (`${meta.name} antidup` in w) {
           return;
         }

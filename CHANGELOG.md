@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.11 (2026-06-24)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA dialog loading multiple duplicate challenges during typing or other state updates. Added load-state tracking and DOM safety guards to ensure a single challenge is loaded at a time.
+
 ### 2.26.10 (2026-06-23)
 
 - Bugfixes
