@@ -50,11 +50,13 @@ const CaptchaT = {
   },
 
   load() {
-    if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread) { return; }
+    if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
+    if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
 
     // Request directly from the native API. The #t-load control is not
     // consistently rendered after a fresh-cookie session.
     this.shouldLoad = false;
+    this.hasRequested = true;
     $.global('loadTCaptcha', CaptchaT.currentThread);
   },
 
@@ -72,6 +74,7 @@ const CaptchaT = {
     this.shouldFocus = focus;
 
     if (!this.nodes.container) {
+      this.hasRequested = !!Conf['Auto-load captcha'];
       // Create a child element for TCaptcha to use. TCaptcha.init() will
       // clear its className and set inline styles on it, but our JS reference
       // (this.nodes.container) remains valid. We observe captcha-root (the
@@ -375,6 +378,7 @@ const CaptchaT = {
   destroy() {
     this.isCompleted = false;
     delete this.isInitialized;
+    delete this.hasRequested;
     if (this.observer) {
       this.observer.disconnect();
       delete this.observer;
@@ -439,6 +443,8 @@ const CaptchaT = {
 
   setUsed() {
     this.isCompleted = false;
+    delete this.hasRequested;
+    this.shouldLoad = true;
     if (this.isEnabled && this.nodes.container) {
       $.global('TCaptchaClearChallenge');
     }
