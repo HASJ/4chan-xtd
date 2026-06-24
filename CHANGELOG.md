@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.12 (2026-06-24)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA options capturing race conditions resulting in duplicate or missing/empty option images. Replaced the MutationObserver logic with a deterministic and safe 50ms setTimeout-based delay, optimizing capturing for the initial slider index.
+
 ### 2.26.11 (2026-06-24)
 
 - Bugfixes
