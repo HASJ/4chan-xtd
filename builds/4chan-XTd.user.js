@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.12
+// @version      2.26.13
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,8 +169,8 @@
   'use strict';
 
   var version = {
-    "version": "2.26.12",
-    "date": "2026-06-24T00:00:00Z"
+    "version": "2.26.13",
+    "date": "2026-06-28T00:00:00Z"
   }
   ;
 
@@ -7054,7 +7054,17 @@ svg.icon {
       if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
       $.after(QR.nodes.com.parentNode, root);
 
+      $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
+      $.on(QR.nodes.com, 'keydown', e => {
+        if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+      });
+      d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
+      d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
       root.addEventListener('focus', (e) => {
+        if (this.redirectCommentFocus(e)) {
+          if (this.isInitializing && e.target.id === 't-resp') { this.isInitializing = false; }
+          return;
+        }
         if (this.isInitializing && e.target.id === 't-resp') {
           this.isInitializing = false;
           if (!this.shouldFocus) {
@@ -7087,6 +7097,7 @@ svg.icon {
     },
 
     load() {
+      if (QR.nodes && (d.activeElement === QR.nodes.com)) { this.startCommentFocusRestore(false); }
       if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
       if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
 
@@ -7094,7 +7105,8 @@ svg.icon {
       // consistently rendered after a fresh-cookie session.
       this.shouldLoad = false;
       this.hasRequested = true;
-      $.global('loadTCaptcha', CaptchaT.currentThread);
+      $.global('loadTCaptcha', CaptchaT.currentThread).then(() => this.restoreCommentFocus());
+      this.restoreCommentFocus();
     },
 
     getThread() {
@@ -7109,6 +7121,7 @@ svg.icon {
 
       this.isCompleted = false;
       this.shouldFocus = focus;
+      this.startCommentFocusRestore(focus);
 
       if (!this.nodes.container) {
         this.hasRequested = !!Conf['Auto-load captcha'];
@@ -7127,6 +7140,7 @@ svg.icon {
           this.createStrips();
           this.checkCompletion();
           this.load();
+          this.restoreCommentFocus();
         });
         // Observe captcha-root, NOT captcha-container, because TCaptcha clears
         // the container's className making class-based queries fail.
@@ -7135,6 +7149,7 @@ svg.icon {
         $.global('setupTCaptcha', CaptchaT.currentThread).then(() => {
           this.isInitialized = true;
           this.load();
+          this.restoreCommentFocus();
         });
 
         // Polling fallback for style changes that MutationObserver might miss.
@@ -7153,6 +7168,81 @@ svg.icon {
       }
 
       if (focus) $('#t-resp').focus();
+    },
+
+    startCommentFocusRestore(focus) {
+      if (focus || (d.activeElement !== QR.nodes.com)) {
+        this.cancelCommentFocusRestore();
+        return;
+      }
+      this.keepCommentFocus = true;
+      this.keepCommentFocusUntil = Date.now() + 10000;
+    },
+
+    cancelCommentFocusRestore() {
+      delete this.keepCommentFocus;
+      delete this.keepCommentFocusUntil;
+    },
+
+    shouldKeepCommentFocus() {
+      if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+      if (Date.now() > this.keepCommentFocusUntil) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      return true;
+    },
+
+    focusComment() {
+      if (!QR.nodes || QR.nodes.el.hidden) { return; }
+      try {
+        QR.nodes.com.focus({ preventScroll: true });
+      } catch (error) {
+        QR.nodes.com.focus();
+      }
+    },
+
+    redirectCommentFocus(e) {
+      if (!this.shouldKeepCommentFocus()) { return false; }
+      const target = e?.target instanceof Node ? e.target : null;
+      if (target === QR.nodes.com) { return false; }
+      if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      if (target && !this.nodes.root.contains(target) && target !== d.body) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      e?.preventDefault?.();
+      this.restoreCommentFocus();
+      return true;
+    },
+
+    restoreCommentFocus() {
+      if (!this.shouldKeepCommentFocus()) { return; }
+
+      const restore = () => {
+        if (!this.shouldKeepCommentFocus()) { return; }
+        const active = d.activeElement;
+        if (active === QR.nodes.com) { return; }
+        if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+          this.cancelCommentFocusRestore();
+          return;
+        }
+        if (active && !this.nodes.root.contains(active) && active !== d.body) {
+          this.cancelCommentFocusRestore();
+          return;
+        }
+        this.focusComment();
+      };
+
+      $.queueTask(restore);
+      if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(restore); }
+      setTimeout(restore, 0);
+      setTimeout(restore, 50);
+      setTimeout(restore, 150);
+      setTimeout(restore, 300);
     },
 
     createStrips() {
@@ -17881,6 +17971,13 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         );
         const counter = $('.captcha-counter > a', root);
         this.nodes = { root, counter };
+        $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
+        $.on(QR.nodes.com, 'keydown', e => {
+          if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+        });
+        d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
+        d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
+        root.addEventListener('focus', e => { this.redirectCommentFocus(e); }, true);
         this.count();
         $.addClass(QR.nodes.el, 'has-captcha', 'captcha-v2');
         $.after(QR.nodes.com.parentNode, root);
@@ -17931,6 +18028,8 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 
       setup(focus, force) {
         if (!this.isEnabled || (!Captcha.cache.needed() && !force)) { return; }
+
+        this.startCommentFocusRestore(focus);
 
         if (focus) {
           $.addClass(QR.nodes.el, 'focus');
@@ -17984,7 +18083,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       },
 
       setupJS() {
-        $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey });
+        $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey }).then(() => this.restoreCommentFocus());
       },
 
       afterSetup(mutations) {
@@ -18005,10 +18104,86 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
         this.fixQRPosition();
         $.on(iframe, 'load', this.fixQRPosition);
         if (d.activeElement === this.nodes.counter) { iframe.focus(); }
+        this.restoreCommentFocus();
         // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
         if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
           return $.on(iframe.parentNode, 'scroll', function () { return this.scrollTop = 0; });
         }
+      },
+
+      startCommentFocusRestore(focus) {
+        if (focus || (d.activeElement !== QR.nodes.com)) {
+          this.cancelCommentFocusRestore();
+          return;
+        }
+        this.keepCommentFocus = true;
+        this.keepCommentFocusUntil = Date.now() + 10000;
+      },
+
+      cancelCommentFocusRestore() {
+        delete this.keepCommentFocus;
+        delete this.keepCommentFocusUntil;
+      },
+
+      shouldKeepCommentFocus() {
+        if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+        if (Date.now() > this.keepCommentFocusUntil) {
+          this.cancelCommentFocusRestore();
+          return false;
+        }
+        return true;
+      },
+
+      focusComment() {
+        if (!QR.nodes || QR.nodes.el.hidden) { return; }
+        try {
+          QR.nodes.com.focus({ preventScroll: true });
+        } catch (error) {
+          QR.nodes.com.focus();
+        }
+      },
+
+      redirectCommentFocus(e) {
+        if (!this.shouldKeepCommentFocus()) { return false; }
+        const target = e?.target instanceof Node ? e.target : null;
+        if (target === QR.nodes.com) { return false; }
+        if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+          this.cancelCommentFocusRestore();
+          return false;
+        }
+        if (target && !this.nodes.root.contains(target) && target !== d.body) {
+          this.cancelCommentFocusRestore();
+          return false;
+        }
+        e?.preventDefault?.();
+        this.restoreCommentFocus();
+        return true;
+      },
+
+      restoreCommentFocus() {
+        if (!this.shouldKeepCommentFocus()) { return; }
+
+        const restore = () => {
+          if (!this.shouldKeepCommentFocus()) { return; }
+          const active = d.activeElement;
+          if (active === QR.nodes.com) { return; }
+          if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+            this.cancelCommentFocusRestore();
+            return;
+          }
+          if (active && !this.nodes.root.contains(active) && active !== d.body) {
+            this.cancelCommentFocusRestore();
+            return;
+          }
+          this.focusComment();
+        };
+
+        $.queueTask(restore);
+        if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(restore); }
+        setTimeout(restore, 0);
+        setTimeout(restore, 50);
+        setTimeout(restore, 150);
+        setTimeout(restore, 300);
       },
 
       fixQRPosition() {

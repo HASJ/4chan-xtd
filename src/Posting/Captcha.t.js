@@ -17,7 +17,17 @@ const CaptchaT = {
     if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
     $.after(QR.nodes.com.parentNode, root);
 
+    $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
+    $.on(QR.nodes.com, 'keydown', e => {
+      if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+    });
+    d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
+    d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
     root.addEventListener('focus', (e) => {
+      if (this.redirectCommentFocus(e)) {
+        if (this.isInitializing && e.target.id === 't-resp') { this.isInitializing = false; }
+        return;
+      }
       if (this.isInitializing && e.target.id === 't-resp') {
         this.isInitializing = false;
         if (!this.shouldFocus) {
@@ -50,6 +60,7 @@ const CaptchaT = {
   },
 
   load() {
+    if (QR.nodes && (d.activeElement === QR.nodes.com)) { this.startCommentFocusRestore(false); }
     if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
     if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
 
@@ -57,7 +68,8 @@ const CaptchaT = {
     // consistently rendered after a fresh-cookie session.
     this.shouldLoad = false;
     this.hasRequested = true;
-    $.global('loadTCaptcha', CaptchaT.currentThread);
+    $.global('loadTCaptcha', CaptchaT.currentThread).then(() => this.restoreCommentFocus());
+    this.restoreCommentFocus();
   },
 
   getThread() {
@@ -72,6 +84,7 @@ const CaptchaT = {
 
     this.isCompleted = false;
     this.shouldFocus = focus;
+    this.startCommentFocusRestore(focus);
 
     if (!this.nodes.container) {
       this.hasRequested = !!Conf['Auto-load captcha'];
@@ -90,6 +103,7 @@ const CaptchaT = {
         this.createStrips();
         this.checkCompletion();
         this.load();
+        this.restoreCommentFocus();
       });
       // Observe captcha-root, NOT captcha-container, because TCaptcha clears
       // the container's className making class-based queries fail.
@@ -98,6 +112,7 @@ const CaptchaT = {
       $.global('setupTCaptcha', CaptchaT.currentThread).then(() => {
         this.isInitialized = true;
         this.load();
+        this.restoreCommentFocus();
       });
 
       // Polling fallback for style changes that MutationObserver might miss.
@@ -116,6 +131,81 @@ const CaptchaT = {
     }
 
     if (focus) $('#t-resp').focus();
+  },
+
+  startCommentFocusRestore(focus) {
+    if (focus || (d.activeElement !== QR.nodes.com)) {
+      this.cancelCommentFocusRestore();
+      return;
+    }
+    this.keepCommentFocus = true;
+    this.keepCommentFocusUntil = Date.now() + 10000;
+  },
+
+  cancelCommentFocusRestore() {
+    delete this.keepCommentFocus;
+    delete this.keepCommentFocusUntil;
+  },
+
+  shouldKeepCommentFocus() {
+    if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+    if (Date.now() > this.keepCommentFocusUntil) {
+      this.cancelCommentFocusRestore();
+      return false;
+    }
+    return true;
+  },
+
+  focusComment() {
+    if (!QR.nodes || QR.nodes.el.hidden) { return; }
+    try {
+      QR.nodes.com.focus({ preventScroll: true });
+    } catch (error) {
+      QR.nodes.com.focus();
+    }
+  },
+
+  redirectCommentFocus(e) {
+    if (!this.shouldKeepCommentFocus()) { return false; }
+    const target = e?.target instanceof Node ? e.target : null;
+    if (target === QR.nodes.com) { return false; }
+    if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+      this.cancelCommentFocusRestore();
+      return false;
+    }
+    if (target && !this.nodes.root.contains(target) && target !== d.body) {
+      this.cancelCommentFocusRestore();
+      return false;
+    }
+    e?.preventDefault?.();
+    this.restoreCommentFocus();
+    return true;
+  },
+
+  restoreCommentFocus() {
+    if (!this.shouldKeepCommentFocus()) { return; }
+
+    const restore = () => {
+      if (!this.shouldKeepCommentFocus()) { return; }
+      const active = d.activeElement;
+      if (active === QR.nodes.com) { return; }
+      if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+        this.cancelCommentFocusRestore();
+        return;
+      }
+      if (active && !this.nodes.root.contains(active) && active !== d.body) {
+        this.cancelCommentFocusRestore();
+        return;
+      }
+      this.focusComment();
+    };
+
+    $.queueTask(restore);
+    if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(restore); }
+    setTimeout(restore, 0);
+    setTimeout(restore, 50);
+    setTimeout(restore, 150);
+    setTimeout(restore, 300);
   },
 
   createStrips() {
