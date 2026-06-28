@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.13 (2026-06-28)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA loading stealing focus from the comment textarea while typing. The QR now restores comment focus when CAPTCHA UI auto-loads without disrupting explicit CAPTCHA interaction.
+
 ### 2.26.12 (2026-06-24)
 
 - Bugfixes

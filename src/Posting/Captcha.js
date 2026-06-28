@@ -160,6 +160,13 @@ const Captcha = {
       );
       const counter = $('.captcha-counter > a', root);
       this.nodes = { root, counter };
+      $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
+      $.on(QR.nodes.com, 'keydown', e => {
+        if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+      });
+      d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
+      d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
+      root.addEventListener('focus', e => { this.redirectCommentFocus(e); }, true);
       this.count();
       $.addClass(QR.nodes.el, 'has-captcha', 'captcha-v2');
       $.after(QR.nodes.com.parentNode, root);
@@ -210,6 +217,8 @@ const Captcha = {
 
     setup(focus, force) {
       if (!this.isEnabled || (!Captcha.cache.needed() && !force)) { return; }
+
+      this.startCommentFocusRestore(focus);
 
       if (focus) {
         $.addClass(QR.nodes.el, 'focus');
@@ -263,7 +272,7 @@ const Captcha = {
     },
 
     setupJS() {
-      $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey });
+      $.global('setupCaptcha', { recaptchaKey: meta.recaptchaKey }).then(() => this.restoreCommentFocus());
     },
 
     afterSetup(mutations) {
@@ -284,10 +293,86 @@ const Captcha = {
       this.fixQRPosition();
       $.on(iframe, 'load', this.fixQRPosition);
       if (d.activeElement === this.nodes.counter) { iframe.focus(); }
+      this.restoreCommentFocus();
       // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
       if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
         return $.on(iframe.parentNode, 'scroll', function () { return this.scrollTop = 0; });
       }
+    },
+
+    startCommentFocusRestore(focus) {
+      if (focus || (d.activeElement !== QR.nodes.com)) {
+        this.cancelCommentFocusRestore();
+        return;
+      }
+      this.keepCommentFocus = true;
+      this.keepCommentFocusUntil = Date.now() + 10000;
+    },
+
+    cancelCommentFocusRestore() {
+      delete this.keepCommentFocus;
+      delete this.keepCommentFocusUntil;
+    },
+
+    shouldKeepCommentFocus() {
+      if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+      if (Date.now() > this.keepCommentFocusUntil) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      return true;
+    },
+
+    focusComment() {
+      if (!QR.nodes || QR.nodes.el.hidden) { return; }
+      try {
+        QR.nodes.com.focus({ preventScroll: true });
+      } catch (error) {
+        QR.nodes.com.focus();
+      }
+    },
+
+    redirectCommentFocus(e) {
+      if (!this.shouldKeepCommentFocus()) { return false; }
+      const target = e?.target instanceof Node ? e.target : null;
+      if (target === QR.nodes.com) { return false; }
+      if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      if (target && !this.nodes.root.contains(target) && target !== d.body) {
+        this.cancelCommentFocusRestore();
+        return false;
+      }
+      e?.preventDefault?.();
+      this.restoreCommentFocus();
+      return true;
+    },
+
+    restoreCommentFocus() {
+      if (!this.shouldKeepCommentFocus()) { return; }
+
+      const restore = () => {
+        if (!this.shouldKeepCommentFocus()) { return; }
+        const active = d.activeElement;
+        if (active === QR.nodes.com) { return; }
+        if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+          this.cancelCommentFocusRestore();
+          return;
+        }
+        if (active && !this.nodes.root.contains(active) && active !== d.body) {
+          this.cancelCommentFocusRestore();
+          return;
+        }
+        this.focusComment();
+      };
+
+      $.queueTask(restore);
+      if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(restore); }
+      setTimeout(restore, 0);
+      setTimeout(restore, 50);
+      setTimeout(restore, 150);
+      setTimeout(restore, 300);
     },
 
     fixQRPosition() {
