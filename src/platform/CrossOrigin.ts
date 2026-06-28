@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
-import QR from "../Posting/QR";
 import $ from "./$";
+import { typeFromExtension } from "../Posting/FileTypes";
 import { dict, platform } from "./helpers";
 
 /*
@@ -102,7 +102,7 @@ var CrossOrigin = {
       }
       if (/^text\/plain;\s*charset=x-user-defined$/i.test(mime)) {
         // In JS Blocker (Safari) content type comes back as 'text/plain; charset=x-user-defined'; guess from filename instead.
-        mime = $.getOwn(QR.typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
+        mime = $.getOwn(typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
       }
       cb(new File([data], name, { type: mime }));
     });

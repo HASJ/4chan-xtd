@@ -3,7 +3,7 @@ import Header from "../General/Header";
 import UI from "../General/UI";
 import { g, Conf, E, d } from "../globals/globals";
 import $ from "../platform/$";
-import QuoteThreading from "../Quotelinks/QuoteThreading";
+import { disableQuoteThreading, registerReplyPruningInput } from "./ThreadDisplayModes";
 
 interface ReplyPruningType {
   container: DocumentFragment;
@@ -65,6 +65,7 @@ const ReplyPruning: ReplyPruningType = {
       enabled: label.firstElementChild as HTMLInputElement,
       replies: el.lastElementChild as HTMLInputElement
     };
+    registerReplyPruningInput(this.inputs.enabled);
 
     this.setEnabled.call(this.inputs.enabled);
     $.on(this.inputs.enabled, 'change', this.setEnabled);
@@ -82,11 +83,7 @@ const ReplyPruning: ReplyPruningType = {
   },
 
   setEnabled(this: HTMLInputElement) {
-    const other = (QuoteThreading as any).input;
-    if (this.checked && other?.checked) {
-      other.checked = false;
-      $.event('change', null, other);
-    }
+    if (this.checked) disableQuoteThreading();
     ReplyPruning.active = this.checked;
   },
 
@@ -103,10 +100,8 @@ const ReplyPruning: ReplyPruningType = {
 
     if (this.isSticky) {
       ReplyPruning.active = (ReplyPruning.inputs.enabled.checked = true);
-      if ((QuoteThreading as any).input) {
-        // Disable Quote Threading for this thread but don't save the setting.
-        Conf['Thread Quotes'] = ((QuoteThreading as any).input.checked = false);
-      }
+      // Disable Quote Threading for this thread but do not save the setting.
+      disableQuoteThreading(false);
     }
 
     this.posts.forEach((post: any) => {

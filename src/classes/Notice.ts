@@ -1,8 +1,8 @@
-import Header from "../General/Header";
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 import { SECOND } from "../platform/helpers";
 import Icon from '../Icons/icon';
+import { addNoticeElement } from "./NoticeHost";
 
 export default class Notice {
   timeout?: number;
@@ -47,7 +47,7 @@ export default class Notice {
       return;
     }
     $.off(d, 'visibilitychange', this.add);
-    $.add(Header.noticesRoot, this.el);
+    addNoticeElement(this.el);
     this.el.clientHeight; // force reflow
     this.el.style.opacity = '1';
     if (this.timeout) {
@@ -70,3 +70,4 @@ export default class Notice {
     }
   }
 }
+

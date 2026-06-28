@@ -10,6 +10,7 @@ import Settings from "./Settings";
 import UI from "./UI";
 import meta from '../../package.json';
 import Icon from "../Icons/icon";
+import { setNoticesRoot } from "../classes/NoticeHost";
 
 /*
  * decaffeinate suggestions:
@@ -21,6 +22,7 @@ var Header: any = {
   init() {
     $.onExists(doc, 'body', () => {
       if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
+      setNoticesRoot(this.noticesRoot);
       $.add(this.bar, [this.noticesRoot, this.toggle]);
       $.prepend(d.body, this.bar);
       $.add(d.body, Header.hover);
@@ -688,3 +690,4 @@ var Header: any = {
   }
 };
 export default Header;
+

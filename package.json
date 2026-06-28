@@ -127,6 +127,7 @@
   "type": "module",
   "scripts": {
     "build": "node ./tools/rollup",
+    "check:cycles": "node ./tools/check-cycles.js",
     "build:min": "node ./tools/rollup -min -platform=userscript",
     "build:userscript": "node ./tools/rollup -platform=userscript",
     "build:crx": "node ./tools/rollup -platform=crx",
@@ -135,3 +136,4 @@
     "build:all": "node ./tools/rollup -min -platform=userscript && node ./tools/rollup -platform=userscript && node ./tools/rollup -platform=crx"
   }
 }
+
