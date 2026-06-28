@@ -8,7 +8,7 @@ import $ from "../platform/$";
 import { debounce, SECOND } from "../platform/helpers";
 import QuoteYou from "../Quotelinks/QuoteYou";
 import Favicon from "./Favicon";
-import ThreadWatcher from "./ThreadWatcher";
+import { updateWatchedThread } from "./ThreadWatcherBridge";
 
 interface LastSet extends Set<number> {
   last?: number;
@@ -375,7 +375,7 @@ const Unread: UnreadType = {
           }
         }
       }
-      ThreadWatcher.update(g.SITE.ID, Unread.thread.board.ID, Unread.thread.ID, {
+      updateWatchedThread(g.SITE.ID, Unread.thread.board.ID, Unread.thread.ID, {
         last: Unread.thread.lastPost,
         isDead: Unread.thread.isDead,
         isArchived: Unread.thread.isArchived,

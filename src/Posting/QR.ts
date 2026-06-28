@@ -17,6 +17,7 @@ import Get from '../General/Get';
 import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
+import { typeFromExtension } from './FileTypes';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -100,16 +101,7 @@ var QR = {
 
   validExtension: /\.(jpe?g|png|gif|pdf|swf|webm|mp4)$/i,
 
-  typeFromExtension: {
-    'jpg':  'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png':  'image/png',
-    'gif':  'image/gif',
-    'pdf':  'application/pdf',
-    'swf':  'application/vnd.adobe.flash.movie',
-    'webm': 'video/webm',
-    'mp4': 'video/mp4'
-  },
+  typeFromExtension,
 
   extensionFromType: {
     'image/jpeg': 'jpg',
