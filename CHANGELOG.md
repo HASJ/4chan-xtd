@@ -3,6 +3,14 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.18 (2026-06-29)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA focus restoration so auto-loaded challenges return focus to the comment field once without hijacking deliberate CAPTCHA or Quick Reply interactions.
+  - Fixed TCaptcha "Post on CAPTCHA completion" handling for multi-step challenges by tracking the selected challenge step before allowing auto-submit.
+- Maintenance
+  - Expanded `.gitignore` coverage for local caches, logs, environment files, editor files, temporary CRX signing output, and signing keys.
+
 ### 2.26.17 (2026-06-29)
 
 - Bugfixes

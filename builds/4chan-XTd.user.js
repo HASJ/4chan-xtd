@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         4chan XTd
-// @version      2.26.17
+// @version      2.26.18
 // @minGMVer     1.14
 // @minFFVer     78
 // @namespace    4chan-XTd
@@ -169,7 +169,7 @@
   'use strict';
 
   var version = {
-    "version": "2.26.17",
+    "version": "2.26.18",
     "date": "2026-06-29T00:00:00Z"
   }
   ;
@@ -852,7 +852,7 @@
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-  if (platform === 'userscript') {
+
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -881,7 +881,7 @@
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-  }
+
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -928,16 +928,7 @@
       Promise.resolve().then(execTask);
     };
   })();
-  if (platform === 'crx') {
-    const callbacks = new Map();
-    chrome.runtime.onMessage.addListener(({ id, data }) => {
-      callbacks.get(id)(data);
-      callbacks.delete(id);
-    });
-    $.eventPageRequest = (params) => new Promise(resolve => {
-      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
-    });
-  }
+
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -1046,178 +1037,7 @@
       return delete data['Redirect to HTTPS'];
     }
   };
-  if (platform === 'crx') {
-    // https://developer.chrome.com/extensions/storage.html
-    $.oldValue = {
-      local: dict(),
-      sync: dict()
-    };
-    chrome.storage.onChanged.addListener(function (changes, area) {
-      for (var key in changes) {
-        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        $.oldValue[area][key] = dict.clone(changes[key].newValue);
-        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-        var cb = $.syncing[key];
-        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
-          cb(newValue, key);
-        }
-      }
-    });
-    $.sync = (key, cb) => $.syncing[key] = cb;
-    $.forceSync = function () { };
-    $.crxWorking = function () {
-      try {
-        if (chrome.runtime.getManifest()) {
-          return true;
-        }
-      } catch (error) { }
-      if (!$.crxWarningShown) {
-        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
-        $.on($('a', msg), 'click', () => location.reload());
-        $.event('CreateNotification', { type: 'warning', content: msg });
-        $.crxWarningShown = true;
-      }
-      return false;
-    };
-    $.get = $.oneItemSugar(function (data, cb) {
-      if (!$.crxWorking()) {
-        return;
-      }
-      const results = {};
-      const get = function (area) {
-        let keys = Object.keys(data);
-        // XXX slow performance in Firefox
-        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
-          keys = null;
-        }
-        return chrome.storage[area].get(keys, function (result) {
-          let key;
-          result = dict.clone(result);
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (keys === null) {
-            const result2 = dict();
-            for (key in result) {
-              var val = result[key];
-              if ($.hasOwn(data, key)) {
-                result2[key] = val;
-              }
-            }
-            result = result2;
-          }
-          for (key in data) {
-            $.oldValue[area][key] = result[key];
-          }
-          results[area] = result;
-          if (results.local && results.sync) {
-            $.extend(data, results.sync);
-            $.extend(data, results.local);
-            return cb(data);
-          }
-        });
-      };
-      get('local');
-      return get('sync');
-    });
-    (function () {
-      const items = {
-        local: dict(),
-        sync: dict()
-      };
-      const exceedsQuota = (key, value) => // bytes in UTF-8
-      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
-      $.delete = function (keys) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        if (typeof keys === 'string') {
-          keys = [keys];
-        }
-        for (var key of keys) {
-          delete items.local[key];
-          delete items.sync[key];
-        }
-        chrome.storage.local.remove(keys);
-        return chrome.storage.sync.remove(keys);
-      };
-      const timeout = {};
-      var setArea = function (area, cb) {
-        const data = dict();
-        $.extend(data, items[area]);
-        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
-          return;
-        }
-        return chrome.storage[area].set(data, function () {
-          let err;
-          let key;
-          if (err = chrome.runtime.lastError) {
-            c.error(err.message);
-            setTimeout(setArea, MINUTE, area);
-            timeout[area] = Date.now() + MINUTE;
-            return cb?.(err);
-          }
-          delete timeout[area];
-          for (key in data) {
-            if (items[area][key] === data[key]) {
-              delete items[area][key];
-            }
-          }
-          if (area === 'local') {
-            for (key in data) {
-              var val = data[key];
-              if (!exceedsQuota(key, val)) {
-                items.sync[key] = val;
-              }
-            }
-            setSync();
-          } else {
-            chrome.storage.local.remove(((() => {
-              const result = [];
-              for (key in data) {
-                if (!(key in items.local)) {
-                  result.push(key);
-                }
-              }
-              return result;
-            })()));
-          }
-          return cb?.();
-        });
-      };
-      var setSync = debounce(SECOND, () => setArea('sync'));
-      $.set = $.oneItemSugar(function (data, cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        $.securityCheck(data);
-        $.extend(items.local, data);
-        return setArea('local', cb);
-      });
-      return $.clear = function (cb) {
-        if (!$.crxWorking()) {
-          return;
-        }
-        items.local = dict();
-        items.sync = dict();
-        let count = 2;
-        let err = null;
-        const done = function () {
-          if (chrome.runtime.lastError) {
-            c.error(chrome.runtime.lastError.message);
-          }
-          if (err == null) {
-            err = chrome.runtime.lastError;
-          }
-          if (!--count) {
-            return cb?.(err);
-          }
-        };
-        chrome.storage.local.clear(done);
-        return chrome.storage.sync.clear(done);
-      };
-    })();
-  } else {
+
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -1434,7 +1254,6 @@
         return cb?.();
       };
     }
-  }
 
   /*
    * This file has the code for the jsx to { innerHTML: "safe string" }
@@ -1741,14 +1560,7 @@
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-      if (platform === 'crx') {
-        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
-          .then(({ response, responseHeaderString }) => {
-          if (response)
-            response = new Uint8Array(response);
-          cb(response, responseHeaderString);
-        });
-      } else {
+
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -1800,7 +1612,7 @@
         } catch (error) {
           return fallback();
         }
-      }
+
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -1872,7 +1684,7 @@
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-      if (platform === 'userscript') {
+
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -1920,14 +1732,7 @@
             } catch (error1) { }
           };
         }
-      } else {
-        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
-          if (result.status) {
-            $.extend(req, result);
-          }
-          return req.onloadend();
-        });
-      }
+
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -1942,15 +1747,7 @@
       });
     },
     permission(cb, cbFail, origins) {
-      if (platform === 'crx') {
-        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
-          if (result) {
-            return cb();
-          } else {
-            return cbFail();
-          }
-        });
-      }
+
       return cb();
     },
   };
@@ -14739,6 +14536,7 @@ svg.icon {
           if (existingClueImage) $.rm(existingClueImage);
           customUiExists = false;
           this.isCapturing = false;
+          delete this.selectedChallengeStep;
         }
       }
 
@@ -14776,6 +14574,7 @@ svg.icon {
       if (tNextForStep) {
         stripsContainer.dataset.step = tNextForStep.textContent;
       }
+      delete this.selectedChallengeStep;
       const minVal = parseInt(slider.getAttribute('min') || '0', 10);
       const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
       const count = maxVal + 1;
@@ -14791,6 +14590,10 @@ svg.icon {
           slider.dispatchEvent(new Event('input', { bubbles: true }));
           $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
           $.addClass(strip, 'selected');
+          if (!this.isRestoring) {
+            const tNext = $('#t-next', mainDiv);
+            this.selectedChallengeStep = stripsContainer.dataset.step || tNext?.textContent || '';
+          }
           if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
             const tNext = $('#t-next', mainDiv);
             if (tNext && !tNext.disabled) {
@@ -14925,6 +14728,7 @@ svg.icon {
       this.isCompleted = false;
       delete this.isInitialized;
       delete this.hasRequested;
+      delete this.selectedChallengeStep;
       if (this.observer) {
         this.observer.disconnect();
         delete this.observer;
@@ -14976,7 +14780,9 @@ svg.icon {
         const tNextText = tNext ? tNext.textContent || '' : '';
         const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
         const hasRemainingChallengeSteps = stepMatch && parseInt(stepMatch[1], 10) < parseInt(stepMatch[2], 10);
-        if (hasRemainingChallengeSteps || (!stepMatch && tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0))) {
+        const selectedCurrentStep = stepMatch && this.selectedChallengeStep === tNextText;
+        const canAdvanceChallenge = tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0);
+        if ((stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge)) {
           return;
         }
         if (this.isCompleted) return;
@@ -14992,6 +14798,7 @@ svg.icon {
     setUsed() {
       this.isCompleted = false;
       delete this.hasRequested;
+      delete this.selectedChallengeStep;
       this.shouldLoad = true;
       if (this.isEnabled && this.nodes.container) {
         $.global('TCaptchaClearChallenge');
@@ -15360,9 +15167,7 @@ svg.icon {
         $.on(getQRCommentInput(), 'keydown', e => {
           if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
         });
-        d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
-        d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
-        root.addEventListener('focus', e => { this.redirectCommentFocus(e); }, true);
+
         this.count();
         addQRClass('has-captcha', 'captcha-v2');
         insertCaptchaRoot(root);
@@ -15501,18 +15306,18 @@ svg.icon {
           this.cancelCommentFocusRestore();
           return;
         }
-        this.keepCommentFocus = true;
-        this.keepCommentFocusUntil = Date.now() + 10000;
+        this.restoreCommentFocusOnLoad = true;
+        this.restoreCommentFocusUntil = Date.now() + 2000;
       },
 
       cancelCommentFocusRestore() {
-        delete this.keepCommentFocus;
-        delete this.keepCommentFocusUntil;
+        delete this.restoreCommentFocusOnLoad;
+        delete this.restoreCommentFocusUntil;
       },
 
-      shouldKeepCommentFocus() {
-        if (!this.keepCommentFocus || !isQROpen()) { return false; }
-        if (Date.now() > this.keepCommentFocusUntil) {
+      shouldRestoreCommentFocus() {
+        if (!this.restoreCommentFocusOnLoad || !isQROpen()) { return false; }
+        if (Date.now() > this.restoreCommentFocusUntil) {
           this.cancelCommentFocusRestore();
           return false;
         }
@@ -15528,28 +15333,11 @@ svg.icon {
         }
       },
 
-      redirectCommentFocus(e) {
-        if (!this.shouldKeepCommentFocus()) { return false; }
-        const target = e?.target instanceof Node ? e.target : null;
-        if (target === getQRCommentInput()) { return false; }
-        if (target && getQRRoot().contains(target) && !this.nodes.root.contains(target)) {
-          this.cancelCommentFocusRestore();
-          return false;
-        }
-        if (target && !this.nodes.root.contains(target) && target !== d.body) {
-          this.cancelCommentFocusRestore();
-          return false;
-        }
-        e?.preventDefault?.();
-        this.restoreCommentFocus();
-        return true;
-      },
-
       restoreCommentFocus() {
-        if (!this.shouldKeepCommentFocus()) { return; }
+        if (!this.shouldRestoreCommentFocus()) { return; }
 
         const restore = () => {
-          if (!this.shouldKeepCommentFocus()) { return; }
+          if (!this.shouldRestoreCommentFocus()) { return; }
           const active = d.activeElement;
           if (active === getQRCommentInput()) { return; }
           if (active && getQRRoot().contains(active) && !this.nodes.root.contains(active)) {
@@ -15561,6 +15349,7 @@ svg.icon {
             return;
           }
           this.focusComment();
+          this.cancelCommentFocusRestore();
         };
 
         $.queueTask(restore);
@@ -27952,9 +27741,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-        if (platform === 'crx') {
-          w = (w.wrappedJSObject || w);
-        }
+
         if (`${meta.name} antidup` in w) {
           return;
         }

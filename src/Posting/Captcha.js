@@ -164,9 +164,7 @@ const Captcha = {
       $.on(getQRCommentInput(), 'keydown', e => {
         if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
       });
-      d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
-      d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
-      root.addEventListener('focus', e => { this.redirectCommentFocus(e); }, true);
+
       this.count();
       addQRClass('has-captcha', 'captcha-v2');
       insertCaptchaRoot(root);
@@ -305,18 +303,18 @@ const Captcha = {
         this.cancelCommentFocusRestore();
         return;
       }
-      this.keepCommentFocus = true;
-      this.keepCommentFocusUntil = Date.now() + 10000;
+      this.restoreCommentFocusOnLoad = true;
+      this.restoreCommentFocusUntil = Date.now() + 2000;
     },
 
     cancelCommentFocusRestore() {
-      delete this.keepCommentFocus;
-      delete this.keepCommentFocusUntil;
+      delete this.restoreCommentFocusOnLoad;
+      delete this.restoreCommentFocusUntil;
     },
 
-    shouldKeepCommentFocus() {
-      if (!this.keepCommentFocus || !isQROpen()) { return false; }
-      if (Date.now() > this.keepCommentFocusUntil) {
+    shouldRestoreCommentFocus() {
+      if (!this.restoreCommentFocusOnLoad || !isQROpen()) { return false; }
+      if (Date.now() > this.restoreCommentFocusUntil) {
         this.cancelCommentFocusRestore();
         return false;
       }
@@ -332,28 +330,11 @@ const Captcha = {
       }
     },
 
-    redirectCommentFocus(e) {
-      if (!this.shouldKeepCommentFocus()) { return false; }
-      const target = e?.target instanceof Node ? e.target : null;
-      if (target === getQRCommentInput()) { return false; }
-      if (target && getQRRoot().contains(target) && !this.nodes.root.contains(target)) {
-        this.cancelCommentFocusRestore();
-        return false;
-      }
-      if (target && !this.nodes.root.contains(target) && target !== d.body) {
-        this.cancelCommentFocusRestore();
-        return false;
-      }
-      e?.preventDefault?.();
-      this.restoreCommentFocus();
-      return true;
-    },
-
     restoreCommentFocus() {
-      if (!this.shouldKeepCommentFocus()) { return; }
+      if (!this.shouldRestoreCommentFocus()) { return; }
 
       const restore = () => {
-        if (!this.shouldKeepCommentFocus()) { return; }
+        if (!this.shouldRestoreCommentFocus()) { return; }
         const active = d.activeElement;
         if (active === getQRCommentInput()) { return; }
         if (active && getQRRoot().contains(active) && !this.nodes.root.contains(active)) {
@@ -365,6 +346,7 @@ const Captcha = {
           return;
         }
         this.focusComment();
+        this.cancelCommentFocusRestore();
       };
 
       $.queueTask(restore);
