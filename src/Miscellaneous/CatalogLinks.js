@@ -13,12 +13,6 @@ import UI from "../General/UI";
 import Get from "../General/Get";
 import { dict } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var CatalogLinks = {
   init() {
     registerBoardURLResolver((kind, board) => CatalogLinks[kind](board));

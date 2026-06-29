@@ -2,13 +2,6 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import { dict, HOUR } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS104: Avoid inline assignments
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-
 interface SiteData {
   boards: Record<string, any>;
   lastChecked?: number;

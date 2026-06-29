@@ -35,6 +35,10 @@ function resolveImport(from, specifier) {
 }
 
 const graph = new Map(files.map(file => [file, []]));
+
+// Matches `import ... from "path"`, `export ... from "path"`, and `import "path"`.
+// Captures whether `type ` was used so we can ignore type-only imports.
+// Note: This relies on a simple regex and does not parse dynamic `import()` or multiline syntax perfectly.
 const importPattern = /\b(import|export)\s+(type\s+)?(?:[^'\"]*?\s+from\s*)?['\"]([^'\"]+)['\"]/g;
 
 for (const file of files) {

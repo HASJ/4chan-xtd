@@ -2,11 +2,6 @@
 import Callbacks from "../classes/Callbacks";
 import { g, Conf } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var ThreadLinks = {
   init() {
     if ((g.VIEW !== 'index') || !Conf['Open Threads in New Tab']) { return; }

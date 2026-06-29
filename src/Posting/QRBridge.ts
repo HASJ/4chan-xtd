@@ -1,3 +1,13 @@
+/*
+ * Explicit Quick Reply captcha bridge.
+ *
+ * QR.ts owns the concrete Quick Reply implementation and registers this
+ * facade after the QR object exists. Captcha modules import only these
+ * helpers so the QR/captcha dependency stays one-way and acyclic.
+ *
+ * IMPORTANT: To maintain the acyclic dependency graph, this module must
+ * NOT import QR.ts, Captcha.js, or Captcha.t.js.
+ */
 export interface QRCaptchaPost {
   thread: string | number;
   file?: unknown;
@@ -27,6 +37,7 @@ export interface QRCaptchaBridge {
 }
 
 let currentBridge: QRCaptchaBridge | undefined;
+const emptyPosts: QRCaptchaPost[] = [];
 
 function requireBridge(): QRCaptchaBridge {
   if (!currentBridge) {
@@ -40,7 +51,7 @@ export function registerQRCaptchaBridge(bridge: QRCaptchaBridge) {
 }
 
 export function getQRPosts() {
-  return requireBridge().getPosts();
+  return currentBridge?.getPosts() ?? emptyPosts;
 }
 
 export function getFirstQRPost() {
@@ -48,15 +59,15 @@ export function getFirstQRPost() {
 }
 
 export function hasActiveQRRequest() {
-  return requireBridge().hasActiveRequest();
+  return currentBridge?.hasActiveRequest() ?? false;
 }
 
 export function isQRAutoCooldown() {
-  return requireBridge().isAutoCooldown();
+  return currentBridge?.isAutoCooldown() ?? false;
 }
 
 export function getQRNodes() {
-  return requireBridge().getNodes();
+  return currentBridge?.getNodes();
 }
 
 export function getQRRoot() {
@@ -85,15 +96,15 @@ export function isQRStatusActive() {
 }
 
 export function focusQR() {
-  return requireBridge().focus();
+  currentBridge?.focus();
 }
 
 export function focusQRComment(preventScroll = false) {
-  return requireBridge().focusComment(preventScroll);
+  currentBridge?.focusComment(preventScroll);
 }
 
 export function focusQRStatus() {
-  return requireBridge().focusStatus();
+  currentBridge?.focusStatus();
 }
 
 export function showQRError(error: unknown, focusOverride?: boolean) {
@@ -105,17 +116,17 @@ export function submitQR() {
 }
 
 export function setupCurrentCaptcha(focus?: boolean) {
-  return requireBridge().setupCaptcha(focus);
+  currentBridge?.setupCaptcha(focus);
 }
 
 export function addQRClass(...classes: string[]) {
-  return requireBridge().addClass(...classes);
+  currentBridge?.addClass(...classes);
 }
 
 export function removeQRClass(...classes: string[]) {
-  return requireBridge().removeClass(...classes);
+  currentBridge?.removeClass(...classes);
 }
 
 export function insertCaptchaRoot(root: HTMLElement) {
-  return requireBridge().insertCaptchaRoot(root);
+  currentBridge?.insertCaptchaRoot(root);
 }

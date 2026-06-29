@@ -11,11 +11,6 @@ import $$ from "../platform/$$";
 import Embedding from "./Embedding";
 import { registerLinkifyProcessor } from "./LinkifyActions";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Linkify = {
   init() {
     if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }

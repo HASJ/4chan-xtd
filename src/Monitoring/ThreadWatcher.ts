@@ -1,3 +1,12 @@
+/**
+ * @module ThreadWatcher
+ * @description
+ * Manages the Thread Watcher feature, allowing users to track and monitor
+ * specific threads across different boards and sites. It provides a UI
+ * dialog for viewing watched threads, tracks unread post counts, monitors
+ * for threads dying (404/archived), and integrates with the catalog and
+ * thread views to toggle watched status.
+ */
 import ThreadWatcherPage from './ThreadWatcher/ThreadWatcher.html';
 import $ from "../platform/$";
 import Board from '../classes/Board';
@@ -22,33 +31,65 @@ import { dict, HOUR, MINUTE } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { registerThreadWatcherLookup, registerThreadWatcherUpdate } from './ThreadWatcherBridge';
 
+/**
+ * Defines the structure and capabilities of the ThreadWatcher singleton.
+ */
 interface ThreadWatcherType {
+  /** Whether the Thread Watcher feature is enabled in user settings. */
   enabled?: boolean;
+  /** The shortcut icon/button added to the header. */
   shortcut: HTMLElement;
+  /** The main DataBoard instance storing watched thread data. */
   db: DataBoard;
+  /** The DataBoard instance storing last-modified timestamps for watched threads. */
   dbLM: DataBoard;
+  /** The main UI dialog element for the Thread Watcher. */
   dialog: HTMLElement;
+  /** The status display element within the dialog. */
   status: HTMLElement;
+  /** The container element for the list of watched threads. */
   list: HTMLElement;
+  /** The button used to manually refresh watched threads. */
   refreshButton: HTMLElement;
+  /** The button used to open the Thread Watcher menu. */
   menuButton: HTMLElement;
+  /** The button used to close/hide the Thread Watcher dialog. */
   closeButton: HTMLElement;
+  /** The DataBoard instance for tracking unread posts. */
   unreaddb: any;
+  /** Whether tracking unread posts is enabled. */
   unreadEnabled: boolean;
+  /** Active cross-origin or local AJAX requests. */
   requests: any[];
+  /** Count of completed requests in the current batch. */
   fetched: number;
+  /** Map of site IDs to their shortened prefixes for display. */
   prefixes: Record<string, string>;
+  /** Whether a sync operation is currently in progress. */
   syncing?: boolean;
+  /** Timer ID for the auto-fetch interval. */
   timeout?: any;
+  /** Timestamp of the last page update. */
   lastPageUpdate?: Date;
+
+  /** Initializes the Thread Watcher UI, state, and event listeners. */
   init(): void;
+  /** Checks if a specific thread object is currently watched. */
   isWatched(thread: any): boolean;
+  /** Checks if a thread is watched using raw board and thread IDs. */
   isWatchedRaw(boardID: string, threadID: number): boolean;
+  /** Updates the visual state of a watch toggle button. */
   setToggler(toggler: HTMLElement, isWatched: boolean): string;
+  /** Callback to attach the watch button to a post node. */
   node(this: any): void;
+  /** Callback to attach watch functionality to a catalog thread node. */
   catalogNode(this: any): void;
+  /** Appends the Thread Watcher dialog to the document body. */
   addDialog(): void;
+  /** Toggles the visibility of the Thread Watcher dialog. */
   toggleWatcher(): void;
+
+  /** Collection of event callbacks used by the Thread Watcher. */
   cb: {
     openAll(this: HTMLElement): void;
     openUnread(this: HTMLElement): void;
@@ -63,28 +104,53 @@ interface ThreadWatcherType {
     onIndexUpdate(e: Event): void;
     onThreadRefresh(e: Event): void;
   };
+
+  /** Clears the current list of active requests and resets fetch status. */
   clearRequests(): void;
+  /** Aborts all ongoing network requests for the Thread Watcher. */
   abort(): void;
+  /** Initializes the last modified timestamps from storage. */
   initLastModified(): void;
+  /** Triggers an automatic periodic fetch of thread statuses. */
   fetchAuto(): void;
+  /** Handler for the manual fetch all button. */
   buttonFetchAll(): void;
+  /** Fetches status for all watched threads. */
   fetchAllStatus(interval?: number): any[];
+  /** Fetches status for all watched threads on a specific board. */
   fetchBoard(board: any, deep?: boolean): void;
+  /** Parses the response from a board fetch request. */
   parseBoard(this: any, board: any, url: string): void;
+  /** Fetches the status of a specific thread. */
   fetchStatus(thread: any): void;
+  /** Parses the status response for a specific thread. */
   parseStatus(this: any, thread: any, isArchiveURL?: boolean): void;
+  /** Retrieves all watched threads, optionally grouped by board. */
   getAll(groupByBoard?: boolean): any[];
+  /** Constructs a DOM element representing a watched thread line. */
   makeLine(siteID: string, boardID: string, threadID: number, data: any): HTMLElement;
+  /** Determines unique site prefixes for the watched threads. */
   setPrefixes(threads: any[]): Record<string, string>;
+  /** Builds the Thread Watcher dialog's thread list UI. */
   build(): void;
+  /** Refreshes the Thread Watcher UI and state. */
   refresh(manual?: boolean): void;
+  /** Updates the icon indicating unread or quoting posts. */
   refreshIcon(): void;
+  /** Updates the stored data for a watched thread. */
   update(siteID: string, boardID: string, threadID: number, newData: any): void;
+  /** Marks a thread as dead (404/archived) and executes a callback. */
   set404(boardID: string, threadID: number, cb: () => void): void;
+  /** Toggles the watched status of a thread. */
   toggle(thread: any, manual?: boolean): void;
+  /** Adds a thread to the Thread Watcher. */
   add(thread: any, cb?: () => void, manual?: boolean): void;
+  /** Adds a thread to the Thread Watcher using raw IDs and data. */
   addRaw(boardID: string, threadID: number, data: any, cb?: () => void, manual?: boolean): void;
+  /** Removes a thread from the Thread Watcher. */
   rm(siteID: string, boardID: string, threadID: number, cb?: () => void, manual?: boolean): void;
+
+  /** Menu functionality for the Thread Watcher. */
   menu: {
     menu: any;
     init(): void;
@@ -95,6 +161,9 @@ interface ThreadWatcherType {
   [key: string]: any;
 }
 
+/**
+ * The ThreadWatcher singleton instance.
+ */
 const ThreadWatcher: ThreadWatcherType = {
   shortcut: null as any,
   db: null as any,

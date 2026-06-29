@@ -11,11 +11,6 @@ import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 import Icon from '../Icons/icon';
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var ThreadHiding = {
   init() {
     if (!['index', 'catalog'].includes(g.VIEW) || (!Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index'])) { return; }

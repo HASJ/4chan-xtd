@@ -1,10 +1,9 @@
 // @ts-nocheck
 /*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
+ * Platform DOM Helpers
+ *
+ * $.ts provides a lightweight jQuery-like abstraction for cross-platform DOM
+ * manipulation, event binding, and local storage access used throughout the project.
  */
 // loosely follows the jquery api:
 // http://api.jquery.com/
