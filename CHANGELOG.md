@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.17 (2026-06-29)
+
+- Bugfixes
+  - Fixed Quick Reply TCaptcha so the empty challenge area stays hidden while idle, while active multi-step CAPTCHAs still show their strips and keep "Post on CAPTCHA completion" working across step transitions.
+
 ### 2.26.16 (2026-06-29)
 
 - Architecture
