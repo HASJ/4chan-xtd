@@ -8,7 +8,7 @@ import ExpandThread from "../Miscellaneous/ExpandThread";
 import $ from "../platform/$";
 import { dict } from "../platform/helpers";
 import QuoteYou from "../Quotelinks/QuoteYou";
-import ThreadWatcher from "./ThreadWatcher";
+import { updateWatchedThread } from "./ThreadWatcherBridge";
 
 interface UnreadIndexType {
   lastReadPost: Record<string, number>;
@@ -155,7 +155,7 @@ const UnreadIndex: UnreadIndexType = {
     });
     $.rm(UnreadIndex.hr[thread.fullID]);
     thread.nodes.root.classList.remove('unread-thread');
-    ThreadWatcher.update(g.SITE.ID, thread.board.ID, thread.ID, {
+    updateWatchedThread(g.SITE.ID, thread.board.ID, thread.ID, {
       last: thread.lastPost,
       unread: 0,
       quotingYou: 0

@@ -3,7 +3,7 @@ import { Conf, d, doc } from "../globals/globals";
 import Callbacks from "../classes/Callbacks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import Header from "./Header";
+import { getHeaderDialogBorders } from "./HeaderLayout";
 import Icon from "../Icons/icon";
 
 /*
@@ -313,12 +313,7 @@ export var dragstart = function (e) {
     isTouching
   };
 
-  [o.topBorder, o.bottomBorder] = Conf['Header auto-hide'] || !Conf['Fixed Header'] ?
-    [0, 0]
-  : Conf['Bottom Header'] ?
-    [0, Header.bar.getBoundingClientRect().height]
-  :
-    [Header.bar.getBoundingClientRect().height, 0];
+  [o.topBorder, o.bottomBorder] = getHeaderDialogBorders();
 
   if (isTouching) {
     o.identifier = e.identifier;

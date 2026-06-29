@@ -3,7 +3,8 @@ import galleryPage from './Gallery/Gallery.html';
 import $ from '../platform/$';
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
-import Keybinds from '../Miscellaneous/Keybinds';
+import { disableKeybindHandler, enableKeybindHandler } from '../Miscellaneous/KeybindEvents';
+import keyCode from '../Miscellaneous/KeyCode';
 import $$ from '../platform/$$';
 import ImageCommon from './ImageCommon';
 import Sauce from './Sauce';
@@ -183,7 +184,7 @@ const Gallery: GalleryType = {
     }
 
     $.on(d, 'keydown', cb.keybinds);
-    if (Conf['Keybinds']) { $.off(d, 'keydown', Keybinds.keydown); }
+    disableKeybindHandler();
 
     $.on(window, 'resize', Gallery.cb.setHeight);
 
@@ -383,7 +384,7 @@ const Gallery: GalleryType = {
   cb: {
     keybinds(e: KeyboardEvent) {
       let key: string | boolean;
-      if (!(key = Keybinds.keyCode(e))) { return; }
+      if (!(key = keyCode(e))) { return; }
 
       const cb = (() => {
         switch (key) {
@@ -517,7 +518,7 @@ const Gallery: GalleryType = {
       doc.style.overflow = '';
 
       $.off(d, 'keydown', Gallery.cb.keybinds);
-      if (Conf['Keybinds']) { $.on(d, 'keydown', Keybinds.keydown); }
+      enableKeybindHandler();
       $.off(window, 'resize', Gallery.cb.setHeight);
       clearTimeout(Gallery.timeoutID);
     },

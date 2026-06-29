@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
-import Filter from "../Filtering/Filter";
+import { runQuickFilterMD5 } from "../Filtering/QuickFilterActions";
 import { g, Conf, E } from "../globals/globals";
 import h, { isEscaped } from "../globals/jsx";
 import Icon from "../Icons/icon";
@@ -32,7 +32,7 @@ var FileInfo = {
         $.on(a, 'click', ImageCommon.download);
       }
       for (a of $$('.file-info .quick-filter-md5', this.file.text)) {
-        $.on(a, 'click', Filter.quickFilterMD5);
+        $.on(a, 'click', runQuickFilterMD5);
       }
       return;
     }
@@ -62,7 +62,7 @@ var FileInfo = {
       $.on(a, 'click', ImageCommon.download);
     }
     for (a of $$('.quick-filter-md5', outputNode)) {
-      $.on(a, 'click', Filter.quickFilterMD5);
+      $.on(a, 'click', runQuickFilterMD5);
     }
   },
 

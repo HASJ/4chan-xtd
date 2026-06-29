@@ -3,7 +3,7 @@ import { isEscaped } from '../globals/jsx';
 import Callbacks from '../classes/Callbacks';
 import ImageHost from '../Images/ImageHost';
 import Board from '../classes/Board';
-import Fetcher from '../classes/Fetcher';
+import ArchiveTags from './ArchiveTags';
 import Post, { type File } from '../classes/Post';
 import Thread from '../classes/Thread';
 import { E, g } from '../globals/globals';
@@ -99,7 +99,7 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
   let comment = (data.comment || '').split(/(\n|\[\/?(?:b|spoiler|code|moot|banned|fortune(?: color="#\w+")?|i|red|green|blue)\])/);
   comment = comment.map((text, i) => {
     if ((i % 2) === 1) {
-      var tag = Fetcher.archiveTags[text.replace(/\ .*\]/, ']')];
+      var tag = ArchiveTags[text.replace(/\ .*\]/, ']')];
       return (typeof tag === 'function') ? tag(text) : tag;
     } else {
       var greentext = text[0] === '>';

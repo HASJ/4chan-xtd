@@ -9,6 +9,7 @@ import ExpandComment from "../Miscellaneous/ExpandComment";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Embedding from "./Embedding";
+import { registerLinkifyProcessor } from "./LinkifyActions";
 
 /*
  * decaffeinate suggestions:
@@ -210,5 +211,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     return a;
   }
 };
+registerLinkifyProcessor(Linkify.process);
+
 export default Linkify;
 

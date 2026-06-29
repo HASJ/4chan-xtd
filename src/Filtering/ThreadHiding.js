@@ -2,7 +2,7 @@
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Thread from "../classes/Thread";
-import Index from "../General/Index";
+import { getIndexRoot, getIndexSortedThreadIDs, indexShowsHiddenThreads, updateIndexHideLabel } from "../General/IndexThreadHidingBridge";
 import UI from "../General/UI";
 import { g, Conf, d, doc } from "../globals/globals";
 import Menu from "../Menu/Menu";
@@ -289,10 +289,10 @@ var ThreadHiding = {
     if (thread.isHidden) { return; }
     const threadRoot = thread.nodes.root;
     thread.isHidden = true;
-    Index.updateHideLabel();
-    if (thread.catalogView && !Index.showHiddenThreads) {
+    updateIndexHideLabel();
+    if (thread.catalogView && !indexShowsHiddenThreads()) {
       $.rm(thread.catalogView.nodes.root);
-      $.event('PostsRemoved', null, Index.root);
+      $.event('PostsRemoved', null, getIndexRoot());
     }
 
     if (!makeStub) { return threadRoot.hidden = true; }
@@ -307,22 +307,23 @@ var ThreadHiding = {
     }
     const threadRoot = thread.nodes.root;
     threadRoot.hidden = (thread.isHidden = false);
-    Index.updateHideLabel();
+    updateIndexHideLabel();
     if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
       const { root } = thread.catalogView.nodes;
 
-      if (Index.showHiddenThreads) {
+      if (indexShowsHiddenThreads()) {
         $.rm(root);
-        $.event('PostsRemoved', null, Index.root);
+        $.event('PostsRemoved', null, getIndexRoot());
       } else {
-        let i = Index.sortedThreadIDs.indexOf(thread.ID) - 1;
+        const sortedThreadIDs = getIndexSortedThreadIDs();
+        let i = sortedThreadIDs.indexOf(thread.ID) - 1;
 
         while (true) {
           if (i < 0) {
             $('.board').insertAdjacentElement('afterbegin', root);
             break;
           }
-          const rootPrevious = d.getElementById(`t${Index.sortedThreadIDs[i]}`);
+          const rootPrevious = d.getElementById(`t${sortedThreadIDs[i]}`);
           if (rootPrevious) {
             rootPrevious.insertAdjacentElement('afterend', root)
             break;
@@ -330,7 +331,7 @@ var ThreadHiding = {
           --i;
         }
 
-        $.event('PostsInserted', null, Index.root);
+        $.event('PostsInserted', null, getIndexRoot());
       }
     }
   }

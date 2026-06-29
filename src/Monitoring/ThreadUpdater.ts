@@ -5,7 +5,7 @@ import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
 import Post from '../classes/Post';
 import Config from '../config/Config';
-import Settings from '../General/Settings';
+import { openSettings } from '../General/SettingsBridge';
 import QuoteThreading from '../Quotelinks/QuoteThreading';
 import Unread from './Unread';
 import Header from '../General/Header';
@@ -277,7 +277,7 @@ var ThreadUpdater = {
   },
 
   intervalShortcut() {
-    Settings.open('Advanced');
+    openSettings('Advanced');
     const settings = $.id('fourchanx-settings');
     return $('input[name=Interval]', settings).focus();
   },

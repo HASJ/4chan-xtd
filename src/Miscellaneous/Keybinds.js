@@ -23,6 +23,8 @@ import QuoteThreading from "../Quotelinks/QuoteThreading";
 import QuoteYou from "../Quotelinks/QuoteYou";
 import CatalogLinks from "./CatalogLinks";
 import ExpandThread from "./ExpandThread";
+import keyCode from "./KeyCode";
+import { enableKeybindHandler, registerKeybindHandler } from "./KeybindEvents";
 import Nav from "./Nav";
 
 /*
@@ -42,7 +44,7 @@ var Keybinds = {
 
     var init = function() {
       $.off(d, '4chanXInitFinished', init);
-      $.on(d, 'keydown', Keybinds.keydown);
+      enableKeybindHandler();
       for (var node of $$('[accesskey]')) {
         node.removeAttribute('accesskey');
       }
@@ -57,7 +59,7 @@ var Keybinds = {
   keydown(e) {
     let key, thread, threadRoot;
     let catalog, notifications;
-    if (!(key = Keybinds.keyCode(e))) { return; }
+    if (!(key = keyCode(e))) { return; }
     const {target} = e;
     if (['INPUT', 'TEXTAREA'].includes(target.nodeName)) {
       if (!/(Esc|Alt|Ctrl|Meta|Shift\+\w{2,})/.test(key) || !!/^Alt\+(\d|Up|Down|Left|Right)$/.test(key)) { return; }
@@ -326,50 +328,7 @@ var Keybinds = {
     }
   },
 
-  keyCode(e) {
-    let key = (() => { let kc;
-    switch ((kc = e.keyCode)) {
-      case 8: // return
-        return '';
-      case 13:
-        return 'Enter';
-      case 27:
-        return 'Esc';
-      case 32:
-        return 'Space';
-      case 37:
-        return 'Left';
-      case 38:
-        return 'Up';
-      case 39:
-        return 'Right';
-      case 40:
-        return 'Down';
-      case 188:
-        return 'Comma';
-      case 190:
-        return 'Period';
-      case 191:
-        return 'Slash';
-      case 59: case 186:
-        return 'Semicolon';
-      default:
-        if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
-          return String.fromCharCode(kc).toLowerCase();
-        } else if (96 <= kc && kc <= 105) { // numpad 0-9
-          return String.fromCharCode(kc - 48);
-        } else {
-          return null;
-        }
-    } })();
-    if (key) {
-      if (e.altKey) {   key = 'Alt+'   + key; }
-      if (e.ctrlKey) {  key = 'Ctrl+'  + key; }
-      if (e.metaKey) {  key = 'Meta+'  + key; }
-      if (e.shiftKey) { key = 'Shift+' + key; }
-    }
-    return key;
-  },
+  keyCode,
 
   post(thread) {
     const s = g.SITE.selectors;
@@ -475,5 +434,8 @@ var Keybinds = {
     }
   }
 };
+
+registerKeybindHandler(Keybinds.keydown);
+
 export default Keybinds;
 

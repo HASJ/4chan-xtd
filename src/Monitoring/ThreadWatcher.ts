@@ -20,7 +20,7 @@ import UI from '../General/UI';
 import Get from '../General/Get';
 import { dict, HOUR, MINUTE } from '../platform/helpers';
 import Icon from '../Icons/icon';
-import { registerThreadWatcherUpdate } from './ThreadWatcherBridge';
+import { registerThreadWatcherLookup, registerThreadWatcherUpdate } from './ThreadWatcherBridge';
 
 interface ThreadWatcherType {
   enabled?: boolean;
@@ -1032,5 +1032,6 @@ const ThreadWatcher: ThreadWatcherType = {
 };
 
 registerThreadWatcherUpdate(ThreadWatcher.update);
+registerThreadWatcherLookup(ThreadWatcher.isWatchedRaw);
 
 export default ThreadWatcher;

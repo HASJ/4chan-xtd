@@ -4,9 +4,10 @@ import Filter from "../Filtering/Filter";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import meta from '../../package.json';
-import Index from "../General/Index";
+import { indexEnabledOn } from "../General/IndexAvailability";
 import Site from "../site/Site";
 import Header from "../General/Header";
+import { getBoardLists, registerBoardListUpdater, registerBoardURLResolver } from "../General/HeaderBoardLists";
 import { g, Conf } from "../globals/globals";
 import UI from "../General/UI";
 import Get from "../General/Get";
@@ -20,6 +21,7 @@ import { dict } from "../platform/helpers";
  */
 var CatalogLinks = {
   init() {
+    registerBoardURLResolver((kind, board) => CatalogLinks[kind](board));
     if ((g.SITE.software === 'yotsuba') && (Conf['External Catalog'] || Conf['JSON Index']) && !(Conf['JSON Index'] && (g.VIEW === 'index'))) {
       const selector = (() => { switch (g.VIEW) {
         case 'thread': case 'archive': return '.navLinks.desktop > a';
@@ -57,6 +59,7 @@ var CatalogLinks = {
     }
 
     if (this.enabled = Conf['Catalog Links']) {
+      registerBoardListUpdater(CatalogLinks.setLinks);
       let el;
       CatalogLinks.el = (el = UI.checkbox('Header catalog links', 'Catalog Links'));
       el.id = 'toggleCatalog';
@@ -87,8 +90,7 @@ var CatalogLinks = {
 
   set(useCatalog) {
     Conf['Header catalog links'] = useCatalog;
-    CatalogLinks.setLinks(Header.boardList);
-    CatalogLinks.setLinks(Header.bottomBoardList);
+    for (const list of getBoardLists()) { CatalogLinks.setLinks(list); }
     CatalogLinks.el.title = `Turn catalog links ${useCatalog ? 'off' : 'on'}.`;
     return $('input', CatalogLinks.el).checked = useCatalog;
   },
@@ -157,7 +159,7 @@ var CatalogLinks = {
     let external, nativeCatalog;
     if (Conf['External Catalog'] && (external = CatalogLinks.external(board))) {
       return external;
-    } else if (Index.enabledOn(board) && Conf[`Use ${meta.name} Catalog`]) {
+    } else if (indexEnabledOn(board) && Conf[`Use ${meta.name} Catalog`]) {
       return CatalogLinks.jsonIndex(board, '#catalog');
     } else if (nativeCatalog = Get.url('catalog', board)) {
       return nativeCatalog;
@@ -167,7 +169,7 @@ var CatalogLinks = {
   },
 
   index(board=g.BOARD) {
-    if (Index.enabledOn(board)) {
+    if (indexEnabledOn(board)) {
       return CatalogLinks.jsonIndex(board, '#index');
     } else {
       return Get.url('index', board);

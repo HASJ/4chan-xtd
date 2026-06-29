@@ -15,12 +15,12 @@ import Config from '../config/Config';
 import Filter from '../Filtering/Filter';
 import PostHiding from '../Filtering/PostHiding';
 import ThreadHiding from '../Filtering/ThreadHiding';
-import CatalogLinks from '../Miscellaneous/CatalogLinks';
+import { resolveBoardURL } from './HeaderBoardLists';
 import RelativeDates from '../Miscellaneous/RelativeDates';
-import ThreadWatcher from '../Monitoring/ThreadWatcher';
+import { isThreadWatched } from '../Monitoring/ThreadWatcherBridge';
 import $$ from '../platform/$$';
 import $ from '../platform/$';
-import QuotePreview from '../Quotelinks/QuotePreview';
+import { runQuotePreviewMouseover } from '../Quotelinks/QuotePreviewActions';
 import { c, Conf, d, doc, g } from '../globals/globals';
 import Header from './Header';
 import UI from './UI';
@@ -32,13 +32,16 @@ import BoardConfig from './BoardConfig';
 import Get from './Get';
 import { dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
+import { indexEnabledOn } from './IndexAvailability';
+import { setIndexEnabled } from './IndexState';
+import { registerIndexThreadHidingActions } from './IndexThreadHidingBridge';
 
 var Index = {
   showHiddenThreads: false,
   changed: {},
 
   enabledOn({siteID, boardID}) {
-    return Conf['JSON Index'] && (g.sites[siteID].software === 'yotsuba') && (boardID !== 'f');
+    return indexEnabledOn({siteID, boardID});
   },
 
   init() {
@@ -52,6 +55,7 @@ var Index = {
     if (!this.enabledOn(g.BOARD)) { return; }
 
     this.enabled = true;
+    setIndexEnabled(true);
 
     Callbacks.Post.push({
       name: 'Index Page Numbers',
@@ -131,7 +135,7 @@ var Index = {
     // Navigation links at top of index
     this.navLinks = $.el('div', {className: 'navLinks json-index'});
     $.extend(this.navLinks, {innerHTML: NavLinksPage});
-    $('.cataloglink a', this.navLinks).href = CatalogLinks.catalog();
+    $('.cataloglink a', this.navLinks).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
     if (!BoardConfig.isArchived(g.BOARD.ID)) { $('.archlistlink', this.navLinks).hidden = true; }
     $.on($('#index-last-refresh a', this.navLinks), 'click', this.cb.refreshFront);
 
@@ -184,7 +188,7 @@ var Index = {
     // Page list
     this.pagelist = $.el('div', {className: 'pagelist json-index'});
     $.extend(this.pagelist, {innerHTML: PageList});
-    $('.cataloglink a', this.pagelist).href = CatalogLinks.catalog();
+    $('.cataloglink a', this.pagelist).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
     $.on(this.pagelist, 'click', this.cb.pageNav);
 
     this.update(true);
@@ -1024,7 +1028,7 @@ var Index = {
       if (Index.isHiddenReply(thread.ID, data)) { continue; }
       var reply = g.SITE.Build.catalogReply(thread, data);
       RelativeDates.update($('time', reply));
-      $.on($('.catalog-reply-preview', reply), 'mouseover', QuotePreview.mouseover);
+      $.on($('.catalog-reply-preview', reply), 'mouseover', runQuotePreviewMouseover);
       replies.push(reply);
     }
 
@@ -1081,7 +1085,7 @@ var Index = {
     // Sticky threads
     Index.sortOnTop(obj => obj.isSticky);
     // Highlighted threads
-    Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && ThreadWatcher.isWatchedRaw(obj.boardID, obj.threadID)));
+    Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && isThreadWatched(obj.boardID, obj.threadID)));
     // Non-hidden threads
     if (Conf['Anchor Hidden Threads']) { return Index.sortOnTop(obj => !Index.isHidden(obj.threadID)); }
   },
@@ -1233,4 +1237,12 @@ var Index = {
     return true;
   }
 };
+
+registerIndexThreadHidingActions({
+  updateHideLabel: Index.updateHideLabel,
+  isShowingHiddenThreads: () => Index.showHiddenThreads,
+  getRoot: () => Index.root,
+  getSortedThreadIDs: () => Index.sortedThreadIDs,
+});
+
 export default Index;
