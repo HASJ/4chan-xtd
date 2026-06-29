@@ -274,6 +274,7 @@ const CaptchaT = {
       return;
     }
     $.rmClass(this.nodes.root, 'captcha-idle');
+    $.addClass(this.nodes.root, 'is-challenge');
 
     // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
     if (customUiExists) {
@@ -377,7 +378,7 @@ const CaptchaT = {
           slider.value = '' + i;
           slider.dispatchEvent(new Event('input', { bubbles: true }));
           slider.dispatchEvent(new Event('change', { bubbles: true }));
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
 
         const stripIndex = i - startIndex;
@@ -531,9 +532,11 @@ const CaptchaT = {
     if (!this.isEnabled || !this.nodes.container) return;
     const response = this.getOne();
     if (response && response['t-response']) {
-      // Check if there is an active/visible "Next" button for intermediate challenges
       const tNext = $('#t-next', this.nodes.container);
-      if (tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0)) {
+      const tNextText = tNext ? tNext.textContent || '' : '';
+      const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
+      const hasRemainingChallengeSteps = stepMatch && parseInt(stepMatch[1], 10) < parseInt(stepMatch[2], 10);
+      if (hasRemainingChallengeSteps || (!stepMatch && tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0))) {
         return;
       }
       if (this.isCompleted) return;
