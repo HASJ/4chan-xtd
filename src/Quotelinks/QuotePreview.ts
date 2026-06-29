@@ -6,6 +6,7 @@ import UI from "../General/UI";
 import { Conf, d, doc, g } from "../globals/globals";
 import ExpandComment from "../Miscellaneous/ExpandComment";
 import $ from "../platform/$";
+import { registerQuotePreviewMouseover } from "./QuotePreviewActions";
 
 interface QuotePreviewType {
   init(): void;
@@ -94,5 +95,7 @@ const QuotePreview: QuotePreviewType = {
     }
   }
 };
+
+registerQuotePreviewMouseover(QuotePreview.mouseover);
 
 export default QuotePreview;

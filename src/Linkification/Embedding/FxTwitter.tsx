@@ -1,6 +1,6 @@
 import $ from '../../platform/$';
 import Icon from '../../Icons/icon';
-import Linkify from '../Linkify';
+import { processLinks } from '../LinkifyActions';
 import h, { type EscapedHtml, hFragment, isEscaped } from '../../globals/jsx';
 import Time from '../../Miscellaneous/Time';
 import CrossOrigin from '../../platform/CrossOrigin';
@@ -230,7 +230,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
     const rendered = await renderFullTweet(tweet);
     el.innerHTML = rendered.innerHTML;
     for (const textEl of el.getElementsByClassName('fxt-text')) {
-      Linkify.process(textEl);
+      processLinks(textEl);
     }
 
     el.style.resize = null;

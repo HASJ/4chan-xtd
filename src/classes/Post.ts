@@ -1,7 +1,7 @@
 import type { FilterResults } from "../Filtering/Filter";
 import Get from "../General/Get";
 // #region tests_enabled
-import Test from "../General/Test";
+import normalizePost from "../General/PostNormalizer";
 // #endregion
 import { g, Conf } from "../globals/globals";
 import ImageExpand from "../Images/ImageExpand";
@@ -101,7 +101,7 @@ export default class Post {
 
   constructor(root?: HTMLElement, thread?: Thread, board?: Board, flags={}) {
     // #region tests_enabled
-    if (root) this.normalizedOriginal = Test.normalize(root);
+    if (root) this.normalizedOriginal = normalizePost(root);
     // #endregion
 
     // Skip initialization for PostClone

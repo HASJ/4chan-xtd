@@ -3,7 +3,7 @@ import $ from "../platform/$";
 import CaptchaReplace from "./Captcha.replace";
 import CaptchaT from "./Captcha.t";
 import meta from '../../package.json';
-import Keybinds from "../Miscellaneous/Keybinds";
+import keyCode from "../Miscellaneous/KeyCode";
 import $$ from "../platform/$$";
 import QR from "./QR";
 import { Conf, d, doc } from "../globals/globals";
@@ -173,7 +173,7 @@ const Captcha = {
 
       $.on(counter, 'click', this.toggle.bind(this));
       $.on(counter, 'keydown', e => {
-        if (Keybinds.keyCode(e) !== 'Space') { return; }
+        if (keyCode(e) !== 'Space') { return; }
         this.toggle();
         e.preventDefault();
         return e.stopPropagation();

@@ -2,7 +2,8 @@ import Callbacks from "../classes/Callbacks";
 import Notice from "../classes/Notice";
 import Config from "../config/Config";
 import Get from "../General/Get";
-import Settings from "../General/Settings";
+import { openFilterSettings } from "../General/SettingsBridge";
+import { registerQuickFilterMD5 } from "./QuickFilterActions";
 import { g, Conf, doc } from "../globals/globals";
 import Menu from "../Menu/Menu";
 import Unread from "../Monitoring/Unread";
@@ -491,17 +492,7 @@ var Filter = {
   },
 
   showFilters(type) {
-    // Open the settings and display & focus the relevant filter textarea.
-    Settings.open('Filter');
-    const section = $('.section-container');
-    const select = $('select[name=filter]', section);
-    select.value = type;
-    Settings.selectFilter.call(select);
-    return $.onExists(section, 'textarea', function(ta) {
-      const tl = ta.textLength;
-      ta.setSelectionRange(tl, tl);
-      return ta.focus();
-    });
+    return openFilterSettings(type);
   },
 
   quickFilterMD5() {
@@ -643,4 +634,6 @@ var Filter = {
     }
   }
 };
+registerQuickFilterMD5(Filter.quickFilterMD5);
+
 export default Filter;

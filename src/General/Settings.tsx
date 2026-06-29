@@ -11,7 +11,7 @@ import Config from '../config/Config';
 import ImageHost from '../Images/ImageHost';
 import CustomCSS from '../Miscellaneous/CustomCSS';
 import FileInfo from '../Miscellaneous/FileInfo';
-import Keybinds from '../Miscellaneous/Keybinds';
+import keyCode from '../Miscellaneous/KeyCode';
 import Time from '../Miscellaneous/Time';
 import Favicon from '../Monitoring/Favicon';
 import ThreadUpdater from '../Monitoring/ThreadUpdater';
@@ -25,11 +25,14 @@ import h, { hFragment } from '../globals/jsx';
 import { dict } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import UI from './UI';
+import { registerFilterSettingsOpener, registerSettingsOpener } from './SettingsBridge';
 
 var Settings = {
   dialog: undefined as HTMLDivElement | undefined,
 
   init() {
+    registerSettingsOpener(Settings.open);
+    registerFilterSettingsOpener(Settings.openFilterSettings);
     // 4chan X settings link
     const link = $.el('a', {
       className: 'settings-link',
@@ -61,6 +64,19 @@ var Settings = {
         $.global('disableNativeExtensionNoStorage');
       }
     }
+  },
+
+  openFilterSettings(type) {
+    Settings.open("Filter");
+    const section = $(".section-container");
+    const select = $("select[name=filter]", section);
+    select.value = type;
+    Settings.selectFilter.call(select);
+    return $.onExists(section, "textarea", function(ta) {
+      const tl = ta.textLength;
+      ta.setSelectionRange(tl, tl);
+      return ta.focus();
+    });
   },
 
   open(openSection) {
@@ -867,7 +883,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     if (e.keyCode === 9) return; // tab
     e.preventDefault();
     e.stopPropagation();
-    const key = Keybinds.keyCode(e);
+    const key = keyCode(e);
     if (key == null) return; // empty string is backspace
     this.value = key;
     $.cb.value.call(this);
