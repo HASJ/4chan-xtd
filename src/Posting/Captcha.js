@@ -5,7 +5,7 @@ import CaptchaT from "./Captcha.t";
 import meta from '../../package.json';
 import keyCode from "../Miscellaneous/KeyCode";
 import $$ from "../platform/$$";
-import QR from "./QRBridge";
+import { addQRClass, focusQR, focusQRComment, focusQRStatus, getFirstQRPost, getQRCommentInput, getQRPosts, getQRRoot, getQRStatusInput, hasActiveQRRequest, insertCaptchaRoot, isQRAutoCooldown, isQRCommentActive, isQROpen, isQRStatusActive, removeQRClass, setupCurrentCaptcha, showQRError, submitQR } from "./QRBridge";
 import { Conf, d, doc } from "../globals/globals";
 import { isPassEnabled, MINUTE, SECOND } from "../platform/helpers";
 
@@ -28,9 +28,9 @@ const Captcha = {
 
     neededRaw() {
       return !(
-        this.haveCookie() || this.captchas.length || QR.req || this.submitCB
+        this.haveCookie() || this.captchas.length || hasActiveQRRequest() || this.submitCB
       ) && (
-          (QR.posts.length > 1) || Conf['Auto-load captcha'] || !QR.posts[0].isOnlyQuotes() || QR.posts[0].file
+          (getQRPosts().length > 1) || Conf['Auto-load captcha'] || !getFirstQRPost().isOnlyQuotes() || getFirstQRPost().file
         );
     },
 
@@ -40,7 +40,7 @@ const Captcha = {
 
     haveCookie() {
       const hasCT = /\b_ct=/.test(d.cookie);
-      return hasCT && (QR.posts[0].thread !== 'new');
+      return hasCT && (getFirstQRPost().thread !== 'new');
     },
 
     getOne() {
@@ -88,8 +88,8 @@ const Captcha = {
       let cb;
       if (cb = this.submitCB) {
         if (!this.haveCookie() || detail?.error) {
-          QR.error(detail?.error || 'Failed to retrieve captcha.');
-          QR.captcha.setup(d.activeElement === QR.nodes.status);
+          showQRError(detail?.error || 'Failed to retrieve captcha.');
+          setupCurrentCaptcha(isQRStatusActive());
         }
         delete this.submitCB;
         cb();
@@ -146,7 +146,7 @@ const Captcha = {
       if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) { return; }
 
       if (this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled')) {
-        $.addClass(QR.nodes.el, 'noscript-captcha');
+        addQRClass('noscript-captcha');
       }
 
       Captcha.cache.init();
@@ -161,15 +161,15 @@ const Captcha = {
       const counter = $('.captcha-counter > a', root);
       this.nodes = { root, counter };
       $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
-      $.on(QR.nodes.com, 'keydown', e => {
+      $.on(getQRCommentInput(), 'keydown', e => {
         if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
       });
       d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
       d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
       root.addEventListener('focus', e => { this.redirectCommentFocus(e); }, true);
       this.count();
-      $.addClass(QR.nodes.el, 'has-captcha', 'captcha-v2');
-      $.after(QR.nodes.com.parentNode, root);
+      addQRClass('has-captcha', 'captcha-v2');
+      insertCaptchaRoot(root);
 
       $.on(counter, 'click', this.toggle.bind(this));
       $.on(counter, 'keydown', e => {
@@ -201,7 +201,7 @@ const Captcha = {
       return $.queueTask(() => {
         const needed = Captcha.cache.needed();
         if (needed && !this.prevNeeded) {
-          this.setup(QR.cooldown.auto && (d.activeElement === QR.nodes.status));
+          this.setup(isQRAutoCooldown() && (isQRStatusActive()));
         }
         return this.prevNeeded = needed;
       });
@@ -221,7 +221,7 @@ const Captcha = {
       this.startCommentFocusRestore(focus);
 
       if (focus) {
-        $.addClass(QR.nodes.el, 'focus');
+        addQRClass('focus');
         this.nodes.counter.focus();
       }
 
@@ -237,7 +237,7 @@ const Captcha = {
           let iframe;
           if (this.nodes.container && (d.activeElement === this.nodes.counter) && (iframe = $('iframe[src^="https://www.google.com/recaptcha/"]', this.nodes.container))) {
             iframe.focus();
-            return QR.focus();
+            return focusQR();
           }
         }); // Event handler not fired in Firefox
         return;
@@ -289,7 +289,7 @@ const Captcha = {
       let needle;
       if (!doc.contains(iframe)) { return; }
       Captcha.replace.iframe(iframe);
-      $.addClass(QR.nodes.el, 'captcha-open');
+      addQRClass('captcha-open');
       this.fixQRPosition();
       $.on(iframe, 'load', this.fixQRPosition);
       if (d.activeElement === this.nodes.counter) { iframe.focus(); }
@@ -301,7 +301,7 @@ const Captcha = {
     },
 
     startCommentFocusRestore(focus) {
-      if (focus || (d.activeElement !== QR.nodes.com)) {
+      if (focus || (!isQRCommentActive())) {
         this.cancelCommentFocusRestore();
         return;
       }
@@ -315,7 +315,7 @@ const Captcha = {
     },
 
     shouldKeepCommentFocus() {
-      if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+      if (!this.keepCommentFocus || !isQROpen()) { return false; }
       if (Date.now() > this.keepCommentFocusUntil) {
         this.cancelCommentFocusRestore();
         return false;
@@ -324,19 +324,19 @@ const Captcha = {
     },
 
     focusComment() {
-      if (!QR.nodes || QR.nodes.el.hidden) { return; }
+      if (!isQROpen()) { return; }
       try {
-        QR.nodes.com.focus({ preventScroll: true });
+        focusQRComment(true);
       } catch (error) {
-        QR.nodes.com.focus();
+        focusQRComment();
       }
     },
 
     redirectCommentFocus(e) {
       if (!this.shouldKeepCommentFocus()) { return false; }
       const target = e?.target instanceof Node ? e.target : null;
-      if (target === QR.nodes.com) { return false; }
-      if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+      if (target === getQRCommentInput()) { return false; }
+      if (target && getQRRoot().contains(target) && !this.nodes.root.contains(target)) {
         this.cancelCommentFocusRestore();
         return false;
       }
@@ -355,8 +355,8 @@ const Captcha = {
       const restore = () => {
         if (!this.shouldKeepCommentFocus()) { return; }
         const active = d.activeElement;
-        if (active === QR.nodes.com) { return; }
-        if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+        if (active === getQRCommentInput()) { return; }
+        if (active && getQRRoot().contains(active) && !this.nodes.root.contains(active)) {
           this.cancelCommentFocusRestore();
           return;
         }
@@ -376,9 +376,9 @@ const Captcha = {
     },
 
     fixQRPosition() {
-      if (QR.nodes.el.getBoundingClientRect().bottom > doc.clientHeight) {
-        QR.nodes.el.style.top = '';
-        return QR.nodes.el.style.bottom = '0px';
+      if (getQRRoot().getBoundingClientRect().bottom > doc.clientHeight) {
+        getQRRoot().style.top = '';
+        return getQRRoot().style.bottom = '0px';
       }
     },
 
@@ -389,7 +389,7 @@ const Captcha = {
     destroy() {
       if (!this.isEnabled) { return; }
       delete this.timeouts.destroy;
-      $.rmClass(QR.nodes.el, 'captcha-open');
+      removeQRClass('captcha-open');
       if (this.nodes.container) {
         $.global('resetCaptcha');
         $.rm(this.nodes.container);
@@ -410,10 +410,10 @@ const Captcha = {
       const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
       if (Captcha.cache.needed()) {
         if (focus) {
-          if (QR.cooldown.auto || Conf['Post on Captcha Completion']) {
+          if (isQRAutoCooldown() || Conf['Post on Captcha Completion']) {
             this.nodes.counter.focus();
           } else {
-            QR.nodes.status.focus();
+            focusQRStatus();
           }
         }
         this.reload();
@@ -423,10 +423,10 @@ const Captcha = {
         } else {
           if (this.timeouts.destroy == null) { this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND); }
         }
-        if (focus) { QR.nodes.status.focus(); }
+        if (focus) { focusQRStatus(); }
       }
 
-      if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) { return QR.submit(); }
+      if (Conf['Post on Captcha Completion'] && !isQRAutoCooldown()) { return submitQR(); }
     },
 
     count() {

@@ -18,7 +18,7 @@ import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import { typeFromExtension } from './FileTypes';
-import { registerQR } from './QRBridge';
+import { registerQRCaptchaBridge } from './QRBridge';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -2411,7 +2411,53 @@ class post {
   }
 };
 QR.post = post;
-registerQR(QR);
+registerQRCaptchaBridge({
+  getPosts() {
+    return QR.posts;
+  },
+  hasActiveRequest() {
+    return !!QR.req;
+  },
+  isAutoCooldown() {
+    return !!QR.cooldown.auto;
+  },
+  getNodes() {
+    return QR.nodes;
+  },
+  focus() {
+    QR.focus();
+  },
+  focusComment(preventScroll = false) {
+    if (preventScroll) {
+      try {
+        QR.nodes.com.focus({ preventScroll: true });
+        return;
+      } catch (error) {}
+    }
+    QR.nodes.com.focus();
+  },
+  focusStatus() {
+    QR.nodes.status.focus();
+  },
+  showError(error, focusOverride) {
+    QR.error(error, focusOverride);
+  },
+  submit() {
+    QR.submit();
+  },
+  setupCaptcha(focus) {
+    QR.captcha.setup(focus);
+  },
+  addClass(...classes) {
+    $.addClass(QR.nodes.el, ...classes);
+  },
+  removeClass(...classes) {
+    $.rmClass(QR.nodes.el, ...classes);
+  },
+  insertCaptchaRoot(root) {
+    $.after(QR.nodes.com.parentNode, root);
+  }
+});
 
 export default QR;
 
