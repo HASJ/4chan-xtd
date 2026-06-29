@@ -299,6 +299,7 @@ const CaptchaT = {
         if (existingClueImage) $.rm(existingClueImage);
         customUiExists = false;
         this.isCapturing = false;
+        delete this.selectedChallengeStep;
       }
     }
 
@@ -336,6 +337,7 @@ const CaptchaT = {
     if (tNextForStep) {
       stripsContainer.dataset.step = tNextForStep.textContent;
     }
+    delete this.selectedChallengeStep;
     const minVal = parseInt(slider.getAttribute('min') || '0', 10);
     const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
     const count = maxVal + 1;
@@ -351,6 +353,10 @@ const CaptchaT = {
         slider.dispatchEvent(new Event('input', { bubbles: true }));
         $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
         $.addClass(strip, 'selected');
+        if (!this.isRestoring) {
+          const tNext = $('#t-next', mainDiv);
+          this.selectedChallengeStep = stripsContainer.dataset.step || tNext?.textContent || '';
+        }
         if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
           const tNext = $('#t-next', mainDiv);
           if (tNext && !tNext.disabled) {
@@ -485,6 +491,7 @@ const CaptchaT = {
     this.isCompleted = false;
     delete this.isInitialized;
     delete this.hasRequested;
+    delete this.selectedChallengeStep;
     if (this.observer) {
       this.observer.disconnect();
       delete this.observer;
@@ -536,7 +543,9 @@ const CaptchaT = {
       const tNextText = tNext ? tNext.textContent || '' : '';
       const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
       const hasRemainingChallengeSteps = stepMatch && parseInt(stepMatch[1], 10) < parseInt(stepMatch[2], 10);
-      if (hasRemainingChallengeSteps || (!stepMatch && tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0))) {
+      const selectedCurrentStep = stepMatch && this.selectedChallengeStep === tNextText;
+      const canAdvanceChallenge = tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0);
+      if ((stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge)) {
         return;
       }
       if (this.isCompleted) return;
@@ -552,6 +561,7 @@ const CaptchaT = {
   setUsed() {
     this.isCompleted = false;
     delete this.hasRequested;
+    delete this.selectedChallengeStep;
     this.shouldLoad = true;
     if (this.isEnabled && this.nodes.container) {
       $.global('TCaptchaClearChallenge');

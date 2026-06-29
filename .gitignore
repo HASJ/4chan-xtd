@@ -1,21 +1,60 @@
+# Dependencies
 node_modules/
+
+# Package manager artifacts
 /npm-shrinkwrap.json
-*~
-*.db
-*.DS_Store
-/tmp/
+*.tgz
+
+# Build outputs
+/dist/
 /testbuilds/
+/tmp-crx/
+/builds/*.gz
+/builds/*.js.map
+/builds/crx/crx.7z
+
+# Test and local development artifacts
+/tmp/
+/test/
 /test.html
 /captchas.html
 /install.json
 /.tests_enabled
 /.events
 /.events2
-/dist/
-/builds/*.gz
-/test/
-/builds/crx/crx.7z
-/builds/*.js.map
 4chan thread.html
-*.log
 main_diff.txt
+
+# Logs and diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript and coverage
+*.tsbuildinfo
+/coverage/
+/.nyc_output/
+/.cache/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Signing keys and local secrets
+*.pem
+*.p12
+*.pfx
+
+# Editor and OS files
+*~
+*.db
+*.DS_Store
+Thumbs.db
+Desktop.ini
+/.idea/
+/.vscode/
+*.swp
+*.swo
