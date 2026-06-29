@@ -3,6 +3,16 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.14 (2026-06-29)
+
+- Architecture
+  - Removed all detected circular source dependencies by splitting shared helpers and bridge modules out of feature implementations.
+  - Added `npm run check:cycles` coverage for source dependency graph validation.
+  - Isolated Quick Reply CAPTCHA integration behind a QR bridge so Rollup no longer reports circular dependency warnings.
+
+- Documentation
+  - Added `ToDo.md` with a granular follow-up plan to replace the dynamic QR bridge proxy with an explicit typed QR CAPTCHA facade.
+
 ### 2.26.13 (2026-06-28)
 
 - Bugfixes
