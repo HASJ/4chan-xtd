@@ -26,9 +26,10 @@ If you're reporting a bug, the more detail you can give, the better. If I can't 
 - Open the directory: `cd 4chan-xtd`
 - Fetch needed dependencies with: `npm install`
 
-### Build
+### Build and Verify
 
 - Build with `npm run build`. Options are in the readme.
+- Check for circular dependencies with `npm run check:cycles`.
 
 ### Contribute
 
@@ -37,7 +38,9 @@ If you're reporting a bug, the more detail you can give, the better. If I can't 
 - Edit the sources in the src/ directory (not the compiled scripts in builds/).
 - Fetch needed dependencies with: `npm install`
 - Compile the script with: `npm run build`
-- Install the compiled script (found in the build/ directory), and test your changes.
+- Verify that there are no circular dependencies with: `npm run check:cycles`
+- Install the compiled script (found in the builds/ directory), and test your changes.
+- **Note**: Generated files under `builds/` should not be edited directly. Revert changes to `builds/` before committing unless you are intentionally creating a release.
 - Make sure you have set your name and email as you want them, as they will be published in your commit message:<br>`git config user.name yourname`<br>`git config user.email youremail`
 - Commit your changes: `git commit -a`
 - Open a pull request on GitHub.
@@ -48,4 +51,23 @@ Pull requests to archive.json should be sent upstream: https://github.com/4chenz
 ### More info
 
 Further documentation is available at the wiki for the original 4chan X: https://github.com/ccd0/4chan-x/wiki/Developer-Documentation.
-At the moment 4chan XTd doesn't have its own wiki yet.
+At the moment 4chan XTd doesn't have its own wiki yet, but you can find XTd-specific documentation in the project's internal `GEMINI.md` and `AGENTS.md` context files, as well as comments within the source codebase.
+
+## TypeScript Migration
+
+The project is currently migrating from JavaScript (CoffeeScript-compiled) to TypeScript.
+
+### `@ts-nocheck` Usage
+Many files currently begin with `// @ts-nocheck` to bypass type errors temporarily while allowing TypeScript to parse them.
+- **When is it acceptable?** It is acceptable to leave `@ts-nocheck` in large, legacy modules during intermediate refactoring (e.g., breaking circular dependencies) if converting the types would block the primary goal.
+- **High-risk files:** Core singletons like `src/Posting/QR.ts` or large UI orchestrators still rely heavily on loose types and are high-priority for eventual conversion.
+
+### Removing `@ts-nocheck`
+To migrate a file fully:
+1. Remove `// @ts-nocheck`.
+2. Add necessary type annotations and fix strict type errors reported by the TS compiler.
+3. Keep the commit focused on typing; do not bundle behavior changes.
+
+### Known JS Interop Patterns
+- The project often builds complex DOM structures using `$.el` and `$.extend`, which can confuse TS about the resulting object's shape.
+- Legacy JS modules might implicitly mutate global state or rely on late-bound properties (e.g., `QR.nodes`). Use explicit interfaces or null checks to satisfy TypeScript in these cases.

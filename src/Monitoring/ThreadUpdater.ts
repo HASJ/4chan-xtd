@@ -1,4 +1,10 @@
 // @ts-nocheck
+/*
+ * Thread Updater Service
+ *
+ * Periodically polls the server for new posts in a thread.
+ * Manages the update/error/retry cycle, backoff logic, and notifications.
+ */
 import Beep from './ThreadUpdater/beep.wav';
 import $ from "../platform/$";
 import Callbacks from '../classes/Callbacks';
@@ -13,13 +19,6 @@ import { g, Conf, d, doc } from '../globals/globals';
 import UI from '../General/UI';
 import { MINUTE, SECOND } from '../platform/helpers';
 import type Thread from '../classes/Thread';
-
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS201: Simplify complex destructure assignments
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 
 var ThreadUpdater = {
   init(this: typeof ThreadUpdater) {

@@ -20,13 +20,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const buildDir = resolve(__dirname, '../builds/');
 
-const minify = process.argv.includes('-min');
-const noFormat = process.argv.includes('-no-format');
-const platform = /** @type {'crx'|'userscript'} */ (process.argv.find(arg => arg.startsWith('-platform='))?.slice(10));
+const minify = process.argv.includes('-min'); // -min: Minifies the output.
+const noFormat = process.argv.includes('-no-format'); // -no-format: Skips post-processing formatting steps (faster builds, larger output).
+const platform = /** @type {'crx'|'userscript'} */ (process.argv.find(arg => arg.startsWith('-platform='))?.slice(10)); // -platform=[userscript|crx]: Targets a specific build output. If omitted, builds both.
 if (platform !== undefined && platform !== 'crx' && platform !== 'userscript') {
   throw new Error('incorrect value for the platform argument');
 }
-const buildForTest = process.argv.includes('-test');
+const buildForTest = process.argv.includes('-test'); // -test: Includes test-only code regions (`// #region tests_enabled`).
 
 // https://github.com/rollup/plugins/discussions/1777
 const tsPlugin = typescript({

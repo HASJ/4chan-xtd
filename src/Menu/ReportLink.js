@@ -4,11 +4,6 @@ import $ from "../platform/$";
 import Menu from "./Menu";
 import { isPassEnabled } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var ReportLink = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }

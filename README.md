@@ -40,10 +40,17 @@ This fork is distributed through [GitHub releases](https://github.com/TuxedoTako
 
 ## Build from source
 
-The simplest build is as easy as `npm install` `npm run build`, but there are some options:
+The standard build commands are:
+- `npm run build`: builds the default development output (userscript and CRX).
+- `npm run build:userscript`: builds the userscript target.
+- `npm run build:crx`: builds the browser extension target.
+- `npm run build:min`: builds a minified userscript.
+- `npm run build:all`: builds minified userscript, unminified userscript, and CRX outputs.
+
+You can also pass arguments directly to the build script (e.g., `node ./tools/rollup -min`):
 
 - `-min`: Minified output.
-- `-platform=userscript`, `-platform=crx`: Only builds for one platform, and removes code related to only the other. Note that without this, the code is only build once without this optimization for both.
+- `-platform=userscript`, `-platform=crx`: Target a specific platform.
 - `-no-format` Skips some formatting like switching the indent from the TypeScript output back from 4 to 2, and removing the decaffeinate suggestions comments. Might speed up the build, but the result is larger.
 - `-test` Include tests in build.
 
@@ -57,36 +64,10 @@ If you encounter a bug, try the steps [here](https://github.com/TuxedoTako/4chan
 - [Report Bugs](https://github.com/TuxedoTako/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc)
 - [Contributing](https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/CONTRIBUTING.md)
 
-### TODO
-
 <details>
 <summary>Click to expand</summary>
 
-- find alternative for `<% if (`
-  - [x] made html templates jsx/txt functions
-    - this uses the typescript compiler to compile the jsx
-    - render code is in [src/globals/jsx.ts](./src/globals/jsx.ts)
-  - [x] binary files are included as base64 in the bundle step, they do need explicit imports
-  - [x] `<% if (readJSON('/.tests_enabled')) { %>`
-    - replaced by `// #region tests_enabled` `// #endregion`
-- build script
-  - [x] userscript
-  - [ ] .crx extension
-    - [x] crx directory that can be loaded as an unpacked extension is created
-- [x] port updates made to 4chan-X made since this was forked
-- [x] Clean up circular dependencies
-
-</details>
-
-### Other notes about this fork
-
-<details>
-<summary>Click to expand</summary>
-
-- A lot of files have circular dependencies, but rollup can handle that
-  - but for some scripts that add to the same object I had to merge them, like Posting/QR and site/SW.yotsuba.js
-  - sometimes something might not be initialized before use, for example, `$.dict()` and `$.SECONDS`
-    - I moved these to a new file called helpers.ts, which shouldn't have dependencies itself
+- The project aims for zero circular dependencies in the source graph. Run `npm run check:cycles` to verify.
 - tsconfig.json has `"checkJs": true,`, and a lot of js files report type errors when opened because of unknown properties on objects and reassigning variables with different types. These errors don't block the bundle at this moment.
 - the es 2020 target was chosen for optional chaining
 - @violentmonkey/types was chosen over @types/greasemonkey because @types/greasemonkey only declares the GM object, and not GM\_ functions

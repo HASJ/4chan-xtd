@@ -1,3 +1,9 @@
+/*
+ * Main Bootstrap Registry
+ *
+ * This module is the entry point for the application. It initializes globals,
+ * sets up the environment, and registers all features and modules during startup.
+ */
 import Redirect from "../Archive/Redirect";
 // #region tests_enabled
 import Test from "../General/Test";

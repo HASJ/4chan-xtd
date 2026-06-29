@@ -1,4 +1,10 @@
 // @ts-nocheck
+/*
+ * Quick Reply Singleton
+ *
+ * QR.ts manages the Quick Reply interface, post queuing, and submission logic.
+ * It is a core singleton that delegates captcha operations to the bridge facade.
+ */
 import QuickReplyPage from './QR/QuickReply.html';
 import $ from '../platform/$';
 import Callbacks from '../classes/Callbacks';
@@ -2411,6 +2417,9 @@ class post {
   }
 };
 QR.post = post;
+
+// Register the explicit captcha facade. This allows captcha modules to depend
+// on QR state and operations without importing QR.ts and creating a circular dependency.
 registerQRCaptchaBridge({
   getPosts() {
     return QR.posts;

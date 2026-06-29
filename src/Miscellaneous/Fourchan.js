@@ -6,11 +6,6 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import ExpandComment from "./ExpandComment";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Fourchan = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }

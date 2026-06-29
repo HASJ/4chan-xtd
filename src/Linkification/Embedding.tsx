@@ -1,4 +1,10 @@
 // @ts-nocheck
+/*
+ * Embedding Service Registry
+ *
+ * Handles fetching titles and embedding media for various third-party services
+ * (e.g., YouTube, Twitter, Soundcloud) from linkified text.
+ */
 import Get from '../General/Get';
 import Header from '../General/Header';
 import UI from '../General/UI';
@@ -11,14 +17,6 @@ import { dict } from '../platform/helpers';
 import EmbeddingPage from './Embedding/Embed.html';
 import EmbedFxTwitter from './Embedding/FxTwitter';
 import Icon from '../Icons/icon';
-
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 
 var Embedding = {
   init() {

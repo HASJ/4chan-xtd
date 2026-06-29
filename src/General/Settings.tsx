@@ -1,4 +1,12 @@
 // @ts-nocheck
+/**
+ * @module Settings
+ * @description
+ * Manages the main settings user interface for 4chan XTd.
+ * This module handles the initialization, rendering, and interaction logic
+ * for the settings dialog, including various configuration sections (Main,
+ * Filter, Sauce, Advanced, Keybinds), as well as import/export functionality.
+ */
 import SettingsPage from './Settings/SettingsHtml';
 import FilterGuidePage from './Settings/Filter-guide.html';
 import SaucePage from './Settings/Sauce.html';
@@ -27,9 +35,16 @@ import Icon from '../Icons/icon';
 import UI from './UI';
 import { registerFilterSettingsOpener, registerSettingsOpener } from './SettingsBridge';
 
+/**
+ * The Settings singleton object managing all aspects of the configuration UI.
+ */
 var Settings = {
   dialog: undefined as HTMLDivElement | undefined,
 
+  /**
+   * Initializes the settings system by registering openers, building the settings link
+   * in the header, and setting up relevant event listeners.
+   */
   init() {
     registerSettingsOpener(Settings.open);
     registerFilterSettingsOpener(Settings.openFilterSettings);
@@ -79,6 +94,11 @@ var Settings = {
     });
   },
 
+  /**
+   * Opens the settings dialog and constructs the UI, switching to the specified section.
+   *
+   * @param {string} [openSection] - The title of the settings section to open initially.
+   */
   open(openSection) {
     let dialog, sectionToOpen;
     if (Settings.dialog) { return; }
@@ -125,6 +145,9 @@ var Settings = {
     $.event('OpenSettings', null, dialog);
   },
 
+  /**
+   * Closes the settings dialog and cleans up its associated DOM elements.
+   */
   close() {
     if (!Settings.dialog) { return; }
     // Unfocus current field to trigger change event.
@@ -135,6 +158,12 @@ var Settings = {
 
   sections: [],
 
+  /**
+   * Registers a new section to be displayed in the settings dialog.
+   *
+   * @param {string|CustomEvent} title - The title of the section, or an event containing the title.
+   * @param {Function} [open] - The callback to execute when the section is opened.
+   */
   addSection(title, open) {
     if (typeof title !== 'string') {
       ({title, open} = title.detail);
@@ -314,6 +343,10 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
   isExportModalOpen: false,
 
+  /**
+   * Exports the user's settings to a JSON file. Optionally includes history depending
+   * on user preference or dialog input.
+   */
   async export() {
     let exportHistory = Conf['Export History'];
     let cancelled = false;
@@ -424,6 +457,14 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     reader.readAsText(file);
   },
 
+  /**
+   * Upgrades the provided settings data object to handle migrations across different
+   * versions of the script.
+   *
+   * @param {Object} data - The settings data object to upgrade.
+   * @param {string|Array} version - The version string/array from which to upgrade.
+   * @returns {Object} A dictionary of changes applied during the upgrade.
+   */
   upgrade(data, version) {
     let corrupted, key, val;
     const changes = dict();
@@ -500,6 +541,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     return changes;
   },
 
+  /**
+   * Loads settings from a parsed JSON object, upgrading them if necessary, and persists them.
+   *
+   * @param {Object} data - The parsed settings data.
+   * @param {Function} cb - Callback to run after settings are loaded and saved.
+   */
   loadSettings(data, cb) {
     if (data.version !== g.VERSION) {
       Settings.upgrade(data.Conf, data.version);

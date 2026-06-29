@@ -1,11 +1,4 @@
 // @ts-nocheck
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-
 import Notice from "../classes/Notice";
 import Post from "../classes/Post";
 import Config from "../config/Config";
