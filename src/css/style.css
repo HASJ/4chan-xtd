@@ -1586,6 +1586,23 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root {
   position: relative;
 }
+#qr .captcha-root.captcha-idle > div {
+  height: auto !important;
+  min-height: 0 !important;
+  background-image: none !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+#qr .captcha-root.captcha-idle #t-slider,
+#qr .captcha-root.captcha-idle #t-msg,
+#qr .captcha-root.captcha-idle #t-task,
+#qr .captcha-root.captcha-idle #t-box,
+#qr .captcha-root.captcha-idle .captcha-custom-ui,
+#qr .captcha-root.captcha-idle .captcha-clue-image,
+#qr .captcha-root.captcha-idle .captcha-strip {
+  display: none !important;
+}
+
 #qr .captcha-root.is-challenge > div,
 .captcha-iframe.is-challenge .captcha-root > div {
   height: auto !important;

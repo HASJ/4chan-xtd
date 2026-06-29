@@ -852,7 +852,7 @@
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-
+  if (platform === 'userscript') {
     // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
     (function () {
       if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
@@ -881,7 +881,7 @@
         return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
       }
     })();
-
+  }
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -928,7 +928,16 @@
       Promise.resolve().then(execTask);
     };
   })();
-
+  if (platform === 'crx') {
+    const callbacks = new Map();
+    chrome.runtime.onMessage.addListener(({ id, data }) => {
+      callbacks.get(id)(data);
+      callbacks.delete(id);
+    });
+    $.eventPageRequest = (params) => new Promise(resolve => {
+      chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
+    });
+  }
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -1037,7 +1046,178 @@
       return delete data['Redirect to HTTPS'];
     }
   };
-
+  if (platform === 'crx') {
+    // https://developer.chrome.com/extensions/storage.html
+    $.oldValue = {
+      local: dict(),
+      sync: dict()
+    };
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      for (var key in changes) {
+        var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        $.oldValue[area][key] = dict.clone(changes[key].newValue);
+        var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+        var cb = $.syncing[key];
+        if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
+          cb(newValue, key);
+        }
+      }
+    });
+    $.sync = (key, cb) => $.syncing[key] = cb;
+    $.forceSync = function () { };
+    $.crxWorking = function () {
+      try {
+        if (chrome.runtime.getManifest()) {
+          return true;
+        }
+      } catch (error) { }
+      if (!$.crxWarningShown) {
+        const msg = $.el('div', { innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.` });
+        $.on($('a', msg), 'click', () => location.reload());
+        $.event('CreateNotification', { type: 'warning', content: msg });
+        $.crxWarningShown = true;
+      }
+      return false;
+    };
+    $.get = $.oneItemSugar(function (data, cb) {
+      if (!$.crxWorking()) {
+        return;
+      }
+      const results = {};
+      const get = function (area) {
+        let keys = Object.keys(data);
+        // XXX slow performance in Firefox
+        if (($.engine === 'gecko') && (area === 'sync') && (keys.length > 3)) {
+          keys = null;
+        }
+        return chrome.storage[area].get(keys, function (result) {
+          let key;
+          result = dict.clone(result);
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (keys === null) {
+            const result2 = dict();
+            for (key in result) {
+              var val = result[key];
+              if ($.hasOwn(data, key)) {
+                result2[key] = val;
+              }
+            }
+            result = result2;
+          }
+          for (key in data) {
+            $.oldValue[area][key] = result[key];
+          }
+          results[area] = result;
+          if (results.local && results.sync) {
+            $.extend(data, results.sync);
+            $.extend(data, results.local);
+            return cb(data);
+          }
+        });
+      };
+      get('local');
+      return get('sync');
+    });
+    (function () {
+      const items = {
+        local: dict(),
+        sync: dict()
+      };
+      const exceedsQuota = (key, value) => // bytes in UTF-8
+      unescape(encodeURIComponent(JSON.stringify(key))).length + unescape(encodeURIComponent(JSON.stringify(value))).length > chrome.storage.sync.QUOTA_BYTES_PER_ITEM;
+      $.delete = function (keys) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        if (typeof keys === 'string') {
+          keys = [keys];
+        }
+        for (var key of keys) {
+          delete items.local[key];
+          delete items.sync[key];
+        }
+        chrome.storage.local.remove(keys);
+        return chrome.storage.sync.remove(keys);
+      };
+      const timeout = {};
+      var setArea = function (area, cb) {
+        const data = dict();
+        $.extend(data, items[area]);
+        if (!Object.keys(data).length || (timeout[area] > Date.now())) {
+          return;
+        }
+        return chrome.storage[area].set(data, function () {
+          let err;
+          let key;
+          if (err = chrome.runtime.lastError) {
+            c.error(err.message);
+            setTimeout(setArea, MINUTE, area);
+            timeout[area] = Date.now() + MINUTE;
+            return cb?.(err);
+          }
+          delete timeout[area];
+          for (key in data) {
+            if (items[area][key] === data[key]) {
+              delete items[area][key];
+            }
+          }
+          if (area === 'local') {
+            for (key in data) {
+              var val = data[key];
+              if (!exceedsQuota(key, val)) {
+                items.sync[key] = val;
+              }
+            }
+            setSync();
+          } else {
+            chrome.storage.local.remove(((() => {
+              const result = [];
+              for (key in data) {
+                if (!(key in items.local)) {
+                  result.push(key);
+                }
+              }
+              return result;
+            })()));
+          }
+          return cb?.();
+        });
+      };
+      var setSync = debounce(SECOND, () => setArea('sync'));
+      $.set = $.oneItemSugar(function (data, cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        $.securityCheck(data);
+        $.extend(items.local, data);
+        return setArea('local', cb);
+      });
+      return $.clear = function (cb) {
+        if (!$.crxWorking()) {
+          return;
+        }
+        items.local = dict();
+        items.sync = dict();
+        let count = 2;
+        let err = null;
+        const done = function () {
+          if (chrome.runtime.lastError) {
+            c.error(chrome.runtime.lastError.message);
+          }
+          if (err == null) {
+            err = chrome.runtime.lastError;
+          }
+          if (!--count) {
+            return cb?.(err);
+          }
+        };
+        chrome.storage.local.clear(done);
+        return chrome.storage.sync.clear(done);
+      };
+    })();
+  } else {
     // http://wiki.greasespot.net/Main_Page
     // https://tampermonkey.net/documentation.php
     if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
@@ -1254,6 +1434,7 @@
         return cb?.();
       };
     }
+  }
 
   /*
    * This file has the code for the jsx to { innerHTML: "safe string" }
@@ -1560,7 +1741,14 @@
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-
+      if (platform === 'crx') {
+        $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
+          .then(({ response, responseHeaderString }) => {
+          if (response)
+            response = new Uint8Array(response);
+          cb(response, responseHeaderString);
+        });
+      } else {
         const fallback = function () {
           return $.ajax(url, {
             headers,
@@ -1612,7 +1800,7 @@
         } catch (error) {
           return fallback();
         }
-
+      }
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -1684,7 +1872,7 @@
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-
+      if (platform === 'userscript') {
         if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
           return $.ajax(url, options);
         }
@@ -1732,7 +1920,14 @@
             } catch (error1) { }
           };
         }
-
+      } else {
+        $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
+          if (result.status) {
+            $.extend(req, result);
+          }
+          return req.onloadend();
+        });
+      }
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -1747,7 +1942,15 @@
       });
     },
     permission(cb, cbFail, origins) {
-
+      if (platform === 'crx') {
+        return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
+          if (result) {
+            return cb();
+          } else {
+            return cbFail();
+          }
+        });
+      }
       return cb();
     },
   };
@@ -12707,6 +12910,23 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root {
   position: relative;
 }
+#qr .captcha-root.captcha-idle > div {
+  height: auto !important;
+  min-height: 0 !important;
+  background-image: none !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+#qr .captcha-root.captcha-idle #t-slider,
+#qr .captcha-root.captcha-idle #t-msg,
+#qr .captcha-root.captcha-idle #t-task,
+#qr .captcha-root.captcha-idle #t-box,
+#qr .captcha-root.captcha-idle .captcha-custom-ui,
+#qr .captcha-root.captcha-idle .captcha-clue-image,
+#qr .captcha-root.captcha-idle .captcha-strip {
+  display: none !important;
+}
+
 #qr .captcha-root.is-challenge > div,
 .captcha-iframe.is-challenge .captcha-root > div {
   height: auto !important;
@@ -14313,6 +14533,7 @@ svg.icon {
         // (this.nodes.container) remains valid. We observe captcha-root (the
         // parent) since it retains its class and stays stable.
         this.nodes.container = $.el('div', {className: 'captcha-container'});
+        $.addClass(this.nodes.root, 'captcha-idle');
         $.prepend(this.nodes.root, this.nodes.container);
         CaptchaT.currentThread = CaptchaT.getThread();
         CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
@@ -14428,6 +14649,18 @@ svg.icon {
       setTimeout(restore, 300);
     },
 
+    clearCustomUi(mainDiv) {
+      $$('.captcha-custom-ui, .captcha-clue-image, .captcha-strip', mainDiv).forEach(el => $.rm(el));
+      this._isNotLikeOthers = false;
+      this.isCapturing = false;
+    },
+
+    setIdle(mainDiv) {
+      this.clearCustomUi(mainDiv);
+      $.rmClass(this.nodes.root, 'is-challenge');
+      $.addClass(this.nodes.root, 'captcha-idle');
+    },
+
     createStrips() {
       const mainDiv = this.nodes.container;
       if (!mainDiv) return;
@@ -14435,41 +14668,52 @@ svg.icon {
       const slider = $('#t-slider', mainDiv);
       const taskEl = $('#t-task', mainDiv);
       let customUiExists = !!$('.captcha-custom-ui', mainDiv);
+      const tLoad = $('#t-load', mainDiv);
+      const tLoadText = tLoad ? `${tLoad.value || ''} ${tLoad.textContent || ''}` : '';
+      const isOnCooldown = /\(\d+\)/.test(tLoadText);
+      const tNext = $('#t-next', mainDiv);
+      const tNextText = tNext ? tNext.textContent || '' : '';
+      const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
+
+      if (isOnCooldown && !hasActiveChallengeStep) {
+        this.setIdle(mainDiv);
+        return;
+      }
 
       // If there's no slider or it has no max attribute, it's not a real puzzle
       // (e.g., "Verification not required", "Captcha expired", or initializing)
       if (!slider || !slider.hasAttribute('max')) {
-        $.rmClass(this.nodes.root, 'is-challenge');
-        this._isNotLikeOthers = false;
+        this.setIdle(mainDiv);
         return;
       }
 
       const imgEl = taskEl ? $('img', taskEl) : null;
+      const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
+      const hasTaskBg = taskBg && taskBg.includes('url(');
 
-      // Now we know it's a real puzzle because it has a max attribute.
-      // If it has no image clue, it must be the odd one out!
-      if (!imgEl) {
+      // A real puzzle has task image frames. If there is no separate clue image,
+      // the challenge is the odd-one-out variant.
+      if (!imgEl && (hasTaskBg || hasActiveChallengeStep)) {
         this._isNotLikeOthers = true;
       } else if (imgEl && imgEl.src) {
         this._isNotLikeOthers = false;
       }
       const isNotLikeOthers = !!this._isNotLikeOthers;
 
-      const taskBg = taskEl ? taskEl.style.backgroundImage : '';
       let clueUrl = '';
       if (imgEl && imgEl.src) {
           clueUrl = `url("${imgEl.src}")`;
-      } else if (taskBg && taskBg.includes('url(')) {
+      } else if (hasTaskBg) {
           clueUrl = taskBg;
       }
 
-      // Safety check, though the max attribute check above already guarantees it's a challenge
-      const isChallenge = !!clueUrl || isNotLikeOthers;
+      const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-      if (!customUiExists && !isChallenge) {
-        $.rmClass(this.nodes.root, 'is-challenge');
+      if (!isChallenge) {
+        this.setIdle(mainDiv);
         return;
       }
+      $.rmClass(this.nodes.root, 'captcha-idle');
 
       // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
       if (customUiExists) {
@@ -14565,6 +14809,7 @@ svg.icon {
 
       // Now capture the 4 puzzle images by programmatically moving the slider
       const originalSliderValue = slider.value;
+      let capturedImages = 0;
 
       const runCapture = async () => {
         for (let i = startIndex; i < count; i++) {
@@ -14578,11 +14823,25 @@ svg.icon {
           const stripIndex = i - startIndex;
           const strip = stripsContainer.children[stripIndex];
           if (strip) {
-            strip.style.backgroundImage = taskEl.style.backgroundImage;
-            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
-            strip.style.backgroundSize = taskEl.style.backgroundSize;
-            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
+            const taskStyle = getComputedStyle(taskEl);
+            const bg = taskEl.style.backgroundImage || taskStyle.backgroundImage;
+            if (bg && bg.includes('url(')) { capturedImages++; }
+            strip.style.backgroundImage = bg;
+            strip.style.backgroundPosition = taskEl.style.backgroundPosition || taskStyle.backgroundPosition;
+            strip.style.backgroundSize = taskEl.style.backgroundSize || taskStyle.backgroundSize;
+            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat || taskStyle.backgroundRepeat;
           }
+        }
+
+        if (!capturedImages) {
+          this.isCapturing = false;
+          this.isRestoring = true;
+          slider.value = originalSliderValue;
+          slider.dispatchEvent(new Event('change', { bubbles: true }));
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          this.isRestoring = false;
+          if (!hasActiveChallengeStep) { this.setIdle(mainDiv); }
+          return;
         }
 
         // Done capturing!
@@ -14680,7 +14939,7 @@ svg.icon {
       if (!this.isEnabled || !this.nodes.container) { return; }
       $.global('destroyTCaptcha');
       $.rm(this.nodes.container);
-      $.rmClass(this.nodes.root, 'is-challenge');
+      $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle');
       delete this.nodes.container;
     },
 
@@ -27690,7 +27949,9 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-
+        if (platform === 'crx') {
+          w = (w.wrappedJSObject || w);
+        }
         if (`${meta.name} antidup` in w) {
           return;
         }

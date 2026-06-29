@@ -768,7 +768,36 @@
     }
     return root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail }));
   };
-
+  if (platform === 'userscript') {
+    // XXX Make $.event work in Pale Moon with GM 3.x (no cloneInto function).
+    (function () {
+      if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) {
+        return;
+      }
+      try {
+        return new CustomEvent('x', { detail: {} });
+      } catch (err) {
+        const unsafeConstructors = {
+          Object: unsafeWindow.Object,
+          Array: unsafeWindow.Array
+        };
+        var clone = function (obj) {
+          let constructor;
+          if ((obj != null) && (typeof obj === 'object') && (constructor = unsafeConstructors[obj.constructor.name])) {
+            const obj2 = new constructor();
+            for (var key in obj) {
+              var val = obj[key];
+              obj2[key] = clone(val);
+            }
+            return obj2;
+          } else {
+            return obj;
+          }
+        };
+        return $.event = (event, detail, root = d) => root.dispatchEvent(new CustomEvent(event, { bubbles: true, cancelable: true, detail: clone(detail) }));
+      }
+    })();
+  }
   $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
   if (!globalThis.chrome?.extension) {
     $.open =
@@ -815,7 +844,7 @@
       Promise.resolve().then(execTask);
     };
   })();
-
+  if (platform === 'crx') {
     const callbacks = new Map();
     chrome.runtime.onMessage.addListener(({ id, data }) => {
       callbacks.get(id)(data);
@@ -824,7 +853,7 @@
     $.eventPageRequest = (params) => new Promise(resolve => {
       chrome.runtime.sendMessage(params, id => { callbacks.set(id, resolve); });
     });
-
+  }
   /**
    * Runs a function on the page instead of the user script or extension context.
    * @param fn The name of the function in pageContext.ts. It must be defined there to run in a manifest V3 context.
@@ -933,7 +962,7 @@
       return delete data['Redirect to HTTPS'];
     }
   };
-
+  if (platform === 'crx') {
     // https://developer.chrome.com/extensions/storage.html
     $.oldValue = {
       local: dict(),
@@ -1104,6 +1133,224 @@
         return chrome.storage.sync.clear(done);
       };
     })();
+  } else {
+    // http://wiki.greasespot.net/Main_Page
+    // https://tampermonkey.net/documentation.php
+    if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
+      $.syncChannel = new BroadcastChannel(g.NAMESPACE + 'sync');
+      $.on($.syncChannel, 'message', e => (() => {
+        const result = [];
+        for (var key in e.data) {
+          var cb;
+          var val = e.data[key];
+          if (cb = $.syncing[key]) {
+            result.push(cb(dict.json(JSON.stringify(val)), key));
+          }
+        }
+        return result;
+      })());
+      $.sync = (key, cb) => $.syncing[key] = cb;
+      $.forceSync = function () { };
+      $.delete = function (keys, cb) {
+        let key;
+        if (!(keys instanceof Array)) {
+          keys = [keys];
+        }
+        Promise.all(keys.map(key => GM.deleteValue(g.NAMESPACE + key))).then(function () {
+          const items = dict();
+          for (key of keys)
+            items[key] = undefined;
+          $.syncChannel.postMessage(items);
+          cb?.();
+        });
+      };
+      $.get = $.oneItemSugar(function (items, cb) {
+        const keys = Object.keys(items);
+        return Promise.all(keys.map((key) => GM.getValue(g.NAMESPACE + key))).then(function (values) {
+          for (let i = 0; i < values.length; i++) {
+            var val = values[i];
+            if (val) {
+              items[keys[i]] = dict.json(val);
+            }
+          }
+          return cb(items);
+        });
+      });
+      $.set = $.oneItemSugar(function (items, cb) {
+        $.securityCheck(items);
+        return Promise.all((() => {
+          const result = [];
+          for (var key in items) {
+            var val = items[key];
+            result.push(GM.setValue(g.NAMESPACE + key, JSON.stringify(val)));
+          }
+          return result;
+        })()).then(function () {
+          $.syncChannel.postMessage(items);
+          return cb?.();
+        });
+      });
+      $.clear = cb => GM.listValues().then(keys => $.delete(keys.map(key => key.replace(g.NAMESPACE, '')), cb)).catch(() => $.delete(Object.keys(Conf).concat(['previousversion', 'QR Size', 'QR.persona']), cb));
+    } else {
+      if (typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) {
+        $.getValue = GM_getValue;
+        $.listValues = () => GM_listValues(); // error when called if missing
+      } else if ($.hasStorage) {
+        $.getValue = key => localStorage.getItem(key);
+        $.listValues = () => (() => {
+          const result = [];
+          for (var key in localStorage) {
+            if (key.slice(0, g.NAMESPACE.length) === g.NAMESPACE) {
+              result.push(key);
+            }
+          }
+          return result;
+        })();
+      } else {
+        $.getValue = function () { };
+        $.listValues = () => [];
+      }
+      if (typeof GM_addValueChangeListener !== 'undefined' && GM_addValueChangeListener !== null) {
+        $.setValue = GM_setValue;
+        $.deleteValue = GM_deleteValue;
+      } else if (typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) {
+        $.oldValue = dict();
+        $.setValue = function (key, val) {
+          GM_setValue(key, val);
+          if (key in $.syncing) {
+            $.oldValue[key] = val;
+            if ($.hasStorage) {
+              return localStorage.setItem(key, val);
+            } // for `storage` events
+          }
+        };
+        $.deleteValue = function (key) {
+          GM_deleteValue(key);
+          if (key in $.syncing) {
+            delete $.oldValue[key];
+            if ($.hasStorage) {
+              return localStorage.removeItem(key);
+            } // for `storage` events
+          }
+        };
+        if (!$.hasStorage) {
+          $.cantSync = true;
+        }
+      } else if ($.hasStorage) {
+        $.oldValue = dict();
+        $.setValue = function (key, val) {
+          if (key in $.syncing) {
+            $.oldValue[key] = val;
+          }
+          return localStorage.setItem(key, val);
+        };
+        $.deleteValue = function (key) {
+          if (key in $.syncing) {
+            delete $.oldValue[key];
+          }
+          return localStorage.removeItem(key);
+        };
+      } else {
+        $.setValue = function () { };
+        $.deleteValue = function () { };
+        $.cantSync = ($.cantSet = true);
+      }
+      if (typeof GM_addValueChangeListener !== 'undefined' && GM_addValueChangeListener !== null) {
+        $.sync = (key, cb) => $.syncing[key] = GM_addValueChangeListener(g.NAMESPACE + key, function (key2, oldValue, newValue, remote) {
+          if (remote) {
+            if (newValue !== undefined) {
+              newValue = dict.json(newValue);
+            }
+            return cb(newValue, key);
+          }
+        });
+        $.forceSync = function () { };
+      } else if ((typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) || $.hasStorage) {
+        $.sync = function (key, cb) {
+          key = g.NAMESPACE + key;
+          $.syncing[key] = cb;
+          return $.oldValue[key] = $.getValue(key);
+        };
+        (function () {
+          const onChange = function ({ key, newValue }) {
+            let cb;
+            if (!(cb = $.syncing[key])) {
+              return;
+            }
+            if (newValue != null) {
+              if (newValue === $.oldValue[key]) {
+                return;
+              }
+              $.oldValue[key] = newValue;
+              return cb(dict.json(newValue), key.slice(g.NAMESPACE.length));
+            } else {
+              if ($.oldValue[key] == null) {
+                return;
+              }
+              delete $.oldValue[key];
+              return cb(undefined, key.slice(g.NAMESPACE.length));
+            }
+          };
+          $.on(window, 'storage', onChange);
+          return $.forceSync = function (key) {
+            // Storage events don't work across origins
+            // e.g. http://boards.4chan.org and https://boards.4chan.org
+            // so force a check for changes to avoid lost data.
+            key = g.NAMESPACE + key;
+            return onChange({ key, newValue: $.getValue(key) });
+          };
+        })();
+      } else {
+        $.sync = function () { };
+        $.forceSync = function () { };
+      }
+      $.delete = function (keys) {
+        if (!(keys instanceof Array)) {
+          keys = [keys];
+        }
+        for (var key of keys) {
+          $.deleteValue(g.NAMESPACE + key);
+        }
+      };
+      $.get = $.oneItemSugar((items, cb) => $.queueTask($.getSync, items, cb));
+      $.getSync = function (items, cb) {
+        for (var key in items) {
+          var val2;
+          if (val2 = $.getValue(g.NAMESPACE + key)) {
+            try {
+              items[key] = dict.json(val2);
+            } catch (err) {
+              // XXX https://github.com/ccd0/4chan-x/issues/2218
+              if (!/^(?:undefined)*$/.test(val2)) {
+                throw err;
+              }
+            }
+          }
+        }
+        return cb(items);
+      };
+      $.set = $.oneItemSugar(function (items, cb) {
+        $.securityCheck(items);
+        return $.queueTask(function () {
+          for (var key in items) {
+            var value = items[key];
+            $.setValue(g.NAMESPACE + key, JSON.stringify(value));
+          }
+          return cb?.();
+        });
+      });
+      $.clear = function (cb) {
+        // XXX https://github.com/greasemonkey/greasemonkey/issues/2033
+        // Also support case where GM_listValues is not defined.
+        $.delete(Object.keys(Conf));
+        $.delete(['previousversion', 'QR Size', 'QR.persona']);
+        try {
+          $.delete($.listValues().map(key => key.replace(g.NAMESPACE, '')));
+        } catch (error) { }
+        return cb?.();
+      };
+    }
+  }
 
   /*
    * This file has the code for the jsx to { innerHTML: "safe string" }
@@ -1410,14 +1657,66 @@
     binary(url, cb, headers = dict()) {
       // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
       url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
-
+      if (platform === 'crx') {
         $.eventPageRequest({ type: 'ajax', url, headers, responseType: 'arraybuffer' })
           .then(({ response, responseHeaderString }) => {
           if (response)
             response = new Uint8Array(response);
           cb(response, responseHeaderString);
         });
-
+      } else {
+        const fallback = function () {
+          return $.ajax(url, {
+            headers,
+            responseType: 'arraybuffer',
+            onloadend() {
+              if (this.status && this.response) {
+                return cb(new Uint8Array(this.response), this.getAllResponseHeaders());
+              } else {
+                return cb(null);
+              }
+            }
+          });
+        };
+        if ((typeof window.GM_xmlhttpRequest === 'undefined' || window.GM_xmlhttpRequest === null)) {
+          fallback();
+          return;
+        }
+        const gmOptions = {
+          method: "GET",
+          anonymous: true,
+          url,
+          headers,
+          responseType: 'arraybuffer',
+          overrideMimeType: 'text/plain; charset=x-user-defined',
+          onload(xhr) {
+            let data;
+            if (xhr.response instanceof ArrayBuffer) {
+              data = new Uint8Array(xhr.response);
+            } else {
+              const r = xhr.responseText;
+              data = new Uint8Array(r.length);
+              let i = 0;
+              while (i < r.length) {
+                data[i] = r.charCodeAt(i);
+                i++;
+              }
+            }
+            return cb(data, xhr.responseHeaders);
+          },
+          onerror() {
+            return cb(null);
+          },
+          onabort() {
+            return cb(null);
+          }
+        };
+        try {
+          return (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
+        } catch (error) {
+          return fallback();
+        }
+      }
     },
     file(url, cb) {
       return CrossOrigin.binary(url, function (data, headers) {
@@ -1489,14 +1788,62 @@
       }
       const req = new CrossOrigin.Request();
       req.onloadend = onloadend;
-
+      if (platform === 'userscript') {
+        if (window.GM?.xmlHttpRequest == null && window.GM_xmlhttpRequest == null) {
+          return $.ajax(url, options);
+        }
+        const gmOptions = {
+          method: 'GET',
+          anonymous: true,
+          url,
+          headers,
+          timeout,
+          onload(xhr) {
+            try {
+              let response = xhr.responseText;
+              if (responseType === 'json') {
+                try {
+                  response = JSON.parse(xhr.responseText);
+                } catch (error) {
+                  console.error(error);
+                  console.error(xhr);
+                }
+              }
+              $.extend(req, {
+                url,
+                headers,
+                response,
+                status: xhr.status,
+                statusText: xhr.statusText,
+                responseHeaderString: xhr.responseHeaders
+              });
+            } catch (error) { }
+            return req.onloadend();
+          },
+          onerror() { return req.onloadend(); },
+          onabort() { return req.onloadend(); },
+          ontimeout() { return req.onloadend(); }
+        };
+        try {
+          gmReq = (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
+        } catch (error) {
+          return $.ajax(url, options);
+        }
+        if (gmReq && (typeof gmReq.abort === 'function')) {
+          req.abort = function () {
+            try {
+              return gmReq.abort();
+            } catch (error1) { }
+          };
+        }
+      } else {
         $.eventPageRequest({ type: 'ajax', url, responseType, headers, timeout }).then((result) => {
           if (result.status) {
             $.extend(req, result);
           }
           return req.onloadend();
         });
-
+      }
       return req;
     },
     ajaxPromise(url, options = {}) {
@@ -1511,7 +1858,7 @@
       });
     },
     permission(cb, cbFail, origins) {
-
+      if (platform === 'crx') {
         return $.eventPageRequest({ type: 'permission', origins }).then((result) => {
           if (result) {
             return cb();
@@ -1519,7 +1866,7 @@
             return cbFail();
           }
         });
-
+      }
       return cb();
     },
   };
@@ -12479,6 +12826,23 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root {
   position: relative;
 }
+#qr .captcha-root.captcha-idle > div {
+  height: auto !important;
+  min-height: 0 !important;
+  background-image: none !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+#qr .captcha-root.captcha-idle #t-slider,
+#qr .captcha-root.captcha-idle #t-msg,
+#qr .captcha-root.captcha-idle #t-task,
+#qr .captcha-root.captcha-idle #t-box,
+#qr .captcha-root.captcha-idle .captcha-custom-ui,
+#qr .captcha-root.captcha-idle .captcha-clue-image,
+#qr .captcha-root.captcha-idle .captcha-strip {
+  display: none !important;
+}
+
 #qr .captcha-root.is-challenge > div,
 .captcha-iframe.is-challenge .captcha-root > div {
   height: auto !important;
@@ -14085,6 +14449,7 @@ svg.icon {
         // (this.nodes.container) remains valid. We observe captcha-root (the
         // parent) since it retains its class and stays stable.
         this.nodes.container = $.el('div', {className: 'captcha-container'});
+        $.addClass(this.nodes.root, 'captcha-idle');
         $.prepend(this.nodes.root, this.nodes.container);
         CaptchaT.currentThread = CaptchaT.getThread();
         CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
@@ -14200,6 +14565,18 @@ svg.icon {
       setTimeout(restore, 300);
     },
 
+    clearCustomUi(mainDiv) {
+      $$('.captcha-custom-ui, .captcha-clue-image, .captcha-strip', mainDiv).forEach(el => $.rm(el));
+      this._isNotLikeOthers = false;
+      this.isCapturing = false;
+    },
+
+    setIdle(mainDiv) {
+      this.clearCustomUi(mainDiv);
+      $.rmClass(this.nodes.root, 'is-challenge');
+      $.addClass(this.nodes.root, 'captcha-idle');
+    },
+
     createStrips() {
       const mainDiv = this.nodes.container;
       if (!mainDiv) return;
@@ -14207,41 +14584,52 @@ svg.icon {
       const slider = $('#t-slider', mainDiv);
       const taskEl = $('#t-task', mainDiv);
       let customUiExists = !!$('.captcha-custom-ui', mainDiv);
+      const tLoad = $('#t-load', mainDiv);
+      const tLoadText = tLoad ? `${tLoad.value || ''} ${tLoad.textContent || ''}` : '';
+      const isOnCooldown = /\(\d+\)/.test(tLoadText);
+      const tNext = $('#t-next', mainDiv);
+      const tNextText = tNext ? tNext.textContent || '' : '';
+      const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
+
+      if (isOnCooldown && !hasActiveChallengeStep) {
+        this.setIdle(mainDiv);
+        return;
+      }
 
       // If there's no slider or it has no max attribute, it's not a real puzzle
       // (e.g., "Verification not required", "Captcha expired", or initializing)
       if (!slider || !slider.hasAttribute('max')) {
-        $.rmClass(this.nodes.root, 'is-challenge');
-        this._isNotLikeOthers = false;
+        this.setIdle(mainDiv);
         return;
       }
 
       const imgEl = taskEl ? $('img', taskEl) : null;
+      const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
+      const hasTaskBg = taskBg && taskBg.includes('url(');
 
-      // Now we know it's a real puzzle because it has a max attribute.
-      // If it has no image clue, it must be the odd one out!
-      if (!imgEl) {
+      // A real puzzle has task image frames. If there is no separate clue image,
+      // the challenge is the odd-one-out variant.
+      if (!imgEl && (hasTaskBg || hasActiveChallengeStep)) {
         this._isNotLikeOthers = true;
       } else if (imgEl && imgEl.src) {
         this._isNotLikeOthers = false;
       }
       const isNotLikeOthers = !!this._isNotLikeOthers;
 
-      const taskBg = taskEl ? taskEl.style.backgroundImage : '';
       let clueUrl = '';
       if (imgEl && imgEl.src) {
           clueUrl = `url("${imgEl.src}")`;
-      } else if (taskBg && taskBg.includes('url(')) {
+      } else if (hasTaskBg) {
           clueUrl = taskBg;
       }
 
-      // Safety check, though the max attribute check above already guarantees it's a challenge
-      const isChallenge = !!clueUrl || isNotLikeOthers;
+      const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-      if (!customUiExists && !isChallenge) {
-        $.rmClass(this.nodes.root, 'is-challenge');
+      if (!isChallenge) {
+        this.setIdle(mainDiv);
         return;
       }
+      $.rmClass(this.nodes.root, 'captcha-idle');
 
       // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
       if (customUiExists) {
@@ -14337,6 +14725,7 @@ svg.icon {
 
       // Now capture the 4 puzzle images by programmatically moving the slider
       const originalSliderValue = slider.value;
+      let capturedImages = 0;
 
       const runCapture = async () => {
         for (let i = startIndex; i < count; i++) {
@@ -14350,11 +14739,25 @@ svg.icon {
           const stripIndex = i - startIndex;
           const strip = stripsContainer.children[stripIndex];
           if (strip) {
-            strip.style.backgroundImage = taskEl.style.backgroundImage;
-            strip.style.backgroundPosition = taskEl.style.backgroundPosition;
-            strip.style.backgroundSize = taskEl.style.backgroundSize;
-            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
+            const taskStyle = getComputedStyle(taskEl);
+            const bg = taskEl.style.backgroundImage || taskStyle.backgroundImage;
+            if (bg && bg.includes('url(')) { capturedImages++; }
+            strip.style.backgroundImage = bg;
+            strip.style.backgroundPosition = taskEl.style.backgroundPosition || taskStyle.backgroundPosition;
+            strip.style.backgroundSize = taskEl.style.backgroundSize || taskStyle.backgroundSize;
+            strip.style.backgroundRepeat = taskEl.style.backgroundRepeat || taskStyle.backgroundRepeat;
           }
+        }
+
+        if (!capturedImages) {
+          this.isCapturing = false;
+          this.isRestoring = true;
+          slider.value = originalSliderValue;
+          slider.dispatchEvent(new Event('change', { bubbles: true }));
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          this.isRestoring = false;
+          if (!hasActiveChallengeStep) { this.setIdle(mainDiv); }
+          return;
         }
 
         // Done capturing!
@@ -14452,7 +14855,7 @@ svg.icon {
       if (!this.isEnabled || !this.nodes.container) { return; }
       $.global('destroyTCaptcha');
       $.rm(this.nodes.container);
-      $.rmClass(this.nodes.root, 'is-challenge');
+      $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle');
       delete this.nodes.container;
     },
 
@@ -27462,9 +27865,9 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
       // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
       try {
         let w = window;
-
+        if (platform === 'crx') {
           w = (w.wrappedJSObject || w);
-
+        }
         if (`${meta.name} antidup` in w) {
           return;
         }

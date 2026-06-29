@@ -93,6 +93,7 @@ const CaptchaT = {
       // (this.nodes.container) remains valid. We observe captcha-root (the
       // parent) since it retains its class and stays stable.
       this.nodes.container = $.el('div', {className: 'captcha-container'});
+      $.addClass(this.nodes.root, 'captcha-idle');
       $.prepend(this.nodes.root, this.nodes.container);
       CaptchaT.currentThread = CaptchaT.getThread();
       CaptchaT.currentThread.autoLoad = Conf['Auto-load captcha'] ? '1' : '0';
@@ -208,6 +209,18 @@ const CaptchaT = {
     setTimeout(restore, 300);
   },
 
+  clearCustomUi(mainDiv) {
+    $$('.captcha-custom-ui, .captcha-clue-image, .captcha-strip', mainDiv).forEach(el => $.rm(el));
+    this._isNotLikeOthers = false;
+    this.isCapturing = false;
+  },
+
+  setIdle(mainDiv) {
+    this.clearCustomUi(mainDiv);
+    $.rmClass(this.nodes.root, 'is-challenge');
+    $.addClass(this.nodes.root, 'captcha-idle');
+  },
+
   createStrips() {
     const mainDiv = this.nodes.container;
     if (!mainDiv) return;
@@ -215,41 +228,52 @@ const CaptchaT = {
     const slider = $('#t-slider', mainDiv);
     const taskEl = $('#t-task', mainDiv);
     let customUiExists = !!$('.captcha-custom-ui', mainDiv);
+    const tLoad = $('#t-load', mainDiv);
+    const tLoadText = tLoad ? `${tLoad.value || ''} ${tLoad.textContent || ''}` : '';
+    const isOnCooldown = /\(\d+\)/.test(tLoadText);
+    const tNext = $('#t-next', mainDiv);
+    const tNextText = tNext ? tNext.textContent || '' : '';
+    const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
+
+    if (isOnCooldown && !hasActiveChallengeStep) {
+      this.setIdle(mainDiv);
+      return;
+    }
     
     // If there's no slider or it has no max attribute, it's not a real puzzle 
     // (e.g., "Verification not required", "Captcha expired", or initializing)
     if (!slider || !slider.hasAttribute('max')) {
-      $.rmClass(this.nodes.root, 'is-challenge');
-      this._isNotLikeOthers = false;
+      this.setIdle(mainDiv);
       return;
     }
 
     const imgEl = taskEl ? $('img', taskEl) : null;
+    const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
+    const hasTaskBg = taskBg && taskBg.includes('url(');
     
-    // Now we know it's a real puzzle because it has a max attribute.
-    // If it has no image clue, it must be the odd one out!
-    if (!imgEl) {
+    // A real puzzle has task image frames. If there is no separate clue image,
+    // the challenge is the odd-one-out variant.
+    if (!imgEl && (hasTaskBg || hasActiveChallengeStep)) {
       this._isNotLikeOthers = true;
     } else if (imgEl && imgEl.src) {
       this._isNotLikeOthers = false;
     }
     const isNotLikeOthers = !!this._isNotLikeOthers;
 
-    const taskBg = taskEl ? taskEl.style.backgroundImage : '';
     let clueUrl = '';
     if (imgEl && imgEl.src) {
         clueUrl = `url("${imgEl.src}")`;
-    } else if (taskBg && taskBg.includes('url(')) {
+    } else if (hasTaskBg) {
         clueUrl = taskBg;
     }
     
-    // Safety check, though the max attribute check above already guarantees it's a challenge
-    const isChallenge = !!clueUrl || isNotLikeOthers;
+    const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-    if (!customUiExists && !isChallenge) {
-      $.rmClass(this.nodes.root, 'is-challenge');
+    if (!isChallenge) {
+      this.setIdle(mainDiv);
       return;
     }
+    $.rmClass(this.nodes.root, 'captcha-idle');
 
     // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
     if (customUiExists) {
@@ -345,6 +369,7 @@ const CaptchaT = {
 
     // Now capture the 4 puzzle images by programmatically moving the slider
     const originalSliderValue = slider.value;
+    let capturedImages = 0;
     
     const runCapture = async () => {
       for (let i = startIndex; i < count; i++) {
@@ -358,11 +383,25 @@ const CaptchaT = {
         const stripIndex = i - startIndex;
         const strip = stripsContainer.children[stripIndex];
         if (strip) {
-          strip.style.backgroundImage = taskEl.style.backgroundImage;
-          strip.style.backgroundPosition = taskEl.style.backgroundPosition;
-          strip.style.backgroundSize = taskEl.style.backgroundSize;
-          strip.style.backgroundRepeat = taskEl.style.backgroundRepeat;
+          const taskStyle = getComputedStyle(taskEl);
+          const bg = taskEl.style.backgroundImage || taskStyle.backgroundImage;
+          if (bg && bg.includes('url(')) { capturedImages++; }
+          strip.style.backgroundImage = bg;
+          strip.style.backgroundPosition = taskEl.style.backgroundPosition || taskStyle.backgroundPosition;
+          strip.style.backgroundSize = taskEl.style.backgroundSize || taskStyle.backgroundSize;
+          strip.style.backgroundRepeat = taskEl.style.backgroundRepeat || taskStyle.backgroundRepeat;
         }
+      }
+
+      if (!capturedImages) {
+        this.isCapturing = false;
+        this.isRestoring = true;
+        slider.value = originalSliderValue;
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        this.isRestoring = false;
+        if (!hasActiveChallengeStep) { this.setIdle(mainDiv); }
+        return;
       }
 
       // Done capturing!
@@ -460,7 +499,7 @@ const CaptchaT = {
     if (!this.isEnabled || !this.nodes.container) { return; }
     $.global('destroyTCaptcha');
     $.rm(this.nodes.container);
-    $.rmClass(this.nodes.root, 'is-challenge');
+    $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle');
     delete this.nodes.container;
   },
 
