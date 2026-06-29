@@ -2,7 +2,7 @@
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import QR from "./QRBridge";
+import { addQRClass, focusQRComment, getFirstQRPost, getQRCommentInput, getQRPosts, getQRRoot, insertCaptchaRoot, isQRAutoCooldown, isQRCommentActive, isQROpen, submitQR } from "./QRBridge";
 import { isPassEnabled } from "../platform/helpers";
 
 const CaptchaT = {
@@ -13,12 +13,12 @@ const CaptchaT = {
     const root = $.el('div', {className: 'captcha-root'});
     this.nodes = {root};
 
-    $.addClass(QR.nodes.el, 'has-captcha', 'captcha-t');
+    addQRClass('has-captcha', 'captcha-t');
     if (Conf['Theme Captcha']) $.addClass(document.documentElement, 'themed-captcha');
-    $.after(QR.nodes.com.parentNode, root);
+    insertCaptchaRoot(root);
 
     $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
-    $.on(QR.nodes.com, 'keydown', e => {
+    $.on(getQRCommentInput(), 'keydown', e => {
       if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
     });
     d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
@@ -32,10 +32,10 @@ const CaptchaT = {
         this.isInitializing = false;
         if (!this.shouldFocus) {
           e.preventDefault();
-          if (e.relatedTarget && QR.nodes.el.contains(e.relatedTarget)) {
+          if (e.relatedTarget && getQRRoot().contains(e.relatedTarget)) {
             e.relatedTarget.focus();
-          } else if (QR.nodes && !QR.nodes.el.hidden) {
-            QR.nodes.com.focus();
+          } else if (isQROpen()) {
+            focusQRComment();
           }
         }
       }
@@ -43,13 +43,13 @@ const CaptchaT = {
   },
 
   moreNeeded() {
-    const post = QR.posts[0];
+    const post = getFirstQRPost();
     if (!this.isEnabled || !post) { return; }
 
     // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge
     // for an empty QR, but fetch one as soon as the queued post needs it.
     if (
-      (QR.posts.length > 1) ||
+      (getQRPosts().length > 1) ||
       Conf['Auto-load captcha'] ||
       !post.isOnlyQuotes() ||
       post.file
@@ -60,7 +60,7 @@ const CaptchaT = {
   },
 
   load() {
-    if (QR.nodes && (d.activeElement === QR.nodes.com)) { this.startCommentFocusRestore(false); }
+    if (isQRCommentActive()) { this.startCommentFocusRestore(false); }
     if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
     if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
 
@@ -75,7 +75,7 @@ const CaptchaT = {
   getThread() {
     return {
       boardID: g.BOARD.ID,
-      threadID: QR.posts[0].thread === 'new' ? '0' : ('' + QR.posts[0].thread),
+      threadID: getFirstQRPost().thread === 'new' ? '0' : ('' + getFirstQRPost().thread),
     };
   },
 
@@ -134,7 +134,7 @@ const CaptchaT = {
   },
 
   startCommentFocusRestore(focus) {
-    if (focus || (d.activeElement !== QR.nodes.com)) {
+    if (focus || (!isQRCommentActive())) {
       this.cancelCommentFocusRestore();
       return;
     }
@@ -148,7 +148,7 @@ const CaptchaT = {
   },
 
   shouldKeepCommentFocus() {
-    if (!this.keepCommentFocus || !QR.nodes || QR.nodes.el.hidden) { return false; }
+    if (!this.keepCommentFocus || !isQROpen()) { return false; }
     if (Date.now() > this.keepCommentFocusUntil) {
       this.cancelCommentFocusRestore();
       return false;
@@ -157,19 +157,19 @@ const CaptchaT = {
   },
 
   focusComment() {
-    if (!QR.nodes || QR.nodes.el.hidden) { return; }
+    if (!isQROpen()) { return; }
     try {
-      QR.nodes.com.focus({ preventScroll: true });
+      focusQRComment(true);
     } catch (error) {
-      QR.nodes.com.focus();
+      focusQRComment();
     }
   },
 
   redirectCommentFocus(e) {
     if (!this.shouldKeepCommentFocus()) { return false; }
     const target = e?.target instanceof Node ? e.target : null;
-    if (target === QR.nodes.com) { return false; }
-    if (target && QR.nodes.el.contains(target) && !this.nodes.root.contains(target)) {
+    if (target === getQRCommentInput()) { return false; }
+    if (target && getQRRoot().contains(target) && !this.nodes.root.contains(target)) {
       this.cancelCommentFocusRestore();
       return false;
     }
@@ -188,8 +188,8 @@ const CaptchaT = {
     const restore = () => {
       if (!this.shouldKeepCommentFocus()) { return; }
       const active = d.activeElement;
-      if (active === QR.nodes.com) { return; }
-      if (active && QR.nodes.el.contains(active) && !this.nodes.root.contains(active)) {
+      if (active === getQRCommentInput()) { return; }
+      if (active && getQRRoot().contains(active) && !this.nodes.root.contains(active)) {
         this.cancelCommentFocusRestore();
         return;
       }
@@ -499,8 +499,8 @@ const CaptchaT = {
       }
       if (this.isCompleted) return;
       this.isCompleted = true;
-      if (Conf['Post on Captcha Completion'] && !QR.cooldown.auto) {
-        QR.submit();
+      if (Conf['Post on Captcha Completion'] && !isQRAutoCooldown()) {
+        submitQR();
       }
     } else {
       this.isCompleted = false;
