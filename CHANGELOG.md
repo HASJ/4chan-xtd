@@ -3,6 +3,16 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.16 (2026-06-29)
+
+- Architecture
+  - Replaced the dynamic Quick Reply CAPTCHA bridge proxy with an explicit typed facade to resolve circular dependencies.
+- Maintenance
+  - Removed outdated decaffeinate suggestions from source files.
+  - Documented CLI arguments in build tools (`tools/rollup.js`) and `check-cycles.js` scripts.
+  - Added module documentation headers to core entry points and platform adapters.
+  - Documented project maintenance gaps and subagent documentation.
+
 ### 2.26.14 (2026-06-29)
 
 - Architecture
