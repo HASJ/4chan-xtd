@@ -18,6 +18,7 @@ import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import { typeFromExtension } from './FileTypes';
+import { registerQR } from './QRBridge';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -2410,6 +2411,7 @@ class post {
   }
 };
 QR.post = post;
+registerQR(QR);
 
 export default QR;
 

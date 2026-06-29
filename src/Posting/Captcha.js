@@ -5,7 +5,7 @@ import CaptchaT from "./Captcha.t";
 import meta from '../../package.json';
 import keyCode from "../Miscellaneous/KeyCode";
 import $$ from "../platform/$$";
-import QR from "./QR";
+import QR from "./QRBridge";
 import { Conf, d, doc } from "../globals/globals";
 import { isPassEnabled, MINUTE, SECOND } from "../platform/helpers";
 
