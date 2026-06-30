@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.19.1 (2026-06-30)
+
+- Bugfixes
+  - Fixed queued Quick Reply posting so TCaptcha loads for the next queued post without flashing back to the empty idle rectangle after a file post completes.
+
 ### 2.26.19 (2026-06-30)
 
 - Bugfixes
