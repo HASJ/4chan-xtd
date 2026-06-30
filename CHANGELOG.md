@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.19 (2026-06-30)
+
+- Bugfixes
+  - Fixed Quick Reply TCaptcha no-verification handling so the native "Verification not required" message and captcha rectangle remain visible instead of being hidden as an idle challenge.
+
 ### 2.26.18 (2026-06-29)
 
 - Bugfixes

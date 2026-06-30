@@ -1603,6 +1603,19 @@ input.field.tripped:not(:hover):not(:focus) {
   display: none !important;
 }
 
+#qr .captcha-root.captcha-status > div {
+  display: block !important;
+  height: auto !important;
+  min-height: 170px !important;
+  overflow: visible !important;
+}
+
+#qr .captcha-root.captcha-status #t-msg,
+#qr .captcha-root.captcha-status #t-task,
+#qr .captcha-root.captcha-status #t-box {
+  display: block !important;
+}
+
 #qr .captcha-root.is-challenge > div,
 .captcha-iframe.is-challenge .captcha-root > div {
   height: auto !important;

@@ -217,8 +217,20 @@ const CaptchaT = {
 
   setIdle(mainDiv) {
     this.clearCustomUi(mainDiv);
-    $.rmClass(this.nodes.root, 'is-challenge');
+    $.rmClass(this.nodes.root, 'is-challenge', 'captcha-status');
     $.addClass(this.nodes.root, 'captcha-idle');
+  },
+
+  setStatusMessage(mainDiv) {
+    this.clearCustomUi(mainDiv);
+    $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle', 'captcha-status');
+    $.addClass(this.nodes.root, 'captcha-status');
+  },
+
+  hasVerificationNotRequired(mainDiv) {
+    if (!mainDiv) { return false; }
+    const el = $('#t-msg, #t-task', mainDiv);
+    return !!(el && /Verification not required/i.test(el.textContent));
   },
 
   createStrips() {
@@ -234,6 +246,12 @@ const CaptchaT = {
     const tNext = $('#t-next', mainDiv);
     const tNextText = tNext ? tNext.textContent || '' : '';
     const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
+    const verificationNotRequired = this.hasVerificationNotRequired(mainDiv);
+
+    if (verificationNotRequired) {
+      this.setStatusMessage(mainDiv);
+      return;
+    }
 
     if (isOnCooldown && !hasActiveChallengeStep) {
       this.setIdle(mainDiv);
@@ -241,7 +259,7 @@ const CaptchaT = {
     }
     
     // If there's no slider or it has no max attribute, it's not a real puzzle 
-    // (e.g., "Verification not required", "Captcha expired", or initializing)
+    // (e.g., "Captcha expired" or initializing)
     if (!slider || !slider.hasAttribute('max')) {
       this.setIdle(mainDiv);
       return;
@@ -273,7 +291,7 @@ const CaptchaT = {
       this.setIdle(mainDiv);
       return;
     }
-    $.rmClass(this.nodes.root, 'captcha-idle');
+    $.rmClass(this.nodes.root, 'captcha-idle', 'captcha-status');
     $.addClass(this.nodes.root, 'is-challenge');
 
     // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
@@ -507,7 +525,7 @@ const CaptchaT = {
     if (!this.isEnabled || !this.nodes.container) { return; }
     $.global('destroyTCaptcha');
     $.rm(this.nodes.container);
-    $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle');
+    $.rmClass(this.nodes.root, 'is-challenge', 'captcha-idle', 'captcha-status');
     delete this.nodes.container;
   },
 
@@ -522,14 +540,13 @@ const CaptchaT = {
   },
 
   getOne() {
-    let el;
     let response = {};
     if (this.nodes.container) {
       for (var key of ['t-response', 't-challenge']) {
         response[key] = $(`[name='${key}']`, this.nodes.container).value;
       }
     }
-    if (!response['t-response'] && !((el = $('#t-msg, #t-task')) && /Verification not required/i.test(el.textContent))) {
+    if (!response['t-response'] && !this.hasVerificationNotRequired(this.nodes.container)) {
       response = null;
     }
     return response;
