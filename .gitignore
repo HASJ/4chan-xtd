@@ -9,9 +9,7 @@ node_modules/
 /dist/
 /testbuilds/
 /tmp-crx/
-/builds/*.gz
-/builds/*.js.map
-/builds/crx/crx.7z
+builds/*
 
 # Test and local development artifacts
 /tmp/
