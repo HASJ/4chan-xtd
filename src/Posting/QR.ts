@@ -1199,6 +1199,7 @@ var QR = {
     if (postsCount) {
       post.rm();
       QR.captcha.setup(d.activeElement === QR.nodes.status);
+      QR.captcha.moreNeeded();
     } else if (Conf['Persistent QR']) {
       post.rm();
       if (Conf['Auto Hide QR']) {

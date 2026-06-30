@@ -62,7 +62,11 @@ const CaptchaT = {
   load() {
     if (isQRCommentActive()) { this.startCommentFocusRestore(false); }
     if (!this.shouldLoad || !this.isInitialized || !CaptchaT.currentThread || this.hasRequested) { return; }
-    if (this.nodes.container && ($('#t-slider', this.nodes.container) || $('#t-resp', this.nodes.container))) { return; }
+    if (this.nodes.container) {
+      const slider = $('#t-slider', this.nodes.container);
+      const response = $('#t-resp', this.nodes.container);
+      if ((slider && slider.hasAttribute('max')) || response?.value) { return; }
+    }
 
     // Request directly from the native API. The #t-load control is not
     // consistently rendered after a fresh-cookie session.
@@ -579,9 +583,10 @@ const CaptchaT = {
     this.isCompleted = false;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
-    this.shouldLoad = true;
+    this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
       $.global('TCaptchaClearChallenge');
+      this.setIdle(this.nodes.container);
     }
   },
 
