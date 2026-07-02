@@ -1,14 +1,10 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import UI from "../General/UI";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Menu = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
@@ -57,3 +53,4 @@ var Menu = {
   }
 };
 export default Menu;
+

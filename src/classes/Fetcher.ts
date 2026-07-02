@@ -3,45 +3,15 @@ import Board from "./Board";
 import Post from "./Post";
 import Thread from "./Thread";
 import $ from "../platform/$";
-import Main from "../main/Main";
+import Callbacks from "./Callbacks";
 import Index from "../General/Index";
-import { E, g, Conf, d } from "../globals/globals";
+import { g, Conf, d } from "../globals/globals";
 import CrossOrigin from "../platform/CrossOrigin";
 import Get from "../General/Get";
 import RestoreDeletedFromArchive from "../Archive/RestoreDeletedFromArchive";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS206: Consider reworking classes to avoid initClass
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 export default class Fetcher {
-  static archiveTags = {
-    '\n':         {innerHTML: "<br>"},
-    '[b]':        {innerHTML: "<b>"},
-    '[/b]':       {innerHTML: "</b>"},
-    '[spoiler]':  {innerHTML: "<s>"},
-    '[/spoiler]': {innerHTML: "</s>"},
-    '[code]':     {innerHTML: "<pre class=\"prettyprint\">"},
-    '[/code]':    {innerHTML: "</pre>"},
-    '[moot]':     {innerHTML: "<div style=\"padding:5px;margin-left:.5em;border-color:#faa;border:2px dashed rgba(255,0,0,.1);border-radius:2px\">"},
-    '[/moot]':    {innerHTML: "</div>"},
-    '[banned]':   {innerHTML: "<strong style=\"color: red;\">"},
-    '[/banned]':  {innerHTML: "</strong>"},
-    '[fortune]'(text) { return {innerHTML: "<span class=\"fortune\" style=\"color:" + E(text.match(/#\w+|$/)[0]) + "\"><b>"}; },
-    '[/fortune]': {innerHTML: "</b></span>"},
-    '[i]':        {innerHTML: "<span class=\"mu-i\">"},
-    '[/i]':       {innerHTML: "</span>"},
-    '[red]':      {innerHTML: "<span class=\"mu-r\">"},
-    '[/red]':     {innerHTML: "</span>"},
-    '[green]':    {innerHTML: "<span class=\"mu-g\">"},
-    '[/green]':   {innerHTML: "</span>"},
-    '[blue]':     {innerHTML: "<span class=\"mu-b\">"},
-    '[/blue]':    {innerHTML: "</span>"}
-  };
+  static flagCSS: HTMLLinkElement | null;
 
   declare boardID: string;
   declare threadID: number;
@@ -65,7 +35,7 @@ export default class Fetcher {
     if ((post = Index.replyData?.[`${this.boardID}.${this.postID}`]) && (thread = g.threads.get(`${this.boardID}.${this.threadID}`))) {
       const board  = g.boards[this.boardID];
       post = new Post(g.SITE.Build.postFromObject(post, this.boardID), thread, board, {isFetchedQuote: true});
-      Main.callbackNodes('Post', [post]);
+      Callbacks.Post.execute(post);
       this.insert(post);
       return;
     }
@@ -73,7 +43,7 @@ export default class Fetcher {
     this.root.textContent = `Loading post No.${this.postID}...`;
     if (this.threadID) {
       const that = this;
-      $.cache(g.SITE.urls.threadJSON({boardID: this.boardID, threadID: this.threadID}), function({isCached}) {
+      ($ as any).cache(g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID}), function({isCached}) {
         return that.fetchedPost(this, isCached);
       });
     } else {
@@ -86,7 +56,7 @@ export default class Fetcher {
     if (!this.root.parentNode) { return; }
     if (!this.quoter) { this.quoter = post; }
     const clone = post.addClone(this.quoter.context, ($.hasClass(this.root, 'dialog')));
-    Main.callbackNodes('Post', [clone]);
+    Callbacks.Post.execute(clone);
 
     // Get rid of the side arrows/stubs.
     const {nodes} = clone;
@@ -152,10 +122,10 @@ export default class Fetcher {
     if (post.no !== this.postID) {
       // Cached requests can be stale and must be rechecked.
       if (isCached) {
-        const api = g.SITE.urls.threadJSON({boardID: this.boardID, threadID: this.threadID});
-        $.cleanCache(url => url === api);
+        const api = g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID});
+        ($ as any).cleanCache(url => url === api);
         const that = this;
-        $.cache(api, function() {
+        ($ as any).cache(api, function() {
           return that.fetchedPost(this, false);
         });
         return;
@@ -172,9 +142,9 @@ export default class Fetcher {
     const board = g.boards[this.boardID] ||
       new Board(this.boardID);
     const thread = g.threads.get(`${this.boardID}.${this.threadID}`) ||
-      new Thread(this.threadID, board);
+      new Thread(this.threadID as any, board);
     post = new Post(g.SITE.Build.postFromObject(post, this.boardID), thread, board, {isFetchedQuote: true});
-    Main.callbackNodes('Post', [post]);
+    Callbacks.Post.execute(post);
     return this.insert(post);
   }
 
@@ -225,6 +195,6 @@ export default class Fetcher {
       return;
     }
 
-    return this.insert(RestoreDeletedFromArchive.insert(data)[0]);
+    return this.insert(RestoreDeletedFromArchive.insert(data, url)[0]);
   }
 }

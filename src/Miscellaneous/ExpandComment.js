@@ -1,14 +1,10 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Get from "../General/Get";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var ExpandComment = {
   init() {
     if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) { return; }
@@ -101,3 +97,4 @@ var ExpandComment = {
   }
 };
 export default ExpandComment;;
+

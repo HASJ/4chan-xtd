@@ -20,17 +20,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const buildDir = resolve(__dirname, '../builds/');
 
-const minify = process.argv.includes('-min');
-const noFormat = process.argv.includes('-no-format');
-const platform = /** @type {'crx'|'userscript'} */ (process.argv.find(arg => arg.startsWith('-platform='))?.slice(10));
+const minify = process.argv.includes('-min'); // -min: Minifies the output.
+const noFormat = process.argv.includes('-no-format'); // -no-format: Skips post-processing formatting steps (faster builds, larger output).
+const platform = /** @type {'crx'|'userscript'} */ (process.argv.find(arg => arg.startsWith('-platform='))?.slice(10)); // -platform=[userscript|crx]: Targets a specific build output. If omitted, builds both.
 if (platform !== undefined && platform !== 'crx' && platform !== 'userscript') {
   throw new Error('incorrect value for the platform argument');
 }
-const buildForTest = process.argv.includes('-test');
+const buildForTest = process.argv.includes('-test'); // -test: Includes test-only code regions (`// #region tests_enabled`).
 
 // https://github.com/rollup/plugins/discussions/1777
 const tsPlugin = typescript({
-  compilerOptions: { outDir: buildDir, },
+  compilerOptions: {
+    outDir: buildDir,
+    noEmit: false,
+  },
 });
 
 (async () => {
@@ -57,13 +60,14 @@ const tsPlugin = typescript({
   });
 
   const bundle = await rollup({
-    input: resolve(__dirname, '../src/main/Main.js'),
+    input: resolve(__dirname, '../src/main/Main.ts'),
+    treeshake: false,
     plugins: [
       platform ? platformSpecific({
         platform,
         include: [
           // Only files that actually have platform specific code.
-          "**/src/main/Main.js",
+          "**/src/main/Main.ts",
           "**/src/platform/$.ts",
           "**/src/platform/CrossOrigin.ts",
         ],
@@ -72,7 +76,7 @@ const tsPlugin = typescript({
       buildForTest ? undefined : removeTestCode({
         include: [
           // Only files that actually have test code.
-          "**/src/main/Main.js",
+          "**/src/main/Main.ts",
           "**/src/classes/Post.ts",
           "**/src/Linkification/Linkify.js",
         ],
@@ -161,7 +165,7 @@ const tsPlugin = typescript({
       constBindings: false,
     },
     // Can't be none as long as the root file defined exports
-    // exports: 'none',
+    exports: 'none',
   };
 
   // user script

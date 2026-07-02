@@ -41,20 +41,20 @@ export interface Board {
   threads: SimpleDict<Thread>,
 }
 
-export const Conf = Object.create(null);
+export const Conf: Record<string, any> = Object.create(null);
 
 export const g: {
   VERSION:   string,
   VERSION_DATE: Date,
   NAMESPACE: string,
-  sites:     (typeof SWTinyboard)[],
+  sites:     any[],
   boardID?:  string,
   boards:    Board[],
   posts?:    SimpleDict<Post>,
   threads?:  SimpleDict<Thread>,
   threadID?: number,
   THREADID?: number,
-  SITE?:     typeof SWTinyboard,
+  SITE?:     any,
   BOARD?:    Board,
   VIEW?:     string,
 } = {

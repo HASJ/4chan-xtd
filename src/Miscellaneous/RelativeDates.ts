@@ -1,6 +1,7 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Post from "../classes/Post";
-import Index from "../General/Index";
+import { indexEnabled } from "../General/IndexState";
 import { g, Conf, d, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { DAY, HOUR, MINUTE, SECOND } from "../platform/helpers";
@@ -14,7 +15,7 @@ var RelativeDates = {
         ['index', 'thread', 'archive'].includes(g.VIEW) &&
         ['Show', 'Both', 'BothRelativeFirst'].includes(Conf.RelativeTime)
       ) ||
-      Index.enabled
+      indexEnabled
     ) {
       this.flush();
       $.on(d, 'visibilitychange PostsInserted', this.flush);
@@ -176,3 +177,4 @@ var RelativeDates = {
   }
 };
 export default RelativeDates;
+

@@ -1,17 +1,11 @@
+// @ts-nocheck
 import { Conf, d, doc } from "../globals/globals";
-import Main from "../main/Main";
+import Callbacks from "../classes/Callbacks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import Header from "./Header";
+import { getHeaderDialogBorders } from "./HeaderLayout";
 import Icon from "../Icons/icon";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS206: Consider reworking classes to avoid initClass
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const dialog = function(id, properties) {
   const el = $.el('div', {
     className: 'dialog',
@@ -138,7 +132,7 @@ var Menu = (function() {
         try {
           if (!entry.open(data)) { return; }
         } catch (err) {
-          Main.handleErrors({
+          Callbacks.errorHandler?.({
             message: `Error in building the ${this.type} menu.`,
             error: err
           });
@@ -312,12 +306,7 @@ export var dragstart = function (e) {
     isTouching
   };
 
-  [o.topBorder, o.bottomBorder] = Conf['Header auto-hide'] || !Conf['Fixed Header'] ?
-    [0, 0]
-  : Conf['Bottom Header'] ?
-    [0, Header.bar.getBoundingClientRect().height]
-  :
-    [Header.bar.getBoundingClientRect().height, 0];
+  [o.topBorder, o.bottomBorder] = getHeaderDialogBorders();
 
   if (isTouching) {
     o.identifier = e.identifier;

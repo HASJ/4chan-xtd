@@ -58,3 +58,10 @@ export const HOUR = MINUTE * 60;
 export const DAY = HOUR * 24;
 
 export const platform = window.GM_xmlhttpRequest ? 'userscript' : 'crx';
+
+export const isPassEnabled = () => {
+  // A ticket left in localStorage is not proof that the corresponding cookie
+  // still exists. In particular, clearing cookies leaves stale tickets behind
+  // and must not suppress CAPTCHA initialization.
+  return document.cookie.indexOf('pass_enabled=1') >= 0;
+};

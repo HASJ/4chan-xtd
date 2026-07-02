@@ -140,7 +140,7 @@ var PostHiding = {
         { el: thisPost },
         { el: replies },
       ];
-      let byId: HTMLElement;
+      let byId: any;
       if (g.BOARD.config.user_ids) {
         byId = UI.checkbox('byId', 'By poster id', false);
         showOptions.push({ el: byId });
@@ -160,9 +160,9 @@ var PostHiding = {
           if (!data) return false;
 
           PostHiding.menu.post = post;
-          thisPost.firstChild.checked = post.isHidden;
-          replies.firstChild.checked = data.hideRecursively ?? Conf['Recursive Hiding'];
-          if (byId) byId.firstChild.checked = data.byId;
+          (thisPost.firstChild as HTMLInputElement).checked = post.isHidden;
+          (replies.firstChild as HTMLInputElement).checked = data.hideRecursively ?? Conf['Recursive Hiding'];
+          if (byId) (byId.firstChild as HTMLInputElement).checked = data.byId;
           return true;
         },
         subEntries: showOptions
@@ -217,7 +217,7 @@ var PostHiding = {
       }
 
       PostHiding.saveHiddenState(post, true, thisPost, makeStub, replies, byId);
-      $.event('CloseMenu');
+      $.event('CloseMenu', null);
     },
 
     show() {
@@ -257,7 +257,7 @@ var PostHiding = {
       if (data) {
         PostHiding.saveHiddenState(post, !(thisPost && replies), !thisPost, data.makeStub, !replies, byId);
       }
-      $.event('CloseMenu');
+      $.event('CloseMenu', null);
     },
     hideStub() {
       let data;
@@ -267,7 +267,7 @@ var PostHiding = {
         PostHiding.hide(post, false, data.hideRecursively);
         PostHiding.saveHiddenState(post, true, true, false, data.hideRecursively, data.byId);
       }
-      $.event('CloseMenu');
+      $.event('CloseMenu', null);
     }
   },
 
@@ -293,7 +293,7 @@ var PostHiding = {
     hideRecursively?: boolean,
     byId?: boolean
   ) {
-    const data = {
+    const data: any = {
       boardID:  post.board.ID,
       threadID: post.thread.ID,
       postID:   post.ID

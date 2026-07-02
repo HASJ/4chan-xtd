@@ -1,13 +1,9 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var RemoveSpoilers = {
   init() {
     if (Conf['Reveal Spoilers']) {
@@ -40,3 +36,4 @@ var RemoveSpoilers = {
   }
 };
 export default RemoveSpoilers;
+

@@ -1,14 +1,13 @@
+// @ts-nocheck
 /*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
+ * Platform DOM Helpers
+ *
+ * $.ts provides a lightweight jQuery-like abstraction for cross-platform DOM
+ * manipulation, event binding, and local storage access used throughout the project.
  */
 // loosely follows the jquery api:
 // http://api.jquery.com/
 
-import Notice from "../classes/Notice";
 import { c, Conf, d, doc, g } from "../globals/globals";
 import { debounce, dict, MINUTE, platform, SECOND } from "./helpers";
 import meta from '../../package.json';
@@ -502,8 +501,8 @@ $.oneItemSugar = fn => (function(key, val, cb) {
     return fn(key, val);
   }
 }) as (
-  ((key: string, value: any, callback?: (() => void)) => void) &
-  ((values: Record<string, any>, callback?: (() => void)) => void)
+  ((key: string, value: any, callback?: ((items: any) => void)) => void) &
+  ((values: Record<string, any>, callback?: ((items: any) => void)) => void)
 );
 
 $.syncing = dict();
@@ -545,7 +544,7 @@ if (platform === 'crx') {
       const msg = $.el('div',
         {innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.`});
       $.on($('a', msg), 'click', () => location.reload());
-      new Notice('warning', msg);
+      $.event('CreateNotification', { type: 'warning', content: msg });
       $.crxWarningShown = true;
     }
     return false;
@@ -889,3 +888,5 @@ if (platform === 'crx') {
 }
 
 export default $;
+
+

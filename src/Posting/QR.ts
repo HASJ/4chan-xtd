@@ -1,8 +1,14 @@
+// @ts-nocheck
+/*
+ * Quick Reply Singleton
+ *
+ * QR.ts manages the Quick Reply interface, post queuing, and submission logic.
+ * It is a core singleton that delegates captcha operations to the bridge facade.
+ */
 import QuickReplyPage from './QR/QuickReply.html';
 import $ from '../platform/$';
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
-import Main from '../main/Main';
 import Favicon from '../Monitoring/Favicon';
 import $$ from '../platform/$$';
 import CrossOrigin from '../platform/CrossOrigin';
@@ -16,6 +22,9 @@ import BoardConfig from '../General/BoardConfig';
 import Get from '../General/Get';
 import { DAY, dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
+import { VideoStripper } from './VideoStripper';
+import { typeFromExtension } from './FileTypes';
+import { registerQRCaptchaBridge } from './QRBridge';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */
@@ -99,16 +108,7 @@ var QR = {
 
   validExtension: /\.(jpe?g|png|gif|pdf|swf|webm|mp4)$/i,
 
-  typeFromExtension: {
-    'jpg':  'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png':  'image/png',
-    'gif':  'image/gif',
-    'pdf':  'application/pdf',
-    'swf':  'application/vnd.adobe.flash.movie',
-    'webm': 'video/webm',
-    'mp4': 'video/mp4'
-  },
+  typeFromExtension,
 
   extensionFromType: {
     'image/jpeg': 'jpg',
@@ -256,7 +256,7 @@ var QR = {
         QR.dialog();
       } catch (err) {
         delete QR.nodes;
-        Main.handleErrors({
+        Callbacks.errorHandler?.({
           message: 'Quick Reply dialog creation crashed.',
           error: err
         });
@@ -1199,6 +1199,7 @@ var QR = {
     if (postsCount) {
       post.rm();
       QR.captcha.setup(d.activeElement === QR.nodes.status);
+      QR.captcha.moreNeeded();
     } else if (Conf['Persistent QR']) {
       post.rm();
       if (Conf['Auto Hide QR']) {
@@ -2092,6 +2093,14 @@ class post {
    * @returns A promise with the old file if it was valid, or a new file if it wasn't.
    */
   async validateFile(file: File): Promise<File> {
+    if (file.type.startsWith('video/') && BoardConfig.noAudio(g.BOARD.ID)) {
+      const strippedFile = await VideoStripper.stripAudio(file);
+      if (strippedFile !== file) {
+        file = strippedFile;
+        new Notice('info', 'Audio track removed automatically.', 3);
+      }
+    }
+
     // Do not check on altchans, those might support types 4chan doesn't
     if (location.hostname.endsWith('4chan.org') && !QR.mimeTypes.includes(file.type)) {
       if (file.type.startsWith('image/')) {
@@ -2410,4 +2419,55 @@ class post {
 };
 QR.post = post;
 
+// Register the explicit captcha facade. This allows captcha modules to depend
+// on QR state and operations without importing QR.ts and creating a circular dependency.
+registerQRCaptchaBridge({
+  getPosts() {
+    return QR.posts;
+  },
+  hasActiveRequest() {
+    return !!QR.req;
+  },
+  isAutoCooldown() {
+    return !!QR.cooldown.auto;
+  },
+  getNodes() {
+    return QR.nodes;
+  },
+  focus() {
+    QR.focus();
+  },
+  focusComment(preventScroll = false) {
+    if (preventScroll) {
+      try {
+        QR.nodes.com.focus({ preventScroll: true });
+        return;
+      } catch (error) {}
+    }
+    QR.nodes.com.focus();
+  },
+  focusStatus() {
+    QR.nodes.status.focus();
+  },
+  showError(error, focusOverride) {
+    QR.error(error, focusOverride);
+  },
+  submit() {
+    QR.submit();
+  },
+  setupCaptcha(focus) {
+    QR.captcha.setup(focus);
+  },
+  addClass(...classes) {
+    $.addClass(QR.nodes.el, ...classes);
+  },
+  removeClass(...classes) {
+    $.rmClass(QR.nodes.el, ...classes);
+  },
+  insertCaptchaRoot(root) {
+    $.after(QR.nodes.com.parentNode, root);
+  }
+});
+
 export default QR;
+

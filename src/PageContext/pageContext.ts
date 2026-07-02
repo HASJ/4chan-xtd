@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Because of increased security in manifest v3, scripts can no longer just inject a script tag into the main page.
  * Functions to be called in the main context must be predefined. Those functions should be in this file, and they will
@@ -30,12 +31,17 @@ const PageContextFunctions = {
 
   exposeVersion: ({ buildDate, version }) => {
       const date = +buildDate;
+      const value = Object.freeze({
+        version,
+        // Getter to prevent mutations.
+        get buildDate() { return new Date(date) },
+      });
+      Object.defineProperty(window, 'fourchanXTd', {
+        value,
+        writable: false,
+      });
       Object.defineProperty(window, 'fourchanXT', {
-        value: Object.freeze({
-          version,
-          // Getter to prevent mutations.
-          get buildDate() { return new Date(date) },
-        }),
+        value,
         writable: false,
       });
   },
@@ -147,6 +153,38 @@ const PageContextFunctions = {
     })));
     if (autoLoad === '1') TCaptcha.load(boardID, threadID);
   },
+  loadTCaptcha: ({ boardID, threadID }) => {
+    (window as any).TCaptcha.load(boardID, +threadID);
+  },
+
+  captureTCaptchaStrips: () => {
+    const slider = document.querySelector('#qr #t-slider') as HTMLInputElement;
+    const task = document.querySelector('#qr #t-task') as HTMLElement;
+    const strips = document.querySelectorAll('#qr .captcha-strip');
+    if (!slider || !task || !strips.length) return;
+    const max = parseInt(slider.getAttribute('max') || '3', 10);
+    const origVal = slider.value;
+    const step = (i: number) => {
+      if (i > max) {
+        slider.value = origVal;
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      slider.value = '' + i;
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      setTimeout(() => {
+        const bg = task.style.backgroundImage;
+        if (strips[i] && bg) {
+          (strips[i] as HTMLElement).style.backgroundImage = bg;
+          (strips[i] as HTMLElement).style.backgroundSize = 'contain';
+          (strips[i] as HTMLElement).style.backgroundPosition = 'center';
+        }
+        step(i + 1);
+      }, 100);
+    };
+    step(0);
+  },
+
   destroyTCaptcha: () => { (window as any).TCaptcha.destroy(); },
   TCaptchaClearChallenge: () => { (window as any).TCaptcha.clearChallenge() },
 

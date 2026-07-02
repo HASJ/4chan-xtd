@@ -1,9 +1,10 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import type Post from "../classes/Post";
 import RandomAccessList from "../classes/RandomAccessList";
 import Header from "../General/Header";
 import { Conf, d, g } from "../globals/globals";
-import ReplyPruning from "../Monitoring/ReplyPruning";
+import { disableReplyPruning, registerQuoteThreadingInput } from "../Monitoring/ThreadDisplayModes";
 import Unread from "../Monitoring/Unread";
 import $ from "../platform/$";
 import { dict } from "../platform/helpers";
@@ -27,6 +28,7 @@ var QuoteThreading = {
     $.extend(this.threadNewLink, {innerHTML: "<a href=\"javascript:;\">Thread New Posts</a>"});
 
     this.input = $('input', this.controls);
+    registerQuoteThreadingInput(this.input);
     this.input.checked = Conf['Thread Quotes'];
 
     $.on(this.input, 'change', this.setEnabled);
@@ -68,11 +70,7 @@ var QuoteThreading = {
   setEnabled() {
     if (this.checked) {
       $.set('Prune All Threads', false);
-      const other = ReplyPruning.inputs?.enabled;
-      if (other?.checked) {
-        other.checked = false;
-        $.event('change', null, other);
-      }
+      disableReplyPruning();
     }
     $.cb.checked.call(this);
   },
@@ -209,3 +207,4 @@ var QuoteThreading = {
   },
 };
 export default QuoteThreading;
+

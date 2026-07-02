@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 // #region tests_enabled
 import Test from "../General/Test";
@@ -8,12 +9,8 @@ import ExpandComment from "../Miscellaneous/ExpandComment";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Embedding from "./Embedding";
+import { registerLinkifyProcessor } from "./LinkifyActions";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Linkify = {
   init() {
     if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }
@@ -209,4 +206,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     return a;
   }
 };
+registerLinkifyProcessor(Linkify.process);
+
 export default Linkify;
+

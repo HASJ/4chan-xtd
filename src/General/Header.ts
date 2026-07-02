@@ -1,27 +1,24 @@
 import Redirect from "../Archive/Redirect";
 import Notice from "../classes/Notice";
 import { Conf, d, doc, E, g } from "../globals/globals";
-import Main from "../main/Main";
-import CatalogLinks from "../Miscellaneous/CatalogLinks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import BoardConfig from "./BoardConfig";
 import Get from "./Get";
-import Settings from "./Settings";
 import UI from "./UI";
 import meta from '../../package.json';
 import Icon from "../Icons/icon";
+import { setNoticesRoot } from "../classes/NoticeHost";
+import { setBoardLinkURL, updateBoardListLinks } from "./HeaderBoardLists";
+import { setHeaderBar } from "./HeaderLayout";
+import { openSettings } from "./SettingsBridge";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS104: Avoid inline assignments
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
-var Header = {
+var Header: any = {
   init() {
+    setHeaderBar(this.bar);
     $.onExists(doc, 'body', () => {
-      if (!Main.isThisPageLegit()) { return; }
+      if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
+      setNoticesRoot(this.noticesRoot);
       $.add(this.bar, [this.noticesRoot, this.toggle]);
       $.prepend(d.body, this.bar);
       $.add(d.body, Header.hover);
@@ -118,7 +115,9 @@ var Header = {
 
     $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
 
-    Main.ready(function() {
+    $.ready(function() {
+      const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
+      if (!isPageLegit) { return; }
       let footer;
       if ((g.SITE.software === 'yotsuba') && !(footer = $.id('boardNavDesktopFoot'))) {
         let absbot;
@@ -134,7 +133,7 @@ var Header = {
         for (var a of $$('a', Header.bottomBoardList)) {
           if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
         }
-        return CatalogLinks.setLinks(Header.bottomBoardList);
+        return updateBoardListLinks(Header.bottomBoardList);
       }
     });
 
@@ -157,6 +156,9 @@ var Header = {
 
   bar: $.el('div',
     {id: 'header-bar'}),
+
+  bottomBoardList: undefined as HTMLElement | undefined,
+  boardList: undefined as HTMLElement | undefined,
 
   noticesRoot: $.el('div',
     {id: 'notifications'}),
@@ -200,7 +202,7 @@ var Header = {
     for (var a of $$('a', fullBoardList)) {
       if ((a.hostname === location.hostname) && (a.pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
     }
-    return CatalogLinks.setLinks(fullBoardList);
+    return updateBoardListLinks(fullBoardList);
   },
 
   generateBoardList(boardnav: string) {
@@ -227,7 +229,7 @@ var Header = {
         segmentNodes.forEach(node => currentContainer.appendChild(node));
       }
     });
-    return CatalogLinks.setLinks(list);
+    return updateBoardListLinks(list);
   },
 
   mapCustomNavigation(t) {
@@ -243,7 +245,7 @@ var Header = {
       return '';
     });
 
-    let indexOptions = [];
+    let indexOptions: any = [];
     t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function(m0, m1) {
       indexOptions.push(m1.toLowerCase().replace(/\ /g, '-'));
       return '';
@@ -335,12 +337,7 @@ var Header = {
       text || boardID;
 
     if (m = t.match(/-(index|catalog)/)) {
-      const urlIC = CatalogLinks[m[1]]({siteID: '4chan.org', boardID});
-      if (urlIC) {
-        a.dataset.only = m[1];
-        a.href = urlIC;
-        if (m[1] === 'catalog') { $.addClass(a, 'catalog'); }
-      } else {
+      if (!setBoardLinkURL(a, m[1], {siteID: '4chan.org', boardID})) {
         return a.firstChild; // Its text node.
       }
     }
@@ -395,7 +392,7 @@ var Header = {
   },
 
   toggleLinkJustify() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const centered = this.nodeName === 'INPUT' ?
       this.checked : undefined;
     Header.setLinkJustify(centered);
@@ -414,7 +411,7 @@ var Header = {
   },
 
   toggleBarFixed() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
 
     Header.setBarFixed(this.checked);
 
@@ -432,7 +429,7 @@ var Header = {
   },
 
   toggleShortcutIcons() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
 
     Header.setShortcutIcons(this.checked);
 
@@ -442,7 +439,7 @@ var Header = {
 
   setBarVisibility(hide) {
     Header.headerToggler.checked = hide;
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
     return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
   },
@@ -492,7 +489,7 @@ var Header = {
 
   setBarPosition(bottom) {
     if (Header.barPositionToggler) Header.barPositionToggler.checked = bottom;
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const args = bottom ? [
       'bottom-header',
       'top-header',
@@ -519,7 +516,7 @@ var Header = {
   },
 
   toggleFooterVisibility() {
-    $.event('CloseMenu');
+    $.event('CloseMenu', null);
     const hide = this.nodeName === 'INPUT' ?
       this.checked
     :
@@ -547,7 +544,7 @@ var Header = {
   },
 
   editCustomNav() {
-    Settings.open('Advanced');
+    openSettings('Advanced');
     const settings = $.id('fourchanx-settings');
     return $('[name=boardnav]', settings).focus();
   },
@@ -684,3 +681,4 @@ var Header = {
   }
 };
 export default Header;
+

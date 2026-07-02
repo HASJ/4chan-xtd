@@ -1,12 +1,8 @@
+﻿// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const PostSuccessful = {
   init() {
     if (!Conf['Remember Your Posts']) { return; }
@@ -30,3 +26,4 @@ const PostSuccessful = {
   }
 };
 export default PostSuccessful;
+

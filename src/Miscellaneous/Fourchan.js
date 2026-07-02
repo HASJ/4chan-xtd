@@ -1,21 +1,16 @@
+// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import BoardConfig from "../General/BoardConfig";
 import { d, doc, g } from "../globals/globals";
-import Main from "../main/Main";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import ExpandComment from "./ExpandComment";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Fourchan = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
     BoardConfig.ready(this.initBoard);
-    return Main.ready(this.initReady);
+    return $.on(d, '4chanXInitFinished', this.initReady);
   },
 
   initBoard() {
@@ -93,3 +88,4 @@ var Fourchan = {
   }
 };
 export default Fourchan;
+

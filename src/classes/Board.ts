@@ -3,12 +3,8 @@ import { d, g } from "../globals/globals";
 import SimpleDict from "./SimpleDict";
 import type Post from "./Post";
 import type Thread from "./Thread";
+import { isPassEnabled } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 export default class Board {
   declare ID: string;
   declare boardID: string;
@@ -27,7 +23,7 @@ export default class Board {
     this.posts   = new SimpleDict();
     this.config  = BoardConfig.boards?.[this.ID] || {};
 
-    g.boards[this] = this;
+    g.boards[this.ID] = this;
   }
 
   cooldowns() {
@@ -39,7 +35,7 @@ export default class Board {
       thread_global: 300 // inter-board thread cooldown
     };
     // Pass users have reduced cooldowns.
-    if (d.cookie.indexOf('pass_enabled=1') >= 0) {
+    if (isPassEnabled()) {
       for (var key of ['reply', 'image']) {
         c[key] = Math.ceil(c[key] / 2);
       }

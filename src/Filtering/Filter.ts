@@ -2,7 +2,8 @@ import Callbacks from "../classes/Callbacks";
 import Notice from "../classes/Notice";
 import Config from "../config/Config";
 import Get from "../General/Get";
-import Settings from "../General/Settings";
+import { openFilterSettings } from "../General/SettingsBridge";
+import { registerQuickFilterMD5 } from "./QuickFilterActions";
 import { g, Conf, doc } from "../globals/globals";
 import Menu from "../Menu/Menu";
 import Unread from "../Monitoring/Unread";
@@ -14,14 +15,6 @@ import PostHiding from "./PostHiding";
 import ThreadHiding from "./ThreadHiding";
 import Post from "../classes/Post";
 import Recursive from "./Recursive";
-
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 
 interface FilterObj {
   regexp: string | RegExp;
@@ -440,7 +433,7 @@ var Filter = {
     subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
     comment(post) {
       if (post.info.comment == null) {
-        post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.(post.info.commentHTML.innerHTML);
+        post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.((post.info.commentHTML as any).innerHTML);
       }
       return [post.info.comment];
     },
@@ -491,17 +484,7 @@ var Filter = {
   },
 
   showFilters(type) {
-    // Open the settings and display & focus the relevant filter textarea.
-    Settings.open('Filter');
-    const section = $('.section-container');
-    const select = $('select[name=filter]', section);
-    select.value = type;
-    Settings.selectFilter.call(select);
-    return $.onExists(section, 'textarea', function(ta) {
-      const tl = ta.textLength;
-      ta.setSelectionRange(tl, tl);
-      return ta.focus();
-    });
+    return openFilterSettings(type);
   },
 
   quickFilterMD5() {
@@ -510,7 +493,7 @@ var Filter = {
     if (!files.length) { return; }
     const filter = files.map(f => `/${f.MD5}/`).join('\n');
     Filter.addFilter('MD5', filter);
-    const origin = post.origin || post;
+    const origin = (post as any).origin || post;
     if (origin.isReply) {
       PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f.MD5}`).join(' & '));
     } else if (g.VIEW === 'index') {
@@ -643,4 +626,6 @@ var Filter = {
     }
   }
 };
+registerQuickFilterMD5(Filter.quickFilterMD5);
+
 export default Filter;
