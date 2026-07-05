@@ -701,4 +701,4 @@ some other changes as well. These changes aren't in the upstream PR.
 
 ## Original 4chan X changelog
 
-For the original changelog, see [original 4chan X CHANGELOG.md](./original%204chan%20X%20CHANGELOG.md).
+For the original changelog, see [upstream 4chan X CHANGELOG.md](https://github.com/ccd0/4chan-x/blob/master/CHANGELOG.md).
