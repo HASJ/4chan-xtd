@@ -98,7 +98,6 @@
     "@types/chrome": "^0.0.217",
     "@types/node": "^18.14.5",
     "@violentmonkey/types": "^0.1.5",
-    "chrome-webstore-upload": "^1.0.0",
     "magic-string": "^0.30.13",
     "rollup": "^4.27.3",
     "rollup-plugin-cleanup": "^3.2.1",
@@ -136,4 +135,3 @@
     "build:all": "node ./tools/rollup -min -platform=userscript && node ./tools/rollup -platform=userscript && node ./tools/rollup -platform=crx"
   }
 }
-
