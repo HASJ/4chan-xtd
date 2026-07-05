@@ -1,5 +1,0 @@
-﻿// @ts-nocheck
-Main.init();
-
-})();
-
