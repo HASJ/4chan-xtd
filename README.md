@@ -51,7 +51,7 @@ You can also pass arguments directly to the build script (e.g., `node ./tools/ro
 
 - `-min`: Minified output.
 - `-platform=userscript`, `-platform=crx`: Target a specific platform.
-- `-no-format` Skips some formatting like switching the indent from the TypeScript output back from 4 to 2, and removing the decaffeinate suggestions comments. Might speed up the build, but the result is larger.
+- `-no-format` Skips post-processing formatting steps. This results in faster building, but also a larger output size.
 - `-test` Include tests in build.
 
 ## Troubleshooting
