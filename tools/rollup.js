@@ -13,7 +13,6 @@ import fixTsOutputFormat from './fix-ts-output-format.js';
 import cleanup from 'rollup-plugin-cleanup';
 import alias from '@rollup/plugin-alias';
 import platformSpecific from './rollup-plugin-platform-specific.js';
-import removeDecaffeinateComments from './rollup-plugin-remove-decaffeinate-comments.js';
 import removeTestCode from './rollup-plugin-remove-test-code.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -81,9 +80,6 @@ const tsPlugin = typescript({
           "**/src/Linkification/Linkify.js",
         ],
         sourceMap: minify,
-      }),
-      noFormat || minify ? undefined : removeDecaffeinateComments({
-        include: ["**/*.js", "**/*.ts", "**/*.tsx"],
       }),
       tsPlugin,
       alias({
