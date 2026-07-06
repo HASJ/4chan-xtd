@@ -1,0 +1,53 @@
+{
+  // Configuration file for the vs code streetsidesoftware.code-spell-checker extension
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "Bitchute",
+    "burichan",
+    "Clyp",
+    "cooldown",
+    "Dailymotion",
+    "futaba",
+    "Gfycat",
+    "iqdb",
+    "keybinds",
+    "linkification",
+    "linkify",
+    "Liveleak",
+    "Mathjax",
+    "nitter",
+    "Pastebin",
+    "Peertube",
+    "reposts",
+    "Saucenao",
+    "Soundcloud",
+    "Streamable",
+    "Tegaki",
+    "Twitchtv",
+    "Vidlii",
+    "Vocaroo",
+    "WEBM",
+    "yotsuba"
+  ],
+  "ignoreWords": [
+    "deadlink",
+    "endregion",
+    "fappe",
+    "fourchan",
+    "grecaptcha",
+    "noti",
+    "quotelink",
+    "quotelinks",
+    "recursives",
+    "Tyme",
+    "userscript",
+    "werk",
+    "xmark",
+  ],
+  "flagWords": [
+    "hte:the",
+    "teh:the",
+    "fucus:focus"
+  ]
+}

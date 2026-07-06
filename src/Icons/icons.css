@@ -1,0 +1,22 @@
+/* Icons */
+svg.icon {
+  height: 1em;
+  width: 1em;
+  display: inline-flex;
+  vertical-align: -.125em;
+}
+/* Override catalog.css */
+:root.catalog svg.icon {
+  position: static;
+}
+:root.shortcut-icons #shortcuts .icon--alt-text,
+:root:not(.shortcut-icons) .shortcut .icon {
+  display: none;
+}
+:root.shortcut-icons .shortcut.brackets-wrap::before,
+:root.shortcut-icons .shortcut.brackets-wrap::after {
+  display: none;
+}
+@keyframes spin {
+  100% {transform:rotate(1turn)}
+}

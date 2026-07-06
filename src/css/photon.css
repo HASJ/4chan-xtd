@@ -1,0 +1,23 @@
+:root.photon {
+  --xt-background: #DDD;
+  --xt-border: #CCC;
+  --xt-border-field-focus: #EA8;
+  --xt-border-highlight: rgba(221, 0, 0, .8);
+  --xt-header-dialog-bg: rgba(221, 221, 221, 0.98);
+  --xt-header-dialog-fg: #333;
+  --xt-dead-link: #F60;
+  --xt-qr-link-border: rgb(206, 206, 206) rgb(206, 206, 206) rgb(191, 191, 191);
+  --xt-qr-bg: linear-gradient(#ECECEC, #DDD) repeat scroll 0% 0% transparent;
+  --xt-menu-fg: #333;
+  --xt-entry-focus-bg: rgba(255, 255, 255, .33);
+  --xt-unread: rgba(221, 221, 221, 0.5);
+  --xt-watcher-quoting-you: #00F;
+  --xt-watcher: #333;
+
+  --xt-fxt-fg: #333;
+}
+
+/* 4chan style fixes */
+:root.photon #arc-list tr:nth-of-type(odd) span.quote {
+  color: #C0E17A;
+}

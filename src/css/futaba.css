@@ -1,0 +1,24 @@
+:root.futaba {
+  --xt-background: #F0E0D6;
+  --xt-border: #D9BFB7;
+  --xt-border-field-focus: #EA8;
+  --xt-border-highlight: rgba(221, 0, 0, .8);
+  --xt-notification-size: 11pt;
+  --xt-header-dialog-fg: #B86;
+  --xt-dead-link: #00E;
+  --xt-header-dialog-bg: rgba(240,224,214,0.98);
+  --xt-header-link: #800000;
+  --xt-qr-link-border: rgb(225, 209, 199) rgb(225, 209, 199) rgb(210, 194, 184);
+  --xt-qr-bg: linear-gradient(#FFEFE5, #F0E0D6) repeat scroll 0% 0% transparent;
+  --xt-entry-size: 12pt;
+  --xt-entry-focus-bg: rgba(255, 255, 255, .33);
+  --xt-unread: rgba(240, 224, 214, 0.5);
+  --xt-watcher: #800000;
+
+  --xt-fxt-fg: #800000;
+}
+
+/* Anonymize */
+:root.futaba.anonymize $site$info$name::before {
+  font-size: 12pt;
+}

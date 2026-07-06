@@ -1,0 +1,56 @@
+:root.spooky {
+  --xt-background: #171526;
+  --xt-link-hover-bg: #1A1829;
+  --xt-border: #707070;
+  --xt-border-field-focus: #98E;
+  --xt-border-highlight: rgba(145, 182, 214, .8);
+  --xt-header-dialog-bg: rgba(23, 21, 38, 0.98);
+  --xt-header-dialog-fg: #C49756;
+  --xt-header-link: #FE9600;
+  --xt-dead-link: #FE9600;
+  --xt-qr-link-border: rgb(8, 6, 23) rgb(8, 6, 23) rgb(0, 0, 8);
+  --xt-qr-bg: linear-gradient(#262435, #171526) repeat scroll 0% 0% transparent;
+  --xt-entry-focus-bg: rgba(255, 255, 255, .33);
+  --xt-unread: rgba(23, 21, 38, 0.5);
+  --xt-watcher: #fe9600;
+
+  --xt-unread-line: rgb(197, 200, 198);
+  --xt-filter-highlight: rgba(145, 182, 214, .5);
+  --xt-qphl: rgba(145, 182, 214, .8);
+  --xt-highlight-side-arrow: rgb(155, 185, 210);
+
+  --xt-fxt-fg: #f0f8ffd1;
+}
+
+/* 4chan style fixes */
+:root.spooky #arc-list span.quote {
+  color: #634C2C;
+}
+
+:root.spooky.shortcut-icons .native-settings {
+  background-image: url('//s.4cdn.org/image/favicon-ws.ico');
+}
+
+:root.spooky #qr .field {
+  background-color: rgb(26, 27, 29);
+  color: rgb(197,200,198);
+  border-color: rgb(40, 41, 42);
+}
+:root.spooky #qr .field:focus,
+:root.spooky #qr .field.focus {
+  border-color: rgb(254, 150, 0) !important;
+  background-color: rgb(30,32,36);
+}
+:root.spooky #qr select {
+  border-color: rgb(40, 41, 42);
+  background: unset;
+}
+:root.spooky #qr-filename {
+  color: rgb(197,200,198);
+}
+
+/* Unread */
+:root.spooky .unread-line {
+  visibility: visible;
+  opacity: 1;
+}

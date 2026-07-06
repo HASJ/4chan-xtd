@@ -1,0 +1,160 @@
+/* General */
+.dialog {
+  background-color: var(--xt-background);
+  border-color: var(--xt-border);
+}
+.field:focus,
+.field.focus {
+  border-color: var(--xt-border-field-focus);
+}
+
+/* 4chan style fixes */
+:root:not(.oneechan).highlight-you .quotesYou$site$highlightable$reply {
+  border-left: 3px solid var(--xt-border-highlight) !important;
+}
+:root:not(.oneechan).highlight-own .yourPost$site$highlightable$reply {
+  border-left: 3px dashed var(--xt-border-highlight) !important;
+}
+
+/* Header */
+#header-bar.dialog {
+  background-color: var(--xt-header-dialog-bg);
+}
+:root:not(.fixed) #header-bar, #notifications {
+  font-size: var(--xt-notification-size, 9pt);
+}
+#header-bar, #notifications {
+  color: var(--xt-header-dialog-fg);
+}
+#board-list a, #shortcuts a {
+  color: var(--xt-header-link, unset);
+}
+
+/* Settings */
+#fourchanx-settings fieldset, .section-main div::before {
+  border-color: var(--xt-border);
+}
+.suboption-list > div:last-of-type {
+  background-color: var(--xt-background);
+}
+
+/* Catalog */
+:root.catalog-hover-expand .catalog-container:hover > .post {
+  background-color: var(--xt-background);
+}
+:root.werkTyme .catalog-thread:not(:hover),
+:root.werkTyme:not(.catalog-hover-expand) .catalog-thread,
+:root.catalog-hover-expand .catalog-container:hover > .post,
+:root.catalog-hover-expand .catalog-container:hover .catalog-reply {
+  border-color: var(--xt-border);
+}
+
+/* Quote */
+.backlink.deadlink {
+  color: var(--xt-dead-link) !important;
+}
+.inline {
+  border-color: var(--xt-border);
+  background-color: var(--xt-inline, rgba(255, 255, 255, .14));
+}
+
+/* Fappe and Werk Tyme */
+.indicator {
+  color: var(--xt-background);
+}
+
+/* QR */
+#dump-list::-webkit-scrollbar-thumb {
+  background-color: var(--xt-background);
+  border-color: var(--xt-border);
+}
+.qr-preview {
+  background-color: var(--xt-qr-preview-bg, rgba(0, 0, 0, .15));
+}
+.qr-link {
+  border-color: var(--xt-qr-link-border);
+  background: var(--xt-qr-bg);
+}
+.qr-link:hover {
+  background: var(--xt-link-hover-bg, var(--xt-background));
+}
+
+/* Menu */
+#menu {
+  color: var(--xt-menu-fg, var(--xt-header-link));
+}
+.entry {
+  font-size: var(--xt-entry-size, 10pt);
+}
+.focused.entry {
+  background: var(--xt-entry-focus-bg);
+}
+
+/* Unread */
+.unread-mark-read {
+  background-color: var(--xt-unread);
+}
+
+/* Thread Watcher */
+.replies-quoting-you > a, #watcher-link.replies-quoting-you, .last-page > a > .watcher-page {
+  color: var(--xt-watcher-quoting-you, #F00) !important;
+}
+
+/* Moved from style.css */
+
+/* Highlighting */
+.qphl {
+  outline: 2px solid var(--xt-qphl, rgba(216, 94, 49, .8));
+}
+:root.highlight-you .quotesYou$site$highlightable$op,
+:root.highlight-you .quotesYou$site$highlightable$reply {
+  border-left: 3px solid var(--xt-border-highlight);
+}
+:root.highlight-own .yourPost$site$highlightable$op,
+:root.highlight-own .yourPost$site$highlightable$reply {
+  border-left: 3px dashed var(--xt-border-highlight) ;
+}
+.filter-highlight$site$highlightable$op,
+.filter-highlight$site$highlightable$reply {
+  box-shadow: inset 5px 0 var(--xt-filter-highlight, rgba(221, 0, 0, .5));
+}
+:root.highlight-own .yourPost > $site$sideArrows,
+:root.highlight-you .quotesYou > $site$sideArrows,
+.filter-highlight > $site$sideArrows {
+  color: var(--xt-highlight-side-arrow, rgba(221, 0, 0, .8));
+}
+
+:root:not(.werkTyme) .catalog-thread.filter-highlight .catalog-thumb,
+:root.werkTyme .catalog-thread.filter-highlight:not(:hover),
+:root.werkTyme:not(.catalog-hover-expand) .catalog-thread.filter-highlight,
+:root.werkTyme.catalog-hover-expand .catalog-thread.filter-highlight > .catalog-container:hover > .catalog-post,
+:root.catalog $site$catalog$thread.filter-highlight$site$highlightable$catalog {
+  box-shadow: 0 0 3px 3px var(--xt-highlight-shadow, rgba(255, 0, 0, .5));
+}
+:root:not(.werkTyme) .catalog-thread.watched .catalog-thumb,
+:root:root.werkTyme .catalog-thread.watched:not(:hover),
+:root:root.werkTyme:not(.catalog-hover-expand) .catalog-thread.watched,
+:root.werkTyme.catalog-hover-expand .catalog-thread.watched > .catalog-container:hover > .catalog-post {
+  border: 2px solid var(--xt-watched-border, rgba(255, 0, 0, .75));
+}
+
+.unread-line {
+  border-color: var(--xt-unread-line, rgb(255,0,0));
+}
+
+:root.tomorrow,
+:root.spooky {
+  color-scheme: dark;
+}
+
+:root.tomorrow .field,
+:root.spooky .field {
+  background-color: unset;
+  color: unset;
+  border-color: unset;
+}
+
+:root.tomorrow input[type="button"],
+:root.spooky input[type="button"] {
+  filter: brightness(80%);
+}

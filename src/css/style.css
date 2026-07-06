@@ -1,0 +1,2265 @@
+/* General */
+.dialog {
+  border: 1px solid;
+  display: block;
+  background-color: inherit;
+}
+.dialog:not(#qr):not(#thread-watcher):not(#header-bar) {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+}
+#qr,
+#thread-watcher {
+  box-shadow: -1px 2px 2px rgba(0, 0, 0, 0.25);
+}
+.field {
+  background-color: #FFF;
+  padding: 2px 4px 3px;
+  border: 1px solid #CCC;
+  box-sizing: border-box;
+  color: #333;
+  font: 13px sans-serif;
+  outline: none;
+  margin: 0px;
+  transition: color .25s, border-color .25s;
+}
+.field::placeholder {
+  color: #AAA;
+  opacity: 1;
+}
+.field:hover {
+  border-color: #999;
+}
+.field:hover, .field:focus, .field.focus {
+  color: #000;
+}
+.field[disabled] {
+  background-color: #F2F2F2;
+  color: #888;
+}
+.move {
+  cursor: move;
+  overflow: hidden;
+}
+label {
+  cursor: pointer;
+}
+a[href="javascript:;"] {
+  text-decoration: none;
+}
+.warning {
+  color: red;
+}
+:root.sw-yotsuba #boardNavDesktop, :root.sw-yotsuba #boardNavMobile {
+  display: none !important;
+}
+:root.hide-bottom-board-list $site$boardListBottom {
+  display: none;
+}
+body.hasDropDownNav{
+  margin-top: 5px;
+}
+.painted {
+  border-radius: 3px;
+  padding: 0px 2px;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* 4chan style fixes */
+/* overrides 4chan CSS on div.opContainer, div.op */
+:root.sw-yotsuba .opContainer, :root.sw-yotsuba .op {
+  display: block;
+  overflow: visible;
+}
+:root.sw-yotsuba .reply > .file > .fileText {
+  margin: 0 20px;
+}
+:root.sw-yotsuba #arc-list span.quote {
+  color: #789922;
+}
+:root.sw-yotsuba .fileText a {
+  unicode-bidi: isolate;
+}
+:root.sw-yotsuba #g-recaptcha {
+  min-height: 78px;
+  height: auto;
+}
+:root.sw-yotsuba:not(.js-enabled) #postForm {
+  display: table;
+}
+:root.sw-yotsuba #captchaContainerAlt td:nth-child(2) {
+  display: table-cell !important;
+}
+:root.sw-yotsuba canvas#tegaki-canvas {
+  background: none;
+}
+/* Disable obnoxious captcha fade-in. */
+:root.sw-yotsuba > body > div:last-of-type {
+  transition: none !important;
+}
+/* Fix captcha scrolling to top of page. */
+:root.sw-yotsuba > body > div[style*=" top: -10000px;"] {
+  visibility: hidden !important;
+}
+/* Make long filenames wrap properly: https://github.com/ccd0/4chan-x/issues/1082 */
+:root.sw-yotsuba .post > .file {
+  word-break: break-word;
+}
+:root.sw-yotsuba:not(.ua-webkit):not(.ua-blink) .fileText {
+  word-wrap: break-word;
+  max-width: calc(100vw - 90px);
+}
+:root.sw-yotsuba > body.is_catalog .thread > a > img {
+  display: inline-block;
+}
+/* Links to NSFW boards */
+:root.sw-yotsuba .nwsb {
+  display: inline;
+}
+:root.sw-yotsuba .fileText {
+  max-width: auto;
+  white-space: normal;
+}
+
+/* Ads */
+:root.sw-yotsuba .ad-cnt > *, :root.sw-yotsuba .adg-rects > *, :root.sw-yotsuba .bsa-cnt {
+  height: auto !important;
+}
+:root.sw-yotsuba:not(.ads-loaded) hr.abovePostForm,
+:root.sw-yotsuba:not(.ads-loaded) .adg-rects > hr,
+:root.sw-yotsuba #adg-ol + hr,
+:root.sw-yotsuba .danbo-slot:empty {
+  display: none;
+}
+:root.sw-yotsuba .adg-rects {
+  margin: 0;
+  font-size: 0;
+}
+:root.sw-yotsuba div.center[style] {
+  display: none !important;
+}
+
+/* Tinyboard / vichan conflicts */
+#menu > .hide-thread-link {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  background-image: none;
+}
+#menu label.entry {
+  display: block;
+}
+#fourchanx-settings label {
+  display: inline;
+}
+.intro a[href="javascript:;"],
+#menu a {
+  margin: 0;
+}
+.gal-buttons.gal-buttons a {
+  font-size: inherit;
+}
+:root.sw-tinyboard.fixed.top-header:not(.autohide) .boardlist,
+:root.sw-tinyboard.fixed.top-header:not(.autohide) .bar.top {
+  position: static;
+}
+:root.sw-tinyboard.fixed.top-header:not(.autohide) div.pages.top {
+  top: auto;
+  bottom: 0;
+}
+:root.sw-tinyboard.fixed.top-header.autohide .boardlist,
+:root.sw-tinyboard.fixed.top-header.autohide .bar.top {
+  z-index: 3;
+}
+
+/* Tinyboard site style conflicts */
+:root[data-host="fufufu.moe"].fixed.top-header:not(.autohide) div.pages.top {
+  top: 26px;
+  bottom: auto;
+}
+:root[data-host="merorin.com"].fixed.top-header:not(.autohide) span.settings {
+  top: 26px;
+}
+:root[data-host="fufufu.moe"]:not(.fixed) #header-bar {
+  margin-top: 38px;
+}
+:root[data-host="lainchan.org"]:not(.fixed) #header-bar {
+  margin-top: 17px;
+}
+:root[data-host="smuglo.li"]:not(.fixed) #header-bar {
+  margin-top: 8px;
+}
+
+/* Anti-autoplay */
+audio.controls-added {
+  display: block;
+  margin: auto;
+  white-space: normal;
+}
+:root.anti-autoplay div.embed {
+  position: static;
+  width: auto;
+  height: auto;
+  text-align: center;
+}
+:root.anti-autoplay .autoplay-removed {
+  visibility: visible !important;
+  min-width: 640px;
+  min-height: 360px;
+}
+
+/* fixed, z-index */
+#overlay,
+#qp, #ihover,
+#navlinks, .fixed #header-bar,
+:root.float #updater,
+:root.float #thread-stats,
+#qr,
+#export-dialog {
+  position: fixed;
+}
+#overlay {
+  z-index: 999;
+}
+#qp, #ihover {
+  z-index: 60;
+}
+#menu, .gal-buttons {
+  z-index: 50;
+}
+#updater, #thread-stats {
+  z-index: 40;
+}
+:root.fixed #header-bar, #notifications {
+  z-index: 35;
+}
+#a-gallery {
+  z-index: 30;
+}
+#navlinks {
+  z-index: 25;
+}
+#qr {
+  z-index: 20;
+}
+#embedding {
+  z-index: 11;
+}
+#export-dialog {
+  z-index: 1001;
+}
+:root.fixed-watcher #thread-watcher {
+  z-index: 10;
+}
+:root.fixed:not(.gallery-open) #header-bar:not(:hover) {
+  z-index: 8;
+}
+#thread-watcher {
+  z-index: 5;
+}
+
+/* Header */
+.fixed.top-header body {
+  padding-top: 2em;
+}
+.fixed.bottom-header body {
+  padding-bottom: 2em;
+}
+.fixed #header-bar {
+  right: 0;
+  left: 0;
+  padding: 4px;
+  font-size: 13px;
+}
+.fixed.top-header #header-bar {
+  top: 0;
+}
+.fixed.bottom-header #header-bar {
+  bottom: 0;
+}
+#header-bar {
+  border-width: 0;
+  transition: all .1s .05s ease-in-out;
+}
+:root.fixed #header-bar {
+  box-shadow: -5px 1px 10px rgba(0, 0, 0, 0.20);
+}
+:root.centered-links #shortcuts {
+  width: 300px;
+  text-align: right;
+  justify-content: right;
+}
+:root.centered-links #header-bar {
+  text-align: center;
+}
+:root.centered-links #custom-board-list {
+  position: relative;
+  left: 150px;
+}
+.fixed.top-header #header-bar {
+  border-bottom-width: 1px;
+}
+.fixed.bottom-header #header-bar {
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, .15);
+  border-top-width: 1px;
+}
+.fixed.bottom-header #header-bar .menu-button .icon {
+  transform: rotate(180deg) translateY(-.125em);
+}
+.fixed #header-bar.autohide:not(:hover) {
+  box-shadow: none;
+  transition: all .8s .6s cubic-bezier(.55, .055, .675, .19);
+}
+.fixed.top-header #header-bar.autohide:not(:hover) {
+  margin-bottom: -1em;
+  transform: translateY(-100%);
+}
+.fixed.bottom-header #header-bar.autohide:not(:hover) {
+  transform: translateY(100%);
+}
+#scroll-marker {
+  left: 0;
+  right: 0;
+  height: 10px;
+  position: absolute;
+}
+#header-bar:not(.autohide) #scroll-marker {
+  pointer-events: none;
+}
+#header-bar #scroll-marker {
+  display: none;
+}
+.fixed #header-bar #scroll-marker {
+  display: block;
+}
+.fixed.top-header #header-bar #scroll-marker {
+  top: 100%;
+}
+.fixed.bottom-header #header-bar #scroll-marker {
+  bottom: 100%;
+}
+#board-list a {
+  text-decoration: none;
+  padding: 1px;
+}
+#shortcuts:empty {
+  display: none;
+}
+.dead-thread,
+.disabled:not(.replies-quoting-you) {
+  opacity: .45;
+}
+#shortcuts {
+  float: right;
+  display: flex;
+  gap: 4px;
+}
+#shortcuts .icon {
+  font-size: 14px;
+}
+:root.autohiding-scrollbar #shortcuts {
+  margin-right: 12px;
+}
+:root.shortcut-icons .native-settings {
+  font-size: 0;
+  color: transparent;
+  display: inline-block;
+  vertical-align: top;
+  height: 14px;
+  width: 14px;
+  background: url('//s.4cdn.org/image/favicon.ico') -1px -1px no-repeat;
+}
+#navbotright,
+#navtopright {
+  display: none;
+}
+#toggleMsgBtn {
+  display: none !important;
+}
+.current,
+:root.sw-yotsuba div#boardNavDesktopFoot a.current {
+  font-weight: bold;
+}
+/* 4chan X link brackets */
+.brackets-wrap::before {
+  content: "[";
+}
+.brackets-wrap::after {
+  content: "]";
+}
+/* Notifications */
+#notifications {
+  position: fixed;
+  top: 0;
+  height: 0;
+  text-align: center;
+  right: 0;
+  left: 0;
+  visibility: visible;
+}
+#notifications:empty {
+  display: none;
+}
+:root.fixed.top-header:not(.gallery-open) #header-bar #notifications,
+:root.fixed.top-header #header-bar.autohide #notifications {
+  position: absolute;
+  top: 100%;
+}
+.notification {
+  color: #FFF;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .15);
+  border-radius: 2px;
+  margin: 1px auto;
+  width: 550px;
+  max-width: 100%;
+  position: relative;
+  transition: all .25s ease-in-out;
+  padding: 6px 5px 6px 20px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.notification.error {
+  background-color: hsla(0, 100%, 38%, .9);
+}
+.notification.warning {
+  background-color: hsla(36, 100%, 38%, .9);
+}
+.notification.info {
+  background-color: hsla(200, 100%, 38%, .9);
+}
+.notification.success {
+  background-color: hsla(104, 100%, 38%, .9);
+}
+.notification a {
+  color: white;
+}
+.notification > .close {
+  order: 1;
+}
+.message {
+  overflow-wrap: break-word;
+  box-sizing: border-box;
+  padding: 0 5px;
+  max-height: 200px;
+  width: 100%;
+  overflow: auto;
+  white-space: pre-line;
+}
+.message a {
+  text-decoration: underline;
+}
+:root.tainted .report-error {
+  display: none;
+}
+
+/* Settings */
+:root.fourchan-x body {
+  box-sizing: border-box;
+}
+#overlay {
+  background-color: rgba(0, 0, 0, .5);
+  display: flex;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+#fourchanx-settings {
+  box-sizing: border-box;
+  box-shadow: 0 0 15px rgba(0, 0, 0, .15);
+  height: 600px;
+  max-height: 100%;
+  width: 900px;
+  max-width: 100%;
+  margin: auto;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+#fourchanx-settings > nav {
+  padding: 2px 2px 8px;
+  display: flex;
+}
+#fourchanx-settings > nav a {
+  text-decoration: underline;
+}
+#fourchanx-settings > nav a.close {
+  text-decoration: none;
+  padding: 0 2px;
+  margin: 0;
+}
+.section-container {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+  padding-right: 5px;
+  overscroll-behavior: contain;
+}
+.sections-list {
+  flex: 1;
+}
+.export, .import, .reset {
+  cursor: pointer;
+  text-decoration: none !important;
+}
+.tab-selected {
+  font-weight: 700;
+}
+.section-sauce ul,
+.section-advanced ul {
+  list-style: none;
+  margin: 0;
+}
+.section-sauce ul {
+  padding: 8px;
+}
+.section-advanced ul {
+  padding: 0px;
+}
+.section-sauce li,
+.section-advanced li {
+  padding-left: 4px;
+}
+.section-main ul {
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+.section-main li {
+  white-space: pre-line;
+  list-style: disc;
+}
+.section-main li:not(:first-of-type) {
+  margin-top: 4px;
+}
+.section-main label {
+  text-decoration: underline;
+}
+div[data-checked="false"] > .suboption-list {
+  display: none;
+}
+.suboption-list {
+  position: relative;
+}
+.suboption-list::before {
+  content: "";
+  display: inline-block;
+  position: absolute;
+  left: .7em;
+  width: 0;
+  height: 100%;
+  border-left: 1px solid;
+}
+.suboption-list > div {
+  position: relative;
+  padding-left: 1.4em;
+}
+.suboption-list > div::before {
+  content: "";
+  display: inline-block;
+  position: absolute;
+  left: .7em;
+  width: .7em;
+  height: .6em;
+  border-left: 1px solid;
+  border-bottom: 1px solid;
+}
+#fourchanx-settings .section-main p {
+  margin: .5em 0 0;
+}
+.section-filter ul {
+  padding: 0;
+}
+.section-filter li {
+  margin: 10px 40px;
+  list-style: disc;
+}
+.section-filter textarea {
+  height: 500px;
+}
+.section-main a, .section-filter a, .section-advanced a {
+  text-decoration: underline;
+}
+#sauce-doc-expand:not(:checked) ~ #sauce-doc {
+  max-height: 130px;
+  overflow: auto;
+}
+#sauce-doc > label {
+  float: right;
+  margin: 0 5px;
+}
+/* XXX for OneeChan */
+#sauce-doc-expand + .riceCheck {
+  display: none;
+}
+.section-sauce textarea {
+  height: 430px;
+}
+.section-advanced .field.wide {
+  width: 100%;
+}
+.section-advanced textarea {
+  height: 150px;
+}
+.section-advanced textarea[name="archiveLists"],
+.section-advanced textarea[name="externalCatalogURLs"],
+.section-advanced textarea[name="knownBanners"] {
+  height: 75px;
+}
+.section-advanced .archive-cell {
+  min-width: 160px;
+  text-align: center;
+}
+.section-advanced #archive-board-select {
+  position: absolute;
+}
+.section-advanced .note {
+  font-size: 0.8em;
+  font-style: italic;
+  margin-left: 10px;
+}
+.section-advanced .note code {
+  font-style: normal;
+  font-size: 11px;
+}
+.favicon-preview > img {
+    vertical-align: middle;
+}
+.favicon-preview > img:nth-of-type(3n+1) {
+    margin-left: 4px;
+}
+.section-keybinds .field {
+  font-family: monospace;
+}
+#fourchanx-settings fieldset {
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 0.35em 0.625em 0.75em;
+  margin: 0px 2px;
+}
+#fourchanx-settings legend {
+  font-weight: 700;
+  color: inherit;
+}
+#fourchanx-settings textarea {
+  font-family: monospace;
+  width: 100%;
+  resize: vertical;
+}
+#fourchanx-settings code {
+  color: #000;
+  background-color: #FFF;
+  padding: 0 2px;
+}
+#fourchanx-settings th {
+  text-align: center;
+  font-weight: bold;
+}
+#fourchanx-settings p {
+  margin: 1em 0px;
+}
+#fourchanx-settings table {
+  margin: auto;
+}
+
+/* Index */
+:root.index-loading .navLinks:not(.json-index),
+:root.index-loading .board:not(.json-index),
+:root.index-loading .pagelist:not(.json-index),
+:root.infinite-mode .pagelist,
+:root.all-pages-mode .pagelist,
+:root.catalog-mode .pagelist,
+:root:not(.catalog-mode) .indexlink,
+:root.catalog-mode .cataloglink,
+:root:not(.catalog-mode) #hidden-label,
+:root:not(.catalog-mode) #index-size {
+  display: none;
+}
+#index-search {
+  padding-right: 1.5em;
+  width: 100px;
+  transition: color .25s, border-color .25s, width .25s;
+}
+#index-search:focus,
+#index-search[data-searching] {
+  width: 200px;
+}
+#index-search-clear {
+  color: gray;
+  position: relative;
+  left: -1.5em;
+}
+#index-search::-webkit-search-cancel-button {
+  display: none;
+}
+#index-search:not([data-searching]) + #index-search-clear {
+  display: none;
+}
+#index-options {
+  float: right;
+}
+#lastlong-options {
+  display: inline-block;
+  vertical-align: middle;
+  height: 28px;
+  margin: -14px 0;
+}
+#lastlong-options > input {
+  padding: 0;
+  border: 0 !important;
+  text-align: center;
+  background: transparent;
+  display: block;
+  font-size: 12px;
+  height: 12px;
+  width: 30px;
+  margin: 1px 0;
+}
+.summary {
+  text-decoration: none;
+}
+
+/* Catalog */
+:root.catalog-mode .board {
+  text-align: center;
+}
+.catalog-thread {
+  display: inline-block;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  word-wrap: break-word;
+  vertical-align: top;
+  position: relative;
+}
+/* overrides 4chan CSS on div.thread */
+.catalog-thread.catalog-thread {
+  margin: 2px;
+}
+.catalog-small > .catalog-thread {
+  width: 165px;
+  height: 320px;
+}
+.catalog-large > .catalog-thread {
+  width: 270px;
+  height: 410px;
+}
+:root.catalog-hover-expand .catalog-thread:hover {
+  z-index: 1;
+}
+.catalog-container {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.catalog-container:not(:hover),
+:root:not(.catalog-hover-expand) .catalog-container {
+  overflow: hidden;
+}
+.catalog-post {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  border: 1px solid transparent;
+  padding-top: 20px;
+}
+/* overrides inline CSS from Index.cb.hoverAdjust */
+:root:not(.catalog-hover-expand) .catalog-post {
+  left: 0 !important;
+  right: 0 !important;
+}
+/* overrides 4chan CSS on div.post */
+.catalog-post.catalog-post {
+  margin: -21px -1px -1px;
+  overflow: visible;
+}
+.catalog-thread.noFile > * > .catalog-post {
+  margin-top: -7px;
+  padding-top: 6px;
+}
+:root.catalog-hover-expand .catalog-container:hover > .catalog-post {
+  margin-left: -61px;
+  margin-right: -61px;
+}
+:root.catalog-hover-expand .catalog-container:hover > * > :not(.catalog-replies) {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+.catalog-link {
+  display: block;
+  position: relative;
+}
+.catalog-thumb {
+  border-radius: 2px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, .25);
+  vertical-align: top;
+}
+.catalog-thumb.spoiler-file {
+  width: 100px;
+  height: 100px;
+}
+.catalog-thumb.deleted-file {
+  width: 127px;
+  height: 13px;
+  padding: 20px 11px;
+}
+.catalog-thumb.no-file {
+  width: 77px;
+  height: 13px;
+  padding: 20px 36px;
+}
+.catalog-icons > img,
+.catalog-stats > .menu-button {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  vertical-align: text-top;
+  padding-left: 2px;
+}
+.catalog-stats > .menu-button > .icon {
+  height: 10px;
+}
+.catalog-stats {
+  font-size: 10px;
+  font-weight: 700;
+  padding-top: 2px;
+}
+.catalog-stats > [title] {
+  cursor: help;
+}
+.catalog-post > .postMessage {
+  margin: 0;
+  padding-bottom: .3em;
+}
+.catalog-container:not(:hover) > * > .file,
+.catalog-container:not(:hover) > * > .postInfo > :not(.subject),
+.catalog-container:not(:hover) > * > .catalog-replies,
+.catalog-container:not(:hover) .extra-linebreak,
+.catalog-container:not(:hover) .abbr,
+:root:not(.catalog-hover-expand) .catalog-container > * > .file,
+:root:not(.catalog-hover-expand) .catalog-container > * > .postInfo > :not(.subject),
+:root:not(.catalog-hover-expand) .catalog-container > * > .catalog-replies,
+:root:not(.catalog-hover-expand) .catalog-container .extra-linebreak,
+:root:not(.catalog-hover-expand) .catalog-container .abbr,
+.catalog-thread > .catalog-container > :not(.catalog-post),
+.preview-summary,
+.catalog-post > .file > :not(.fileText),
+.catalog-post > * > .fileText > :not(:first-child),
+.catalog-post > .postInfo > :not(.subject):not(.nameBlock):not(.dateTime),
+.catalog-post > .postInfo > .nameBlock > .contact-links,
+.catalog-post > * > * > .posteruid,
+.catalog-post > * > * > .postJumper,
+:root.bottom-backlinks .catalog-post > .container,
+.post:not(.catalog-post) > .catalog-link,
+.post:not(.catalog-post) > .catalog-stats,
+.post:not(.catalog-post) > .catalog-replies {
+  display: none;
+}
+.catalog-post > .file {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  min-height: 20px;
+  background-color: inherit;
+}
+.catalog-post > * > .fileText {
+  position: relative;
+  padding: 2px;
+  background-color: inherit;
+}
+.catalog-small .catalog-post > * .fileText {
+  font-size: 10px;
+}
+.catalog-post > * > .fileText:not(:hover) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.catalog-post > * > .fileText:hover {
+  z-index: 1;
+}
+/* overrides 4chan CSS on div.post div.postInfo */
+.catalog-post > .postInfo.postInfo {
+  width: auto;
+}
+.catalog-post > * > .subject {
+  display: block;
+}
+.catalog-post > * > .dateTime {
+  display: inline-block;
+  font-style: italic;
+}
+:root.catalog-hover-expand .catalog-container:hover > * > * > .nameBlock,
+:root.catalog-hover-expand .catalog-container:hover > * > * > .dateTime,
+:root.catalog-hover-expand .catalog-container:hover > * > .postMessage:not(:empty) {
+  padding-top: .3em;
+}
+.catalog-post .extra-linebreak {
+  content: ''; /* makes this work in Blink/WebKit */
+  display: block;
+  margin-top: .3em;
+}
+.catalog-reply {
+  text-align: left;
+  white-space: nowrap;
+  border-top: 1px solid transparent;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+.catalog-reply > * {
+  padding: 3px;
+  overflow: hidden;
+  flex: none;
+}
+.catalog-reply > span {
+  font-style: italic;
+  font-weight: bold;
+}
+.catalog-reply-excerpt {
+  flex: 1 1 auto;
+}
+.catalog-post .prettyprinted {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.catalog-post .MathJax_Display {
+  text-align: center !important;
+}
+.catalog-container:not(:hover) .exif,
+:root:not(.catalog-hover-expand) .catalog-container .exif {
+  display: none !important;
+}
+.catalog-post > * > .exif {
+  border-collapse: collapse;
+}
+:root.catalog-hover-expand .catalog-container:hover .exif[style*="display: block;"] {
+  display: inline-block !important;
+}
+.catalog-post > * > .exif,
+.catalog-post > * > .exif > tbody {
+  background-color: inherit;
+}
+.catalog-post > * > .exif,
+.catalog-post > * > .exif td {
+  min-width: 0;
+}
+.catalog-post > * > .exif td {
+  padding-top: 1px;
+}
+:root.hats-enabled .catalog-thread::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  background-size: contain;
+}
+:root.hats-enabled .catalog-small > .catalog-thread::after {
+  left: -8px;
+  top: -59px;
+  width: 96px;
+  height: 96px;
+}
+:root.hats-enabled:not(.werkTyme) .catalog-small > .catalog-thread:not(.noFile)::after {
+  left: calc(67px - .3px * var(--tn-w));
+}
+:root.hats-enabled .catalog-large > .catalog-thread::after {
+  left: -15px;
+  top: -98px;
+  width: 160px;
+  height: 160px;
+}
+:root.hats-enabled:not(.werkTyme) .catalog-large > .catalog-thread:not(.noFile)::after {
+  left: calc(110px - .5px * var(--tn-w));
+}
+
+/* Copy Text Link's textarea element */
+textarea.copy-text-element {
+  height: 0;
+  width: 0;
+  position: absolute;
+  top: -10000px;
+}
+
+/* Announcement Hiding */
+:root.hide-announcement $site$psa {
+  display: none;
+}
+.hide-announcement-button {
+  opacity: 0.4;
+  float: left;
+}
+
+/* Unread */
+.unread-line {
+  margin: 0;
+}
+.unread-line + br {
+  display: none;
+}
+.unread-mark-read {
+  float: right;
+  clear: both;
+  width: 100%;
+  text-align: right;
+}
+:not(.unread-thread) > .unread-mark-read {
+  display: none;
+}
+
+/* Thread Updater */
+#updater {
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+#updater > .move {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  left: -5px;
+  right: -5px;
+  z-index: -1;
+}
+#updater > div:last-child {
+  text-align: center;
+}
+#updater input[type="number"] {
+  width: 4em;
+}
+:root.float #updater {
+  padding: 0px 3px;
+}
+:root:not(.float).shortcut-icons #updater {
+  display: inline-block;
+  min-width: 12pt;
+  text-align: right;
+}
+.new {
+  color: limegreen;
+}
+#update-status:not(.empty) + #update-timer:not(.empty):not(.loading) {
+  margin-left: 5px;
+}
+#update-timer {
+  cursor: pointer;
+}
+
+/* Thread Watcher */
+#thread-watcher {
+  position: absolute;
+}
+#thread-watcher {
+  padding-bottom: 3px;
+  padding-left: 3px;
+  white-space: nowrap;
+  min-width: 146px;
+}
+#watched-threads {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+:root.fixed-watcher #thread-watcher {
+  position: fixed;
+}
+:root.fixed-watcher #watched-threads {
+  max-height: calc(100vh - 75px);
+}
+:root:not(.fixed-watcher) #watched-threads:not(:hover) {
+  max-height: 210px;
+  overflow-y: hidden;
+}
+#thread-watcher > .move {
+  padding-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+#watched-threads > div {
+  padding-left: 3px;
+  padding-right: 3px;
+}
+#watched-threads .watcher-link {
+  max-width: 250px;
+  display: inline-flex;
+  flex-direction: row;
+}
+#watched-threads .watcher-page,
+#watched-threads .watcher-unread {
+  flex: 0 0 auto;
+  margin-right: 2px;
+}
+#watched-threads .watcher-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+}
+#watched-threads .watcher-title:not(:first-child) {
+  margin-left: 2px;
+}
+.replies-quoting-you > a, #watcher-link.replies-quoting-you, .last-page > a > .watcher-page {
+  color: #F00;
+}
+#thread-watcher a {
+  text-decoration: none;
+}
+#thread-watcher .move > .close {
+  margin-left: auto;
+}
+.watch-thread-link {
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  padding: 2px;
+  opacity: 0.2;
+  filter: none;
+  cursor: pointer;
+  color: var(--xt-watcher, #000);
+}
+.watch-thread-link.watched {
+  opacity: 1;
+}
+:root.oneechan .watch-thread-link > svg {
+  display: none;
+}
+
+
+/* Thread Stats */
+#thread-stats {
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+:root.float #thread-stats > .move > :not(#page-count) {
+  pointer-events: none;
+}
+:root.float #thread-stats {
+  padding: 0px 3px;
+}
+#page-count {
+  cursor: pointer;
+}
+
+/* Quote */
+.hashlink::before {
+  content: ' ';
+  visibility: hidden;
+}
+.inline + .hashlink {
+  display: none !important;
+}
+:root.resurrect-quotes .deadlink {
+  text-decoration: none !important;
+}
+.catalog-post .qmark-ct {
+  display: none;
+}
+.backlink.deadlink:not(.forwardlink),
+.quotelink.deadlink:not(.forwardlink) {
+  text-decoration: underline !important;
+}
+:root:not(.catalog-mode) .inlined {
+  opacity: .5;
+}
+#qp input, .forwarded {
+  display: none;
+}
+.quotelink.forwardlink,
+.backlink.forwardlink {
+  text-decoration: underline dashed;
+}
+.filtered {
+  text-decoration: underline line-through;
+}
+:root.hide-backlinks .backlink.filtered,
+:root.hide-backlinks .backlink.filtered + .hashlink.filtered {
+  display: none;
+}
+.postNum + .container::before {
+  content: " ";
+}
+:root.bottom-backlinks .container {
+  display: block;
+  clear: both;
+  margin: 0 4px;
+}
+:root.bottom-backlinks .backlink {
+  font-size: 90%;
+}
+.inline {
+  border: 1px solid;
+  display: table;
+  margin: 2px 0;
+}
+.container ~ .inline {
+  margin-left: 20px;
+}
+:root.catalog-mode .inline {
+  display: none;
+}
+.inline .post {
+  border: 0 !important;
+  background-color: transparent !important;
+  display: table !important;
+  margin: 0 !important;
+  padding: 1px 2px !important;
+}
+#qp > .opContainer::after {
+  content: '';
+  clear: both;
+  display: table;
+}
+#qp .post {
+  border: none;
+  margin: 0;
+  padding: 2px 2px 5px;
+}
+#qp img {
+  max-height: 80vh;
+  max-width: 50vw;
+}
+#qp .preview-summary {
+  display: block;
+}
+
+/* Quote Threading */
+.threadContainer {
+  margin-left: 20px;
+  border-left: 1px solid rgba(128,128,128,.3);
+}
+.threadOP {
+  clear: both;
+}
+
+/* File */
+.expanded-image > .post > .file > .fileThumb {
+  display: flex;
+  flex-direction: column;
+}
+.fileText-original,
+.fnswitch:hover > .fntrunc,
+.fnswitch:not(:hover) > .fnfull,
+.expanded-image > .post > .file > .fileThumb > video[data-md5],
+.expanded-image > .post > .file > .fileThumb > img[data-md5] {
+  display: none;
+}
+.full-image[data-file-i-d] {
+  display: none;
+  cursor: pointer;
+}
+.expanded-image > .post > .file > .fileThumb > .full-image {
+  display: inline;
+}
+.expanded-image > .post > .file > .fileThumb > audio {
+  height: 30px;
+  width: 100%;
+  min-width: 300px;
+}
+.expanded-image {
+  clear: left;
+}
+.expanding {
+  opacity: .5;
+}
+:root.fit-height .full-image {
+  max-height: 100vh;
+}
+:root.fit-height.fixed .full-image {
+  max-height: calc(100vh - 35px);
+}
+:root.fit-width .full-image {
+  max-width: 100%;
+}
+:root.ua-gecko.fit-width .full-image {
+  width: 100%;
+}
+.fileThumb > .warning {
+  clear: both;
+}
+#ihover {
+  pointer-events: none;
+  max-height: calc(100vh - 25px);
+  max-width: 100vw;
+}
+/* WEBM Metadata */
+.webm-title > a::before {
+  content: "title";
+  text-decoration: underline;
+}
+.webm-title.loading > a::after {
+  content: "...";
+}
+.webm-title.error > a:hover::before,
+.webm-title.error > a:focus::before {
+  content: "error";
+  text-decoration: none;
+}
+.webm-title > span {
+  cursor: text;
+}
+.webm-title.not-found > span::before {
+  content: "not found";
+}
+.webm-title:not(:hover):not(:focus) > span,
+.webm-title:hover > span + a,
+.webm-title:focus > span + a {
+  display: none;
+}
+/* Volume control */
+input[name="Default Volume"] {
+  width: 4em;
+  height: 1ex;
+  vertical-align: middle;
+  margin: 0px;
+}
+/* Fappe and Werk Tyme */
+:root.fappeTyme $site$replyOriginal.noFile,
+:root.fappeTyme $site$replyOriginal.noFile + br {
+  display: none;
+}
+:root.werkTyme $site$thumbLink,
+:root.werkTyme $site$file$thumb,
+:root.werkTyme .catalog-thumb:not(.deleted-file):not(.no-file),
+:root:not(.werkTyme) .werkTyme-filename {
+  display: none;
+}
+.werkTyme-filename {
+  font-weight: bold;
+  font-size: 110%;
+}
+:root.werkTyme .catalog-link {
+  box-shadow: 0 0 5px rgba(0, 0, 0, .25);
+  padding: 8px;
+  text-align: center;
+}
+:root.werkTyme .catalog-thumb {
+  box-shadow: none;
+  padding: 0;
+  vertical-align: middle;
+}
+.indicator {
+  background: rgba(255,0,0,0.8);
+  font-weight: bold;
+  display: inline-block;
+  min-width: 9px;
+  padding: 0px 2px;
+  margin: 0 1px;
+  text-align: center;
+  color: white;
+  border-radius: 2px;
+  cursor: pointer;
+}
+:root:not(.fappeTyme) #shortcut-fappe,
+:root:not(.werkTyme) #shortcut-werk {
+  display: none !important;
+}
+
+/* Index/Reply Navigation */
+#navlinks {
+  top: 25px;
+  right: 10px;
+}
+:root.catalog-mode #navlinks {
+  display: none;
+}
+:root.highlight-own .yourPost$site$highlightable$op::after,
+:root.highlight-you .quotesYou$site$highlightable$op::after,
+.filter-highlight$site$highlightable$op::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+/* Spoiler text */
+:root.reveal-spoilers $site$spoiler,
+:root.reveal-spoilers $site$spoiler > a {
+  color: white !important;
+}
+:root.reveal-spoilers .removed-spoiler::before {
+  content: "[spoiler]";
+}
+:root.reveal-spoilers .removed-spoiler::after {
+  content: "[/spoiler]";
+}
+
+/* Thread & Reply Hiding */
+.hide-thread-button,
+.hide-reply-button {
+  float: left;
+  margin-right: 4px;
+  padding: 2px;
+}
+$site$infoRoot a.hide-reply-button {
+  margin-right: 6px;
+  padding: 0;
+}
+.replacedSideArrows {
+  float: left;
+}
+.hide-thread-button:not(:hover),
+.hide-reply-button:not(:hover) {
+  opacity: 0.4;
+}
+.threadContainer .hide-reply-button {
+  margin-left: 2px !important;
+  position: relative;
+  left: 1px;
+}
+.hide-thread-button {
+  margin-top: -1px;
+  width: 11px;
+}
+.stub ~ :not(.threadDivider) {
+  display: none !important;
+}
+.stub input {
+  display: inline-block;
+}
+.stub .stub-icon,
+.stub-subject {
+  margin-right: 1ch;
+}
+.stub-replies {
+  margin-left: 1ch;
+}
+.stub-reasons::before { content: ' ('; }
+.stub-reasons::after { content: ')'; }
+.stub-reason:not(:last-of-type)::after { content: ' & '; }
+$site$thread[hidden] + hr {
+  display: none;
+}
+:root.reply-hide $site$sideArrows {
+  display: none;
+}
+:root.sw-yotsuba.thread-hide .party-hat {
+  left: 19px;
+}
+
+/* Anonymize */
+:root.anonymize $site$info$name,
+:root.sw-yotsuba.anonymize .post-author:not([class*=capcode]) {
+  font-size: 0;
+}
+:root.anonymize $site$info$tripcode,
+:root.sw-yotsuba.anonymize .n-pu {
+  display: none;
+}
+:root.anonymize $site$info$name::before,
+:root.sw-yotsuba.anonymize .post-author:not([class*=capcode])::before {
+  content: "Anonymous";
+  font-size: 10pt;
+}
+:root.sw-yotsuba.anonymize .flashListing .name::before,
+:root.sw-yotsuba.anonymize .post-last > .post-author:not([class*=capcode])::before {
+  font-size: 9pt;
+}
+
+/* QR */
+:root.hide-original-post-form #togglePostFormLink,
+#qr.autohide:not(.focus):not(:hover):not(:active) > form,
+:root.thread-view #qr:not(.show-new-thread-option) select[data-name="thread"],
+#file-n-submit:not(.has-file) #qr-filerm {
+  display: none;
+}
+:root.hide-original-post-form #postForm {
+  display: none !important;
+}
+#qr select,
+#qr-filename-container > a,
+.remove {
+  cursor: pointer;
+}
+#qr {
+  position: fixed;
+  padding: 1px;
+  border: 1px solid transparent;
+  min-width: 300px;
+  border-radius: 3px 3px 0 0;
+}
+#qr > form {
+  max-height: calc(100vh - 75px);
+  overflow: hidden auto;
+}
+.qr-link-container {
+  text-align: center;
+  margin: 16px 0;
+}
+.qr-link-container-bottom {
+  position: absolute;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+.qr-link {
+  border-radius: 3px;
+  padding: 6px 10px 5px;
+  font-weight: bold;
+  vertical-align: middle;
+  border-style: solid;
+  border-width: 1px;
+  font-size: 10pt;
+}
+.qr-link-container + #togglePostFormLink {
+  font-size: 10pt;
+  font-weight: normal;
+  margin: -8px 0 3.5px;
+}
+.persona {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+}
+.persona .field {
+  flex: 1;
+  width: 0;
+}
+#qr.forced-anon :is(input[data-name="name"]:not(.force-show), input[data-name="sub"]:not(.force-show)),
+#qr.reply-to-thread input[data-name="sub"]:not(.force-show),
+body:not(.board_f) #qr select[name="filetag"],
+#qr.reply-to-thread select[name="filetag"],
+#qr:not(.has-sjis) #sjis-toggle,
+#qr:not(.has-math) #tex-preview-button,
+#qr.tex-preview .textarea > :not(#tex-preview),
+#qr:not(.tex-preview) #tex-preview {
+  display: none;
+}
+#sjis-toggle, #qr.sjis-preview textarea.field {
+  font-family: "IPAMonaPGothic","Mona","MS PGothic",monospace;
+  font-size: 16px;
+  line-height: 17px;
+}
+#tex-preview-button {
+  font-size: 10px;
+}
+#tex-preview {
+  white-space: pre-line;
+}
+.textarea {
+  position: relative;
+  display: flex;
+}
+#qr textarea.field {
+  height: 14.8em;
+  min-height: 9em;
+  min-width: 300px;
+  resize: both;
+}
+#qr.has-captcha textarea.field {
+  height: 9em;
+}
+#char-count {
+  color: #000;
+  background: hsla(0, 0%, 100%, .5);
+  font-size: 8pt;
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  pointer-events: none;
+}
+#char-count.warning {
+  color: red;
+}
+input.field.tripped:not(:hover):not(:focus) {
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+#qr > .move {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#qr > .move label {
+  display: inline-flex;
+  align-items: center;
+}
+#qr > .move .close {
+  order: 2;
+}
+
+/* Recaptcha v2 */
+#qr .captcha-root {
+  position: relative;
+}
+#qr .captcha-container > div {
+  margin: auto;
+  width: 304px;
+}
+/* XXX scrollable with scroll bar hidden; prevents scroll on space press */
+:root.ua-blink #qr .captcha-container > div,
+:root.ua-edge #qr .captcha-container > div {
+  overflow: hidden;
+}
+:root.ua-blink #qr .captcha-container > div > div:first-of-type,
+:root.ua-edge #qr .captcha-container > div > div:first-of-type {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  padding-right: 30px;
+  height: 99%;
+  width: 100%;
+}
+#qr .captcha-counter {
+  display: block;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+}
+#qr.captcha-open .captcha-counter {
+  position: absolute;
+  bottom: 3px;
+}
+#qr .captcha-counter > a {
+  pointer-events: auto;
+  display: inline-block; /* XXX https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/8851747/ */
+}
+#qr:not(.captcha-open) .captcha-counter > a {
+  display: block;
+  width: 100%;
+}
+#qr.captcha-v2 #qr-captcha-iframe {
+  width: 302px;
+  height: 423px;
+  border: 0;
+  display: block;
+  margin: auto;
+}
+.goog-bubble-content {
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: auto;
+}
+.goog-bubble-content iframe {
+  position: static !important;
+}
+#overlay.media-preview {
+  display: flex;
+  overflow: auto;
+  align-items: center;
+}
+#overlay.media-preview :is(img, video) {
+  margin: auto;
+}
+#overlay.media-preview video {
+  max-height: 100%;
+  max-width: 100%;
+}
+
+/* File Input, Submit Button, Oekaki */
+#file-n-submit, #qr .oekaki {
+  display: flex;
+  align-items: stretch;
+  margin-top: 1px;
+}
+#qr-file-button, #qr-draw-button {
+  width: 15%;
+}
+#file-n-submit input[type="submit"] {
+  width: 25%;
+}
+#qr-filename-container {
+  flex: 1 1 auto;
+  width: 0;
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 1px;
+}
+input#qr-filename {
+  border: none !important;
+  background: none !important;
+  outline: none;
+}
+#qr-filename,
+.has-file #qr-no-file {
+  display: none;
+}
+#qr-no-file,
+.has-file #qr-filename {
+  flex: 1 1 auto;
+  width: 0px; /* XXX Fixes filename not shrinking to allow space for buttons in Edge */
+  display: inline-block;
+  padding: 0;
+  padding-left: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#qr-no-file {
+  color: #AAA;
+}
+#qr .oekaki.has-file {
+  display: none;
+}
+#qr .oekaki > label {
+  flex: 1 1 auto;
+  width: 0;
+  display: flex;
+  align-items: center;
+}
+#qr .oekaki > label > span {
+  margin: 0 3px;
+}
+#qr .oekaki > label > input {
+  flex: 1 1 auto;
+  width: 0;
+}
+#qr .oekaki-bg {
+  position: relative;
+  display: inline-block;
+  width: 10%;
+  margin-left: 3px;
+}
+#qr .oekaki-bg > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+}
+#qr .oekaki-bg > :not([name="oekaki-bgcolor"]) {
+  z-index: 1;
+}
+#qr [name="oekaki-bgcolor"] {
+  height: 100%;
+  width: 100%;
+  border: none;
+  padding: 0;
+}
+#qr [name="oekaki-bg"]:not(:checked) ~ [name="oekaki-bgcolor"] {
+  visibility: hidden;
+}
+#qr input[type="file"] {
+  visibility: hidden;
+  position: absolute;
+}
+
+/* Spoiler Checkbox, QR Icons */
+#qr-filename-container > label, #qr-filename-container > a {
+  flex: none;
+  margin: 0;
+  margin-right: 3px;
+}
+#qr:not(.has-spoiler) #qr-spoiler-label,
+#file-n-submit:not(.has-file) :is(#qr-spoiler-label, #qr-randomize, #qr-restore-name),
+#file-n-submit:not(.has-image) #qr-jpg,
+#file-n-submit:not(.has-image):not(.has-video) #qr-view,
+#file-n-submit.has-file :is(#paste-area, #url-button),
+#file-n-submit:not(.custom-cooldown) #custom-cooldown-button {
+  display: none;
+}
+#qr-filename-container > label {
+  position: relative;
+}
+#qr-filename-container input[type="checkbox"] {
+  margin: 0;
+}
+.checkbox-letter {
+  font-size: 13px;
+  font-weight: bold;
+}
+#qr-filename-container label:not(:hover) > input[type="checkbox"]:not(:focus):not(:checked),
+#qr-filename-container label:not(:hover) > input[type="checkbox"]:not(:focus):not(:checked) ~ :not(.checkbox-letter),
+#qr-filename-container label:hover > .checkbox-letter,
+input[type="checkbox"]:focus ~ .checkbox-letter,
+input[type="checkbox"]:checked ~ .checkbox-letter {
+  /* not displayed but still focusable */
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.checkbox-letter, #paste-area, #url-button, #custom-cooldown-button, #dump-button, #split-post {
+  opacity: 0.6;
+}
+#paste-area {
+  font-size: 0;
+}
+#paste-area:focus {
+  opacity: 1;
+}
+#custom-cooldown-button.disabled {
+  opacity: 0.27;
+}
+
+/* Thread and Flash Tag Select */
+#qr select {
+  background: white;
+  border: 1px solid #CCC;
+}
+#qr select[data-name="thread"] {
+  float: right;
+}
+#qr > form > select {
+  margin-top: 1px;
+}
+
+/* Dumping UI */
+.dump #dump-list-container {
+  display: block;
+}
+#dump-list-container {
+  display: none;
+  position: relative;
+  overflow-y: hidden;
+  margin-top: 1px;
+}
+#dump-list {
+  overflow: auto;
+  white-space: nowrap;
+  width: 248px;
+  max-height: 248px;
+  min-height: 90px;
+  max-width: 100%;
+  min-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+}
+.qr-preview {
+  box-sizing: border-box;
+  counter-increment: thumbnails;
+  cursor: move;
+  display: inline-block;
+  height: 90px;
+  width: 90px;
+  padding: 2px;
+  opacity: .5;
+  overflow: hidden;
+  position: relative;
+  text-shadow: 0 0 2px #000;
+  transition: opacity .25s ease-in-out, transform .25s ease-in-out;
+  vertical-align: top;
+  background-size: cover;
+  flex: none;
+}
+.qr-preview:hover,
+.qr-preview:focus {
+  opacity: .9;
+}
+.qr-preview::before {
+  content: counter(thumbnails);
+  color: #fff;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  text-shadow: 0 0 3px #000, 0 0 8px #000;
+}
+.qr-preview#selected {
+  opacity: 1;
+}
+.qr-preview.drag {
+  box-shadow: 0 0 10px rgba(0,0,0,.5);
+  transform: scale(.8);
+}
+.qr-preview.over {
+  border-color: #fff;
+  transform: scale(1.1);
+  opacity: 0.9;
+  z-index: 10;
+}
+.qr-preview > span {
+  color: #fff;
+}
+.remove {
+  background: none;
+  color: #e00;
+  padding: 1px;
+}
+.qr-preview:only-of-type > .remove {
+  display: none;
+}
+.remove:hover::after {
+  content: " Remove";
+}
+.qr-preview:not(.has-file) label,
+#qr:not(.has-spoiler) .qr-preview-spoiler {
+  display: none;
+}
+.qr-preview > label {
+  background: rgba(0,0,0,.5);
+  color: #fff;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  text-align: center;
+}
+.qr-preview > label > input {
+  margin: 0;
+}
+#add-post {
+  cursor: pointer;
+  font-size: 1.5em;
+  position: absolute;
+  bottom: 20px;
+  right: 10px;
+  transform: translateY(calc(-50% - .75em));
+}
+#file-n-submit {
+  display: flex;
+  flex-direction: column;
+}
+#file-n-submit .row {
+  display: flex;
+  flex-direction: row;
+}
+#file-n-submit .row.space {
+  justify-content: space-between;
+}
+#qr-actions {
+  align-items: center;
+  gap: 6px;
+  padding: 0 3px;
+}
+#qr-actions .qr-action-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Menu */
+.menu-button {
+  position: relative;
+  cursor: pointer;
+}
+.postInfo > .menu-button {
+  margin: 0 4px;
+}
+#menu {
+  position: fixed;
+  outline: none;
+  font-weight: normal;
+}
+#menu, .submenu {
+  border-radius: 3px;
+  padding-top: 1px;
+  padding-bottom: 3px;
+}
+.entry {
+  cursor: pointer;
+  display: block;
+  outline: none;
+  padding: 2px 10px;
+  position: relative;
+  text-decoration: none;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: left;
+  text-shadow: none;
+  font-size: 10pt;
+}
+.entry input[type="checkbox"],
+.entry input[type="radio"] {
+  margin: 0px;
+  position: relative;
+  top: 2px;
+}
+.entry input[type="number"] {
+  width: 4.5em;
+}
+.entry.has-shortcut-text,
+.entry.has-submenu {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.entry .shortcut-text {
+  opacity: 0.5;
+  font-size: 70%;
+  margin-left: 5px;
+}
+.menu-indicator {
+  pointer-events: none;
+  position: relative;
+  right: -7px;
+}
+.left .menu-indicator > .icon {
+  transform: rotate(180deg);
+}
+.submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: -1px;
+  margin-left: 0px;
+  margin-top: -2px;
+}
+.focused > .submenu {
+  display: block;
+}
+.imp-exp-result {
+  position: absolute;
+  text-align: center;
+  margin: auto;
+  right: 0px;
+  left: 0px;
+  width: 200px;
+}
+
+/* Custom Board Titles */
+.boardTitle, .boardSubtitle {
+  white-space: pre-line;
+}
+.boardTitle[contenteditable="true"],
+.boardSubtitle[contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* Embedding */
+.embedder:not(.embedded) > span {
+  display: none;
+}
+#embedding {
+  padding: 1px 4px;
+  position: fixed;
+}
+#embedding.empty {
+  display: none;
+}
+#embedding > .move {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Gallery */
+#a-gallery {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: row;
+  background: rgba(0,0,0,0.7);
+}
+.gal-viewport {
+  display: flex;
+  align-items: stretch;
+  flex-direction: row;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.gal-thumbnails {
+  flex: 0 0 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  background: rgba(0,0,0,.5);
+  border-left: 1px solid #222;
+}
+.gal-hide-thumbnails .gal-thumbnails {
+  display: none;
+}
+.gal-thumb img,
+.gal-thumb video {
+  max-width: 125px;
+  max-height: 125px;
+  height: auto;
+  width: auto;
+}
+.gal-thumb {
+  flex: 0 0 auto;
+  padding: 3px;
+  line-height: 0;
+  transition: background .2s linear;
+}
+.gal-highlight {
+  background: rgba(0, 190, 255,.8);
+}
+.gal-prev {
+  border-right: 1px solid #222;
+}
+.gal-next {
+  border-left: 1px solid #222;
+}
+.gal-prev,
+.gal-next {
+  flex: 0 0 20px;
+  position: relative;
+  cursor: pointer;
+  opacity: 0.7;
+  background-color: rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px;
+  color: #fff;
+}
+.gal-prev:hover,
+.gal-next:hover {
+  opacity: 1;
+}
+.gal-image {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  overflow: hidden;
+  /* Flex > Non-Flex child max-width and overflow fix (Firefox only?) */
+  width: 1%;
+}
+:root:not(.gal-fit-height):not(.gal-pdf) .gal-image {
+  overflow-y: scroll !important;
+}
+:root:not(.gal-fit-width):not(.gal-pdf) .gal-image {
+  overflow-x: scroll !important;
+}
+.gal-image a {
+  display: flex;
+  align-items: flex-start;
+  margin: auto;
+  line-height: 0;
+  max-width: 100%;
+}
+:root.gal-pdf .gal-image a {
+  width: 100%;
+  height: 100%;
+}
+.gal-image img,
+.gal-image video {
+  flex: none;
+}
+.gal-fit-width .gal-image img,
+.gal-fit-width .gal-image video {
+  max-width: 100%;
+}
+.gal-fit-height .gal-image img,
+.gal-fit-height .gal-image video {
+  max-height: calc(100vh - 25px);
+}
+.gal-image iframe {
+  width: 100%;
+  height: 100%;
+}
+.gal-buttons {
+  font-size: 1.5em;
+  margin-right: 3px;
+  padding-left: 7px;
+  padding-right: 7px;
+  top: 5px;
+}
+:root.gal-pdf .gal-buttons {
+  top: 40px;
+  background: rgba(0,0,0,0.6) !important;
+  border-radius: 3px;
+}
+.gal-buttons a {
+  color: #ffffff;
+  text-shadow: 0px 0px 1px #000000;
+}
+.gal-buttons.gal-playing > .gal-start,
+.gal-buttons:not(.gal-playing) > .gal-stop {
+  display: none;
+}
+.gal-labels {
+  position: fixed;
+  bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+:root:not(.show-sauce) .gal-sauce {
+  display: none;
+}
+.gal-name,
+.gal-count,
+.gal-sauce {
+  background: rgba(0,0,0,0.6) !important;
+  border-radius: 3px;
+  padding: 1px 5px 2px 5px;
+  margin-top: 3px;
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+.gal-sauce a {
+  color: #ffffff !important;
+}
+.gal-name:hover,
+.gal-buttons a:hover,
+.gal-sauce a:hover {
+  color: rgb(95, 95, 101) !important;
+}
+:root.gal-pdf .gal-buttons a:hover {
+  color: rgb(204, 204, 204) !important;
+}
+.gal-buttons,
+.gal-labels {
+  position: fixed;
+  right: 195px;
+}
+.gal-hide-thumbnails .gal-buttons,
+.gal-hide-thumbnails .gal-labels {
+  right: 44px;
+}
+:root:not(.gal-fit-width):not(.gal-pdf) .gal-labels {
+  bottom: 23px !important;
+}
+:root.gal-fit-height:not(.gal-pdf):not(.gal-hide-thumbnails) .gal-buttons,
+:root.gal-fit-height:not(.gal-pdf):not(.gal-hide-thumbnails) .gal-labels {
+  right: 178px !important;
+}
+:root.gal-hide-thumbnails.gal-fit-height:not(.gal-pdf) .gal-buttons,
+:root.gal-hide-thumbnails.gal-fit-height:not(.gal-pdf) .gal-labels {
+  right: 28px !important;
+}
+:root.gallery-open.fixed #header-bar:not(.autohide) {
+  visibility: hidden;
+}
+
+/* Mod Contact Links */
+.contact-links {
+  margin-left: 2px;
+}
+.move-note > a {
+  text-decoration: underline;
+}
+.invisible {
+  font-size: 0;
+}
+
+/* PSA */
+.fcx-announcement {
+  text-align: center;
+}
+.fcx-announcement a {
+  text-decoration: underline;
+}
+
+.spin > .icon {
+  animation: spin 2s infinite linear;
+}
+
+/* To not scroll posts behind the header */
+div.post {
+  overflow: auto;
+  scroll-margin-top: 30px;
+}
+
+/* (you) markers on the scrollbar */
+.post-scroll-marker {
+  border: none;
+  padding: 0;
+  position: fixed;
+  right: -5px;
+  background-color: var(
+    --xt-scroll-maker-you, 
+    var(--xt-border-highlight, currentColor)
+  );
+  border-radius: 3px;
+  width: 10px;
+  min-height: 5px;
+  top: calc(var(--top) * 1vh);
+  height: calc(var(--height) * 1vh);
+}
+
+.post-scroll-marker.you-scroll-marker {
+  opacity: 50%;
+}
+
+.scroll-marker-container {
+  display: contents;
+}

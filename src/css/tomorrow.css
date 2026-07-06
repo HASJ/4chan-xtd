@@ -1,0 +1,61 @@
+:root.tomorrow {
+  --xt-background: #282A2E;
+  --xt-border: #111;
+  --xt-border-field-focus: rgb(129, 162, 190);
+  --xt-border-highlight: rgba(145, 182, 214, .8);
+  --xt-header-dialog-bg: rgba(40,42,46,0.9);
+  --xt-header-dialog-fg: #C5C8C6;
+  --xt-header-link: #81A2BE;
+  --xt-dead-link: #81A2BE;
+  --xt-inline: rgba(0, 0, 0, .14);
+  --xt-qr-preview-bg: rgba(255, 255, 255, .15);
+  --xt-qr-link-border: rgb(25, 27, 31) rgb(25, 27, 31) rgb(10, 12, 16);
+  --xt-qr-bg: linear-gradient(#37393D, #282A2E) repeat scroll 0% 0% transparent;
+  --xt-menu-fg: #C5C8C6;
+  --xt-entry-focus-bg: rgba(0, 0, 0, .33);
+  --xt-unread: rgba(40, 42, 46, 0.5);
+  --xt-watcher: #c5c8c6;
+
+  --xt-unread-line: rgb(197, 200, 198);
+  --xt-filter-highlight: rgba(145, 182, 214, .5);
+  --xt-highlight-shadow: rgba(64, 192, 255, .7);
+  --xt-watched-border: rgb(64, 192, 255);
+  --xt-qphl: rgba(145, 182, 214, .8);
+  --xt-highlight-side-arrow: rgb(155, 185, 210);
+
+  --xt-fxt-fg: #c5c8c6;
+}
+
+/* 4chan style fixes */
+:root.tomorrow #arc-list span.quote {
+  color: #B5BD68;
+}
+
+:root.tomorrow #header-bar a, :root.tomorrow #notifications a {
+  color: #81A2BE;
+}
+:root.tomorrow.shortcut-icons .native-settings {
+  background-image: url('//s.4cdn.org/image/favicon-ws.ico');
+}
+
+
+:root.tomorrow #qr .field {
+  background-color: rgb(26, 27, 29);
+  color: rgb(197,200,198);
+  border-color: rgb(40, 41, 42);
+}
+:root.tomorrow #qr .field:focus,
+:root.tomorrow #qr .field.focus {
+  border-color: var(--xt-border-field-focus) !important;
+  background-color: rgb(30,32,36);
+}
+:root.tomorrow #qr select {
+  border-color: rgb(40, 41, 42);
+  background: unset;
+}
+:root.tomorrow #qr select > option {
+  background-color: var(--xt-background);
+}
+:root.tomorrow #qr-filename {
+  color: rgb(197,200,198);
+}
