@@ -1,7 +1,7 @@
 import Callbacks from "../classes/Callbacks";
 import Fetcher from "../classes/Fetcher";
 import Get from "../General/Get";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { Conf, d, doc, g } from "../globals/globals";
 import ExpandComment from "../Miscellaneous/ExpandComment";
@@ -57,7 +57,7 @@ const QuotePreview: QuotePreviewType = {
       className: 'dialog'
     });
 
-    $.add(Header.hover, qp);
+    $.add(UIState.hoverUI, qp);
     new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
 
     UI.hover({
@@ -83,7 +83,7 @@ const QuotePreview: QuotePreviewType = {
     let root: HTMLElement | null;
     if (!(root = this.el.firstElementChild as HTMLElement)) { return; }
 
-    $.event('PostsRemoved', null, Header.hover);
+    $.event('PostsRemoved', null, UIState.hoverUI);
 
     const clone = Get.postFromRoot(root);
     let post = clone.origin;

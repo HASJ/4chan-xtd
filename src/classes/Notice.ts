@@ -1,8 +1,8 @@
+import UIState from "../globals/UIState";
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 import { SECOND } from "../platform/helpers";
 import Icon from '../Icons/icon';
-import { addNoticeElement } from "./NoticeHost";
 
 export default class Notice {
   timeout?: number;
@@ -47,7 +47,7 @@ export default class Notice {
       return;
     }
     $.off(d, 'visibilitychange', this.add);
-    addNoticeElement(this.el);
+    $.add(UIState.noticesRoot, this.el);
     this.el.clientHeight; // force reflow
     this.el.style.opacity = '1';
     if (this.timeout) {

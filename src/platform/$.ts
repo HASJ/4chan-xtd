@@ -522,7 +522,7 @@ if (platform === 'crx') {
       const msg = $.el('div',
         {innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.`});
       $.on($('a', msg), 'click', () => location.reload());
-      $.event('CreateNotification', { type: 'warning', content: msg });
+      $.event('CreateNotification', {type: 'warning', content: msg});
       $.crxWarningShown = true;
     }
     return false;

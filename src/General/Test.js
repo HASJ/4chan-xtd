@@ -8,7 +8,7 @@ import keyCode from "../Miscellaneous/KeyCode";
 import Unread from "../Monitoring/Unread";
 import $$ from "../platform/$$";
 import $ from "../platform/$";
-import Header from "./Header";
+import UIState from "../globals/UIState";
 import { g, Conf, c, d } from "../globals/globals";
 import Menu from "../Menu/Menu";
 
@@ -32,14 +32,14 @@ const Test = {
     const a2 = $.el('a',
       {textContent: 'Test HTML building'});
     $.on(a2, 'click', this.cb.testAll);
-    Header.menu.addEntry({
+    UIState.headerMenu.addEntry({
       el: a2});
 
     if (Unread.posts) {
       const testOrderLink = $.el('a',
         {textContent: 'Test Post Order'});
       $.on(testOrderLink, 'click', this.cb.testOrder);
-      Header.menu.addEntry({
+      UIState.headerMenu.addEntry({
         el: testOrderLink});
     }
 
@@ -153,7 +153,7 @@ const Test = {
 
     testAll() {
       Test.testAll();
-      return Header.menu.close();
+      return UIState.headerMenu.close();
     },
 
     testOrder() {

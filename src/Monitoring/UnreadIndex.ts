@@ -1,7 +1,7 @@
 import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import Get from "../General/Get";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import Index from "../General/Index";
 import { g, Conf, d } from "../globals/globals";
 import ExpandThread from "../Miscellaneous/ExpandThread";
@@ -74,7 +74,7 @@ const UnreadIndex: UnreadIndexType = {
     const wasVisible = !!UnreadIndex.hr[thread.fullID]?.parentNode;
     UnreadIndex.update(thread);
     if (Conf['Scroll to Last Read Post'] && (e.type === 'PostsInserted') && !wasVisible && !!UnreadIndex.hr[thread.fullID]?.parentNode) {
-      Header.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
+      UIState.scrollToIfNeeded(UnreadIndex.hr[thread.fullID], true);
     }
   },
 

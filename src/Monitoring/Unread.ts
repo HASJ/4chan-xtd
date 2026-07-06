@@ -2,7 +2,7 @@ import Callbacks from "../classes/Callbacks";
 import DataBoard from "../classes/DataBoard";
 import RandomAccessList from "../classes/RandomAccessList";
 import Get from "../General/Get";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 import { debounce, SECOND } from "../platform/helpers";
@@ -120,7 +120,7 @@ const Unread: UnreadType = {
       textContent: 'Mark all unread'
     });
     $.on(resetLink, 'click', Unread.reset);
-    Header.menu.addEntry({
+    UIState.headerMenu.addEntry({
       el: resetLink,
       order: 70
     });
@@ -151,7 +151,7 @@ const Unread: UnreadType = {
         // Don't try to scroll to posts with display: none
         position = position.prev;
       } else {
-        Header.scrollToIfNeeded(bottom, true);
+        UIState.scrollToIfNeeded(bottom, true);
         break;
       }
     }
@@ -228,13 +228,13 @@ const Unread: UnreadType = {
   },
 
   openNotification(post: any, predicate = ' replied to you') {
-    if (!Header.areNotificationsEnabled) { return; }
+    if (!UIState.areNotificationsEnabled) { return; }
     const notif = new Notification(`${post.info.nameBlock}${predicate}`, {
       body: post.commentDisplay(),
       icon: Favicon.logo
     });
     notif.onclick = function() {
-      Header.scrollToIfNeeded(post.nodes.bottom, true);
+      UIState.scrollToIfNeeded(post.nodes.bottom, true);
       window.focus();
     };
     notif.onshow = () => setTimeout(() => notif.close(), 7 * SECOND);
@@ -272,7 +272,7 @@ const Unread: UnreadType = {
       const { ID, data } = Unread.position;
       const { bottom } = data.nodes;
       if (bottom.getBoundingClientRect().height && // post has been hidden
-        (Header.getBottomOf(bottom) <= -1)) { break; }                      // post is completely read
+        (UIState.getBottomOf(bottom) <= -1)) { break; }                      // post is completely read
       count++;
       Unread.posts.delete(ID);
       Unread.postsQuotingYou.delete(ID);

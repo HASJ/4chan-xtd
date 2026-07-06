@@ -1,6 +1,6 @@
 ﻿// @ts-nocheck
 import Get from "../General/Get";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import { g, Conf, d, doc } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
@@ -70,7 +70,7 @@ var Nav = {
     for (var threadRoot of $$(g.SITE.selectors.thread)) {
       var thread = Get.threadFromRoot(threadRoot);
       if (thread.isHidden && !thread.stub) { continue; }
-      if (Header.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
+      if (UIState.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
         return threadRoot;
       }
     }
@@ -89,14 +89,14 @@ var Nav = {
       // Unless we're not at the beginning of the current thread,
       // and thus wanting to move to beginning,
       // or we're above the first thread and don't want to skip it.
-      const top = Header.getTopOf(thread);
+      const top = UIState.getTopOf(thread);
       if (((delta === +1) && (top < 5)) || ((delta === -1) && (top > -5))) { thread = next; }
     }
     // Add extra space to the end of the page if necessary so that all threads can be selected by keybinds.
-    const extra = (Header.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
+    const extra = (UIState.getTopOf(thread) + doc.clientHeight) - d.body.getBoundingClientRect().bottom;
     if (extra > 0) { d.body.style.marginBottom = `${extra}px`; }
 
-    Header.scrollTo(thread);
+    UIState.scrollTo(thread);
 
     if ((extra > 0) && !Nav.haveExtra) {
       Nav.haveExtra = true;

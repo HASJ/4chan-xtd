@@ -6,6 +6,7 @@ import $$ from "../platform/$$";
 import meta from '../../package.json';
 import { indexEnabledOn } from "../General/IndexAvailability";
 import Site from "../site/Site";
+import UIState from "../globals/UIState";
 import Header from "../General/Header";
 import { getBoardLists, registerBoardListUpdater, registerBoardURLResolver } from "../General/HeaderBoardLists";
 import { g, Conf } from "../globals/globals";
@@ -60,7 +61,7 @@ var CatalogLinks = {
       const input = $('input', el);
       $.on(input, 'change', this.toggle);
       $.sync('Header catalog links', CatalogLinks.set);
-      return Header.menu.addEntry({
+      return UIState.headerMenu.addEntry({
         el,
         order: 95
       });

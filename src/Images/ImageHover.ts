@@ -1,5 +1,5 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { g, Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
@@ -65,7 +65,7 @@ const ImageHover: ImageHoverType = {
         ImageCommon.rewind(this);
       }
       el.id = 'ihover';
-      $.add(Header.hover, el);
+      $.add(UIState.hoverUI, el);
       if (isVideo) {
         const video = el as HTMLVideoElement;
         video.loop     = true;

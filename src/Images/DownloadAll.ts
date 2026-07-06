@@ -1,5 +1,5 @@
 import { g, Conf, d } from "../globals/globals";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import Icon from "../Icons/icon";
 import $ from "../platform/$";
 import CrossOrigin from "../platform/CrossOrigin";
@@ -48,7 +48,7 @@ const DownloadAll = {
         const thread = g.threads.get(`${g.BOARD.ID}.${g.THREADID}`);
         if (thread) DownloadAll.queueThread(thread);
       });
-      Header.addShortcut('download-all', el, 526);
+      UIState.addShortcut('download-all', el, 526);
     }
   },
 

@@ -1,5 +1,5 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
@@ -37,7 +37,7 @@ const FappeTyme: FappeTymeType = {
         if (Conf[lc]) { this.set(lc, true); }
         $.on(this.nodes[lc], 'change', this.toggle.bind(this, lc));
 
-        Header.menu.addEntry({
+        UIState.headerMenu.addEntry({
           el,
           order: 97
         });
@@ -52,7 +52,7 @@ const FappeTyme: FappeTymeType = {
           check.checked = !check.checked;
           $.event('change', null, check);
         });
-        Header.addShortcut(lc, indicator, 410);
+        UIState.addShortcut(lc, indicator, 410);
       }
     }
 

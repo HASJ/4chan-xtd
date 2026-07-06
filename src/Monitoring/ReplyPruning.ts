@@ -1,5 +1,5 @@
 import Callbacks from "../classes/Callbacks";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { g, Conf, E, d } from "../globals/globals";
 import $ from "../platform/$";
@@ -71,7 +71,7 @@ const ReplyPruning: ReplyPruningType = {
     $.on(this.inputs.enabled, 'change', this.setEnabled);
     $.on(this.inputs.replies, 'change', $.cb.value);
 
-    Header.menu.addEntry({
+    UIState.headerMenu.addEntry({
       el,
       order: 190
     });
@@ -188,7 +188,7 @@ const ReplyPruning: ReplyPruningType = {
     ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
 
     // Maintain position in thread when posts are added/removed above
-    if ((hidden1 !== hidden2) && ((boardTop = Header.getTopOf($('.board') as HTMLElement)) < 0)) {
+    if ((hidden1 !== hidden2) && ((boardTop = UIState.getTopOf($('.board') as HTMLElement)) < 0)) {
       window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
     }
   }

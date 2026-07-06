@@ -21,8 +21,8 @@ import PostRedirect from '../Posting/PostRedirect';
 import QuoteYou from '../Quotelinks/QuoteYou';
 import Unread from './Unread';
 import UnreadIndex from './UnreadIndex';
-import Header from '../General/Header';
-import Index from '../General/Index';
+import UIState from '../globals/UIState';
+import IndexState from '../globals/IndexState';
 import { Conf, d, doc, g } from '../globals/globals';
 import Menu from '../Menu/Menu';
 import UI from '../General/UI';
@@ -231,13 +231,13 @@ const ThreadWatcher: ThreadWatcherType = {
       this.dialog.hidden = true;
     }
 
-    Header.addShortcut('watcher', sc, 510);
+    UIState.addShortcut('watcher', sc, 510);
 
     ThreadWatcher.initLastModified();
     ThreadWatcher.fetchAuto();
     $.on(window, 'visibilitychange focus', () => $.queueTask(ThreadWatcher.fetchAuto));
 
-    if (Conf['Menu'] && Index.enabled) {
+    if (Conf['Menu'] && IndexState.enabled) {
       Menu.menu.addEntry({
         el: $.el('a', {
           href:      'javascript:;',
@@ -982,7 +982,7 @@ const ThreadWatcher: ThreadWatcherType = {
     addHeaderMenuEntry() {
       if (g.VIEW !== 'thread') { return; }
       const entryEl = $.el('a', { href: 'javascript:;' });
-      Header.menu.addEntry({
+      UIState.headerMenu.addEntry({
         el: entryEl,
         order: 60,
         open() {

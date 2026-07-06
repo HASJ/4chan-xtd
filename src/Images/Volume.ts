@@ -1,6 +1,6 @@
 import Callbacks from "../classes/Callbacks";
 import Config from "../config/Config";
-import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import UI from "../General/UI";
 import { g, Conf, E } from "../globals/globals";
 import $ from "../platform/$";
@@ -67,8 +67,8 @@ const Volume: VolumeType = {
     $.on(this.inputs.unmute, 'change', $.cb.checked);
     $.on(this.inputs.volume, 'change', $.cb.value);
 
-    Header.menu.addEntry({ el: unmuteEntry, order: 200 });
-    Header.menu.addEntry({ el: volumeEntry, order: 201 });
+    UIState.headerMenu.addEntry({ el: unmuteEntry, order: 200 });
+    UIState.headerMenu.addEntry({ el: volumeEntry, order: 201 });
   },
 
   setup(video: HTMLVideoElement) {
@@ -101,7 +101,7 @@ const Volume: VolumeType = {
     if ((g.SITE as any).noAudio?.(this.board)) { return; }
     for (const file of this.files) {
       if (file.isVideo) {
-        if (file.thumb) { $.on(file.thumb, 'wheel', Volume.wheel.bind(Header.hover)); }
+        if (file.thumb) { $.on(file.thumb, 'wheel', Volume.wheel.bind(UIState.hoverUI)); }
         $.on(($('.file-info', file.text) || file.link), 'wheel', Volume.wheel.bind(file.thumbLink));
       }
     }
@@ -110,7 +110,7 @@ const Volume: VolumeType = {
   catalogNode(this: any) {
     const file = this.thread.OP.files[0];
     if (!file?.isVideo) { return; }
-    $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(Header.hover));
+    $.on(this.nodes.thumb, 'wheel', Volume.wheel.bind(UIState.hoverUI));
   },
 
   wheel(this: any, e: WheelEvent) {

@@ -29,6 +29,7 @@ import $ from '../platform/$';
 import meta from '../../package.json';
 import { c, Conf, d, doc, g } from '../globals/globals';
 import Header from './Header';
+import UIState from '../globals/UIState';
 import h, { hFragment } from '../globals/jsx';
 import { dict } from '../platform/helpers';
 import Icon from '../Icons/icon';
@@ -57,7 +58,7 @@ var Settings = {
     Icon.set(link, 'wrench', 'Settings');
     $.on(link, 'click', Settings.open);
 
-    Header.addShortcut('settings', link, 820);
+    UIState.addShortcut('settings', link, 820);
 
     const add = this.addSection;
 

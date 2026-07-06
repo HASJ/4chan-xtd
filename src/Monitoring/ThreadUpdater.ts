@@ -14,7 +14,7 @@ import Config from '../config/Config';
 import { openSettings } from '../General/SettingsBridge';
 import QuoteThreading from '../Quotelinks/QuoteThreading';
 import Unread from './Unread';
-import Header from '../General/Header';
+import UIState from '../globals/UIState';
 import { g, Conf, d, doc } from '../globals/globals';
 import UI from '../General/UI';
 import { MINUTE, SECOND } from '../platform/helpers';
@@ -41,7 +41,7 @@ var ThreadUpdater = {
       this.dialog = (sc = $.el('span',
         {id:        'updater'}));
       $.extend(sc, {innerHTML: '<span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>'});
-      Header.addShortcut('updater', sc, 100);
+      UIState.addShortcut('updater', sc, 100);
     } else {
       this.dialog = (sc = UI.dialog('updater',
         {innerHTML: '<div class="move"></div><span id="update-status" class="empty"></span><span id="update-timer" class="empty" title="Update now"></span>'}));
@@ -89,7 +89,7 @@ var ThreadUpdater = {
 
     subEntries.push({el: this.settings});
 
-    Header.menu.addEntry(this.entry = {
+    UIState.headerMenu.addEntry(this.entry = {
       el: $.el('span',
         {textContent: 'Updater'}),
       order: 110,
@@ -442,7 +442,7 @@ var ThreadUpdater = {
         if (Conf['Bottom Scroll']) {
           window.scrollTo(0, d.body.clientHeight);
         } else {
-          if (firstPost) { Header.scrollTo(firstPost); }
+          if (firstPost) { UIState.scrollTo(firstPost); }
         }
       }
     }

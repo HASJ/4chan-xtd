@@ -1,6 +1,6 @@
-﻿// @ts-nocheck
+// @ts-nocheck
+import { typeFromExtension } from "../globals/MimeTypes";
 import $ from "./$";
-import { typeFromExtension } from "../Posting/FileTypes";
 import { dict, platform } from "./helpers";
 
 export interface CrossOriginAjaxOptions {

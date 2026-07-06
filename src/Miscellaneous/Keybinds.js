@@ -6,6 +6,7 @@ import ThreadHiding from "../Filtering/ThreadHiding";
 import BoardConfig from "../General/BoardConfig";
 import Get from "../General/Get";
 import Header from "../General/Header";
+import UIState from "../globals/UIState";
 import Index from "../General/Index";
 import Settings from "../General/Settings";
 import { Conf, d, g } from "../globals/globals";
@@ -239,7 +240,7 @@ var Keybinds = {
       :
         undefined;
       if (searchInput) {
-        Header.scrollToIfNeeded(searchInput);
+        UIState.scrollToIfNeeded(searchInput);
         searchInput.focus();
         hasAction = true;
       }
@@ -272,7 +273,7 @@ var Keybinds = {
     if (key === Conf['Expand thread'] && g.VIEW === 'index' && threadRoot) {
       ExpandThread.toggle(thread);
       // Keep thread from moving off screen when contracted.
-      Header.scrollTo(threadRoot);
+      UIState.scrollTo(threadRoot);
       hasAction = true;
     }
     if (key === Conf['Open thread'] && g.VIEW === 'index' && threadRoot) {
@@ -297,7 +298,7 @@ var Keybinds = {
       hasAction = true;
     }
     if (key === Conf['Hide'] && thread && ThreadHiding.db) {
-      Header.scrollTo(threadRoot);
+      UIState.scrollTo(threadRoot);
       ThreadHiding.toggle(thread);
       hasAction = true;
     }
@@ -400,7 +401,7 @@ var Keybinds = {
 
     if (postEl) {
       const {height} = postEl.getBoundingClientRect();
-      if ((Header.getTopOf(postEl) >= -height) && (Header.getBottomOf(postEl) >= -height)) { // We're at least partially visible
+      if ((UIState.getTopOf(postEl) >= -height) && (UIState.getBottomOf(postEl) >= -height)) { // We're at least partially visible
         let next;
         const {root} = Get.postFromNode(postEl).nodes;
         const axis = delta === +1 ?
@@ -409,7 +410,7 @@ var Keybinds = {
           'preceding';
         if (!(next = $.x(`${axis}-sibling::${g.SITE.xpath.replyContainer}[not(@hidden) and not(child::div[@class='stub'])][1]`, root))) { return; }
         if (!next.matches(replySelector)) { next = $(replySelector, next); }
-        Header.scrollToIfNeeded(next, delta === +1);
+        UIState.scrollToIfNeeded(next, delta === +1);
         $.addClass(next, highlight);
         $.rmClass(postEl, highlight);
         return;
@@ -420,7 +421,7 @@ var Keybinds = {
     const replies = $$(replySelector, thread);
     if (delta === -1) { replies.reverse(); }
     for (var reply of replies) {
-      if (((delta === +1) && (Header.getTopOf(reply) > 0)) || ((delta === -1) && (Header.getBottomOf(reply) > 0))) {
+      if (((delta === +1) && (UIState.getTopOf(reply) > 0)) || ((delta === -1) && (UIState.getBottomOf(reply) > 0))) {
         $.addClass(reply, highlight);
         return;
       }
