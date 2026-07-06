@@ -3,6 +3,13 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.26.20 (2026-07-05)
+
+- Maintenance
+  - Removed vendored upstream changelog history and unused historical screenshot assets.
+  - Removed stale conductor planning files, unused release helper scripts, obsolete meta wrappers, and dead build/source helpers.
+  - Removed the unused Chrome Web Store upload dependency and its transitive packages.
+
 ### 2.26.19.1 (2026-06-30)
 
 - Bugfixes
