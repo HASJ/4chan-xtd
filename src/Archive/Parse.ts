@@ -79,13 +79,89 @@ export interface RawArchivePost {
 }
 
 
+function parseComment(commentRaw: string) {
+  let comment = (commentRaw || '').split(/(\n|\[\/?(?:b|spoiler|code|moot|banned|fortune(?: color="#\w+")?|i|red|green|blue)\])/);
+  const parsed = comment.map((text, i) => {
+    if ((i % 2) === 1) {
+      const tag = ArchiveTags[text.includes(' ') ? text.split(' ')[0] + ']' : text];
+      return (typeof tag === 'function') ? tag(text) : tag;
+    }
+    const greentext = text.startsWith('>');
+    const processedText = text
+      .replace(/(\[\/?[a-z]+):lit(\])/g, '$1$2')
+      .split(/(>>(?:>\/[a-z\d]+\/)?\d+)/g)
+      .map((text2, j) => ((j % 2) ? `<span class="deadlink">${E(text2)}</span>` : E(text2)))
+      .join('');
+    return { innerHTML: (greentext ? `<span class="quote">${processedText}</span>` : processedText) };
+  });
+  return { innerHTML: E.cat(parsed as any), [isEscaped]: true } as any;
+}
+
+function getCapcode(capcode: string): string | undefined {
+  switch (capcode) {
+    // https://github.com/pleebe/FoolFuuka/blob/bf4224eed04637a4d0bd4411c2bf5f9945dfec0b/assets/themes/foolz/foolfuuka-theme-fuuka/src/Partial/Board.php#L77
+    case 'M': return 'Mod';
+    case 'A': return 'Admin';
+    case 'D': return 'Developer';
+    case 'V': return 'Verified';
+    case 'F': return 'Founder';
+    case 'G': return 'Manager';
+  }
+}
+
+function parseFile(media: RawArchivePost['media'], boardID: string, url: string): File | null {
+  if (!media?.media_filename) {
+    return null;
+  }
+  let { thumb_link } = media;
+  // Fix URLs missing origin
+  if (thumb_link?.startsWith('/')) {
+    thumb_link = url.split('/', 3).join('/') + thumb_link;
+  }
+  if (!Redirect.securityCheck(thumb_link)) {
+    thumb_link = '';
+  }
+  let media_link = Redirect.to('file', { boardID, filename: media.media_orig } as any);
+  if (!Redirect.securityCheck(media_link)) {
+    media_link = '';
+  }
+
+  const fileUrl = media_link ||
+    (boardID === 'f' ?
+      `${location.protocol}//${ImageHost.flashHost()}/${boardID}/${encodeURIComponent(E(media.media_filename))}`
+      :
+      `${location.protocol}//${ImageHost.host()}/${boardID}/${media.media_orig}`);
+
+  const file: File = {
+    name: media.media_filename,
+    url: fileUrl,
+    height: media.media_h,
+    width: media.media_w,
+    MD5: media.media_hash,
+    size: $.bytesToString(media.media_size),
+    thumbURL: thumb_link || `${location.protocol}//${ImageHost.thumbHost()}/${boardID}/${media.preview_orig}`,
+    theight: media.preview_h,
+    twidth: media.preview_w,
+    isSpoiler: media.spoiler === '1'
+  } as File;
+
+  if (!file.url.endsWith('.pdf')) {
+    file.dimensions = `${file.width}x${file.height}`;
+  }
+  if (boardID === 'f' && media.exif) {
+    file.tag = JSON.parse(media.exif).Tag;
+  }
+
+  return file;
+}
+
 export const parseArchivePost = (data: RawArchivePost, url: string) => {
   if (!data || typeof data !== 'object') {
     throw new TypeError("Invalid post data from archive");
   }
-  const postNum = parseInt(data.num, 10);
-  const threadNum = parseInt(data.thread_num, 10);
-  if (isNaN(postNum) || isNaN(threadNum) || postNum <= 0 || threadNum <= 0) {
+  const postNum = Number.parseInt(data.num, 10);
+  const threadNum = Number.parseInt(data.thread_num, 10);
+  if (Number.isNaN(postNum) || Number.isNaN(threadNum) || postNum <= 0 || threadNum <= 0) {
     throw new Error("Invalid post or thread ID from archive");
   }
   const boardShortName = data.board?.shortname;
@@ -93,25 +169,7 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
     throw new Error("Invalid board identifier from archive");
   }
 
-  // https://github.com/eksopl/asagi/blob/v0.4.0b74/src/main/java/net/easymodo/asagi/YotsubaAbstract.java#L82-L129
-  // https://github.com/FoolCode/FoolFuuka/blob/800bd090835489e7e24371186db6e336f04b85c0/src/Model/Comment.php#L368-L428
-  // https://github.com/bstats/b-stats/blob/6abe7bffaf6e5f523498d760e54b110df5331fbb/inc/classes/Yotsuba.php#L157-L168
-  let comment = (data.comment || '').split(/(\n|\[\/?(?:b|spoiler|code|moot|banned|fortune(?: color="#\w+")?|i|red|green|blue)\])/);
-  comment = comment.map((text, i) => {
-    if ((i % 2) === 1) {
-      var tag = ArchiveTags[text.replace(/\ .*\]/, ']')];
-      return (typeof tag === 'function') ? tag(text) : tag;
-    } else {
-      var greentext = text[0] === '>';
-      text = text
-        .replace(/(\[\/?[a-z]+):lit(\])/g, '$1$2')
-        .split(/(>>(?:>\/[a-z\d]+\/)?\d+)/g)
-        .map((text2, j) => ((j % 2) ? `<span class="deadlink">${E(text2)}</span>` : E(text2)))
-        .join('');
-      return { innerHTML: (greentext ? `<span class="quote">${text}</span>` : text) };
-    }
-  });
-  comment = { innerHTML: E.cat(comment as any), [isEscaped]: true } as any;
+  const comment = parseComment(data.comment);
 
   const o = {
     ID: data.num,
@@ -124,17 +182,7 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
       email: data.email,
       name: data.name || '',
       tripcode: data.trip,
-      capcode: (() => {
-        switch (data.capcode) {
-          // https://github.com/pleebe/FoolFuuka/blob/bf4224eed04637a4d0bd4411c2bf5f9945dfec0b/assets/themes/foolz/foolfuuka-theme-fuuka/src/Partial/Board.php#L77
-          case 'M': return 'Mod';
-          case 'A': return 'Admin';
-          case 'D': return 'Developer';
-          case 'V': return 'Verified';
-          case 'F': return 'Founder';
-          case 'G': return 'Manager';
-        }
-      })(),
+      capcode: getCapcode(data.capcode),
       uniqueID: data.poster_hash,
       flagCode: data.poster_country,
       flagCodeTroll: data.troll_country_code,
@@ -146,48 +194,31 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
     file: null as File,
     extra: null as any,
   };
-  if (o.info.capcode) { delete o.info.uniqueID; }
+
+  if (o.info.capcode) {
+    delete o.info.uniqueID;
+  }
+
   if (data.media && !!+data.media.banned) {
     o.fileDeleted = true;
-  } else if (data.media?.media_filename) {
-    let { thumb_link } = data.media;
-    // Fix URLs missing origin
-    if (thumb_link?.[0] === '/') { thumb_link = url.split('/', 3).join('/') + thumb_link; }
-    if (!Redirect.securityCheck(thumb_link)) { thumb_link = ''; }
-    let media_link = Redirect.to('file', { boardID: o.boardID, filename: data.media.media_orig } as any);
-    if (!Redirect.securityCheck(media_link)) { media_link = ''; }
-    o.file = {
-      name: data.media.media_filename,
-      url: media_link ||
-        (o.boardID === 'f' ?
-          `${location.protocol}//${ImageHost.flashHost()}/${o.boardID}/${encodeURIComponent(E(data.media.media_filename))}`
-          :
-          `${location.protocol}//${ImageHost.host()}/${o.boardID}/${data.media.media_orig}`),
-      height: data.media.media_h,
-      width: data.media.media_w,
-      MD5: data.media.media_hash,
-      size: $.bytesToString(data.media.media_size),
-      thumbURL: thumb_link || `${location.protocol}//${ImageHost.thumbHost()}/${o.boardID}/${data.media.preview_orig}`,
-      theight: data.media.preview_h,
-      twidth: data.media.preview_w,
-      isSpoiler: data.media.spoiler === '1'
-    } as File;
-    if (!/\.pdf$/.test(o.file.url)) { o.file.dimensions = `${o.file.width}x${o.file.height}`; }
-    if ((o.boardID === 'f') && data.media.exif) { o.file.tag = JSON.parse(data.media.exif).Tag; }
+  } else {
+    o.file = parseFile(data.media, o.boardID, url);
   }
+
   o.extra = dict();
 
-  const board = g.boards[o.boardID] ||
-    new Board(o.boardID);
-  const thread = g.threads.get(`${o.boardID}.${o.threadID}`) ||
-    new Thread(o.threadID, board);
+  const board = g.boards[o.boardID] || new Board(o.boardID);
+  const thread = g.threads.get(`${o.boardID}.${o.threadID}`) || new Thread(o.threadID, board);
   const post = new Post(g.SITE.Build.post(o), thread, board);
   post.resurrect();
   if (data.deleted === '1') {
     post.markAsFromArchive();
   }
-  if (post.file) { post.file.thumbURL = o.file.thumbURL; }
+  if (post.file) {
+    post.file.thumbURL = o.file?.thumbURL;
+  }
   Callbacks.Post.execute(post);
   return post;
 };
+
 export default parseArchivePost;

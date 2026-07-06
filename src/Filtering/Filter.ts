@@ -45,7 +45,332 @@ export interface FilterResults {
 type FilterType = "postID" | "name" | "uniqueID" | "tripcode" | "capcode" | "pass" | "email" | "subject" | "comment"
   | "flag" | "filename" | "dimensions" | "filesize" | "MD5";
 
-var Filter = {
+function addBoardsForSite(boards: any, siteID: string, site: any, boardID: string) {
+  if (['nsfw', 'sfw'].includes(boardID)) {
+    for (const boardID2 of site.sfwBoards?.(boardID === 'sfw') || []) {
+      boards[`${siteID}/${boardID2}`] = true;
+    }
+  } else {
+    boards[`${siteID}/${encodeURIComponent(boardID)}`] = true;
+  }
+}
+
+function processBoardFilter(boards: any, boardID: string, siteFilter: string) {
+  for (const siteID in g.sites) {
+    if (siteID.startsWith(siteFilter)) {
+      addBoardsForSite(boards, siteID, g.sites[siteID], boardID);
+    }
+  }
+}
+
+interface FilterOptions {
+  boards: any;
+  excludes: any;
+  mask: number;
+  stub: boolean;
+  noti: boolean;
+  hl: string | undefined;
+  top: boolean;
+  hide: boolean;
+  reason: string | undefined;
+  poster: boolean;
+  replies: boolean;
+}
+
+function parseFilterOptions(options: string): FilterOptions {
+  const boards = Filter.parseBoards(/(?:^|;)\s*boards:([^;]+)/.exec(options)?.[1]);
+  const excludes = Filter.parseBoards(/(?:^|;)\s*exclude:([^;]+)/.exec(options)?.[1]);
+
+  const op = /(?:^|;)\s*op:(no|only)/.exec(options)?.[1] || '';
+  let mask = $.getOwn({'no': 1, 'only': 2}, op) || 0;
+
+  const file = /(?:^|;)\s*file:(no|only)/.exec(options)?.[1] || '';
+  mask = mask | ($.getOwn({'no': 4, 'only': 8}, file) || 0);
+
+  const stub = (() => {
+    switch (/(?:^|;)\s*stub:(yes|no)/.exec(options)?.[1]) {
+      case 'yes': return true;
+      case 'no': return false;
+      default: return Conf['Stubs'];
+    }
+  })();
+
+  const noti = /(?:^|;)\s*notify/.test(options);
+  let hl: string | undefined = undefined;
+  let top = false;
+  let hide = true;
+
+  const highlightRes = /(?:^|;)\s*highlight(?::([\w-]+))?/.exec(options);
+  if (highlightRes) {
+    hl = highlightRes[1] || 'filter-highlight';
+    top = (/(?:^|;)\s*top:(yes|no)/.exec(options)?.[1] || 'yes') === 'yes';
+    hide = /(?:^|;)\s*hide(?:[;:]|$)/.test(options);
+  }
+
+  const finalHide = hide || !(hl || noti);
+  const reason = /(?:^|;)\s*reason:([^;$]+)/.exec(options)?.[1];
+  const poster = /(?:^|;)\s*poster(?:[;:]|$)/.test(options);
+  const replies = /(?:^|;)\s*replies(?:[;:]|$)/.test(options);
+
+  return { boards, excludes, mask, stub, noti, hl, top, hide: finalHide, reason, poster, replies };
+}
+
+function parseFilterLine(key: FilterType | 'general', line: string): FilterObj | null {
+  if (line.startsWith('#')) return null;
+
+  const regexpMatch = /\/(.*)\/(\w*)/.exec(line);
+  if (!regexpMatch) return null;
+
+  let regexp: RegExp | string;
+  if (key === 'uniqueID' || key === 'MD5') {
+    regexp = regexpMatch[1];
+  } else {
+    try {
+      regexp = new RegExp(regexpMatch[1], regexpMatch[2]);
+    } catch (err) {
+      const _notice = new Notice('warning', [
+        $.tn(`Invalid ${key} filter:`),
+        $.el('br'),
+        $.tn(line),
+        $.el('br'),
+        $.tn(err.message)
+      ], 60);
+      return null;
+    }
+  }
+
+  const options = line.length > regexpMatch[0].length ? line.replace(regexpMatch[0], '') : '';
+  let hl: string | undefined;
+  let top = false;
+  let hide = true;
+  let mask = 0;
+  let boards: any = false;
+  let excludes: any = false;
+  let reason: string | undefined = undefined;
+  let poster = false;
+  let replies = false;
+  let noti = false;
+  let stub = Conf.Stubs;
+
+  if (options) {
+    const opts = parseFilterOptions(options);
+    boards = opts.boards;
+    excludes = opts.excludes;
+    mask = opts.mask;
+    stub = opts.stub;
+    noti = opts.noti;
+    hl = opts.hl;
+    top = opts.top;
+    hide = opts.hide;
+    reason = opts.reason;
+    poster = opts.poster;
+    replies = opts.replies;
+  }
+
+  return { regexp, boards, excludes, mask, hide, stub, hl, top, noti, reason, poster, replies };
+}
+
+interface FilterState {
+  hide: boolean;
+  stub: boolean;
+  hl: string[] | undefined;
+  top: boolean;
+  noti: boolean;
+  poster: boolean;
+  replies: boolean;
+  reasons: string[] | undefined;
+}
+
+interface EvaluationContext {
+  mask: number;
+  board: string;
+  site: string;
+  hideable: boolean;
+}
+
+function isFilterMatched(filter: FilterObj, value: string, isString: boolean, mask: number, board: string, site: string): boolean {
+  if (filter.boards && !(filter.boards[board] || filter.boards[site])) return false;
+  if (filter.excludes && (filter.excludes[board] || filter.excludes[site])) return false;
+  if (filter.mask & mask) return false;
+  if (isString) {
+    return filter.regexp === value;
+  }
+  return (filter.regexp as RegExp).test(value);
+}
+
+function evaluateFilter(
+  filter: FilterObj,
+  type: FilterType,
+  value: string,
+  isString: boolean,
+  context: EvaluationContext,
+  state: FilterState
+) {
+  const { mask, board, site, hideable } = context;
+  if (!isFilterMatched(filter, value, isString, mask, board, site)) return;
+
+  if (filter.hide) {
+    if (hideable) {
+      state.hide = true;
+      if (state.stub) {
+        state.stub = filter.stub;
+        (state.reasons || (state.reasons = [])).push(filter.reason || `Filtered ${type} ${filter.regexp}`);
+      }
+    }
+  }
+  if (filter.hl && !state.hl?.includes(filter.hl)) {
+    (state.hl || (state.hl = [])).push(filter.hl);
+  }
+  if (!state.top) { state.top = filter.top; }
+  if (filter.noti) state.noti = true;
+  if (filter.poster) state.poster = true;
+  if (filter.replies) state.replies = true;
+}
+
+function addPosterFilter(post: Post, hide: boolean, stub: boolean, replies: boolean, hl: string[] | undefined, reason: string) {
+  const { uniqueID } = post.info;
+  if (!uniqueID) return;
+  const newFilter: FilterObj = {
+    regexp: uniqueID,
+    boards: false,
+    excludes: false,
+    mask: 0,
+    hide,
+    stub,
+    replies,
+    hl: hl?.[0],
+    reason,
+  };
+  const map = Filter.filters.get('uniqueID') as Map<string, FilterObj[]>;
+  if (map) {
+    map.get(uniqueID)?.push(newFilter) ?? map.set(uniqueID, [newFilter]);
+  } else {
+    Filter.filters.set('uniqueID', new Map<string, FilterObj[]>().set(uniqueID, [newFilter]));
+  }
+}
+
+function hideSamePosterReplies(post: Post, stub: boolean, replies: boolean, reason: string) {
+  g.posts.forEach((p) => {
+    if (p.info.uniqueID === post.info.uniqueID && p !== post) {
+      PostHiding.hide(p, stub, replies, reason);
+      if (replies) {
+        Recursive.applyAndAdd(PostHiding.hide, p, stub, undefined, `Hidden recursively from ${p.ID}`);
+      }
+    }
+  });
+}
+
+function applyPostHiding(post: Post, stub: boolean, replies: boolean, poster: boolean, reason: string) {
+  if (post.isReply) {
+    PostHiding.hide(post, stub);
+    if (replies) {
+      Recursive.applyAndAdd(PostHiding.hide, post, stub, undefined, `Hidden recursively from ${post.ID}`);
+    }
+    if (poster && post.info.uniqueID) {
+      hideSamePosterReplies(post, stub, replies, reason);
+    }
+  } else {
+    ThreadHiding.hide(post.thread, stub);
+  }
+}
+
+function highlightSamePosterReplies(post: Post, hl: string[], replies: boolean, hlFn: (p: Post, ...h: string[]) => void) {
+  g.posts.forEach((p) => {
+    if (p.info.uniqueID === post.info.uniqueID && p !== post) {
+      $.addClass(p.nodes.root, ...hl);
+      if (replies) Recursive.applyAndAdd(hlFn, p, ...hl);
+    }
+  });
+}
+
+function applyPostHighlight(post: Post, hl: string[], replies: boolean, poster: boolean) {
+  post.highlights = hl;
+  $.addClass(post.nodes.root, ...hl);
+  if (post.isReply) {
+    const hlFn = (p: Post, ...h: string[]) => { $.addClass(p.nodes.root, ...h); };
+    if (replies) Recursive.applyAndAdd(hlFn, post, ...hl);
+
+    if (poster && post.info.uniqueID) {
+      highlightSamePosterReplies(post, hl, replies, hlFn);
+    }
+  }
+}
+
+function evaluateTypeFilters(
+  type: FilterType,
+  post: Post,
+  mask: number,
+  board: string,
+  site: string,
+  hideable: boolean,
+  state: FilterState
+) {
+  const filtersOrMap = Filter.filters.get(type);
+  if (!filtersOrMap) return;
+
+  const isString = type === 'uniqueID' || type === 'MD5';
+  const context: EvaluationContext = { mask, board, site, hideable };
+
+  for (const value of Filter.values(type, post)) {
+    const filtersForType = Array.isArray(filtersOrMap) ? filtersOrMap : filtersOrMap.get(value);
+    if (!filtersForType) continue;
+
+    for (const filter of filtersForType) {
+      evaluateFilter(filter, type, value, isString, context, state);
+    }
+  }
+}
+
+function addFilter(filters: Map<FilterType, FilterObj[] | Map<string, FilterObj[]>>, type: FilterType, filterObj: FilterObj) {
+  let list = filters.get(type);
+  if (!list || !Array.isArray(list)) {
+    list = [];
+    filters.set(type, list);
+  }
+  list.push(filterObj);
+}
+
+function loadFilterLine(filters: Map<FilterType, FilterObj[] | Map<string, FilterObj[]>>, type: FilterType | 'general', line: string) {
+  const filterObj = parseFilterLine(type, line);
+  if (!filterObj) return;
+
+  if (type === 'general') {
+    const options = line.replace(/\/(.*)\/(\w*)/, '');
+    const types = /(?:^|;)\s*type:([^;]*)/.exec(options)?.[1].split(',')
+      || ['subject', 'name', 'filename', 'comment'];
+    for (const t of types) {
+      addFilter(filters, t as FilterType, filterObj);
+    }
+  } else {
+    addFilter(filters, type, filterObj);
+  }
+}
+
+function loadFilters(filters: Map<FilterType, FilterObj[] | Map<string, FilterObj[]>>) {
+  for (const key in Config.filter) {
+    const type = key as FilterType | 'general';
+    for (const line of (Conf[type] as string).split('\n')) {
+      loadFilterLine(filters, type, line);
+    }
+  }
+}
+
+function convertFiltersToMaps(filters: Map<FilterType, FilterObj[] | Map<string, FilterObj[]>>) {
+  // conversion from array to map for string types
+  for (const type of ['MD5', 'uniqueID'] as FilterType[]) {
+    const filtersForType = filters.get(type);
+    if (!filtersForType || !Array.isArray(filtersForType)) continue;
+
+    const map = new Map<string, FilterObj[]>();
+    for (const filter of filtersForType) {
+      map.get(filter.regexp as string)?.push(filter) ?? map.set(filter.regexp as string, [filter]);
+    }
+
+    filters.set(type, map);
+  }
+}
+
+const Filter = {
   /**
    * Uses a Map for string types, with the value to filter for as the key.
    * This allows faster lookup than iterating over every filter.
@@ -60,132 +385,11 @@ var Filter = {
       $.addClass(doc, 'hide-backlinks');
     }
 
-    for (var key in Config.filter) {
-      for (var line of (Conf[key] as string).split('\n')) {
-        let hl:       string;
-        let regexp:   RegExp | string;
-        let top:      boolean;
-        let hide =    true;
-        let mask =    0;
-        let boards:   any = false;
-        let excludes: any = false;
-        let reason:   string | undefined;
-        let poster =  false;
-        let replies = false;
-        let noti =    false;
-        let stub =    Conf.Stubs;
-
-        if (line[0] === '#') continue;
-
-        const regexpMatch = line.match(/\/(.*)\/(\w*)/);
-        if (!regexpMatch) {
-          continue;
-        }
-
-        if (key === 'uniqueID' || key === 'MD5') {
-          // MD5 filter will use strings instead of regular expressions.
-          regexp = regexpMatch[1];
-        } else {
-          try {
-            // Please, don't write silly regular expressions.
-            regexp = RegExp(regexpMatch[1], regexpMatch[2]);
-          } catch (err) {
-            // I warned you, bro.
-            new Notice('warning', [
-              $.tn(`Invalid ${key} filter:`),
-              $.el('br'),
-              $.tn(line),
-              $.el('br'),
-              $.tn(err.message)
-            ], 60);
-            continue;
-          }
-        }
-
-        // Don't mix up filter flags with the regular expression.
-        const options = line.length > regexpMatch[0].length ? line.replace(regexpMatch[0], '') : '';
-
-        if (options) {
-
-          // List of the boards this filter applies to.
-          boards = this.parseBoards(options.match(/(?:^|;)\s*boards:([^;]+)/)?.[1]);
-
-          // Boards to exclude from an otherwise global rule.
-          excludes = this.parseBoards(options.match(/(?:^|;)\s*exclude:([^;]+)/)?.[1]);
-
-          // Filter OPs along with their threads or replies only.
-          const op = options.match(/(?:^|;)\s*op:(no|only)/)?.[1] || '';
-          mask = $.getOwn({'no': 1, 'only': 2}, op) || 0;
-
-          // Filter only posts with/without files.
-          const file = options.match(/(?:^|;)\s*file:(no|only)/)?.[1] || '';
-          mask = mask | ($.getOwn({'no': 4, 'only': 8}, file) || 0);
-
-          // Overrule the `Show Stubs` setting.
-          // Defaults to stub showing.
-          stub = (() => { switch (options.match(/(?:^|;)\s*stub:(yes|no)/)?.[1]) {
-            case 'yes':
-              return true;
-            case 'no':
-              return false;
-            default:
-              return Conf['Stubs'];
-          } })();
-
-          // Desktop notification
-          noti = /(?:^|;)\s*notify/.test(options);
-
-          // Highlight the post.
-          // If not specified, the highlight class will be filter-highlight.
-          const highlightRes = options.match(/(?:^|;)\s*highlight(?::([\w-]+))?/)
-          if (highlightRes) {
-            hl = highlightRes[1] || 'filter-highlight';
-            // Put highlighted OP's thread on top of the board page or not.
-            // Defaults to on top.
-            top = (options.match(/(?:^|;)\s*top:(yes|no)/)?.[1] || 'yes') === 'yes';
-            hide = /(?:^|;)\s*hide(?:[;:]|$)/.test(options);
-          }
-
-          // Hide the post (default case).
-          hide = hide || !(hl || noti);
-
-          reason = options.match(/(?:^|;)\s*reason:([^;$]+)/)?.[1];
-
-          poster = /(?:^|;)\s*poster(?:[;:]|$)/.test(options);
-
-          replies = /(?:^|;)\s*replies(?:[;:]|$)/.test(options);
-        }
-
-        const filterObj: FilterObj
-          = { regexp, boards, excludes, mask, hide, stub, hl, top, noti, reason, poster, replies };
-
-        // Fields that this filter applies to (for 'general' filters)
-        if (key === 'general') {
-          const types = options.match(/(?:^|;)\s*type:([^;]*)/)?.[1].split(',')
-            || ['subject', 'name', 'filename', 'comment'];
-          for (var type of types) {
-            this.filters.get(type)?.push(filterObj) ?? this.filters.set(type, [filterObj]);
-          }
-        } else {
-          this.filters.get(key)?.push(filterObj) ?? this.filters.set(key, [filterObj]);
-        }
-      }
-    }
+    loadFilters(this.filters);
 
     if (!this.filters.size) return;
 
-    // conversion from array to map for string types
-    for (const type of ['MD5', 'uniqueID'] satisfies FilterType[]) {
-      const filtersForType = this.filters.get(type);
-      if (!filtersForType) continue;
-
-      const map = new Map<string, FilterObj[]>();
-      for (const filter of filtersForType) {
-        map.get(filter.regexp)?.push(filter) ?? map.set(filter.regexp, [filter]);
-      }
-
-      this.filters.set(type, map);
-    }
+    convertFiltersToMaps(this.filters);
 
     if (g.VIEW === 'catalog') {
       return Filter.catalog();
@@ -200,27 +404,17 @@ var Filter = {
   // Parse comma-separated list of boards.
   // Sites can be specified by a beginning part of the site domain followed by a colon.
   parseBoards(boardsRaw: string) {
-    let boards;
     if (!boardsRaw) { return false; }
-    if (boards = Filter.parseBoardsMemo[boardsRaw]) { return boards; }
+    let boards = Filter.parseBoardsMemo[boardsRaw];
+    if (boards) { return boards; }
+
     boards = dict();
     let siteFilter = '';
-    for (var boardID of boardsRaw.split(',')) {
+    for (let boardID of boardsRaw.split(',')) {
       if (boardID.includes(':')) {
         [siteFilter, boardID] = boardID.split(':').slice(-2);
       }
-      for (var siteID in g.sites) {
-        var site = g.sites[siteID];
-        if (siteID.slice(0, siteFilter.length) === siteFilter) {
-          if (['nsfw', 'sfw'].includes(boardID)) {
-            for (var boardID2 of site.sfwBoards?.(boardID === 'sfw') || []) {
-              boards[`${siteID}/${boardID2}`] = true;
-            }
-          } else {
-            boards[`${siteID}/${encodeURIComponent(boardID)}`] = true;
-          }
-        }
-      }
+      processBoardFilter(boards, boardID, siteFilter);
     }
     Filter.parseBoardsMemo[boardsRaw] = boards;
     return boards;
@@ -230,14 +424,6 @@ var Filter = {
 
   test(post: Post, hideable = true): FilterResults {
     if (post.filterResults) return post.filterResults;
-    let hide           = false;
-    let stub           = true;
-    let hl  : string[] = undefined;
-    let top            = false;
-    let noti           = false;
-    let poster         = false;
-    let replies        = false;
-    let reasons: string[];
     if (QuoteYou.isYou(post)) {
       hideable = false;
     }
@@ -245,42 +431,31 @@ var Filter = {
     mask = (mask | (post.file ? 4 : 8));
     const board = `${post.siteID}/${post.boardID}`;
     const site = `${post.siteID}/*`;
+
+    const state: FilterState = {
+      hide: false,
+      stub: true,
+      hl: undefined,
+      top: false,
+      noti: false,
+      poster: false,
+      replies: false,
+      reasons: undefined,
+    };
+
     for (const type of Filter.filters.keys()) {
-      for (const value of Filter.values(type, post)) {
-        const filtersOrMap = Filter.filters.get(type);
-
-        const filtersForType: FilterObj[] = Array.isArray(filtersOrMap) ? filtersOrMap : filtersOrMap.get(value);
-        if (!filtersForType) continue;
-
-        const isString = type === 'uniqueID' || type === 'MD5';
-
-        for (const filter of filtersForType) {
-          if (
-            (filter.boards   && !(filter.boards[board]   || filter.boards[site]  )) ||
-            (filter.excludes &&  (filter.excludes[board] || filter.excludes[site])) ||
-            (filter.mask & mask) ||
-            (isString ? (filter.regexp !== value) : !(filter.regexp as RegExp).test(value))
-          ) continue;
-          if (filter.hide) {
-            if (hideable) {
-              hide = true;
-              if (stub) {
-                ({ stub } = filter);
-                (reasons || (reasons = [])).push(filter.reason || `Filtered ${type} ${filter.regexp}`);
-              }
-            }
-          }
-          if (filter.hl && !hl?.includes(filter.hl)) {
-            (hl || (hl = [])).push(filter.hl);
-          }
-          if (!top) { ({ top } = filter); }
-          if (filter.noti) noti = true;
-          if (filter.poster) poster = true;
-          if (filter.replies) replies = true;
-        }
-      }
+      evaluateTypeFilters(type, post, mask, board, site, hideable, state);
     }
-    post.filterResults = {hide, stub, hl, top, noti, poster, replies, reasons};
+    post.filterResults = {
+      hide: state.hide,
+      stub: state.stub,
+      hl: state.hl,
+      top: state.top,
+      noti: state.noti,
+      poster: state.poster,
+      replies: state.replies,
+      reasons: state.reasons
+    };
     return post.filterResults;
   },
 
@@ -297,67 +472,17 @@ var Filter = {
     );
 
     // Add temporary filter for the poster ID for future posts.
-    let reason: string;
+    let reason = '';
     if (poster && this.info.uniqueID) {
       reason = `Hidden because it's the same poster as ${this.ID} (${this.filterResults.reasons})`;
-      const { uniqueID } = this.info;
-      const newFilter: FilterObj = {
-        regexp: uniqueID,
-        boards: false,
-        excludes: false,
-        mask: 0,
-        hide,
-        stub,
-        replies,
-        // A filter can only have one hl class.
-        hl: hl?.[0],
-        reason,
-      }
-      const map: Map<string, FilterObj[]> = Filter.filters.get('uniqueID');
-      if (map) {
-        map.get(uniqueID)?.push(newFilter) ?? map.set(uniqueID, [newFilter]);
-      } else {
-        Filter.filters.set('uniqueID', (new Map()).set(uniqueID, [newFilter]))
-      }
+      addPosterFilter(this, hide, stub, replies, hl, reason);
     }
 
     if (hide) {
-      if (this.isReply) {
-        PostHiding.hide(this, stub);
-        if (replies) {
-          Recursive.applyAndAdd(PostHiding.hide, this, stub, undefined, `Hidden recursively from ${this.ID}`);
-        }
-        if (poster && this.info.uniqueID) {
-          g.posts.forEach((p) => {
-            if (p.info.uniqueID === this.info.uniqueID && p !== this) {
-              PostHiding.hide(p, stub, replies, reason);
-              if (replies) {
-                Recursive.applyAndAdd(PostHiding.hide, p, stub, undefined, `Hidden recursively from ${p.ID}`);
-              }
-            }
-          });
-        }
-      } else {
-        ThreadHiding.hide(this.thread, stub);
-      }
+      applyPostHiding(this, stub, replies, poster, reason);
     }
     if (hl) {
-      this.highlights = hl;
-      $.addClass(this.nodes.root, ...hl);
-      if (this.isReply) {
-        const hlFn = (post: Post, ...hl: string[]) => { $.addClass(post.nodes.root, ...hl); };
-
-        if (replies) Recursive.applyAndAdd(hlFn, this, ...hl);
-
-        if (poster && this.info.uniqueID) {
-          g.posts.forEach((p) => {
-            if (p.info.uniqueID === this.info.uniqueID && p !== this) {
-              $.addClass(p.nodes.root, ...hl);
-              if (replies) Recursive.applyAndAdd(hlFn, p, ...hl);
-            }
-          });
-        }
-      }
+      applyPostHighlight(this, hl, replies, poster);
     }
     if (noti && Unread.posts && (this.ID > Unread.lastReadPost) && !QuoteYou.isYou(this)) {
       Unread.openNotification(this, ' triggered a notification filter');
@@ -373,8 +498,8 @@ var Filter = {
   },
 
   catalog() {
-    let url;
-    if (!(url = g.SITE.urls.catalogJSON?.(g.BOARD))) { return; }
+    const url = g.SITE.urls.catalogJSON?.(g.BOARD);
+    if (!url) { return; }
     Filter.catalogData = dict();
     $.ajax(url,
       {onloadend: Filter.catalogParse});
@@ -386,11 +511,12 @@ var Filter = {
 
   catalogParse() {
     if (![200, 404].includes(this.status)) {
-      new Notice('warning', `Failed to fetch catalog JSON data. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`, 1);
+      const statusText = this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error';
+      const _notice = new Notice('warning', `Failed to fetch catalog JSON data. ${statusText}`, 1);
       return;
     }
-    for (var page of this.response) {
-      for (var item of page.threads) {
+    for (const page of this.response) {
+      for (const item of page.threads) {
         Filter.catalogData[item.no] = item;
       }
     }
@@ -432,9 +558,7 @@ var Filter = {
     email(post) { return [post.info.email]; },
     subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
     comment(post) {
-      if (post.info.comment == null) {
-        post.info.comment = g.sites[post.siteID]?.Build?.parseComment?.((post.info.commentHTML as any).innerHTML);
-      }
+      post.info.comment ??= g.sites[post.siteID]?.Build?.parseComment?.((post.info.commentHTML as any).innerHTML);
       return [post.info.comment];
     },
     flag(post) { return post.info.flag === undefined ? [] : [post.info.flag]; },
@@ -449,8 +573,8 @@ var Filter = {
       return Filter.valueF[key](post).filter(v => v != null);
     } else {
       return [key.split('+').map(function(k) {
-        let f: (post: Post) => string[];
-        if (f = $.getOwn(Filter.valueF, k)) {
+        const f = $.getOwn(Filter.valueF, k);
+        if (f) {
           return f(post).map(v => v || '').join('\n');
         } else {
           return '';
@@ -473,13 +597,17 @@ var Filter = {
     });
   },
 
-  removeFilters(type: FilterType, res: FilterObj[] | Map<string, FilterObj[]>, cb?: () => void) {
+  removeFilters(type: FilterType, res: FilterObj[] | Map<string, FilterObj[]> | string[], cb?: () => void) {
     return $.get(type, Conf[type], function (item) {
-      let save = item[type];
+      const save = item[type];
       const filterArray = Array.isArray(res) ? res : [...res.values()].flat();
-      const r = filterArray.map(Filter.escape).join('|');
-      save = save.replace(RegExp(`(?:$\n|^)(?:${r})$`, 'mg'), '');
-      return $.set(type, save, cb);
+      const stringArray = filterArray.map(f => {
+        if (typeof f === 'string') return f;
+        return typeof f.regexp === 'string' ? f.regexp : f.regexp.source;
+      });
+      const r = stringArray.map(str => Filter.escape(str)).join('|');
+      const updatedSave = save.replace(new RegExp(`(?:$\n|^)(?:${r})$`, 'mg'), '');
+      return $.set(type, updatedSave, cb);
     });
   },
 
@@ -488,7 +616,7 @@ var Filter = {
   },
 
   quickFilterMD5() {
-    const post: Post = this instanceof Post ? this : Get.postFromNode(this);
+    const post: Post = (this && 'ID' in this) ? this as Post : Get.postFromNode(this as any);
     const files = post.files.filter(f => f.MD5);
     if (!files.length) { return; }
     const filter = files.map(f => `/${f.MD5}/`).join('\n');
@@ -503,7 +631,7 @@ var Filter = {
     if (!Conf['MD5 Quick Filter Notifications']) {
       // feedback for when nothing gets hidden
       if (post.nodes.post.getBoundingClientRect().height) {
-        new Notice('info', 'MD5 filtered.', 2);
+        const _notice = new Notice('info', 'MD5 filtered.', 2);
       }
       return;
     }
@@ -533,7 +661,7 @@ var Filter = {
     },
     undo() {
       Filter.removeFilters('MD5', this.filters);
-      for (var post of this.posts) {
+      for (const post of this.posts) {
         if (post.isReply) {
           PostHiding.show(post);
         } else if (g.VIEW === 'index') {
@@ -544,10 +672,10 @@ var Filter = {
     }
   },
 
-  escape(value) {
-    return value.replace(/\/|\\|\^|\$|\n|\.|\(|\)|\{|\}|\[|\]|\?|\*|\+|\|/g, (c) => {
+  escape(value: string) {
+    return value.replace(/[/\\^$\n.(){}[\]?*+|]/g, (c) => {
       if (c === '\n') {
-        return '\\n';
+        return String.raw`\n`;
       } else {
         return `\\${c}`;
       }
@@ -571,7 +699,7 @@ var Filter = {
         subEntries: []
       };
 
-      for (var type of [
+      for (const type of [
         ['Name',             'name'],
         ['Unique ID',        'uniqueID'],
         ['Tripcode',         'tripcode'],

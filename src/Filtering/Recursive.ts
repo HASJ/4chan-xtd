@@ -4,7 +4,7 @@ import { g } from "../globals/globals";
 
 type DropFirst<T extends unknown[]> = T extends [any, ...infer U] ? U : never;
 
-var Recursive = {
+const Recursive = {
   recursives: new Map<string, { recursives: ((...args: any) => void)[], args: any[][] }>(),
 
   init() {
@@ -17,10 +17,10 @@ var Recursive = {
 
   node(this: Post) {
     if (this.isClone || this.isFetchedQuote) return;
-    for (var quote of this.quotes) {
+    for (const quote of this.quotes) {
       const obj = Recursive.recursives.get(quote);
       if (obj) {
-        for (var i = 0; i < obj.recursives.length; i++) {
+        for (let i = 0; i < obj.recursives.length; i++) {
           obj.recursives[i](this, ...obj.args[i]);
         }
       }

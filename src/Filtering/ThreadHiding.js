@@ -11,7 +11,7 @@ import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 import Icon from '../Icons/icon';
 
-var ThreadHiding = {
+const ThreadHiding = {
   init() {
     if (!['index', 'catalog'].includes(g.VIEW) || (!Conf['Thread Hiding Buttons'] && !(Conf['Menu'] && Conf['Thread Hiding Link']) && !Conf['JSON Index'])) { return; }
     this.db = new DataBoard('hiddenThreads');
@@ -33,13 +33,13 @@ var ThreadHiding = {
       boardID: board.ID,
       defaultValue: dict()
     });
-    for (var threadID in hiddenThreads) { hiddenThreads[threadID] = true; }
-    return localStorage.setItem(`4chan-hide-t-${board}`, JSON.stringify(hiddenThreads));
+    for (const threadID in hiddenThreads) { hiddenThreads[threadID] = true; }
+    return localStorage.setItem(`4chan-hide-t-${board.ID}`, JSON.stringify(hiddenThreads));
   },
 
   catalogWatch() {
     if (!$.hasStorage || (g.SITE.software !== 'yotsuba')) { return; }
-    this.hiddenThreads = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
+    this.hiddenThreads = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD.ID}`)) || {};
     return $.on(d, '4chanXInitFinished', () => // 4chan's catalog sets the style to "display: none;" when hiding or unhiding a thread.
     new MutationObserver(ThreadHiding.catalogSave).observe($.id('threads'), {
       attributes: true,
@@ -50,7 +50,7 @@ var ThreadHiding = {
 
   catalogSave() {
     let threadID;
-    const hiddenThreads2 = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD}`)) || {};
+    const hiddenThreads2 = JSON.parse(localStorage.getItem(`4chan-hide-t-${g.BOARD.ID}`)) || {};
     for (threadID in hiddenThreads2) {
       if (!$.hasOwn(ThreadHiding.hiddenThreads, threadID)) {
         ThreadHiding.db.set({
@@ -67,22 +67,23 @@ var ThreadHiding = {
         });
       }
     }
-    return ThreadHiding.hiddenThreads = hiddenThreads2;
+    ThreadHiding.hiddenThreads = hiddenThreads2;
+    return hiddenThreads2;
   },
 
   isHidden(boardID, threadID) {
-    return !!(ThreadHiding.db && ThreadHiding.db.get({boardID, threadID}));
+    return !!ThreadHiding.db?.get({boardID, threadID});
   },
 
   node() {
-    let data;
     if (this.isReply || this.isClone || this.isFetchedQuote) { return; }
 
     if (Conf['Thread Hiding Buttons']) {
       $.prepend(this.nodes.root, ThreadHiding.makeButton(this.thread, 'hide'));
     }
 
-    if (data = ThreadHiding.db.get({boardID: this.board.ID, threadID: this.ID})) {
+    const data = ThreadHiding.db.get({boardID: this.board.ID, threadID: this.ID});
+    if (data) {
       ThreadHiding.hide(this.thread, data.makeStub, 'Hidden manually');
     }
   },
@@ -161,7 +162,8 @@ var ThreadHiding = {
           if (isReply || !thread.isHidden || (Conf['JSON Index'] && (Conf['Index Mode'] === 'catalog'))) {
             return false;
           }
-          return ThreadHiding.menu.thread = thread;
+          ThreadHiding.menu.thread = thread;
+          return true;
         }
       });
     },
@@ -206,9 +208,9 @@ var ThreadHiding = {
   },
 
   makeStub(thread, root, reason) {
-    let summary, threadDivider;
     let numReplies  = $$(g.SITE.selectors.replyOriginal, root).length;
-    if (summary = $(g.SITE.selectors.summary, root)) { numReplies += +summary.textContent.match(/\d+/); }
+    const summary = $(g.SITE.selectors.summary, root);
+    if (summary) { numReplies += +summary.textContent.match(/\d+/); }
 
     const a = ThreadHiding.makeButton(thread, 'show');
     const { nameBlock, subject } = thread.OP.info;
@@ -248,7 +250,8 @@ var ThreadHiding = {
     $.prepend(root, thread.stub);
 
     // Prevent hiding of thread divider on sites that put it inside the thread
-    if (threadDivider = $(g.SITE.selectors.threadDivider, root)) {
+    const threadDivider = $(g.SITE.selectors.threadDivider, root);
+    if (threadDivider) {
       return $.addClass(threadDivider, 'threadDivider');
     }
   },
@@ -280,7 +283,8 @@ var ThreadHiding = {
     return ThreadHiding.saveHiddenState(thread);
   },
 
-  hide(thread, makeStub=Conf['Stubs'], reason) {
+  hide(thread, makeStub, reason) {
+    if (makeStub === undefined) { makeStub = Conf['Stubs']; }
     if (thread.isHidden) { return; }
     const threadRoot = thread.nodes.root;
     thread.isHidden = true;
@@ -290,7 +294,10 @@ var ThreadHiding = {
       $.event('PostsRemoved', null, getIndexRoot());
     }
 
-    if (!makeStub) { return threadRoot.hidden = true; }
+    if (!makeStub) {
+      threadRoot.hidden = true;
+      return;
+    }
 
     ThreadHiding.makeStub(thread, threadRoot, reason);
   },
@@ -304,31 +311,35 @@ var ThreadHiding = {
     threadRoot.hidden = (thread.isHidden = false);
     updateIndexHideLabel();
     if (thread.catalogView && Conf['Index Mode'] === 'catalog') {
-      const { root } = thread.catalogView.nodes;
-
-      if (indexShowsHiddenThreads()) {
-        $.rm(root);
-        $.event('PostsRemoved', null, getIndexRoot());
-      } else {
-        const sortedThreadIDs = getIndexSortedThreadIDs();
-        let i = sortedThreadIDs.indexOf(thread.ID) - 1;
-
-        while (true) {
-          if (i < 0) {
-            $('.board').insertAdjacentElement('afterbegin', root);
-            break;
-          }
-          const rootPrevious = d.getElementById(`t${sortedThreadIDs[i]}`);
-          if (rootPrevious) {
-            rootPrevious.insertAdjacentElement('afterend', root)
-            break;
-          }
-          --i;
-        }
-
-        $.event('PostsInserted', null, getIndexRoot());
-      }
+      ThreadHiding.showCatalogView(thread);
     }
+  },
+
+  showCatalogView(thread) {
+    const { root } = thread.catalogView.nodes;
+
+    if (indexShowsHiddenThreads()) {
+      $.rm(root);
+      return $.event('PostsRemoved', null, getIndexRoot());
+    }
+
+    const sortedThreadIDs = getIndexSortedThreadIDs();
+    let i = sortedThreadIDs.indexOf(thread.ID) - 1;
+
+    while (true) {
+      if (i < 0) {
+        $.prepend($('.board'), root);
+        break;
+      }
+      const rootPrevious = d.getElementById(`t${sortedThreadIDs[i]}`);
+      if (rootPrevious) {
+        $.after(rootPrevious, root);
+        break;
+      }
+      --i;
+    }
+
+    $.event('PostsInserted', null, getIndexRoot());
   }
 };
 export default ThreadHiding;
