@@ -1,243 +1,131 @@
 # ToDo
 
-## Replace `QRBridge` Proxy With an Explicit QR Captcha Facade
+## Ponytail Audit Cleanup
 
 ### Goal
+Remove the audit-confirmed repo bloat without changing runtime behavior. Each worker owns a small isolated diff; the supervisor coordinates ordering, reviews results, and runs final verification.
 
-Replace `src/Posting/QRBridge.ts` with a small explicit API that exposes only the QR state and operations needed by `Captcha.js` and `Captcha.t.js`, while keeping `npm run check:cycles` clean.
+### Shared Rules
+- [ ] Do not edit builds/. It is generated and ignored.
+- [x] Keep each worker diff scoped to assigned files.
+- [ ] Before deleting any file, grep for its filename and exported symbols.
+- [x] Record files changed, commands run, and any skipped items.
+- [ ] Use rtk for shell commands.
+- [ ] Prefer deletion over replacement unless docs need a live pointer.
 
-### Current State
+### Supervisor / Orchestrator
+Model: GPT 5.5 high.
 
-- [x] `npm run check:cycles` passes with no circular source dependencies.
-- [x] `Captcha.js` imports `QRBridge` instead of `QR.ts`.
-- [x] `Captcha.t.js` imports `QRBridge` instead of `QR.ts`.
-- [x] `QR.ts` registers the full QR object through `registerQR(QR)`.
-- [x] `QRBridge.ts` uses a dynamic `Proxy`, which hides the actual captcha-to-QR contract.
+Responsibilities:
+- [x] Create task branch ponytail-audit-cleanup.
+- [x] Save this delegation plan in ToDo.md.
+- [x] Start sub-agents on GPT 5.4 medium where tooling allows.
+- [x] Keep workers scoped; prevent overlapping edits.
+- [x] Review each worker result before integration.
+- [x] Run final verification after worker diffs land.
+- [x] Summarize net line, dependency, and asset reduction.
 
-### Desired End State
+### Worker A: Historical Docs And Assets
+Scope: original 4chan X CHANGELOG.md, img/, CHANGELOG.md.
 
-- [x] No dynamic `Proxy` is used for QR/captcha communication.
-- [x] Captcha modules depend on an explicit, named facade API.
-- [x] The facade exposes only the QR fields and methods captcha actually needs.
-- [x] The QR/captcha source graph remains acyclic.
-- [x] `npm run check:cycles`, `npm run build`, `npm run build:userscript`, and `npm run build:crx` pass.
-- [x] Generated files under `builds/` are reverted after verification.
+Checklist:
+- [x] Confirm CHANGELOG.md only links to original 4chan X CHANGELOG.md for upstream history.
+- [x] Replace the local upstream changelog link with an external upstream link if useful.
+- [x] Delete original 4chan X CHANGELOG.md.
+- [x] Search all repo files for img references.
+- [x] Delete old screenshot/history-only files from img/.
+- [x] Keep any image with a live non-history reference.
+- [x] Run a grep for original 4chan X CHANGELOG and img references.
+- [x] Record line and byte reduction.
 
-### Phase 1: Inventory the Existing Contract
+Expected result: large historical docs/assets deletion, no build impact.
 
-- [x] List every `QR.*` access in `src/Posting/Captcha.js`.
-- [x] List every `QR.*` access in `src/Posting/Captcha.t.js`.
-- [x] Group accesses into categories:
-  - [x] QR lifecycle methods: `focus`, `submit`, `error`.
-  - [x] QR captcha implementation reference: `captcha.setup`.
-  - [x] QR request/posting state: `req`, `posts`, `cooldown`.
-  - [x] QR DOM nodes: `nodes.el`, `nodes.com`, `nodes.status`.
-  - [x] QR layout operations: captcha classes, focus checks, position fixes.
-- [x] Confirm whether each access is read-only, write-only, or mutating nested state.
-- [x] Identify calls that can become semantic methods instead of raw state reads.
+### Worker B: Stale Planning Scaffolding
+Scope: ToDo.md, conductor/tracks.md, conductor/tracks/ts_migration_20260522/.
 
-### Phase 2: Design the Explicit Facade
+Checklist:
+- [x] Preserve this active cleanup plan in ToDo.md.
+- [x] Confirm old completed checklist content is not needed elsewhere.
+- [x] Confirm the conductor migration track is stale or archived.
+- [x] Delete conductor/tracks/ts_migration_20260522/ if no active process depends on it.
+- [x] Update conductor/tracks.md to remove or mark the track archived.
+- [x] Run a grep for ts_migration_20260522 and ToDo.md references.
 
-- [x] Create a new `src/Posting/QRCaptchaBridge.ts` or replace `QRBridge.ts` with explicit exports.
-- [x] Define a registered implementation object with named methods.
-- [x] Avoid exporting the full QR object.
-- [x] Include fallback no-op behavior for methods called before QR registration only where safe.
-- [x] Prefer semantic names over exposing broad state.
+Expected result: stale process state removed while this active plan remains.
 
-Candidate facade methods:
+### Worker C: Dead Build Tooling
+Scope: tools/rollup-plugin-remove-decaffeinate-comments.js, tools/rollup.js, README.md.
 
-- [x] `registerQRCaptchaBridge(bridge)`.
-- [x] `getQRPosts()`.
-- [x] `getFirstQRPost()`.
-- [x] `hasActiveQRRequest()`.
-- [x] `isQRAutoCooldown()`.
-- [x] `setQRAutoCooldown(enabled)`.
-- [x] `getQRNodes()`.
-- [x] `getQRRoot()`.
-- [x] `getQRCommentInput()`.
-- [x] `getQRStatusInput()`.
-- [x] `isQROpen()`.
-- [x] `focusQR()`.
-- [x] `focusQRComment()`.
-- [x] `focusQRStatus()`.
-- [x] `showQRError(error, focusOverride)`.
-- [x] `submitQR()`.
-- [x] `setupCurrentCaptcha(focus)`.
-- [x] `addQRClass(...classes)`.
-- [x] `removeQRClass(...classes)`.
-- [x] `insertCaptchaRoot(root)`.
+Checklist:
+- [x] Grep for decaffeinate suggestions and decaffeinate across src, tools, README, CHANGELOG, ToDo, and conductor.
+- [x] Confirm no source files contain decaffeinate suggestion blocks.
+- [x] Remove removeDecaffeinateComments import from tools/rollup.js.
+- [x] Remove its plugin entry from the Rollup plugin list.
+- [x] Delete tools/rollup-plugin-remove-decaffeinate-comments.js.
+- [x] Update README text for -no-format so it no longer mentions decaffeinate stripping.
+- [x] Run rtk npm run build.
+- [x] Run rtk npm run build:min.
 
-### Phase 3: Replace `Captcha.js` Call Sites
+Expected result: build behavior unchanged because there are no comments left to strip.
 
-- [x] Replace `QR.req` with `hasActiveQRRequest()`.
-- [x] Replace `QR.posts.length` with `getQRPosts().length` or a semantic helper.
-- [x] Replace `QR.posts[0]` with `getFirstQRPost()`.
-- [x] Replace `QR.error(...)` with `showQRError(...)`.
-- [x] Replace `QR.captcha.setup(...)` with `setupCurrentCaptcha(...)`.
-- [x] Replace direct QR DOM class mutations with `addQRClass` and `removeQRClass`.
-- [x] Replace direct comment/status focus calls with facade focus methods.
-- [x] Replace direct QR node containment checks with small facade helpers if repeated.
-- [x] Run `npm run check:cycles` after this phase.
+### Worker D: Dead Source And Helpers
+Scope: src/classes/Connection.ts, src/meta/fbegin.js, src/meta/fend.js, src/meta/newline.js, src/platform/$.ts.
 
-### Phase 4: Replace `Captcha.t.js` Call Sites
+Checklist:
+- [x] Grep for Connection, fbegin, fend, newline, and debounce across src, tools, and README.
+- [x] Confirm Connection has no imports or callers.
+- [x] Delete src/classes/Connection.ts.
+- [x] Confirm Rollup does not use fbegin.js, fend.js, or newline.js.
+- [x] Delete the three obsolete meta wrapper files.
+- [x] Confirm $.debounce has zero callers.
+- [x] Remove the unused $.debounce function block from src/platform/$.ts.
+- [x] Keep helpers.debounce; it is used.
+- [x] Run rtk npm run check:cycles.
+- [x] Run rtk npm run build.
 
-- [x] Replace `QR.nodes.el` access with `getQRRoot()` or semantic helpers.
-- [x] Replace `QR.nodes.com` access with `getQRCommentInput()`.
-- [x] Replace `QR.posts[0]` access with `getFirstQRPost()`.
-- [x] Replace `QR.posts.length` access with `getQRPosts().length` or a semantic helper.
-- [x] Replace `QR.cooldown.auto` reads with `isQRAutoCooldown()`.
-- [x] Replace `QR.submit()` with `submitQR()`.
-- [x] Replace direct comment focus restoration checks with facade helpers where practical.
-- [x] Run `npm run check:cycles` after this phase.
+Expected result: dead runtime source removed only.
 
-### Phase 5: Register the Facade in `QR.ts`
+### Worker E: Dependency Cleanup
+Scope: package.json, package-lock.json.
 
-- [x] Replace `registerQR(QR)` with `registerQRCaptchaBridge({...})`.
-- [x] Map each facade method to the smallest QR implementation detail needed.
-- [x] Keep all QR implementation logic in `QR.ts`.
-- [x] Do not import `Captcha.js` or `Captcha.t.js` from the facade.
-- [x] Confirm `QR.ts -> Captcha.js -> Captcha.t.js -> facade` does not create a back edge.
+Checklist:
+- [x] Grep for chrome-webstore-upload, webstore, and upload in package files, tools, and src.
+- [x] Confirm no scripts or imports use chrome-webstore-upload.
+- [x] Remove it with rtk npm uninstall chrome-webstore-upload.
+- [x] Confirm lockfile updates only remove that package and unused transitives.
+- [x] Run rtk npm ls chrome-webstore-upload.
+- [x] Run rtk npm run build.
 
-### Phase 6: Tighten Types
+Expected result: one direct dev dependency removed, plus transitive install weight.
 
-- [x] Add TypeScript interfaces for the bridge object.
-- [x] Type the required QR node subset.
-- [x] Type the required QR post subset.
-- [x] Keep JS captcha modules compatible with the typed facade.
-- [x] Avoid `any` except where current JS interop makes it unavoidable.
-- [x] Run `npm run build` and fix type or Rollup warnings introduced by the facade.
+### Worker F: Stale Release Helpers
+Scope: tools/sign.sh, tools/stats.js, docs if they mention either.
 
-### Phase 7: Verification
+Checklist:
+- [x] Grep for sign.sh, stats.js, testbuilds, tmp-crx, and pack-extension.
+- [x] Confirm tools/sign.sh targets nonexistent testbuilds/.
+- [x] Delete tools/sign.sh.
+- [x] Confirm tools/stats.js is not documented or scripted.
+- [x] Delete tools/stats.js.
+- [x] If release docs mention either, remove or replace with current release steps.
 
-- [x] Run `npm run check:cycles`.
-- [x] Run `npm run build`.
-- [x] Run `npm run build:userscript`.
-- [x] Run `npm run build:crx`.
-- [x] Confirm Rollup prints no circular dependency warnings.
-- [x] Revert generated files under `builds/` after verification.
-- [x] Run `rtk git status --short` and confirm only intended source files remain changed.
+Expected result: unmaintained ad hoc release helpers removed.
 
-### Phase 8: Manual QA Targets
+### Integration Checklist
+Run after worker diffs land.
 
-- [x] Open QR on a thread page.
-- [x] Open QR on an index page.
-- [x] Verify v2 captcha setup, focus behavior, reload, and completion.
-- [x] Verify TCaptcha setup, focus restoration, strip UI, and completion.
-- [x] Verify `Post on Captcha Completion` still submits when expected.
-- [x] Verify captcha auto-loading when QR contains text, file, or multiple posts.
-- [x] Verify QR close destroys captcha UI.
-- [x] Verify changing the selected thread refreshes TCaptcha thread data.
-- [x] Verify captcha error paths still display through QR notifications.
+- [x] Run rtk git status --short.
+- [x] Grep for removed symbols and files: Connection, fbegin, fend, newline, removeDecaffeinateComments, chrome-webstore-upload, sign.sh, stats.js, original 4chan X CHANGELOG.
+- [x] Run rtk npm run check:cycles.
+- [x] Run rtk npm run build.
+- [x] Run rtk npm run build:userscript.
+- [x] Run rtk npm run build:crx.
+- [x] Run rtk git diff --check.
+- [x] Review deleted files for accidental live asset loss.
+- [x] Summarize final line, dependency, and asset reduction.
 
-### Phase 9: Commit Checklist
-
-- [x] Review `git diff` for accidental generated changes.
-- [x] Confirm `npm run check:cycles` passes.
-- [x] Confirm the three build commands pass.
-- [x] Commit with a subject like `Make QR captcha bridge explicit`.
-
-## Close Documentation and Code Comment Gaps
-
-### Goal
-
-Bring the project documentation and high-value source comments in line with the current codebase so contributors can understand the build pipeline, dependency constraints, migration status, and major runtime boundaries without relying on stale notes or upstream-only documentation.
-
-### Current State
-
-- [x] `README.md` contains old fork/migration notes and a TODO block.
-- [x] `CONTRIBUTING.md` points contributors to the upstream 4chan X wiki and says XTd has no own wiki.
-- [x] `conductor/tracks/ts_migration_20260522/plan.md` still lists circular dependency work as open.
-- [x] `src/Posting/QRBridge.ts` defines the QR captcha facade without a module-level contract note.
-- [x] Several large runtime modules begin with imports or migration boilerplate instead of orientation comments.
-- [x] Many files still use `@ts-nocheck` without local or central guidance for when that is acceptable.
-- [x] Many legacy `decaffeinate suggestions` blocks remain in source files.
-- [x] Tooling scripts have limited inline explanation of assumptions and supported behavior.
-
-### Desired End State
-
-- [x] Top-level docs describe the current build outputs and verification commands accurately.
-- [x] Current circular dependency status and `npm run check:cycles` expectations are documented.
-- [x] XTd-specific contributor guidance exists locally and does not depend only on the upstream wiki.
-- [x] The QR captcha facade has a short contract comment explaining registration, dependency direction, and ownership.
-- [x] Large singleton/runtime modules have concise orientation comments where they materially help navigation.
-- [x] `@ts-nocheck` usage has documented migration rules and removal expectations.
-- [x] Stale decaffeinate boilerplate is removed or replaced with useful current-context comments.
-- [x] Build and cycle-check tooling assumptions are documented.
-
-### Phase 1: Update Top-Level Project Docs
-
-- [x] Update `README.md` build notes to reflect current userscript and CRX build support.
-- [x] Remove or refresh the stale `README.md` TODO checklist.
-- [x] Replace stale circular dependency wording in `README.md` with current `npm run check:cycles` guidance.
-- [x] Add `npm run check:cycles` to contributor verification guidance.
-- [x] Clarify that generated files under `builds/` should not be edited directly.
-- [x] Update `CONTRIBUTING.md` with XTd-specific internal documentation links or local guidance.
-
-### Phase 2: Reconcile Conductor and Migration Docs
-
-- [x] Review `conductor/tracks/ts_migration_20260522/plan.md` for stale open circular-dependency tasks.
-- [x] Mark completed migration/cycle tasks accurately or move them to historical context.
-- [x] Update `conductor/tracks/ts_migration_20260522/spec.md` if it still describes outdated dependency status.
-- [x] Ensure conductor docs point to the current build and cycle-check commands.
-- [x] Decide whether old track docs are active plans or archived records, and label them accordingly.
-
-### Phase 3: Document QR/Captcha Boundary
-
-- [x] Add a module-level comment to `src/Posting/QRBridge.ts` explaining that it is an explicit acyclic facade.
-- [x] Document that `QRBridge.ts` must not import `QR.ts`, `Captcha.js`, or `Captcha.t.js`.
-- [x] Document that `QR.ts` owns the implementation and registers the bridge via `registerQRCaptchaBridge`.
-- [x] Add a short comment near the registration block in `src/Posting/QR.ts` pointing back to the facade contract.
-- [x] Verify `npm run check:cycles` still passes after comment-only changes.
-
-### Phase 4: Add Runtime Architecture Orientation
-
-- [x] Add a short orientation comment to `src/main/Main.ts` explaining its role as the feature/module bootstrap registry.
-- [x] Add a short orientation comment to `src/Posting/QR.ts` summarizing the Quick Reply singleton responsibilities.
-- [x] Review `src/platform/$.ts` and clarify its local jQuery-like helper contract where useful.
-- [x] Review `src/Monitoring/ThreadUpdater.ts` and document the update/error/retry flow where current comments are insufficient.
-- [x] Review `src/site/SW.yotsuba.tsx` and document the site-adapter responsibilities.
-- [x] Review `src/Linkification/Embedding.tsx` and document the embed/title-fetching service registry if needed.
-- [x] Keep comments focused on non-obvious ownership, ordering, browser quirks, and external service behavior.
-
-### Phase 5: Document TypeScript Migration State
-
-- [x] Count or list current `@ts-nocheck` files and identify the largest/highest-risk ones.
-- [x] Add central guidance for when `@ts-nocheck` is acceptable during migration.
-- [x] Document expected steps for removing `@ts-nocheck` from a file.
-- [x] Call out known JS interop patterns that make type checking difficult.
-- [x] Link this guidance from `CONTRIBUTING.md` or the relevant conductor docs.
-
-### Phase 6: Clean Legacy Comment Noise
-
-- [x] Inventory `decaffeinate suggestions` blocks in `src/`.
-- [x] Remove blocks that only repeat generic decaffeinate output and no longer guide maintenance.
-- [x] Preserve or replace any block that contains current, actionable migration context.
-- [x] Prefer module-level comments that explain current behavior over historical conversion notes.
-- [x] Run a grep for `decaffeinate suggestions` and confirm only intentional occurrences remain.
-
-### Phase 7: Document Tooling Assumptions
-
-- [x] Add or update comments in `tools/check-cycles.js` describing supported import syntax and ignored edges.
-- [x] Document that type-only imports are skipped by the cycle checker.
-- [x] Add or update build-pipeline notes for `tools/rollup.js`, especially `-platform`, `-min`, `-no-format`, and `-test`.
-- [x] Cross-check `README.md` build options against actual `package.json` scripts and `tools/rollup.js` flags.
-- [x] Confirm docs mention that build verification may change `builds/` artifacts and those should be reverted unless intentionally releasing.
-
-### Phase 8: Verification and Commit Checklist
-
-- [x] Run `npm run check:cycles`.
-- [x] Run `npm run build` if source comments or tooling docs touch bundled source files.
-- [x] Run `rtk git diff --check` or equivalent whitespace validation.
-- [x] Review `git diff` for accidental generated changes.
-- [x] Confirm only intended docs/comment files changed.
-- [x] Commit with a subject like `Document project maintenance gaps` or split by docs/source-comment scope.
-
-## Comprehensive Code Documentation
-
-### Goal
-Document the largest and most complex files in the codebase using sub-agents.
-
-### Tasks
-- [x] Document `src/General/Index.js` (Assigned to sub-agent)
-- [x] Document `src/Monitoring/ThreadWatcher.ts` (Assigned to sub-agent)
-- [x] Document `src/General/Settings.tsx` (Assigned to sub-agent)
+### Suggested Order
+- [x] Start Workers A, B, and F immediately.
+- [x] Start Workers C, D, and E immediately if they can work in isolated worktrees or patch bundles.
+- [x] Integrate source, tooling, and dependency changes before final builds.
+- [x] If a build fails, isolate the smallest worker diff that caused it.

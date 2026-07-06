@@ -353,28 +353,6 @@ if (!globalThis.chrome?.extension) {
     url => window.open(url, '_blank');
 }
 
-$.debounce = function(wait, fn) {
-  let lastCall = 0;
-  let timeout  = null;
-  let that     = null;
-  let args     = null;
-  const exec = function() {
-    lastCall = Date.now();
-    return fn.apply(that, args);
-  };
-  return function() {
-    args = arguments;
-    that = this;
-    if (lastCall < (Date.now() - wait)) {
-      return exec();
-    }
-    // stop current reset
-    clearTimeout(timeout);
-    // after wait, let next invocation execute immediately
-    return timeout = setTimeout(exec, wait);
-  };
-};
-
 $.queueTask = (function() {
   const taskQueue = [];
   const execTask = function() {
