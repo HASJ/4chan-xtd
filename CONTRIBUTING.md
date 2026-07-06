@@ -1,6 +1,6 @@
 ## Reporting bugs
 
-Bug reports and feature requests for 4chan XTd are tracked at **https://github.com/TuxedoTako/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc**.
+Bug reports and feature requests for 4chan XTd are tracked at **https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc**.
 
 You can submit a bug report / feature request via your Github account.
 
@@ -19,10 +19,10 @@ If you're reporting a bug, the more detail you can give, the better. If I can't 
 ### Get started
 
 - Install [git](https://git-scm.com/), [node.js](https://nodejs.org/), and [npm](https://www.npmjs.com/).
-- Clone 4chan XTd: `git clone https://github.com/TuxedoTako/4chan-xtd.git`
+- Clone 4chan XTd: `git clone https://github.com/HASJ/4chan-xtd.git`
   - If this is taking too long, you can add `--depth 100` to fetch only recent history.
-  - Alternatively, if you already have a local 4chan X repo, you can add XT as a remote:
-    `git remote add xt https://github.com/TuxedoTako/4chan-xtd.git`
+  - Alternatively, if you already have a local 4chan X repo, you can add XTd as a remote:
+    `git remote add xtd https://github.com/HASJ/4chan-xtd.git`
 - Open the directory: `cd 4chan-xtd`
 - Fetch needed dependencies with: `npm install`
 

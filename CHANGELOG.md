@@ -3,24 +3,24 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
-### 2.26.20 (2026-07-05)
+### [2.26.20](https://github.com/HASJ/4chan-xtd/commit/0f25ca54ec302f2f4d02f712198a907aad1bbf05) (2026-07-05)
 
 - Maintenance
   - Removed vendored upstream changelog history and unused historical screenshot assets.
   - Removed stale conductor planning files, unused release helper scripts, obsolete meta wrappers, and dead build/source helpers.
   - Removed the unused Chrome Web Store upload dependency and its transitive packages.
 
-### 2.26.19.1 (2026-06-30)
+### [2.26.19.1](https://github.com/HASJ/4chan-xtd/commit/c4e393b4442429e1f5696b19c422092685d801e1) (2026-06-30)
 
 - Bugfixes
   - Fixed queued Quick Reply posting so TCaptcha loads for the next queued post without flashing back to the empty idle rectangle after a file post completes.
 
-### 2.26.19 (2026-06-30)
+### [2.26.19](https://github.com/HASJ/4chan-xtd/commit/a4785347bb327c62457e907c40840fbe6592591a) (2026-06-30)
 
 - Bugfixes
   - Fixed Quick Reply TCaptcha no-verification handling so the native "Verification not required" message and captcha rectangle remain visible instead of being hidden as an idle challenge.
 
-### 2.26.18 (2026-06-29)
+### [2.26.18](https://github.com/HASJ/4chan-xtd/commit/4c698232848d9bd3fd95622de56d86edea651902) (2026-06-29)
 
 - Bugfixes
   - Fixed Quick Reply CAPTCHA focus restoration so auto-loaded challenges return focus to the comment field once without hijacking deliberate CAPTCHA or Quick Reply interactions.
@@ -28,12 +28,12 @@ and import them in XTd.
 - Maintenance
   - Expanded `.gitignore` coverage for local caches, logs, environment files, editor files, temporary CRX signing output, and signing keys.
 
-### 2.26.17 (2026-06-29)
+### [2.26.17](https://github.com/HASJ/4chan-xtd/commit/5823a7156e135881980725ded85e420e647ec930) (2026-06-29)
 
 - Bugfixes
   - Fixed Quick Reply TCaptcha so the empty challenge area stays hidden while idle, while active multi-step CAPTCHAs still show their strips and keep "Post on CAPTCHA completion" working across step transitions.
 
-### 2.26.16 (2026-06-29)
+### [2.26.16](https://github.com/HASJ/4chan-xtd/commit/9127a0c26fda7877dad31b1a9ebdb346936a55b1) (2026-06-29)
 
 - Architecture
   - Replaced the dynamic Quick Reply CAPTCHA bridge proxy with an explicit typed facade to resolve circular dependencies.
@@ -43,7 +43,7 @@ and import them in XTd.
   - Added module documentation headers to core entry points and platform adapters.
   - Documented project maintenance gaps and subagent documentation.
 
-### 2.26.14 (2026-06-29)
+### [2.26.14](https://github.com/HASJ/4chan-xtd/commit/215455ca940cb992f47859333f62caccb2567fc9) (2026-06-29)
 
 - Architecture
   - Removed all detected circular source dependencies by splitting shared helpers and bridge modules out of feature implementations.
@@ -53,59 +53,59 @@ and import them in XTd.
 - Documentation
   - Added `ToDo.md` with a granular follow-up plan to replace the dynamic QR bridge proxy with an explicit typed QR CAPTCHA facade.
 
-### 2.26.13 (2026-06-28)
+### [2.26.13](https://github.com/HASJ/4chan-xtd/commit/ce3ac667784733a983962ae91c44285ed847469c) (2026-06-28)
 
 - Bugfixes
   - Fixed Quick Reply CAPTCHA loading stealing focus from the comment textarea while typing. The QR now restores comment focus when CAPTCHA UI auto-loads without disrupting explicit CAPTCHA interaction.
 
-### 2.26.12 (2026-06-24)
+### [2.26.12](https://github.com/HASJ/4chan-xtd/commit/daa80d68cf6ca4ab62c03b5fc754a75a3378f768) (2026-06-24)
 
 - Bugfixes
   - Fixed Quick Reply CAPTCHA options capturing race conditions resulting in duplicate or missing/empty option images. Replaced the MutationObserver logic with a deterministic and safe 50ms setTimeout-based delay, optimizing capturing for the initial slider index.
 
-### 2.26.11 (2026-06-24)
+### [2.26.11](https://github.com/HASJ/4chan-xtd/commit/e28d9759d63715595894ee43e404f2783b8e8aae) (2026-06-24)
 
 - Bugfixes
   - Fixed Quick Reply CAPTCHA dialog loading multiple duplicate challenges during typing or other state updates. Added load-state tracking and DOM safety guards to ensure a single challenge is loaded at a time.
 
-### 2.26.10 (2026-06-23)
+### [2.26.10](https://github.com/HASJ/4chan-xtd/commit/2a0cddbd829c5ef896fed392fe521d0a3f243ece) (2026-06-23)
 
 - Bugfixes
   - Fixed Quick Reply CAPTCHA initialization after cookies are cleared but stale 4chan CAPTCHA/pass data remains in local storage. TCaptcha now requests a challenge through the native API after initialization.
 
-### 2.26.9 (2026-06-23)
+### [2.26.9](https://github.com/HASJ/4chan-xtd/commit/77f9f0516aa379fee9b72c68811fef9e999cb31d) (2026-06-23)
 
 - Bugfixes
   - Fixed native Quick Reply CAPTCHA loading after 4chan CAPTCHA/bypass cookies are cleared. A challenge now loads when the queued reply requires verification, while empty Quick Reply forms still respect the Auto-load captcha setting.
 
-### 2.26.8 (2026-05-22)
+### [2.26.8](https://github.com/HASJ/4chan-xtd/commit/6f1722f653a1e16e48e912c73911de2fd8726d9a) (2026-05-22)
 
 - Bugfixes
   - Fixed cross-thread quotes being incorrectly labeled as "[Deleted, restored from external archive]" by only applying the archive label if the post is actually marked as deleted in the archive data.
   - Fixed relative thumbnail URLs in restored archive posts by correctly passing the archive's base URL during parsing.
 
-### 2.26.7 (2026-05-21)
+### [2.26.7](https://github.com/HASJ/4chan-xtd/commit/cdf4ebbe171250a1d6349d21ccdc0a1d780c2194) (2026-05-21)
 
 - Bugfixes
   - Fixed "Post on Captcha Completion" not auto-submitting on final steps or single-step challenges by ensuring the check only defers submission when the next-step button (`#t-next`) is active/enabled.
 
-### 2.26.6 (2026-05-21)
+### [2.26.6](https://github.com/HASJ/4chan-xtd/commit/7aae6c5dc82889a2ff4959c24758cc93c5441627) (2026-05-21)
 
 - Bugfixes
   - Fixed "Post on Captcha Completion" auto-submitting before the captcha sequence is actually completed during multi-step slider challenges (TCaptcha) by deferring submission if the intermediate next-step button (`#t-next`) is active/visible.
 
-### 2.26.5 (2026-05-21)
+### [2.26.5](https://github.com/HASJ/4chan-xtd/commit/39321a968f894648d934abf8a218b4632b38c10a) (2026-05-21)
 
 - Features
   - Added Left (`ArrowLeft`) and Right (`ArrowRight`) keyboard shortcut navigation support to the native slider captcha (TCaptcha) puzzle strips, allowing seamless Back/Forward selection of answer options.
 
-### 2.26.4 (2026-05-20)
+### [2.26.4](https://github.com/HASJ/4chan-xtd/commit/6491d59ceced31db594b84028624ea61be6fc158) (2026-05-20)
 
 - Bugfixes
   - Fixed TCaptcha "find" challenge empty first strip bug by skipping the empty index 0 (unselected/default slider position) and starting keyboard shortcuts at index 1.
   - Optimized slider options capturing logic by observing changes to `backgroundPosition` in addition to `backgroundImage`, making the transition loop run instantly instead of waiting for safety timeouts.
 
-### 2.26.3 (2026-05-20)
+### [2.26.3](https://github.com/HASJ/4chan-xtd/commit/ea1151f0c857854a2d83186113bc12f290c27a08) (2026-05-20)
 
 - Bugfixes
   - Fixed TCaptcha "find" challenge bug where the first option rectangle was empty and keyboard shortcuts started with "2" instead of "1". The selection index is now determined dynamically using the range slider's `min` attribute.
@@ -114,13 +114,13 @@ and import them in XTd.
 - Security
   - Hardened userscript and extension security posture, covering input validation, script execution boundaries, and safe URI schemes.
 
-### 2.26.2 (2026-05-20)
+### [2.26.2](https://github.com/HASJ/4chan-xtd/commit/b646fb683f5ac10bd2a4b9d3fe3ba6af78740725) (2026-05-20)
 
 - Captcha theming improvements
   - Added a new config option `'Theme Captcha'` (default `true`) under Posting and Captchas settings. When enabled, the captcha will follow the active theme (e.g., custom colors/borders on Tomorrow or Spooky themes). When disabled, the captcha retains its default native styling.
   - Ensured status messages like "Verification not required" and "Captcha expired" are always readable on Tomorrow and Spooky dark themes by using a brighter text color even if Theme Captcha is disabled.
 
-### 2.26.1 (2026-05-20)
+### [2.26.1](https://github.com/HASJ/4chan-xtd/commit/5a1c1430e7cc67546c9cda07a1aa8d77871902d2) (2026-05-20)
 
 - Bugfixes
   - Fixed dynamic theme switching not working without a page refresh (e.g. switching from Tomorrow to Yotsuba).
@@ -137,7 +137,7 @@ and import them in XTd.
   - Themed captcha buttons, response input field, clue image borders, and strip selection highlights using `--xt-border-highlight`.
   - Used structural CSS selectors (`#qr .captcha-root > div`) instead of class-based selectors to work around TCaptcha clearing the `.captcha-container` class name at initialization.
 
-### 2.26.0 (2026-05-19)
+### [2.26.0](https://github.com/HASJ/4chan-xtd/commit/94558c43513864049bb7ac349597b3441859632f) (2026-05-19)
 
 - Declared project as active and alive in `README.md`.
 - Complete migration/branding from 4chan XT to 4chan XTd:
@@ -150,13 +150,13 @@ and import them in XTd.
     - Added robust fallback rules in CSS custom properties.
     - Dynamically set `--xt-background` and `--xt-header-dialog-bg` on `:root` when compiling computed custom/native themes.
 
-### 2.25.2 (2026-05-19)
+### [2.25.2](https://github.com/HASJ/4chan-xtd/commit/dabfb9f4b492226f46aa07b0f7634fb5bb18e0c4) (2026-05-19)
 
 - Captcha option to auto-advance challenges on selection:
   - Added new option `'Next challenge on captcha selection'` under Posting and Captchas settings.
   - Automatically click the next challenge button when a captcha answer strip is selected.
 
-### 2.25.1 (2026-05-18)
+### [2.25.1](https://github.com/HASJ/4chan-xtd/commit/ec4f512ce01510c4a0c98a549d29f69bec9fcc0f) (2026-05-18)
 
 - Captcha UI Refactor for T-captchas (slider captcha):
   - Render "not like the others" (odd-one-out) challenge strips horizontally side-by-side.
@@ -164,7 +164,7 @@ and import them in XTd.
   - Map browser Space key to proceed to the next challenge phase (preventing page scroll).
   - Robustly detect subsequent challenges (e.g. Next 1/2 -> 2/2) using button phase tracking.
 
-### 2.25.0 (2026-05-18)
+### [2.25.0](https://github.com/HASJ/4chan-xtd/commit/12665d88ee2f98adf176746145e7b770a191b4b5) (2026-05-18)
 
 - Captcha UI Refactor for T-captchas (slider captcha):
   - Automatically display all puzzle options in a stacked vertical layout instead of using a slider.

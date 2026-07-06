@@ -36,7 +36,7 @@ Use of the "Link Title" feature to fetch titles of Youtube links is subject to Y
 
 To run an user script, you need an user script manager like Violentmonkey ([Chrome](https://chromewebstore.google.com/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag), [Firefox](https://addons.mozilla.org/firefox/addon/violentmonkey/), [Edge](https://microsoftedge.microsoft.com/addons/detail/eeagobfjdenkkddmbclomhiblgggliao)), or Tampermonkey ([Chrome](https://chrome.google.com/webstore/detail/dhdgffkkebhmkfjojejmpbldmpobfkfo), [Firefox](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/), [Edge](https://microsoftedge.microsoft.com/addons/detail/iikmkjmpaadaobahmlepeloendndfphd), [Safari](https://apps.apple.com/app/tampermonkey/id6738342400)).
 
-This fork is distributed through [GitHub releases](https://github.com/TuxedoTako/4chan-xtd/releases) and [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd). There are known issues with updating user scripts through GitHub: [#34](https://github.com/TuxedoTako/4chan-xtd/issues/34) [violentmonkey#1673](https://github.com/violentmonkey/violentmonkey/issues/1673), but Greasy Fork doesn't allow the minified version. Automatic updates are supported for the user script version, but not the Chrome extension.
+This fork is distributed through [GitHub releases](https://github.com/HASJ/4chan-xtd/releases) and [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd). There are known issues with updating user scripts through GitHub: [#34](https://github.com/HASJ/4chan-xtd/issues/34) [violentmonkey#1673](https://github.com/violentmonkey/violentmonkey/issues/1673), but Greasy Fork doesn't allow the minified version. Automatic updates are supported for the user script version, but not the Chrome extension.
 
 ## Build from source
 
@@ -55,14 +55,14 @@ You can also pass arguments directly to the build script (e.g., `node ./tools/ro
 - `-test` Include tests in build.
 
 ## Troubleshooting
-If you encounter a bug, try the steps [here](https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/CONTRIBUTING.md#reporting-bugs), then report it to the [issue tracker](https://github.com/TuxedoTako/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc). If the bug seems to be caused by a script update, you can install an old version from the [GitHub releases](https://github.com/TuxedoTako/4chan-xtd/releases) or from [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd/versions).
+If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), then report it to the [issue tracker](https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc). If the bug seems to be caused by a script update, you can install an old version from the [GitHub releases](https://github.com/HASJ/4chan-xtd/releases) or from [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd/versions).
 
 ## More information
-- [Changelog](https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/CHANGELOG.md)
-- [Frequently Asked Questions for this fork](https://github.com/TuxedoTako/4chan-xtd/wiki/Frequently-Asked-Questions)
+- [Changelog](CHANGELOG.md)
+- [Frequently Asked Questions for this fork](https://github.com/HASJ/4chan-xtd/wiki/Frequently-Asked-Questions)
 - [Frequently Asked Questions for upstream, most should still apply](https://github.com/ccd0/4chan-x/wiki/Frequently-Asked-Questions)
-- [Report Bugs](https://github.com/TuxedoTako/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc)
-- [Contributing](https://github.com/TuxedoTako/4chan-xtd/blob/project-XT/CONTRIBUTING.md)
+- [Report Bugs](https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc)
+- [Contributing](CONTRIBUTING.md)
 
 <details>
 <summary>Click to expand</summary>
