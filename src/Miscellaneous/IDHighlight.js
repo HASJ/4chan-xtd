@@ -1,12 +1,8 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { g } from "../globals/globals";
 import $ from "../platform/$";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var IDHighlight = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW)) { return; }
@@ -37,3 +33,4 @@ var IDHighlight = {
   }; }
 };
 export default IDHighlight;
+

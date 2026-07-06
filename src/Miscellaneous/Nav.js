@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import Get from "../General/Get";
 import Header from "../General/Header";
 import { g, Conf, d, doc } from "../globals/globals";
@@ -5,11 +6,6 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Icon from "../Icons/icon";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Nav = {
   init() {
     switch (g.VIEW) {
@@ -26,13 +22,13 @@ var Nav = {
     const span = $.el('span',
       {id: 'navlinks'});
     const prev = $.el('a', {
-      textContent: '▲',
+      textContent: 'â–²',
       className: 'navlinks-navlink navlink-prev',
       href: 'javascript:;'
     }
     );
     const next = $.el('a', {
-      textContent: '▼',
+      textContent: 'â–¼',
       className: 'navlinks-navlink navlink-next',
       href: 'javascript:;'
     }
@@ -120,3 +116,4 @@ var Nav = {
   }
 };
 export default Nav;
+

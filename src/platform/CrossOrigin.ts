@@ -1,15 +1,8 @@
-import QR from "../Posting/QR";
+﻿// @ts-nocheck
 import $ from "./$";
+import { typeFromExtension } from "../Posting/FileTypes";
 import { dict, platform } from "./helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS206: Consider reworking classes to avoid initClass
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 export interface CrossOriginAjaxOptions {
   /** called with the returned object as `this` on success or error/abort/timeout. */
   onloadend?: (this: XMLHttpRequest) => void,
@@ -101,7 +94,7 @@ var CrossOrigin = {
       }
       if (/^text\/plain;\s*charset=x-user-defined$/i.test(mime)) {
         // In JS Blocker (Safari) content type comes back as 'text/plain; charset=x-user-defined'; guess from filename instead.
-        mime = $.getOwn(QR.typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
+        mime = $.getOwn(typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
       }
       cb(new File([data], name, { type: mime }));
     });
@@ -248,3 +241,4 @@ var CrossOrigin = {
   },
 };
 export default CrossOrigin;
+

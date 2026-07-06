@@ -1,12 +1,9 @@
+﻿// @ts-nocheck
 import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 import Menu from "./Menu";
+import { isPassEnabled } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var ReportLink = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }
@@ -24,7 +21,7 @@ var ReportLink = {
       order: 10,
       open(post) {
         ReportLink.url = `//sys.${location.hostname.split('.')[1]}.org/${post.board}/imgboard.php?mode=report&no=${post}`;
-        if (d.cookie.indexOf('pass_enabled=1') >= 0) {
+        if (isPassEnabled()) {
           ReportLink.dims = 'width=350,height=275';
         } else {
           ReportLink.dims = 'width=400,height=550';
@@ -42,3 +39,4 @@ var ReportLink = {
   }
 };
 export default ReportLink;
+

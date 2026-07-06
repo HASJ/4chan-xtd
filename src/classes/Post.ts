@@ -1,7 +1,7 @@
 import type { FilterResults } from "../Filtering/Filter";
 import Get from "../General/Get";
 // #region tests_enabled
-import Test from "../General/Test";
+import normalizePost from "../General/PostNormalizer";
 // #endregion
 import { g, Conf } from "../globals/globals";
 import ImageExpand from "../Images/ImageExpand";
@@ -37,6 +37,11 @@ export interface File {
   twidth:      string,
   MD5?:        string,
   isSpoiler?:  boolean,
+  tag?:        string,
+  index?:      number,
+  docIndex?:   number,
+  videoControls?: HTMLElement,
+  videoThumb?: HTMLElement,
 };
 
 export default class Post {
@@ -79,6 +84,8 @@ export default class Post {
     flag:          string | undefined,
     date:          Date | undefined,
     nameBlock:     string,
+    comment?:      string,
+    commentHTML?:  any,
   };
 
   // because of a circular dependency $ might not be initialized, so we can't use $.el
@@ -94,7 +101,7 @@ export default class Post {
 
   constructor(root?: HTMLElement, thread?: Thread, board?: Board, flags={}) {
     // #region tests_enabled
-    if (root) this.normalizedOriginal = Test.normalize(root);
+    if (root) this.normalizedOriginal = normalizePost(root);
     // #endregion
 
     // Skip initialization for PostClone
@@ -137,7 +144,7 @@ export default class Post {
     this.info = {
       subject:   this.nodes.subject?.textContent || undefined,
       name,
-      email:     this.nodes.email ? decodeURIComponent(this.nodes.email.href.replace(/^mailto:/, '')) : undefined,
+      email:     this.nodes.email ? decodeURIComponent((this.nodes.email as HTMLAnchorElement).href.replace(/^mailto:/, '')) : undefined,
       tripcode,
       uniqueID:  this.nodes.uniqueID?.textContent,
       capcode:   this.nodes.capcode?.textContent.replace('## ', ''),
@@ -200,6 +207,8 @@ export default class Post {
       uniqueIDRoot: any,
       uniqueID:     any,
       stub?:        HTMLElement,
+      commentClean?: any,
+      email?:       HTMLAnchorElement | HTMLElement,
     };
 
     const nodes: Node & Partial<Record<keyof Post['info'], HTMLElement>> = {

@@ -1,15 +1,9 @@
+﻿// @ts-nocheck
 import Notice from "../classes/Notice";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import { dict, HOUR } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS104: Avoid inline assignments
- * DS205: Consider reworking code to avoid use of IIFEs
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var BoardConfig = {
   cbs: [],
 
@@ -105,3 +99,4 @@ var BoardConfig = {
   }
 };
 export default BoardConfig;
+

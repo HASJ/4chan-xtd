@@ -1,3 +1,10 @@
+// @ts-nocheck
+/*
+ * Yotsuba (4chan) Site Adapter
+ *
+ * This module contains site-specific configuration and logic for 4chan.
+ * It adapts the core engine to 4chan's DOM structure and behavior.
+ */
 import Redirect from "../Archive/Redirect";
 import PassMessage from "../Miscellaneous/PassMessage";
 import Report from "../Miscellaneous/Report";
@@ -16,12 +23,6 @@ import generateCatalogThreadHtml from "./SW.yotsuba.Build/CatalogThreadHtml";
 import h, { type EscapedHtml, hFragment, isEscaped } from "../globals/jsx";
 import { dict, MINUTE } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const SWYotsuba = {
   isOPContainerThread: false,
   hasIPCount: true,
@@ -82,7 +83,7 @@ const SWYotsuba = {
       isArchived: '.archivedIcon'
     },
     file: {
-      text:  '.file > :first-child',
+      text:  '.fileText, .fileInfo',
       link:  '.fileText > a',
       thumb: 'a.fileThumb > [data-md5]'
     },
@@ -188,6 +189,15 @@ $\
         return;
       case 'sys.4chan.org': case 'sys.4channel.org':
         var pathname = location.pathname.split(/\/+/);
+        if (pathname[1] === 'captcha') {
+          $.onExists(doc, 'body', () => {
+            $.addClass(doc, 'captcha-t', 'captcha-iframe');
+            if (Conf['Theme Captcha']) $.addClass(doc, 'themed-captcha');
+            $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
+            Captcha.t.setupIframe();
+          });
+          return;
+        }
         if (pathname[2] === 'imgboard.php') {
           let match;
           if (/\bmode=report\b/.test(location.search)) {
@@ -726,3 +736,4 @@ $\
   }
 };
 export default SWYotsuba;
+

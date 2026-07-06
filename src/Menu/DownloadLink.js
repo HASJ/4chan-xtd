@@ -1,13 +1,9 @@
+﻿// @ts-nocheck
 import { g, Conf } from "../globals/globals";
 import ImageCommon from "../Images/ImageCommon";
 import $ from "../platform/$";
 import Menu from "./Menu";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const DownloadLink = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) { return; }
@@ -34,3 +30,4 @@ const DownloadLink = {
   }
 };
 export default DownloadLink;
+

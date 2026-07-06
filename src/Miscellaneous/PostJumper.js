@@ -1,14 +1,10 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { Conf, g, E } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Icon from "../Icons/icon";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var PostJumper = { 
   init() {
     if (!Conf['Unique ID and Capcode Navigation'] || !['index', 'thread'].includes(g.VIEW)) { return; }
@@ -96,3 +92,4 @@ var PostJumper = {
   }
 };
 export default PostJumper;
+

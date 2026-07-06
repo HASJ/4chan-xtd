@@ -1,5 +1,3 @@
-import $ from "../platform/$";
-
 export default class SimpleDict<T> {
   keys: string[]
 
@@ -70,7 +68,7 @@ export default class SimpleDict<T> {
     if (key === 'keys') {
       return undefined;
     } else {
-      return $.getOwn(this, key);
+      return Object.prototype.hasOwnProperty.call(this, key) ? this[key] : undefined;
     }
   }
 
@@ -82,3 +80,4 @@ export default class SimpleDict<T> {
     return this.keys.length ? this[this.keys.length - 1] : undefined;
   }
 }
+

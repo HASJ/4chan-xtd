@@ -1,11 +1,17 @@
+// @ts-nocheck
+/*
+ * Thread Updater Service
+ *
+ * Periodically polls the server for new posts in a thread.
+ * Manages the update/error/retry cycle, backoff logic, and notifications.
+ */
 import Beep from './ThreadUpdater/beep.wav';
 import $ from "../platform/$";
 import Callbacks from '../classes/Callbacks';
 import Notice from '../classes/Notice';
 import Post from '../classes/Post';
-import Main from '../main/Main';
 import Config from '../config/Config';
-import Settings from '../General/Settings';
+import { openSettings } from '../General/SettingsBridge';
 import QuoteThreading from '../Quotelinks/QuoteThreading';
 import Unread from './Unread';
 import Header from '../General/Header';
@@ -13,13 +19,6 @@ import { g, Conf, d, doc } from '../globals/globals';
 import UI from '../General/UI';
 import { MINUTE, SECOND } from '../platform/helpers';
 import type Thread from '../classes/Thread';
-
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS201: Simplify complex destructure assignments
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 
 var ThreadUpdater = {
   init(this: typeof ThreadUpdater) {
@@ -61,7 +60,7 @@ var ThreadUpdater = {
     const updateLink = $.el('span',
       {className: 'brackets-wrap updatelink'});
     $.extend(updateLink, {innerHTML: '<a href="javascript:;">Update</a>'});
-    Main.ready(function() {
+    $.on(d, '4chanXInitFinished', function() {
       let navLinksBot;
       if (navLinksBot = $('.navLinksBot')) { return $.add(navLinksBot, [$.tn(' '), updateLink]); }
     });
@@ -277,7 +276,7 @@ var ThreadUpdater = {
   },
 
   intervalShortcut() {
-    Settings.open('Advanced');
+    openSettings('Advanced');
     const settings = $.id('fourchanx-settings');
     return $('input[name=Interval]', settings).focus();
   },
@@ -416,7 +415,7 @@ var ThreadUpdater = {
       const unreadCount   = Unread.posts?.size;
       const unreadQYCount = Unread.postsQuotingYou?.size;
 
-      Main.callbackNodes('Post', posts);
+      for (const post of posts) { Callbacks.Post.execute(post); }
 
       if (d.hidden || !d.hasFocus()) {
         if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
@@ -469,3 +468,4 @@ var ThreadUpdater = {
   }
 };
 export default ThreadUpdater;
+

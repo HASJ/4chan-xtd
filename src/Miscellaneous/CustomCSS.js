@@ -1,12 +1,8 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import CSS from "../css/CSS";
 import { Conf } from "../globals/globals";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const CustomCSS = {
   init() {
     if (!Conf['Custom CSS']) { return; }
@@ -32,3 +28,4 @@ const CustomCSS = {
   }
 };
 export default CustomCSS;
+

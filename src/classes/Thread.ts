@@ -4,11 +4,6 @@ import { g } from "../globals/globals";
 import type Board from "./Board";
 import type Post from "./Post";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 export default class Thread {
   declare board: Board;
   declare ID: number;
@@ -28,8 +23,10 @@ export default class Thread {
   declare ipCount: number;
   declare json: any;
   declare OP: any;
-  declare catalogView: any
-  declare nodes: any
+  declare catalogView: any;
+  declare catalogViewNative?: any;
+  declare stub?: any;
+  declare nodes: any;
 
   toString() { return this.ID; }
 

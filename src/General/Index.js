@@ -1,9 +1,11 @@
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS205: Consider reworking code to avoid use of IIFEs
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
+// @ts-nocheck
+/**
+ * @module Index
+ * @description
+ * Manages the main index page (board view or catalog view) of 4chan XTd.
+ * Handles the initialization, rendering, sorting, searching, and pagination of threads.
+ * Provides features like infinite scrolling, catalog mode, hidden threads toggle,
+ * and custom sorting options.
  */
 import Callbacks from '../classes/Callbacks';
 import CatalogThread from '../classes/CatalogThread';
@@ -14,13 +16,12 @@ import Config from '../config/Config';
 import Filter from '../Filtering/Filter';
 import PostHiding from '../Filtering/PostHiding';
 import ThreadHiding from '../Filtering/ThreadHiding';
-import Main from '../main/Main';
-import CatalogLinks from '../Miscellaneous/CatalogLinks';
+import { resolveBoardURL } from './HeaderBoardLists';
 import RelativeDates from '../Miscellaneous/RelativeDates';
-import ThreadWatcher from '../Monitoring/ThreadWatcher';
+import { isThreadWatched } from '../Monitoring/ThreadWatcherBridge';
 import $$ from '../platform/$$';
 import $ from '../platform/$';
-import QuotePreview from '../Quotelinks/QuotePreview';
+import { runQuotePreviewMouseover } from '../Quotelinks/QuotePreviewActions';
 import { c, Conf, d, doc, g } from '../globals/globals';
 import Header from './Header';
 import UI from './UI';
@@ -32,15 +33,34 @@ import BoardConfig from './BoardConfig';
 import Get from './Get';
 import { dict, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
+import { indexEnabledOn } from './IndexAvailability';
+import { setIndexEnabled } from './IndexState';
+import { registerIndexThreadHidingActions } from './IndexThreadHidingBridge';
 
+/**
+ * The Index controller object.
+ * @namespace Index
+ * @property {boolean} showHiddenThreads - Whether to display hidden threads.
+ * @property {object} changed - Tracks which parts of the state have changed to trigger updates.
+ */
 var Index = {
   showHiddenThreads: false,
   changed: {},
 
+  /**
+   * Checks if the Index feature is enabled for a specific site and board.
+   * @param {object} options
+   * @param {string} options.siteID - The site ID.
+   * @param {string} options.boardID - The board ID.
+   * @returns {boolean} True if the index is enabled.
+   */
   enabledOn({siteID, boardID}) {
-    return Conf['JSON Index'] && (g.sites[siteID].software === 'yotsuba') && (boardID !== 'f');
+    return indexEnabledOn({siteID, boardID});
   },
 
+  /**
+   * Initializes the Index features, UI elements, event listeners, and parses the URL hash state.
+   */
   init() {
     let input, inputs, name;
     if (g.VIEW !== 'index') { return; }
@@ -52,6 +72,7 @@ var Index = {
     if (!this.enabledOn(g.BOARD)) { return; }
 
     this.enabled = true;
+    setIndexEnabled(true);
 
     Callbacks.Post.push({
       name: 'Index Page Numbers',
@@ -131,7 +152,7 @@ var Index = {
     // Navigation links at top of index
     this.navLinks = $.el('div', {className: 'navLinks json-index'});
     $.extend(this.navLinks, {innerHTML: NavLinksPage});
-    $('.cataloglink a', this.navLinks).href = CatalogLinks.catalog();
+    $('.cataloglink a', this.navLinks).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
     if (!BoardConfig.isArchived(g.BOARD.ID)) { $('.archlistlink', this.navLinks).hidden = true; }
     $.on($('#index-last-refresh a', this.navLinks), 'click', this.cb.refreshFront);
 
@@ -184,7 +205,7 @@ var Index = {
     // Page list
     this.pagelist = $.el('div', {className: 'pagelist json-index'});
     $.extend(this.pagelist, {innerHTML: PageList});
-    $('.cataloglink a', this.pagelist).href = CatalogLinks.catalog();
+    $('.cataloglink a', this.pagelist).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
     $.on(this.pagelist, 'click', this.cb.pageNav);
 
     this.update(true);
@@ -229,7 +250,7 @@ var Index = {
       if (timeEl.dataset.utc) { return RelativeDates.update(timeEl); }
     });
 
-    return Main.ready(function() {
+    return $.on(d, '4chanXInitFinished', function() {
       let pagelist;
       if (pagelist = $('.pagelist')) {
         $.replace(pagelist, Index.pagelist);
@@ -238,6 +259,10 @@ var Index = {
     });
   },
 
+  /**
+   * Scroll event handler. Triggers loading the next page in infinite scrolling mode
+   * when the user scrolls near the bottom of the document.
+   */
   scroll() {
     if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) { return; }
     if (Index.pageNum == null) { Index.pageNum = Index.currentPage; } // Avoid having to pushState to keep track of the current page
@@ -738,6 +763,10 @@ var Index = {
       `${hiddenCount} hidden threads`;
   },
 
+  /**
+   * Triggers a refresh of the index by requesting the latest catalog JSON.
+   * @param {boolean} [firstTime] - Indicates if this is the initial load.
+   */
   update(firstTime) {
     let oldReq;
     if (oldReq = Index.req) {
@@ -774,6 +803,9 @@ var Index = {
     return $.addClass(Index.button, 'spin');
   },
 
+  /**
+   * Callback for the JSON catalog request. Parses the response and updates the index view.
+   */
   load() {
     let err;
     if (this !== Index.req) { return; } // aborted
@@ -831,6 +863,10 @@ var Index = {
     return RelativeDates.update(timeEl);
   },
 
+  /**
+   * Parses the JSON catalog data and triggers an index update.
+   * @param {Array<object>} pages - The raw pages data from the catalog JSON.
+   */
   parse(pages) {
     $.cleanCache(url => /^https?:\/\/a\.4cdn\.org\//.test(url));
     Index.parseThreadList(pages);
@@ -838,6 +874,11 @@ var Index = {
     return Index.pageLoad();
   },
 
+  /**
+   * Processes the raw pages data to extract and categorize threads, applying filters
+   * and initializing thread objects for the index view.
+   * @param {Array<object>} pages - The raw pages data from the catalog JSON.
+   */
   parseThreadList(pages) {
     Index.pagesNum          = pages.length;
     Index.threadsNumPerPage = pages[0]?.threads.length || 1;
@@ -885,6 +926,13 @@ var Index = {
     return PostHiding.isHidden(g.BOARD.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD));
   },
 
+  /**
+   * Creates or updates Thread and Post objects for the given thread IDs.
+   * @param {Array<number>} threadIDs - List of thread IDs to build.
+   * @param {boolean} isCatalog - Whether the threads are being built for the catalog view.
+   * @param {boolean} [withReplies] - Whether to include the latest replies for each thread.
+   * @returns {Array<Thread>} Array of built or updated Thread objects.
+   */
   buildThreads(threadIDs, isCatalog, withReplies) {
     let errors;
     const threads    = [];
@@ -941,14 +989,14 @@ var Index = {
         });
       }
     }
-    if (errors) { Main.handleErrors(errors); }
+    if (errors) { Callbacks.errorHandler?.(errors); }
 
     if (withReplies) {
       newPosts = newPosts.concat(Index.buildReplies(threads));
     }
 
-    Main.callbackNodes('Thread', newThreads);
-    Main.callbackNodes('Post',   newPosts);
+    for (const thread of newThreads) { Callbacks.Thread.execute(thread); }
+    for (const post of newPosts) { Callbacks.Post.execute(post); }
     Index.updateHideLabel();
     $.event('IndexRefreshInternal', {threadIDs: (threads.map((t) => t.fullID)), isCatalog});
 
@@ -984,7 +1032,7 @@ var Index = {
       $.add(thread.nodes.root, nodes);
     }
 
-    if (errors) { Main.handleErrors(errors); }
+    if (errors) { Callbacks.errorHandler?.(errors); }
     return posts;
   },
 
@@ -998,7 +1046,7 @@ var Index = {
         catalogThreads.push(new CatalogThread(root, thread));
       }
     }
-    Main.callbackNodes('CatalogThread', catalogThreads);
+    for (const catalogThread of catalogThreads) { Callbacks.CatalogThread.execute(catalogThread); }
   },
 
   sizeCatalogViews(threads) {
@@ -1024,7 +1072,7 @@ var Index = {
       if (Index.isHiddenReply(thread.ID, data)) { continue; }
       var reply = g.SITE.Build.catalogReply(thread, data);
       RelativeDates.update($('time', reply));
-      $.on($('.catalog-reply-preview', reply), 'mouseover', QuotePreview.mouseover);
+      $.on($('.catalog-reply-preview', reply), 'mouseover', runQuotePreviewMouseover);
       replies.push(reply);
     }
 
@@ -1033,6 +1081,10 @@ var Index = {
     $.add(thread.OP.nodes.post, nodes.replies);
   },
 
+  /**
+   * Sorts the available threads according to the current sorting criteria
+   * (e.g., bump order, last reply, creation date) and search queries.
+   */
   sort() {
     let threadIDs;
     const {liveThreadIDs, liveThreadData} = Index;
@@ -1081,7 +1133,7 @@ var Index = {
     // Sticky threads
     Index.sortOnTop(obj => obj.isSticky);
     // Highlighted threads
-    Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && ThreadWatcher.isWatchedRaw(obj.boardID, obj.threadID)));
+    Index.sortOnTop(obj => obj.isOnTop || (Conf['Pin Watched Threads'] && isThreadWatched(obj.boardID, obj.threadID)));
     // Non-hidden threads
     if (Conf['Anchor Hidden Threads']) { return Index.sortOnTop(obj => !Index.isHidden(obj.threadID)); }
   },
@@ -1095,6 +1147,10 @@ var Index = {
     return Index.sortedThreadIDs = topThreads.concat(bottomThreads);
   },
 
+  /**
+   * Rebuilds the DOM structure of the index view based on the current mode
+   * (paged, catalog, infinite) and sorted thread list.
+   */
   buildIndex() {
     let threadIDs;
     if (!Index.liveThreadData) { return; }
@@ -1233,4 +1289,12 @@ var Index = {
     return true;
   }
 };
+
+registerIndexThreadHidingActions({
+  updateHideLabel: Index.updateHideLabel,
+  isShowingHiddenThreads: () => Index.showHiddenThreads,
+  getRoot: () => Index.root,
+  getSortedThreadIDs: () => Index.sortedThreadIDs,
+});
+
 export default Index;

@@ -24,17 +24,11 @@ export default function removeTestCode(opts) {
       if (!filter(id)) return;
 
       const ms = new MagicString(code);
-
-      let index = 0;
-      while (index >= 0) {
-        const startIndex = code.indexOf('// #region tests_enabled', index);
-        if (startIndex < 0) break;
-
-        index = code.indexOf('// #endregion', startIndex) + 13
-        ms.remove(startIndex, index);
+      for (const match of code.matchAll(/\/\/ #region tests_enabled[\s\S]*?\/\/ #endregion/g)) {
+        ms.remove(match.index, match.index + match[0].length);
       }
 
-      return { code: ms.toString(), map: opts.sourceMap ? ms.generateMap() : { mappings: '' } };
+      return { code: ms.toString(), map: ms.generateMap({ hires: true }) };
     }
   };
 };

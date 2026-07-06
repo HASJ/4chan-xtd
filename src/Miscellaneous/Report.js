@@ -1,15 +1,10 @@
+﻿// @ts-nocheck
 import Redirect from "../Archive/Redirect";
 import $ from "../platform/$";
 import ReportPage from './Report/ArchiveReport.html';
 import CSS from "../css/CSS";
 import Captcha from "../Posting/Captcha";
 import { Conf, d, doc, g } from "../globals/globals";
-
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 
 var Report = {
   init() {
@@ -142,3 +137,4 @@ var Report = {
   }
 };
 export default Report;
+

@@ -1,17 +1,11 @@
+// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
-import Main from "../main/Main";
 import Unread from "../Monitoring/Unread";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * DS207: Consider shorter variations of null checks
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var Banner = {
   init() {
     if (Conf['Custom Board Titles']) {
@@ -22,7 +16,7 @@ var Banner = {
 
     // Let 4chan's JS load the banner if enabled; otherwise, load it ourselves.
     if (g.BOARD.ID !== 'f') {
-      return Main.ready(() => $.queueTask(Banner.load));
+      return $.on(d, '4chanXInitFinished', () => $.queueTask(Banner.load));
     }
   },
 
@@ -133,3 +127,4 @@ var Banner = {
   }
 };
 export default Banner;
+

@@ -1,9 +1,9 @@
+// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Post from "../classes/Post";
 import Get from "../General/Get";
 import Index from "../General/Index";
 import { g, Conf, d } from "../globals/globals";
-import Main from "../main/Main";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
@@ -147,7 +147,7 @@ var ExpandThread = {
       posts.push(post);
       postsRoot.push(root);
     }
-    Main.callbackNodes('Post', posts);
+    for (const post of posts) { Callbacks.Post.execute(post); }
     $.after(a, postsRoot);
     $.event('PostsInserted', null, a.parentNode);
 
@@ -163,3 +163,4 @@ var ExpandThread = {
   }
 };
 export default ExpandThread;
+

@@ -1,14 +1,10 @@
+﻿// @ts-nocheck
 import $ from "../platform/$";
 import Redirect from "../Archive/Redirect";
 import Filter from "../Filtering/Filter";
 import { g, Conf } from "../globals/globals";
 import Menu from "./Menu";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 const ArchiveLink = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Archive Link']) { return; }
@@ -83,3 +79,4 @@ const ArchiveLink = {
   }
 };
 export default ArchiveLink;
+

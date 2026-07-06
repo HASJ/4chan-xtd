@@ -1,12 +1,13 @@
+// @ts-nocheck
 import { g, Conf, doc, d } from "../globals/globals";
-import Main from "../main/Main";
 import $ from "../platform/$";
+import { isPassEnabled } from "../platform/helpers";
 
 const CaptchaReplace = {
   init() {
-    if ((g.SITE.software !== 'yotsuba') || (d.cookie.indexOf('pass_enabled=1') >= 0)) { return; }
+    if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) { return; }
 
-    if (Conf['Force Noscript Captcha'] && Main.jsEnabled) {
+    if (Conf['Force Noscript Captcha'] && $.hasClass(doc, 'js-enabled')) {
       $.ready(this.noscript);
       return;
     }
@@ -50,3 +51,4 @@ const CaptchaReplace = {
   }
 };
 export default CaptchaReplace;
+

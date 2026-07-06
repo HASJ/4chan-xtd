@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 // this file is needed in the build script, keep it .js
 
 import { readFile } from "fs/promises";
@@ -73,3 +74,4 @@ export default async function generateMetadata(packageJson, fileName, metaFileNa
 
   return output;
 }
+

@@ -1,5 +1,6 @@
+﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
-import Filter from "../Filtering/Filter";
+import { runQuickFilterMD5 } from "../Filtering/QuickFilterActions";
 import { g, Conf, E } from "../globals/globals";
 import h, { isEscaped } from "../globals/jsx";
 import Icon from "../Icons/icon";
@@ -8,11 +9,6 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import SW from "../site/SW";
 
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var FileInfo = {
   init() {
     if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['File Info Formatting']) { return; }
@@ -31,7 +27,7 @@ var FileInfo = {
         $.on(a, 'click', ImageCommon.download);
       }
       for (a of $$('.file-info .quick-filter-md5', this.file.text)) {
-        $.on(a, 'click', Filter.quickFilterMD5);
+        $.on(a, 'click', runQuickFilterMD5);
       }
       return;
     }
@@ -61,7 +57,7 @@ var FileInfo = {
       $.on(a, 'click', ImageCommon.download);
     }
     for (a of $$('.quick-filter-md5', outputNode)) {
-      $.on(a, 'click', Filter.quickFilterMD5);
+      $.on(a, 'click', runQuickFilterMD5);
     }
   },
 
@@ -103,3 +99,4 @@ var FileInfo = {
   }
 };
 export default FileInfo;
+

@@ -1,12 +1,8 @@
+﻿// @ts-nocheck
 import Header from "../General/Header";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
-/*
- * decaffeinate suggestions:
- * DS102: Remove unnecessary code created because of implicit returns
- * Full docs: https://github.com/decaffeinate/decaffeinate/blob/main/docs/suggestions.md
- */
 var PSAHiding = {
   init() {
     if (!Conf['Announcement Hiding'] || !g.SITE.selectors.psa) { return; }
@@ -43,7 +39,7 @@ var PSAHiding = {
       title:       'Mark announcement as read and hide.',
       className:   'hide-announcement-button',
       href:        'javascript:;',
-      textContent: '➖︎',
+      textContent: 'âž–ï¸Ž',
     }
     ));
     Icon.set(btn, 'squareMinus');
@@ -90,3 +86,4 @@ var PSAHiding = {
   }
 };
 export default PSAHiding;
+

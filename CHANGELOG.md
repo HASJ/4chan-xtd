@@ -1,7 +1,175 @@
-## 4chan XT changelog
+## 4chan XTd changelog
 
-4chan XT uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
-and import them in XT.
+4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
+and import them in XTd.
+
+### 2.26.19.1 (2026-06-30)
+
+- Bugfixes
+  - Fixed queued Quick Reply posting so TCaptcha loads for the next queued post without flashing back to the empty idle rectangle after a file post completes.
+
+### 2.26.19 (2026-06-30)
+
+- Bugfixes
+  - Fixed Quick Reply TCaptcha no-verification handling so the native "Verification not required" message and captcha rectangle remain visible instead of being hidden as an idle challenge.
+
+### 2.26.18 (2026-06-29)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA focus restoration so auto-loaded challenges return focus to the comment field once without hijacking deliberate CAPTCHA or Quick Reply interactions.
+  - Fixed TCaptcha "Post on CAPTCHA completion" handling for multi-step challenges by tracking the selected challenge step before allowing auto-submit.
+- Maintenance
+  - Expanded `.gitignore` coverage for local caches, logs, environment files, editor files, temporary CRX signing output, and signing keys.
+
+### 2.26.17 (2026-06-29)
+
+- Bugfixes
+  - Fixed Quick Reply TCaptcha so the empty challenge area stays hidden while idle, while active multi-step CAPTCHAs still show their strips and keep "Post on CAPTCHA completion" working across step transitions.
+
+### 2.26.16 (2026-06-29)
+
+- Architecture
+  - Replaced the dynamic Quick Reply CAPTCHA bridge proxy with an explicit typed facade to resolve circular dependencies.
+- Maintenance
+  - Removed outdated decaffeinate suggestions from source files.
+  - Documented CLI arguments in build tools (`tools/rollup.js`) and `check-cycles.js` scripts.
+  - Added module documentation headers to core entry points and platform adapters.
+  - Documented project maintenance gaps and subagent documentation.
+
+### 2.26.14 (2026-06-29)
+
+- Architecture
+  - Removed all detected circular source dependencies by splitting shared helpers and bridge modules out of feature implementations.
+  - Added `npm run check:cycles` coverage for source dependency graph validation.
+  - Isolated Quick Reply CAPTCHA integration behind a QR bridge so Rollup no longer reports circular dependency warnings.
+
+- Documentation
+  - Added `ToDo.md` with a granular follow-up plan to replace the dynamic QR bridge proxy with an explicit typed QR CAPTCHA facade.
+
+### 2.26.13 (2026-06-28)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA loading stealing focus from the comment textarea while typing. The QR now restores comment focus when CAPTCHA UI auto-loads without disrupting explicit CAPTCHA interaction.
+
+### 2.26.12 (2026-06-24)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA options capturing race conditions resulting in duplicate or missing/empty option images. Replaced the MutationObserver logic with a deterministic and safe 50ms setTimeout-based delay, optimizing capturing for the initial slider index.
+
+### 2.26.11 (2026-06-24)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA dialog loading multiple duplicate challenges during typing or other state updates. Added load-state tracking and DOM safety guards to ensure a single challenge is loaded at a time.
+
+### 2.26.10 (2026-06-23)
+
+- Bugfixes
+  - Fixed Quick Reply CAPTCHA initialization after cookies are cleared but stale 4chan CAPTCHA/pass data remains in local storage. TCaptcha now requests a challenge through the native API after initialization.
+
+### 2.26.9 (2026-06-23)
+
+- Bugfixes
+  - Fixed native Quick Reply CAPTCHA loading after 4chan CAPTCHA/bypass cookies are cleared. A challenge now loads when the queued reply requires verification, while empty Quick Reply forms still respect the Auto-load captcha setting.
+
+### 2.26.8 (2026-05-22)
+
+- Bugfixes
+  - Fixed cross-thread quotes being incorrectly labeled as "[Deleted, restored from external archive]" by only applying the archive label if the post is actually marked as deleted in the archive data.
+  - Fixed relative thumbnail URLs in restored archive posts by correctly passing the archive's base URL during parsing.
+
+### 2.26.7 (2026-05-21)
+
+- Bugfixes
+  - Fixed "Post on Captcha Completion" not auto-submitting on final steps or single-step challenges by ensuring the check only defers submission when the next-step button (`#t-next`) is active/enabled.
+
+### 2.26.6 (2026-05-21)
+
+- Bugfixes
+  - Fixed "Post on Captcha Completion" auto-submitting before the captcha sequence is actually completed during multi-step slider challenges (TCaptcha) by deferring submission if the intermediate next-step button (`#t-next`) is active/visible.
+
+### 2.26.5 (2026-05-21)
+
+- Features
+  - Added Left (`ArrowLeft`) and Right (`ArrowRight`) keyboard shortcut navigation support to the native slider captcha (TCaptcha) puzzle strips, allowing seamless Back/Forward selection of answer options.
+
+### 2.26.4 (2026-05-20)
+
+- Bugfixes
+  - Fixed TCaptcha "find" challenge empty first strip bug by skipping the empty index 0 (unselected/default slider position) and starting keyboard shortcuts at index 1.
+  - Optimized slider options capturing logic by observing changes to `backgroundPosition` in addition to `backgroundImage`, making the transition loop run instantly instead of waiting for safety timeouts.
+
+### 2.26.3 (2026-05-20)
+
+- Bugfixes
+  - Fixed TCaptcha "find" challenge bug where the first option rectangle was empty and keyboard shortcuts started with "2" instead of "1". The selection index is now determined dynamically using the range slider's `min` attribute.
+  - Fixed TCaptcha control buttons ("Get Captcha", "Next"), status messages, and challenge instructions having black, unreadable text on OneeChan themes by inheriting OneeChan's text color.
+
+- Security
+  - Hardened userscript and extension security posture, covering input validation, script execution boundaries, and safe URI schemes.
+
+### 2.26.2 (2026-05-20)
+
+- Captcha theming improvements
+  - Added a new config option `'Theme Captcha'` (default `true`) under Posting and Captchas settings. When enabled, the captcha will follow the active theme (e.g., custom colors/borders on Tomorrow or Spooky themes). When disabled, the captcha retains its default native styling.
+  - Ensured status messages like "Verification not required" and "Captcha expired" are always readable on Tomorrow and Spooky dark themes by using a brighter text color even if Theme Captcha is disabled.
+
+### 2.26.1 (2026-05-20)
+
+- Bugfixes
+  - Fixed dynamic theme switching not working without a page refresh (e.g. switching from Tomorrow to Yotsuba).
+    - Reverted the stylesheet selector to `link[title=switch]` to correctly identify the main stylesheet, matching the behavior of the original 4chan XT.
+    - Restored `MutationObserver` on the main stylesheet's `href` attribute instead of watching `disabled` on all stylesheets, which never fired for 4chan's native theme-switching mechanism.
+    - Matched alternate stylesheets by comparing `href` values instead of checking the `disabled` attribute.
+  - Fixed brief red highlight flash on page load when using dark themes (e.g. Tomorrow).
+  - Fixed potential null reference in `setClass()` when computing background color for non-standard themes.
+
+- Captcha dark theme integration
+  - The T-Captcha (slider captcha) in the Quick Reply dialog now fully follows the active theme.
+  - Made `#t-root`, `#t-box`, and `#t-ctrl` containers transparent and borderless so the QR dialog background flows through seamlessly.
+  - Styled the native range slider track and thumb using theme CSS variables for dark mode compatibility.
+  - Themed captcha buttons, response input field, clue image borders, and strip selection highlights using `--xt-border-highlight`.
+  - Used structural CSS selectors (`#qr .captcha-root > div`) instead of class-based selectors to work around TCaptcha clearing the `.captcha-container` class name at initialization.
+
+### 2.26.0 (2026-05-19)
+
+- Declared project as active and alive in `README.md`.
+- Complete migration/branding from 4chan XT to 4chan XTd:
+  - Renamed namespace, homepage, downloads, and documentation references across the codebase.
+  - Exposed `window.fourchanXTd` for user scripts while keeping `window.fourchanXT` as a getter for backward compatibility.
+  - Switched media downloader cache to use `4chan-xtd-downloaded` storage keys with backward-compatible legacy fallbacks.
+
+- Bugfixes
+  - Fixed transparent header bar and text overlapping bugs:
+    - Added robust fallback rules in CSS custom properties.
+    - Dynamically set `--xt-background` and `--xt-header-dialog-bg` on `:root` when compiling computed custom/native themes.
+
+### 2.25.2 (2026-05-19)
+
+- Captcha option to auto-advance challenges on selection:
+  - Added new option `'Next challenge on captcha selection'` under Posting and Captchas settings.
+  - Automatically click the next challenge button when a captcha answer strip is selected.
+
+### 2.25.1 (2026-05-18)
+
+- Captcha UI Refactor for T-captchas (slider captcha):
+  - Render "not like the others" (odd-one-out) challenge strips horizontally side-by-side.
+  - Skip empty index 0 strip for "not like the others" challenges, mapping key '1' directly to the first image.
+  - Map browser Space key to proceed to the next challenge phase (preventing page scroll).
+  - Robustly detect subsequent challenges (e.g. Next 1/2 -> 2/2) using button phase tracking.
+
+### 2.25.0 (2026-05-18)
+
+- Captcha UI Refactor for T-captchas (slider captcha):
+  - Automatically display all puzzle options in a stacked vertical layout instead of using a slider.
+  - Dynamically support a variable number of puzzle combinations based on the captcha constraints.
+  - Added keyboard shortcut support (number keys `1-9` and Numpad `1-9`) to quickly select the matching solution.
+  - Ensure native verification-passed and expired messages remain visible when challenges are inactive.
+- Added "Download All Media" thread downloader enhancements:
+  - Implemented persistent download tracking to automatically skip previously downloaded files.
+  - Enabled background downloading using `GM_download` to ensure tasks continue running even if the tab is closed or navigated away.
+- Core architecture migration to TypeScript:
+  - Migrated core codebase entry points and configuration files to TypeScript for strict type safety and cleaner maintenance.
+  - Resolved circular references and updated Rollup configuration for robust `.ts` compilation.
 
 ### 2.24.2 (2025-12-23 🎅🏻)
 
@@ -63,10 +231,10 @@ bug fix pull requests that were open.
 
 - Fix notification padding. [#146](https://github.com/TuxedoTako/4chan-xt/issues/146),
   [#147](https://github.com/TuxedoTako/4chan-xt/pull/147)
-- Fix shortcuts getting squished in the non-4chan-XT catalog. [#148](https://github.com/TuxedoTako/4chan-xt/issues/148),
+- Fix shortcuts getting squished in the non-4chan-XTd catalog. [#148](https://github.com/TuxedoTako/4chan-xt/issues/148),
   [#149](https://github.com/TuxedoTako/4chan-xt/pull/149)
 - Fix not being able to clear keybinds with backspace.
-  [Greasy Fork comment](https://greasyfork.org/en/scripts/489508-4chan-xt/discussions/274072)
+  [Greasy Fork comment](https://greasyfork.org/en/scripts/489508-4chan-xtd/discussions/274072)
 
 ### 2.21.1 (2025-01-12)
 
@@ -277,7 +445,7 @@ bug fix pull requests that were open.
   - Move some settings to the advanced setting: you can now choose which language to translate into instead of English
     or nothing.
 - Remember QR size option is no longer Firefox only. [#61](https://github.com/TuxedoTako/4chan-xt/pull/61)
-- CSS custom properties, also known as CSS variables, used by 4chan XT are now documented in
+- CSS custom properties, also known as CSS variables, used by 4chan XTd are now documented in
   [src/css/README.md](./src/css/README.md).
 - Now that 4chan redirects to https, http support is dropped.
   [#61 \(comment\)](https://github.com/TuxedoTako/4chan-xt/pull/61#issuecomment-2119154714)
@@ -403,7 +571,7 @@ bug fix pull requests that were open.
 ### v2.4.1 (2024-01-21)
 
 - Fixed new Relative dates settings' interaction with elements that aren't the date info on posts, like the refresh
-  button on the 4chan-XT catalog.
+  button on the 4chan-XTd catalog.
 
 ### v2.4.0 (2024-01-21)
 
@@ -435,7 +603,7 @@ bug fix pull requests that were open.
 
 ### v2.3.2 (2023-12-27)
 
-- Fixed the settings import mistaking a 4chan XT config for a [loadletter/4chan-x](https://github.com/loadletter/4chan-x)
+- Fixed the settings import mistaking a 4chan XTd config for a [loadletter/4chan-x](https://github.com/loadletter/4chan-x)
   one and failing. [#16](https://github.com/TuxedoTako/4chan-xt/issues/16)
 
 ### v2.3.1 (2023-12-26)
@@ -446,7 +614,7 @@ bug fix pull requests that were open.
 ### v2.3.0 (2023-12-25) (Merry Christmas)
 
 - Added `.fourchan-xt` class. [#11](https://github.com/TuxedoTako/4chan-xt/issues/11)
-- Added `window.fourchanXT` with the version number in `version` and a `buildDate` `Date` object.
+- Added `window.fourchanXTd` with the version number in `version` and a `buildDate` `Date` object.
 - Version number is no longer prefixed with "XT ", and will now follow major.minor.bugfix.
 - Fixed "Expand All Images" shortcut in the header. [#13](https://github.com/TuxedoTako/4chan-xt/issues/13)
 - Ran the chrome extension version, and fixed a problem with the ajax function. How long has that been down? I use the
