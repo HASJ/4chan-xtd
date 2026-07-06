@@ -75,15 +75,24 @@ const CSS = {
   www,
 
   sub: function(css: string) {
-    var variables = {
+    const variables = {
       site: g.SITE.selectors
     };
-    return css.replace(/\$[\w\$]+/g, function(name) {
-      var words = name.slice(1).split('$');
-      var sel = variables;
-      for (var i = 0; i < words.length; i++) {
+    return css.replace(/\$[\w$]+/g, function(name) {
+      const words = name.slice(1).split('$');
+      let sel: any = variables;
+      for (const word of words) {
         if (typeof sel !== 'object') return ':not(*)';
-        sel = $.getOwn(sel, words[i]);
+        sel = $.getOwn(sel, word);
+      }
+      if (typeof sel !== 'string') return ':not(*)';
+      return sel;
+    }).replace(/\[data-site="([^"]+)"\]/g, function(match, name) {
+      const words = name.split('.');
+      let sel: any = variables.site;
+      for (const word of words) {
+        if (typeof sel !== 'object') return ':not(*)';
+        sel = $.getOwn(sel, word);
       }
       if (typeof sel !== 'string') return ':not(*)';
       return sel;

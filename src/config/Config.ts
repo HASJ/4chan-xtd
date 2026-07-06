@@ -100,6 +100,10 @@ const Config = {
         true,
         `Show notifications when ${meta.name} is successfully updated.`
       ],
+      'Check for Updates': [
+        true,
+        `Periodically check GitHub for new releases.`
+      ],
       'Color User IDs': [
         true,
         'Assign unique colors to user IDs on boards that use them'
@@ -808,7 +812,7 @@ const Config = {
 
     comment: `\
 # Filter Stallman copypasta on /g/:
-#/what you\'re refer+ing to as linux/i;boards:g
+#/what you're refer+ing to as linux/i;boards:g
 # Filter posts with 20 or more quote links:
 #/(?:>>\\d(?:(?!>>\\d)[^])*){20}/
 # Filter posts like T H I S / H / I / S:

@@ -34,7 +34,7 @@
 }
 .field[disabled] {
   background-color: #F2F2F2;
-  color: #888;
+  color: #666;
 }
 .move {
   cursor: move;
@@ -47,12 +47,12 @@ a[href="javascript:;"] {
   text-decoration: none;
 }
 .warning {
-  color: red;
+  color: #c00;
 }
 :root.sw-yotsuba #boardNavDesktop, :root.sw-yotsuba #boardNavMobile {
   display: none !important;
 }
-:root.hide-bottom-board-list $site$boardListBottom {
+:root.hide-bottom-board-list [data-site="boardListBottom"] {
   display: none;
 }
 body.hasDropDownNav{
@@ -104,7 +104,8 @@ body.hasDropDownNav{
 }
 /* Make long filenames wrap properly: https://github.com/ccd0/4chan-x/issues/1082 */
 :root.sw-yotsuba .post > .file {
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 :root.sw-yotsuba:not(.ua-webkit):not(.ua-blink) .fileText {
   word-wrap: break-word;
@@ -219,9 +220,6 @@ audio.controls-added {
 #export-dialog {
   position: fixed;
 }
-#overlay {
-  z-index: 999;
-}
 #qp, #ihover {
   z-index: 60;
 }
@@ -234,29 +232,11 @@ audio.controls-added {
 :root.fixed #header-bar, #notifications {
   z-index: 35;
 }
-#a-gallery {
-  z-index: 30;
-}
-#navlinks {
-  z-index: 25;
-}
-#qr {
-  z-index: 20;
-}
-#embedding {
-  z-index: 11;
-}
 #export-dialog {
   z-index: 1001;
 }
-:root.fixed-watcher #thread-watcher {
-  z-index: 10;
-}
 :root.fixed:not(.gallery-open) #header-bar:not(:hover) {
   z-index: 8;
-}
-#thread-watcher {
-  z-index: 5;
 }
 
 /* Header */
@@ -274,9 +254,12 @@ audio.controls-added {
 }
 .fixed.top-header #header-bar {
   top: 0;
+  border-bottom-width: 1px;
 }
 .fixed.bottom-header #header-bar {
   bottom: 0;
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, .15);
+  border-top-width: 1px;
 }
 #header-bar {
   border-width: 0;
@@ -296,13 +279,6 @@ audio.controls-added {
 :root.centered-links #custom-board-list {
   position: relative;
   left: 150px;
-}
-.fixed.top-header #header-bar {
-  border-bottom-width: 1px;
-}
-.fixed.bottom-header #header-bar {
-  box-shadow: 0 -1px 2px rgba(0, 0, 0, .15);
-  border-top-width: 1px;
 }
 .fixed.bottom-header #header-bar .menu-button .icon {
   transform: rotate(180deg) translateY(-.125em);
@@ -461,6 +437,7 @@ audio.controls-added {
   box-sizing: border-box;
 }
 #overlay {
+  z-index: 999;
   background-color: rgba(0, 0, 0, .5);
   display: flex;
   top: 0;
@@ -987,7 +964,7 @@ textarea.copy-text-element {
 }
 
 /* Announcement Hiding */
-:root.hide-announcement $site$psa {
+:root.hide-announcement [data-site="psa"] {
   display: none;
 }
 .hide-announcement-button {
@@ -1052,9 +1029,8 @@ textarea.copy-text-element {
 
 /* Thread Watcher */
 #thread-watcher {
+  z-index: 5;
   position: absolute;
-}
-#thread-watcher {
   padding-bottom: 3px;
   padding-left: 3px;
   white-space: nowrap;
@@ -1065,6 +1041,7 @@ textarea.copy-text-element {
   overflow-y: auto;
 }
 :root.fixed-watcher #thread-watcher {
+  z-index: 10;
   position: fixed;
 }
 :root.fixed-watcher #watched-threads {
@@ -1319,12 +1296,12 @@ input[name="Default Volume"] {
   margin: 0px;
 }
 /* Fappe and Werk Tyme */
-:root.fappeTyme $site$replyOriginal.noFile,
-:root.fappeTyme $site$replyOriginal.noFile + br {
+:root.fappeTyme [data-site="replyOriginal"].noFile,
+:root.fappeTyme [data-site="replyOriginal"].noFile + br {
   display: none;
 }
-:root.werkTyme $site$thumbLink,
-:root.werkTyme $site$file$thumb,
+:root.werkTyme [data-site="thumbLink"],
+:root.werkTyme [data-site="file.thumb"],
 :root.werkTyme .catalog-thumb:not(.deleted-file):not(.no-file),
 :root:not(.werkTyme) .werkTyme-filename {
   display: none;
@@ -1344,7 +1321,7 @@ input[name="Default Volume"] {
   vertical-align: middle;
 }
 .indicator {
-  background: rgba(255,0,0,0.8);
+  background: rgba(204, 0, 0, 0.8);
   font-weight: bold;
   display: inline-block;
   min-width: 9px;
@@ -1352,6 +1329,7 @@ input[name="Default Volume"] {
   margin: 0 1px;
   text-align: center;
   color: white;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
   border-radius: 2px;
   cursor: pointer;
 }
@@ -1362,23 +1340,24 @@ input[name="Default Volume"] {
 
 /* Index/Reply Navigation */
 #navlinks {
+  z-index: 25;
   top: 25px;
   right: 10px;
 }
 :root.catalog-mode #navlinks {
   display: none;
 }
-:root.highlight-own .yourPost$site$highlightable$op::after,
-:root.highlight-you .quotesYou$site$highlightable$op::after,
-.filter-highlight$site$highlightable$op::after {
+:root.highlight-own .yourPost[data-site="highlightable.op"]::after,
+:root.highlight-you .quotesYou[data-site="highlightable.op"]::after,
+.filter-highlight[data-site="highlightable.op"]::after {
   content: "";
   display: block;
   clear: both;
 }
 
 /* Spoiler text */
-:root.reveal-spoilers $site$spoiler,
-:root.reveal-spoilers $site$spoiler > a {
+:root.reveal-spoilers [data-site="spoiler"],
+:root.reveal-spoilers [data-site="spoiler"] > a {
   color: white !important;
 }
 :root.reveal-spoilers .removed-spoiler::before {
@@ -1395,7 +1374,7 @@ input[name="Default Volume"] {
   margin-right: 4px;
   padding: 2px;
 }
-$site$infoRoot a.hide-reply-button {
+[data-site="infoRoot"] a.hide-reply-button {
   margin-right: 6px;
   padding: 0;
 }
@@ -1431,10 +1410,10 @@ $site$infoRoot a.hide-reply-button {
 .stub-reasons::before { content: ' ('; }
 .stub-reasons::after { content: ')'; }
 .stub-reason:not(:last-of-type)::after { content: ' & '; }
-$site$thread[hidden] + hr {
+[data-site="thread"][hidden] + hr {
   display: none;
 }
-:root.reply-hide $site$sideArrows {
+:root.reply-hide [data-site="sideArrows"] {
   display: none;
 }
 :root.sw-yotsuba.thread-hide .party-hat {
@@ -1442,15 +1421,15 @@ $site$thread[hidden] + hr {
 }
 
 /* Anonymize */
-:root.anonymize $site$info$name,
+:root.anonymize [data-site="info.name"],
 :root.sw-yotsuba.anonymize .post-author:not([class*=capcode]) {
   font-size: 0;
 }
-:root.anonymize $site$info$tripcode,
+:root.anonymize [data-site="info.tripcode"],
 :root.sw-yotsuba.anonymize .n-pu {
   display: none;
 }
-:root.anonymize $site$info$name::before,
+:root.anonymize [data-site="info.name"]::before,
 :root.sw-yotsuba.anonymize .post-author:not([class*=capcode])::before {
   content: "Anonymous";
   font-size: 10pt;
@@ -1476,6 +1455,7 @@ $site$thread[hidden] + hr {
   cursor: pointer;
 }
 #qr {
+  z-index: 20;
   position: fixed;
   padding: 1px;
   border: 1px solid transparent;
@@ -2249,6 +2229,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   display: none;
 }
 #embedding {
+  z-index: 11;
   padding: 1px 4px;
   position: fixed;
 }
@@ -2263,6 +2244,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
 
 /* Gallery */
 #a-gallery {
+  z-index: 30;
   position: fixed;
   top: 0;
   bottom: 0;

@@ -50,6 +50,7 @@ import ExpandThread from "../Miscellaneous/ExpandThread";
 import FileInfo from "../Miscellaneous/FileInfo";
 import Flash from "../Miscellaneous/Flash";
 import Fourchan from "../Miscellaneous/Fourchan";
+import GithubUpdater from "../Miscellaneous/GithubUpdater";
 import IDColor from "../Miscellaneous/IDColor";
 import IDHighlight from "../Miscellaneous/IDHighlight";
 import IDPostCount from "../Miscellaneous/IDPostCount";
@@ -112,7 +113,7 @@ interface Feature {
   init(): void;
 }
 
-var Main = {
+const Main = {
   isFirstRun: false,
   jsEnabled: false,
   thisPageIsLegit: undefined as boolean | undefined,
@@ -123,27 +124,38 @@ var Main = {
   addCatalogThreadsObserver: null as MutationObserver | null,
   bgColorStyle: null as HTMLStyleElement | null,
 
-  init() {
+  checkDuplicateAndFrame(): boolean {
     // Return if the url is exactly https://www.4chan.org, this is only the home page which has a cloudflare checking
     // system which breaks this script. Keep it in the includes so it can be found on greasy fork.
     // __cf is also a cloudflare check page
-    if (location.hostname === 'www.4chan.org' || location.search.includes("__cf")) return;
+    if (location.hostname === 'www.4chan.org' || location.search.includes("__cf")) return true;
     // XXX dwb userscripts extension reloads scripts run at document-start when replaceState/pushState is called.
     // XXX Firefox reinjects WebExtension content scripts when extension is updated / reloaded.
     try {
       let w: any = window;
       if (platform === 'crx') { w = (w.wrappedJSObject || w); }
-      if (`${meta.name} antidup` in w) { return; }
+      if (`${meta.name} antidup` in w) { return true; }
       w[`${meta.name} antidup`] = true;
-    } catch (error) {}
+    } catch (error_) { // NOSONAR
+      // Ignored: security errors in sandboxed contexts
+    }
 
     // Don't run inside ad iframes.
     try {
-      if (window.frameElement && ['', 'about:blank'].includes((window.frameElement as HTMLIFrameElement).src)) { return; }
-    } catch (error1) {}
+      if (window.frameElement && ['', 'about:blank'].includes((window.frameElement as HTMLIFrameElement).src)) { return true; }
+    } catch (error_) { // NOSONAR
+      // Ignored: access errors on cross-origin frames
+    }
 
     // Detect multiple copies of 4chan X
-    if (doc && $.hasClass(doc, 'fourchan-x')) { return; }
+    if (doc && $.hasClass(doc, 'fourchan-x')) { return true; }
+
+    return false;
+  },
+
+  init() {
+    if (Main.checkDuplicateAndFrame()) return;
+
     $.asap(docSet, function() {
       $.addClass(doc, 'fourchan-xtd', 'fourchan-xt', 'fourchan-x', 'seaweedchan');
       if ($.engine) $.addClass(doc, `ua-${$.engine}`);
@@ -163,7 +175,7 @@ var Main = {
       if (Main.expectInitFinished) {
         return delete Main.expectInitFinished;
       } else {
-        new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
+        const _notice = new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
         return $.addClass(doc, 'tainted');
       }
     });
@@ -172,16 +184,19 @@ var Main = {
     const mountedCB = function(): void {
       d.removeEventListener('mounted', mountedCB, true);
       Main.isMounted = true;
-      Main.mountedCBs.map((cb: () => void) =>
-        (() => { try {
-          return cb();
-        } catch (error2) {} })());
+      for (const cb of Main.mountedCBs) {
+        try {
+          cb();
+        } catch (error_) { // NOSONAR
+          // Ignored: errors inside mounted callbacks shouldn't block other callbacks
+        }
+      }
     };
     d.addEventListener('mounted', mountedCB, true);
 
     // Flatten default values from Config into Conf
     const flatten = function(parent: string | null, obj: any): void {
-      if (obj instanceof Array) {
+      if (Array.isArray(obj)) {
         Conf[parent!] = dict.clone(obj[0]);
       } else if (typeof obj === 'object') {
         for (const key in obj) {
@@ -328,14 +343,15 @@ var Main = {
 
     if (g.VIEW === 'file') {
       $.asap((() => d.readyState !== 'loading'), function() {
-        let video;
         if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect'] && g.SITE.is404?.()) {
           const pathname = location.pathname.split(/\/+/);
           return Redirect.navigate('file', {
             boardID:  g.BOARD.ID,
             filename: pathname[pathname.length - 1]
           }, '' as any);
-        } else if (video = $('video')) {
+        }
+        const video = $('video') as HTMLVideoElement | null;
+        if (video) {
           if (Conf['Volume in New Tab']) {
             Volume.setup(video);
           }
@@ -357,13 +373,13 @@ var Main = {
 
     // c.time 'All initializations'
     for (const [name, feature] of Main.features) {
-      if (g.SITE.disabledFeatures && g.SITE.disabledFeatures.includes(name)) { continue; }
+      if (g.SITE.disabledFeatures?.includes(name)) { continue; }
       // c.time "#{name} initialization"
       try {
         feature.init();
       } catch (err) {
         Main.handleErrors({
-          message: `\"${name}\" initialization crashed.`,
+          message: `"${name}" initialization crashed.`,
           error: err
         });
       }
@@ -404,15 +420,15 @@ var Main = {
     let mainStyleSheet: HTMLLinkElement | null = null;
     let style: string | null = null;
     let styleSheets: HTMLLinkElement[] | null = null;
-    const knownStyles = ['yotsuba', 'yotsuba-b', 'futaba', 'burichan', 'photon', 'tomorrow', 'spooky'];
+    const knownStyles = new Set(['yotsuba', 'yotsuba-b', 'futaba', 'burichan', 'photon', 'tomorrow', 'spooky']);
 
     if ((g.SITE.software === 'yotsuba') && (g.VIEW === 'catalog')) {
       const baseCss = $.id('base-css') as HTMLLinkElement | null;
       if (baseCss) {
         mainStyleSheet = baseCss;
-        const match = mainStyleSheet.href.match(/catalog_(\w+)/);
+        const match = /catalog_(\w+)/.exec(mainStyleSheet.href);
         style = match?.[1].replace('_new', '').replace(/_+/g, '-') || null;
-        if (style && knownStyles.includes(style)) {
+        if (style && knownStyles.has(style)) {
           $.addClass(doc, style);
           return;
         }
@@ -421,34 +437,26 @@ var Main = {
 
     style = null;
 
-    const setStyle = function() {
-      // Use preconfigured CSS for 4chan's default themes.
-      if (g.SITE.software === 'yotsuba') {
-        if (style) {
-          $.rmClass(doc, style);
-        }
-        style = null;
-        if (styleSheets) {
-          for (const styleSheet of styleSheets) {
-            if (styleSheet.href === mainStyleSheet?.href) {
-              style = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
-              if (style === '_special') {
-                const match = styleSheet.href.match(/[a-z]*(?=[^/]*$)/);
-                style = match ? match[0] : null;
-              }
-              if (style && !knownStyles.includes(style)) { style = null; }
-              break;
-            }
+    const getYotsubaStyle = function(sheet: HTMLLinkElement | null, sheets: HTMLLinkElement[] | null, known: Set<string>): string | null {
+      if (!sheets || !sheet) return null;
+      for (const styleSheet of sheets) {
+        if (styleSheet.href === sheet.href) {
+          let styleName = styleSheet.title.toLowerCase().replace('new', '').trim().replace(/\s+/g, '-');
+          if (styleName === '_special') {
+            const filename = styleSheet.href.split('/').pop() || '';
+            const match = /^[a-z]+/.exec(filename);
+            styleName = match ? match[0] : '';
           }
-        }
-        if (style) {
-          $.addClass(doc, style);
-          $.rm(Main.bgColorStyle);
-          return;
+          if (styleName && known.has(styleName)) {
+            return styleName;
+          }
+          break;
         }
       }
+      return null;
+    };
 
-      // Determine proper dialog background color for other themes.
+    const determineBgColorCss = function(): string {
       const div = g.SITE.bgColoredEl();
       div.style.position = 'absolute';
       div.style.visibility = 'hidden';
@@ -457,7 +465,7 @@ var Main = {
       $.rm(div);
       const rgb = bgColor.match(/[\d.]+/g);
       // Use body background if reply background is transparent
-      if (!rgb || !/^rgb\(/.test(bgColor)) {
+      if (!rgb || !bgColor.startsWith('rgb(')) {
         const s = window.getComputedStyle(d.body);
         bgColor = `${s.backgroundColor} ${s.backgroundImage} ${s.backgroundRepeat} ${s.backgroundPosition}`;
       }
@@ -471,14 +479,33 @@ var Main = {
   background: ${bgColor};
 }
 .unread-mark-read {
-  background-color: rgba(${parsedRgb.slice(0, 3).join(', ')}, ${0.5*(parseFloat(parsedRgb[3]) || 1)});
+  background-color: rgba(${parsedRgb.slice(0, 3).join(', ')}, ${0.5 * (Number.parseFloat(parsedRgb[3]) || 1)});
 }\
 `;
       if ($.luma(parsedRgb) < 100) {
         css += '.watch-thread-link { --xt-watcher: #c8c8c8 }';
       }
-      Main.bgColorStyle.textContent = css;
-      return $.after($.id('fourchanx-css'), Main.bgColorStyle);
+      return css;
+    };
+
+    const setStyle = function() {
+      // Use preconfigured CSS for 4chan's default themes.
+      if (g.SITE.software === 'yotsuba') {
+        if (style) {
+          $.rmClass(doc, style);
+        }
+        style = getYotsubaStyle(mainStyleSheet, styleSheets, knownStyles);
+        if (style) {
+          $.addClass(doc, style);
+          $.rm(Main.bgColorStyle);
+          return;
+        }
+      }
+
+      if (Main.bgColorStyle) {
+        Main.bgColorStyle.textContent = determineBgColorCss();
+        return $.after($.id('fourchanx-css'), Main.bgColorStyle);
+      }
     };
 
     $.onExists(d.head, g.SITE.selectors.styleSheet, function(el: HTMLLinkElement) {
@@ -510,9 +537,9 @@ var Main = {
             return Redirect.navigate('thread', {
               boardID:  g.BOARD.ID,
               threadID: g.THREADID,
-              postID:   +location.hash.match(/\d+/)
+              postID:   +(/\d+/.exec(location.hash)?.[0] || 0)
             } // post number or 0
-            , `/${g.BOARD}/`);
+            , `/${g.BOARD.ID}/`);
           }
         });
       }
@@ -524,7 +551,7 @@ var Main = {
       const msg = $.el('div',
         {innerHTML: 'The page didn&#039;t load completely.<br>Some features may not work unless you <a href="javascript:;">reload</a>.'});
       $.on($('a', msg), 'click', () => location.reload());
-      new Notice('warning', msg);
+      const _notice = new Notice('warning', msg);
     }
 
     // Parse HTML or skip it and start building from JSON.
@@ -543,16 +570,18 @@ var Main = {
   },
 
   initThread(): void {
-    let board;
     const s = g.SITE.selectors;
-    if (board = $((s.boardFor?.[g.VIEW] || s.board))) {
+    const board = $((s.boardFor?.[g.VIEW] || s.board));
+    if (board) {
       const threads = [];
       const posts   = [];
       const errors  = [];
 
       try {
         g.SITE.preParsingFixes?.(board);
-      } catch (error) {}
+      } catch (error_) { // NOSONAR
+        // Ignored: optional pre-parsing fixes failure should not prevent loading the thread
+      }
 
       Main.addThreadsObserver = new MutationObserver(Main.addThreads);
       Main.addPostsObserver   = new MutationObserver(Main.addPosts);
@@ -572,7 +601,7 @@ var Main = {
       setTimeout(() => {
         Main.callbackNodes('Thread', threads);
         Main.callbackNodesDB('Post', posts, function() {
-          for (var post of posts) QuoteThreading.insert(post);
+          for (const post of posts) QuoteThreading.insert(post);
           Main.expectInitFinished = true;
           $.event('4chanXInitFinished', null);
         });
@@ -587,15 +616,15 @@ var Main = {
   parseThreads(threadRoots: HTMLElement[], threads: any[], posts: any[], errors: ErrorData[]): void {
     for (const threadRoot of threadRoots) {
       const boardObj = (() => {
-        let boardID;
-        if (boardID = threadRoot.dataset.board) {
-        boardID = encodeURIComponent(boardID);
-        return g.boards[boardID] || new Board(boardID);
-      } else {
-        return g.BOARD;
-      }
+        const boardID = threadRoot.dataset.board;
+        if (boardID) {
+          const encodedBoardID = encodeURIComponent(boardID);
+          return g.boards[encodedBoardID] || new Board(encodedBoardID);
+        } else {
+          return g.BOARD;
+        }
       })();
-      const threadID = +threadRoot.id.match(/\d*$/)![0];
+      const threadID = +(/\d+/.exec(threadRoot.id)?.[0] || 0);
       if (!threadID || boardObj.threads.get(threadID)?.nodes.root) { return; }
       const thread = new Thread(threadID as any, boardObj as any);
       thread.nodes.root = threadRoot;
@@ -615,7 +644,7 @@ var Main = {
         } catch (err) {
           // Skip posts that we failed to parse.
           errors.push({
-            message: `Parsing of Post No.${postRoot.id.match(/\d+/)} failed. Post will be skipped.`,
+            message: `Parsing of Post No.${/\d+/.exec(postRoot.id)?.[0] || ''} failed. Post will be skipped.`,
             error: err,
             html: postRoot.outerHTML
           });
@@ -643,44 +672,59 @@ var Main = {
     Main.callbackNodesDB('Post', posts, () => $.event('PostsInserted', null, records[0].target));
   },
 
+  getAddedPostRoots(addedNodes: NodeList): HTMLElement[] {
+    const postRoots: HTMLElement[] = [];
+    for (const node of addedNodes) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (el.matches(g.SITE.selectors.postContainer)) {
+          postRoots.push(el);
+        } else {
+          const child = $(g.SITE.selectors.postContainer, el);
+          if (child) {
+            postRoots.push(child as HTMLElement);
+          }
+        }
+      }
+    }
+    return postRoots;
+  },
+
+  hasRemovedPosts(removedNodes: NodeList): boolean {
+    for (const node of removedNodes) {
+      const el = node as HTMLElement;
+      if (((Get.postFromRoot(el) as any)?.nodes.root === el) && !doc.contains(el)) {
+        return true;
+      }
+    }
+    return false;
+  },
+
   addPosts(records: MutationRecord[]): void {
-    let thread: any;
     const threads: any[]   = [];
     const threadsRM: any[] = [];
     const posts: any[]     = [];
     const errors: ErrorData[]    = [];
     for (const record of records) {
-      thread = Get.threadFromRoot(record.target);
-      const postRoots: HTMLElement[] = [];
-      for (let node of record.addedNodes) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          if ((node as Element).matches(g.SITE.selectors.postContainer) || (node = $(g.SITE.selectors.postContainer, node as HTMLElement)!)) {
-            postRoots.push(node as HTMLElement);
-          }
-        }
-      }
+      const thread = Get.threadFromRoot(record.target as HTMLElement);
+      const postRoots = Main.getAddedPostRoots(record.addedNodes);
+
       const n = posts.length;
       Main.parsePosts(postRoots, thread, posts, errors);
       if ((posts.length > n) && !threads.includes(thread)) {
         threads.push(thread);
       }
-      let anyRemoved = false;
-      for (const el of record.removedNodes) {
-        if (((Get.postFromRoot(el) as any)?.nodes.root === el) && !doc.contains(el)) {
-          anyRemoved = true;
-          break;
-        }
-      }
-      if (anyRemoved && !threadsRM.includes(thread)) {
+
+      if (Main.hasRemovedPosts(record.removedNodes) && !threadsRM.includes(thread)) {
         threadsRM.push(thread);
       }
     }
     if (errors.length) { Main.handleErrors(errors); }
     Main.callbackNodesDB('Post', posts, function() {
-      for (thread of threads) {
+      for (const thread of threads) {
         $.event('PostsInserted', null, thread.nodes.root);
       }
-      for (thread of threadsRM) {
+      for (const thread of threadsRM) {
         $.event('PostsRemoved', null, thread.nodes.root);
       }
     });
@@ -717,7 +761,7 @@ var Main = {
       } catch (err) {
         // Skip threads that we failed to parse.
         errors.push({
-          message: `Parsing of Catalog Thread No.${(threadRoot.dataset.id || threadRoot.id).match(/\d+/)} failed. Thread will be skipped.`,
+          message: `Parsing of Catalog Thread No.${/\d+/.exec(threadRoot.dataset.id || threadRoot.id)?.[0] || ''} failed. Thread will be skipped.`,
           error: err,
           html: threadRoot.outerHTML
         });
@@ -754,9 +798,10 @@ var Main = {
   callbackNodesDB(klass: string, nodes: any[], cb?: () => void): void {
     let i   = 0;
     const cbs = Callbacks[klass];
+    let node: any;
     const fn  = function(): number | false {
-      let node;
-      if (!(node = nodes[i])) { return false; }
+      node = nodes[i];
+      if (!node) { return false; }
       cbs.execute(node);
       return ++i % 250;
     };
@@ -779,7 +824,7 @@ var Main = {
     // Detect conflicts with 4chan X v2
     let error;
     if (d.body && $.hasClass(d.body, 'fourchan_x') && !$.hasClass(doc, 'tainted')) {
-      new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
+      const _notice = new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
       $.addClass(doc, 'tainted');
     }
 
@@ -792,19 +837,19 @@ var Main = {
             const msg = $.el('div',
               { innerHTML: 'Failed to disable the native extension. You may need to <a href="' + E(meta.upstreamFaq) +
                 '#blocking-native-extension" target="_blank">block it</a>.' });
-            new Notice('error', msg);
+            const _notice = new Notice('error', msg);
           }
         }
       });
     }
 
-    if (!(errors instanceof Array)) {
+    if (!Array.isArray(errors)) {
       error = errors;
     } else if ((errors as ErrorData[]).length === 1) {
       error = (errors as ErrorData[])[0];
     }
     if (error) {
-      new Notice('error', Main.parseError(error, Main.reportLink([error])), 15);
+      const _notice = new Notice('error', Main.parseError(error, Main.reportLink([error])), 15);
       return;
     }
 
@@ -813,10 +858,12 @@ var Main = {
         `${(errors as ErrorData[]).length} errors occurred.${Main.reportLink(errors as ErrorData[]).innerHTML} [<a href="javascript:;">show</a>]`
     });
     $.on(div.lastElementChild, 'click', function () {
-      return [this.textContent, logs.hidden] = this.textContent === 'show' ? ['hide', false] : ['show', true];
+      const show = this.textContent === 'show';
+      this.textContent = show ? 'hide' : 'show';
+      logs.hidden = !show;
     });
 
-    var logs = $.el('div',
+    const logs = $.el('div',
       {hidden: true});
     for (error of (errors as ErrorData[])) {
       $.add(logs, Main.parseError(error));
@@ -831,21 +878,31 @@ var Main = {
       { innerHTML: E(data.message) + ((reportLink) ? (reportLink).innerHTML : "") });
     const error = $.el('div',
       {textContent: `${data.error.name || 'Error'}: ${data.error.message || 'see console for details'}`});
-    const lines = data.error.stack?.match(/\d+(?=:\d+\)?$)/mg)?.join().replace(/^/, ' at ') || '';
+    const linesArr: string[] = [];
+    if (data.error.stack) {
+      for (const line of data.error.stack.split('\n')) {
+        const match = /:(\d+):\d+\)?$/.exec(line);
+        if (match) {
+          linesArr.push(match[1]);
+        }
+      }
+    }
+    const lines = linesArr.length ? ' at ' + linesArr.join() : '';
     const context = $.el('div',
       { textContent: `(${meta.name} ${meta.fork} v${g.VERSION} ${platform} on ${$.engine}${lines})` });
     return [message, error, context];
   },
 
   reportLink(errors: ErrorData[]): { innerHTML: string } {
-    let info: any;
     const data = errors[0];
     let title  = data.message;
     if (errors.length > 1) { title += ` (+${errors.length - 1} other errors)`; }
     let details = '';
     const addDetails = function(text: string): string | undefined {
-      if (encodeURIComponent(title + details + text + '\n').length <= meta.newIssueMaxLength - meta.newIssue.replace(/%(title|details)/, '').length) {
-        return details += text + '\n';
+      const newText = text + '\n';
+      if (encodeURIComponent(title + details + newText).length <= meta.newIssueMaxLength - meta.newIssue.replace(/%(title|details)/, '').length) {
+        details += newText;
+        return details;
       }
     };
     addDetails(`\
@@ -856,11 +913,16 @@ URL: ${location.href}
 User agent: ${navigator.userAgent}\
 `
     );
-    if ((platform === 'userscript') && (info = (() => {
-      if (typeof GM !== 'undefined' && GM !== null) { return GM.info; } else { if (typeof GM_info !== 'undefined' && GM_info !== null) { return GM_info; }
-  }
-    })())) {
-      addDetails(`Userscript manager: ${info.scriptHandler} ${info.version}`);
+    let info: any = null;
+    if (platform === 'userscript') {
+      if (typeof GM !== 'undefined' && GM !== null) {
+        info = GM.info;
+      } else if (typeof GM_info !== 'undefined' && GM_info !== null) {
+        info = GM_info;
+      }
+      if (info) {
+        addDetails(`Userscript manager: ${info.scriptHandler} ${info.version}`);
+      }
     }
     addDetails('\n' + data.error);
     if (data.error.stack) { addDetails(data.error.stack.replace(data.error.toString(), '').trim()); }
@@ -872,12 +934,10 @@ User agent: ${navigator.userAgent}\
 
   isThisPageLegit(): boolean {
     // not 404 error page or similar.
-    if (Main.thisPageIsLegit === undefined) {
-      Main.thisPageIsLegit = g.SITE.isThisPageLegit ?
-        g.SITE.isThisPageLegit()
-      :
-        !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
-    }
+    Main.thisPageIsLegit ??= g.SITE.isThisPageLegit ?
+      g.SITE.isThisPageLegit()
+    :
+      !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
     return Main.thisPageIsLegit;
   },
 
@@ -983,6 +1043,7 @@ User agent: ${navigator.userAgent}\
     ['Mod Contact Links',         ModContact],
     ['Restore deleted posts from archive', RestoreDeletedFromArchive],
     ['Mark posts on scroll bar',  ScrollMarkers],
+    ['Check for Updates',         GithubUpdater],
   ]
 };
 Callbacks.errorHandler = Main.handleErrors;
