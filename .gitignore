@@ -56,3 +56,7 @@ Desktop.ini
 /.vscode/
 *.swp
 *.swo
+.claude
+GEMINI.md
+AGENTS.md
+/conductor/
