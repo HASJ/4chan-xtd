@@ -241,3 +241,20 @@ Document the largest and most complex files in the codebase using sub-agents.
 - [x] Document `src/General/Index.js` (Assigned to sub-agent)
 - [x] Document `src/Monitoring/ThreadWatcher.ts` (Assigned to sub-agent)
 - [x] Document `src/General/Settings.tsx` (Assigned to sub-agent)
+
+## Ponytail Audit Cleanup Summary
+
+Fork-era changelog coverage starts at `CHANGELOG.md:167` (`v2.25.0`) and runs through `CHANGELOG.md:6` (`v2.26.20`). Earlier XT history is intentionally out of scope here.
+
+Completed commit trail:
+
+- `3c46a61bf` - Remove vendored upstream changelog assets
+- `124976640` - Remove archived conductor migration track
+- `acac8a8f1` - Remove dead decaffeinate build plugin
+- `db1119438` - Remove unused source helpers
+- `000d6cbbd` - Remove unused webstore upload dependency
+- `fdb5c533a` - Remove stale release helper scripts
+- `1c3656b01` - Merge PR #3 from `ponytail-audit-cleanup`
+- `0f25ca54e` - Release `v2.26.20` cleanup maintenance
+
+The finished task log now lives in this archive file; `ToDo.md` is intentionally empty.
