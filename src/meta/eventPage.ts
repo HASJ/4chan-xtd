@@ -1,5 +1,4 @@
-// @ts-nocheck
-import PageContextFunctions from "../PageContext/pageContext";
+import PageContextFunctions from "../PageContext/pageContext.js";
 
 // This requestId workaround isn't needed in manifest V3, since returning true in the event listener works.
 // But we keep it for manifest V2.

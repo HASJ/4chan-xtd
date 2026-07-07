@@ -128,14 +128,19 @@
   },
   "type": "module",
   "scripts": {
-    "build": "node ./tools/rollup",
-    "check:cycles": "node ./tools/check-cycles.js",
-    "build:min": "node ./tools/rollup -min -platform=userscript",
-    "build:userscript": "node ./tools/rollup -platform=userscript",
-    "build:crx": "node ./tools/rollup -platform=crx",
-    "build:userscript:min": "node ./tools/rollup -min -platform=userscript",
-    "build:crx:min": "node ./tools/rollup -min -platform=crx",
-    "build:all": "node ./tools/rollup -min -platform=userscript && node ./tools/rollup -platform=userscript && node ./tools/rollup -platform=crx"
+    "build:tooling": "tsc -p tools/tsconfig.json",
+    "typecheck:src": "tsc -p tsconfig.json",
+    "typecheck:tools": "tsc -p tools/tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck:src && npm run typecheck:tools",
+    "test": "vitest run --reporter=dot",
+    "build": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js",
+    "check:cycles": "npm run build:tooling && node ./builds/ts-tools/tools/check-cycles.js",
+    "build:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript",
+    "build:userscript": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -platform=userscript",
+    "build:crx": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -platform=crx",
+    "build:userscript:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript",
+    "build:crx:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=crx",
+    "build:all": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=crx"
   },
   "allowScripts": {
     "@fortawesome/fontawesome-common-types@6.5.1": true,

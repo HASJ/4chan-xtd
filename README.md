@@ -2,7 +2,7 @@
 
 4chan XTd is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has no affiliation with it.
 
-4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for [this PR](https://github.com/ccd0/4chan-x/pull/3341). It is a migration of 4chan X from CoffeeScript to TypeScript/JavaScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. The goals of this project is to first get a working bundle from js/ts files, and then gradually convert js files to ts and add types as needed.
+4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for [this PR](https://github.com/ccd0/4chan-x/pull/3341). It is a migration of 4chan X from CoffeeScript to TypeScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. The codebase has been fully migrated to TypeScript, and all build tools and source modules compile with strict type checks.
 
 New features since the fork include:
 
@@ -47,7 +47,7 @@ The standard build commands are:
 - `npm run build:min`: builds a minified userscript.
 - `npm run build:all`: builds minified userscript, unminified userscript, and CRX outputs.
 
-You can also pass arguments directly to the build script (e.g., `node ./tools/rollup -min`):
+You can also pass arguments directly to the compiled build script after `npm run build:tooling` (e.g., `node ./builds/ts-tools/tools/rollup.js -min`):
 
 - `-min`: Minified output.
 - `-platform=userscript`, `-platform=crx`: Target a specific platform.
@@ -68,7 +68,7 @@ If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), th
 <summary>Click to expand</summary>
 
 - The project aims for zero circular dependencies in the source graph. Run `npm run check:cycles` to verify.
-- tsconfig.json has `"checkJs": true,`, and a lot of js files report type errors when opened because of unknown properties on objects and reassigning variables with different types. These errors don't block the bundle at this moment.
+- The codebase is 100% TypeScript. `allowJs` and `checkJs` have been disabled in `tsconfig.json`, enforcing strict TypeScript compilation across all files.
 - the es 2020 target was chosen for optional chaining
 - @violentmonkey/types was chosen over @types/greasemonkey because @types/greasemonkey only declares the GM object, and not GM\_ functions
 

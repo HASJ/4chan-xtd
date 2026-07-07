@@ -1,13 +1,24 @@
 {
+  "extends": "../tsconfig.json",
   "compilerOptions": {
+    "module": "Node16",
     "moduleResolution": "node16",
-    "module" : "Node16",
     "target": "ES2021",
+    "rootDir": "..",
+    "outDir": "../builds/ts-tools",
+    "noEmit": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
     "types": [
-      "@violentmonkey/types",
-      "@types/chrome",
-      "node"
-    ],
+      "node",
+      "@types/chrome"
+    ]
   },
-  "extends": "../tsconfig.json"
+  "include": [
+    "./**/*.ts",
+    "../src/meta/**/*.ts"
+  ],
+  "exclude": [
+    "../builds/"
+  ]
 }

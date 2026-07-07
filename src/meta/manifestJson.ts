@@ -1,6 +1,5 @@
-﻿// @ts-nocheck
 export default function generateManifestJson(p, xtVersion, manifestVersion) {
-  const manifest = {
+  const manifest: any = {
     "name": p.meta.name,
     "version": xtVersion.version,
     "manifest_version": manifestVersion,

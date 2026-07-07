@@ -2,8 +2,7 @@ import { rollup } from 'rollup';
 import typescript from '@rollup/plugin-typescript';
 import setupFileInliner from './rollup-plugin-inline-file.js';
 import faFix from './rollup-plugin-fa.js';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { resolve } from 'path';
 import generateMetadata from '../src/meta/metadata.js';
 import { copyFile, readFile, writeFile } from 'fs/promises';
 import importBase64 from './rollup-plugin-base64.js';
@@ -15,9 +14,9 @@ import alias from '@rollup/plugin-alias';
 import platformSpecific from './rollup-plugin-platform-specific.js';
 import removeTestCode from './rollup-plugin-remove-test-code.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = process.cwd();
 
-const buildDir = resolve(__dirname, '../builds/');
+const buildDir = resolve(repoRoot, 'builds');
 
 const minify = process.argv.includes('-min'); // -min: Minifies the output.
 const noFormat = process.argv.includes('-no-format'); // -no-format: Skips post-processing formatting steps (faster builds, larger output).
@@ -28,7 +27,7 @@ if (platform !== undefined && platform !== 'crx' && platform !== 'userscript') {
 const buildForTest = process.argv.includes('-test'); // -test: Includes test-only code regions (`// #region tests_enabled`).
 
 // https://github.com/rollup/plugins/discussions/1777
-const tsPlugin = typescript({
+const tsPlugin = (typescript as any)({
   compilerOptions: {
     outDir: buildDir,
     noEmit: false,
@@ -36,7 +35,7 @@ const tsPlugin = typescript({
 });
 
 (async () => {
-  const packageJson = JSON.parse(await readFile(resolve(__dirname, '../package.json'), 'utf-8'));
+  const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf-8'));
 
   const fileName = `${packageJson.meta.path}${minify ? '.min' : ''}.user.js`;
   const metaFileName = `${packageJson.meta.path}${minify ? '.min' : ''}.meta.js`;
@@ -44,9 +43,9 @@ const tsPlugin = typescript({
   const metadata = await generateMetadata(packageJson, fileName, metaFileName);
   const metaNoDownload = metadata.replace(/downloadURL( +)[^\n]+\n/, 'downloadURL$1none\n');
 
-  const license = await readFile(resolve(__dirname, '../LICENSE'), 'utf8');
+  const license = await readFile(resolve(repoRoot, 'LICENSE'), 'utf8');
 
-  const version = JSON.parse(await readFile(resolve(__dirname, '../version.json'), 'utf-8'));
+  const version = JSON.parse(await readFile(resolve(repoRoot, 'version.json'), 'utf-8'));
 
   const inlineFile = setupFileInliner(packageJson);
 
@@ -59,7 +58,7 @@ const tsPlugin = typescript({
   });
 
   const bundle = await rollup({
-    input: resolve(__dirname, '../src/main/Main.ts'),
+    input: resolve(repoRoot, 'src/main/Main.ts'),
     treeshake: false,
     plugins: [
       platform ? platformSpecific({
@@ -77,20 +76,20 @@ const tsPlugin = typescript({
           // Only files that actually have test code.
           "**/src/main/Main.ts",
           "**/src/classes/Post.ts",
-          "**/src/Linkification/Linkify.js",
+          "**/src/Linkification/Linkify.ts",
         ],
         sourceMap: minify,
       }),
       tsPlugin,
-      alias({
+      (alias as any)({
         entries: [
           {
             find: /^@fa\/(.*)$/,
-            replacement: resolve(__dirname, '../node_modules/@fortawesome/free-regular-svg-icons/$1.js')
+            replacement: resolve(repoRoot, 'node_modules/@fortawesome/free-regular-svg-icons/$1.js')
           },
           {
             find: /^@fas\/(.*)$/,
-            replacement: resolve(__dirname, '../node_modules/@fortawesome/free-solid-svg-icons/$1.js')
+            replacement: resolve(repoRoot, 'node_modules/@fortawesome/free-solid-svg-icons/$1.js')
           },
         ]
       }),
@@ -154,7 +153,7 @@ const tsPlugin = typescript({
   });
 
   /** @type {import('rollup').OutputOptions} */
-  const sharedBundleOpts = {
+  const sharedBundleOpts: any = {
     format: "iife",
     generatedCode: {
       // needed for possible circular dependencies
@@ -171,7 +170,7 @@ const tsPlugin = typescript({
       banner: (metaNoDownload + license).replace(/\r\n/g, '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
-      plugins: minify ? [terser({
+      plugins: minify ? [(terser as any)({
         format: {
           max_line_len: 1000,
           comments: /^(?: ==\/?UserScript==| @|!)|license|\bcc\b|copyright/i,
@@ -193,7 +192,7 @@ const tsPlugin = typescript({
     });
 
     const eventPage = await rollup({
-      input: resolve(__dirname, '../src/meta/eventPage.js'),
+      input: resolve(repoRoot, 'src/meta/eventPage.ts'),
       plugins: [
         tsPlugin,
         noFormat ? undefined : fixTsOutputFormat({ include: ["**/*.ts", "**/*.tsx"] }),
@@ -217,7 +216,7 @@ const tsPlugin = typescript({
     );
 
     for (const file of ['icon16.png', 'icon48.png', 'icon128.png']) {
-      await copyFile(resolve(__dirname, '../src/meta/', file), resolve(crxDir, file));
+      await copyFile(resolve(repoRoot, 'src/meta', file), resolve(crxDir, file));
     };
   }
 })();

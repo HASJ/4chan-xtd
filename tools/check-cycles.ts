@@ -1,9 +1,7 @@
 import { readdirSync, readFileSync } from 'fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const srcDir = resolve(__dirname, '../src');
+const srcDir = resolve(process.cwd(), 'src');
 const extensions = ['.ts', '.tsx', '.js', '.jsx'];
 
 function walk(dir, files = []) {
@@ -25,8 +23,11 @@ function resolveImport(from, specifier) {
   if (!specifier.startsWith('.')) return null;
 
   const base = resolve(dirname(from), specifier);
+  const sourceBase = base.replace(/\\.(?:m?js|jsx)$/i, '');
   const candidates = [
     base,
+    sourceBase + '.ts',
+    sourceBase + '.tsx',
     ...extensions.map(extension => base + extension),
     ...extensions.map(extension => join(base, 'index' + extension)),
   ];

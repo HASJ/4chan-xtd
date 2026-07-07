@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
     "module": "ES2022",
+    "moduleResolution": "bundler",
     "noImplicitAny": false,
     "removeComments": false,
     "sourceMap": true,
     "target": "ES2020",
-    "allowJs": true,
-    "checkJs": true,
+    "allowJs": false,
+    "resolveJsonModule": false,
     "noEmit": true,
     "newLine": "lf",
     "jsx": "react",
@@ -21,18 +22,23 @@
       "DOM.Iterable",
       "ES2020"
     ],
-    // needs to be in the deepest dir used as target in the rollup build
-    // https://stackoverflow.com/q/40460790, https://github.com/rollup/plugins/issues/243
     "outDir": "builds/test/crx/tsOutput",
     "importHelpers": true,
     "paths": {
       "@fa/*": ["./node_modules/@fortawesome/free-regular-svg-icons/*"],
       "@fas/*": ["./node_modules/@fortawesome/free-solid-svg-icons/*"],
+      "@fortawesome/fontawesome-common-types": ["./node_modules/@fortawesome/fontawesome-common-types/index.d.ts"]
     },
-    "skipDefaultLibCheck": true,
+    "skipDefaultLibCheck": true
   },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts"
+  ],
   "exclude": [
     "builds/",
+    "tools/",
     "src/meta/"
   ]
 }

@@ -1,21 +1,17 @@
-﻿// @ts-nocheck
-// this file is needed in the build script, keep it .js
+// Used by the compiled build script.
 
 import { readFile } from "fs/promises";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { resolve } from "path";
 
 export default async function generateMetadata(packageJson, fileName, metaFileName) {
   const meta = packageJson.meta;
 
-  const versionFile = await readFile(resolve(__dirname, '../../version.json'));
+  const versionFile = await readFile(resolve(process.cwd(), 'version.json'));
   const version = JSON.parse(versionFile.toString());
 
-  const icon = await readFile(resolve(__dirname, './icon48.png'));
+  const icon = await readFile(resolve(process.cwd(), 'src/meta/icon48.png'));
 
-  const archives = JSON.parse(await readFile(resolve(__dirname, '../Archive/archives.json'), { encoding: 'utf-8' }));
+  const archives = JSON.parse(await readFile(resolve(process.cwd(), 'src/Archive/archives.json'), { encoding: 'utf-8' }));
 
   let output = `// ==UserScript==
 // @name         ${meta.name}

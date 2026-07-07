@@ -3,6 +3,14 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### [2.27.0](https://github.com/HASJ/4chan-xtd/compare/v2.26.20...v2.27.0) (2026-07-07)
+
+- Architecture
+  - Completed the codebase-wide migration from JavaScript to TypeScript, converting all remaining runtime feature modules (`src/Filtering`, `src/General`, `src/Menu`, `src/Miscellaneous`, etc.) to TypeScript.
+  - Converted all build tools, rollup configurations, and build-time plugins to TypeScript.
+  - Disabled `allowJs` and `checkJs` in `tsconfig.json`, enforcing strict TypeScript compilation and type safety across the entire source code.
+  - Restructured build tools to compile to `builds/ts-tools/` prior to execution.
+
 ### [2.26.20](https://github.com/HASJ/4chan-xtd/commit/0f25ca54ec302f2f4d02f712198a907aad1bbf05) (2026-07-05)
 
 - Maintenance
