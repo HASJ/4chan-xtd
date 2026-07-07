@@ -14,7 +14,7 @@ import meta from '../../package.json';
 import PageContextFunctions from "../PageContext/pageContext";
 
 // not chainable
-const $ = (selector, root = document.body) => root.querySelector(selector);
+const $: any = (selector, root = document.body) => root.querySelector(selector);
 
 $.id = id => d.getElementById(id);
 
