@@ -40,7 +40,7 @@ import IndexState from '../globals/IndexState';
  * @property {boolean} showHiddenThreads - Whether to display hidden threads.
  * @property {object} changed - Tracks which parts of the state have changed to trigger updates.
  */
-var Index: any = {
+const Index: any = {
   get showHiddenThreads() { return IndexState.showHiddenThreads; },
   set showHiddenThreads(val: boolean) { IndexState.showHiddenThreads = val; },
 
@@ -102,7 +102,7 @@ var Index: any = {
     this.currentPage = this.getCurrentPage();
     this.processHash();
 
-    $.addClass(doc, 'index-loading', `${Conf['Index Mode'].replace(/\ /g, '-')}-mode`);
+    $.addClass(doc, 'index-loading', `${Conf['Index Mode'].replace(/ /g, '-')}-mode`);
     $.on(window, 'popstate', this.cb.popstate);
     $.on(d, 'scroll', this.scroll);
     $.on(d, 'SortIndex', this.cb.resort);
@@ -120,9 +120,9 @@ var Index: any = {
     const entries: any[] = [];
     this.inputs = (inputs = dict());
     for (name in Config.Index) {
-      var arr = Config.Index[name];
-      if (arr instanceof Array) {
-        var label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
+      const arr = Config.Index[name];
+      if (Array.isArray(arr)) {
+        const label = UI.checkbox(name, `${name[0]}${name.slice(1).toLowerCase()}`);
         label.title = arr[1];
         entries.push({el: label});
         input = label.firstChild as HTMLInputElement;
@@ -136,9 +136,10 @@ var Index: any = {
     $.on(inputs['Anchor Hidden Threads'], 'change', this.cb.resort);
 
     const watchSettings = function(e: any) {
-      if (input = $.getOwn(inputs, e.target.name)) {
-        input.checked = e.target.checked;
-        return ($.event as any)('change', null, input);
+      const targetInput = $.getOwn(inputs, e.target.name);
+      if (targetInput) {
+        targetInput.checked = e.target.checked;
+        return ($.event as any)('change', null, targetInput);
       }
     };
     $.on(d, 'OpenSettings', () => $.on($.id('fourchanx-settings'), 'change', watchSettings));
@@ -183,10 +184,10 @@ var Index: any = {
     $.on(this.selectSort, 'change', this.cb.sort);
     $.on(this.selectSize, 'change', $.cb.value);
     $.on(this.selectSize, 'change', this.cb.size);
-    for (var select of [this.selectMode, this.selectSize]) {
+    for (const select of [this.selectMode, this.selectSize]) {
       select.value = Conf[select.name];
     }
-    this.selectRev.checked = /-rev$/.test(Index.currentSort);
+    this.selectRev.checked = Index.currentSort.endsWith('-rev');
     this.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
 
     // Last Long Reply options
@@ -195,10 +196,10 @@ var Index: any = {
     this.lastLongThresholds = [0, 0];
     this.lastLongOptions.hidden = (this.selectSort.value !== 'lastlong');
     for (let i = 0; i < this.lastLongInputs.length; i++) {
-      input = this.lastLongInputs[i];
-      $.on(input, 'change', this.cb.lastLongThresholds);
-      var tRaw = Conf[`Last Long Reply Thresholds ${i}`];
-      input.value = (this.lastLongThresholds[i] =
+      const currentInput = this.lastLongInputs[i];
+      $.on(currentInput, 'change', this.cb.lastLongThresholds);
+      const tRaw = Conf[`Last Long Reply Thresholds ${i}`];
+      currentInput.value = (this.lastLongThresholds[i] =
         typeof tRaw === 'object' ? (tRaw[g.BOARD.ID] ?? 100) : tRaw);
     }
 
@@ -216,7 +217,7 @@ var Index: any = {
 
     this.update(true);
 
-    $.onExists(doc, 'title + *', () => d.title = d.title.replace(/\ -\ Page\ \d+/, ''));
+    $.onExists(doc, 'title + *', () => d.title = d.title.replace(/ - Page \d+/, ''));
 
     $.onExists(doc, '.board > .thread > .postContainer, .board + *', function() {
       let el;
@@ -245,7 +246,8 @@ var Index: any = {
       //   Does not work on Firefox unfortunately. bugzil.la/939713
       try {
         d.implementation.createDocument(null, null, null).appendChild(board);
-      } catch (error) {}
+      } catch (error_) { // NOSONAR
+      }
 
       for (el of $$('.navLinks')) { $.rm(el); }
       $.rm($.id('ctrl-top')!);
@@ -257,9 +259,9 @@ var Index: any = {
     });
 
     return $.on(d, '4chanXInitFinished', function() {
-      let pagelist;
-      if (pagelist = $('.pagelist')) {
-        $.replace(pagelist, Index.pagelist);
+      const pagelistEl = $('.pagelist');
+      if (pagelistEl) {
+        $.replace(pagelistEl, Index.pagelist);
       }
       return $.rmClass(doc, 'index-loading');
     });
@@ -271,7 +273,7 @@ var Index: any = {
    */
   scroll() {
     if (Index.req || !Index.liveThreadData || (Conf['Index Mode'] !== 'infinite') || (window.scrollY <= (doc.scrollHeight - (300 + window.innerHeight)))) { return; }
-    if (Index.pageNum == null) { Index.pageNum = Index.currentPage; } // Avoid having to pushState to keep track of the current page
+    Index.pageNum ??= Index.currentPage; // Avoid having to pushState to keep track of the current page
 
     const pageNum = ++Index.pageNum;
     if (pageNum > Index.pagesNum) { return Index.endNotice(); }
@@ -286,7 +288,7 @@ var Index: any = {
     return function() {
       if (notify) { return; }
       notify = true;
-      new Notice('info', "Last page reached.", 2);
+      const _notice = new Notice('info', "Last page reached.", 2);
       return setTimeout(reset, 3 * SECOND);
     };
   })(),
@@ -354,7 +356,7 @@ var Index: any = {
     const types = (Index.selectSort as HTMLSelectElement).options as unknown as HTMLOptionElement[];
     const filteredTypes = Array.from(types).filter(option => !option.disabled);
     for (i = 0; i < filteredTypes.length; i++) {
-      var type = filteredTypes[i];
+      const type = filteredTypes[i];
       if (type.selected) { break; }
     }
     filteredTypes[(i + 1) % filteredTypes.length].selected = true;
@@ -380,7 +382,8 @@ var Index: any = {
     },
 
     toggleHiddenThreads() {
-      ($('#hidden-toggle a', Index.navLinks) as HTMLElement).textContent = (Index.showHiddenThreads = !Index.showHiddenThreads) ?
+      Index.showHiddenThreads = !Index.showHiddenThreads;
+      ($('#hidden-toggle a', Index.navLinks) as HTMLElement).textContent = Index.showHiddenThreads ?
         'Hide'
       :
         'Show';
@@ -450,11 +453,11 @@ var Index: any = {
 
     hoverToggle(e: MouseEvent) {
       if (Conf['Catalog Hover Toggle'] && $.hasClass(doc, 'catalog-mode') && !$.modifiedClick(e) && !$.x('ancestor-or-self::a', e.target as HTMLElement)) {
-        let thread;
         const input = Index.inputs['Catalog Hover Expand'];
         input.checked = !input.checked;
         ($.event as any)('change', null, input);
-        if (thread = Get.threadFromNode(e.target as HTMLElement)) {
+        const thread = Get.threadFromNode(e.target as HTMLElement);
+        if (thread) {
           Index.cb.catalogReplies.call(thread);
           return Index.cb.hoverAdjust.call(thread.OP.nodes);
         }
@@ -510,10 +513,10 @@ var Index: any = {
 
     hoverAdjust(this: any) {
       // Prevent hovered catalog threads from going offscreen.
-      let x;
       if (!$.hasClass(doc, 'catalog-hover-expand')) { return; }
       const rect = this.post.getBoundingClientRect();
-      if (x = $.minmax(0, -rect.left, doc.clientWidth - rect.right)) {
+      const x = $.minmax(0, -rect.left, doc.clientWidth - rect.right);
+      if (x) {
         const {style} = this.post;
         style.left = `${x}px`;
         style.right = `${-x}px`;
@@ -562,25 +565,28 @@ var Index: any = {
 
   processHash() {
     // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=483304
-    let hash = location.href.match(/#.*/)?.[0] || '';
+    let hash = /#.*/.exec(location.href)?.[0] || '';
     const state: any =
       {replace: true};
     const commands = hash.slice(1).split('/');
     const leftover: string[] = [];
-    for (var command of commands) {
-      var mode, sort;
-      if (mode = $.getOwn(Index.hashCommands.mode, command)) {
+    for (const command of commands) {
+      const mode = $.getOwn(Index.hashCommands.mode, command);
+      if (mode) {
         state.mode = mode;
       } else if (command === 'index') {
         state.mode = Conf['Previous Index Mode'];
         state.page = 1;
-      } else if (sort = $.getOwn(Index.hashCommands.sort, command.replace(/-rev$/, ''))) {
-        state.sort = sort;
-        if (/-rev$/.test(command)) { state.sort += '-rev'; }
-      } else if (/^s=/.test(command)) {
-        state.search = decodeURIComponent(command.slice(2)).replace(/\+/g, ' ').trim();
       } else {
-        leftover.push(command);
+        const sort = $.getOwn(Index.hashCommands.sort, command.replace(/-rev$/, ''));
+        if (sort) {
+          state.sort = sort;
+          if (command.endsWith('-rev')) { state.sort += '-rev'; }
+        } else if (command.startsWith('s=')) {
+          state.search = decodeURIComponent(command.slice(2)).replace(/\+/g, ' ').trim();
+        } else {
+          leftover.push(command);
+        }
       }
     }
     hash = leftover.join('/');
@@ -601,7 +607,7 @@ var Index: any = {
       }
     }
     Index.setState(state);
-    const pathname = Index.currentPage === 1 ? `/${g.BOARD}/` : `/${g.BOARD}/${Index.currentPage}`;
+    const pathname = Index.currentPage === 1 ? `/${g.BOARD!.ID}/` : `/${g.BOARD!.ID}/${Index.currentPage}`;
     if (!hash) { hash = ''; }
     return history[replace ? 'replaceState' : 'pushState']({
       mode:     Conf['Index Mode'],
@@ -637,7 +643,7 @@ var Index: any = {
       Index.currentPage = page;
     }
     if (hash != null) {
-      return Index.changed.hash = true;
+      Index.changed.hash = true;
     }
   },
 
@@ -671,23 +677,23 @@ var Index: any = {
     if (threads || mode || page || order) { Index.buildIndex(); }
     if (threads || page) { Index.setPage(); }
     if (scroll && !hash) { Index.scrollToIndex(); }
-    return Index.changed = {};
+    Index.changed = {};
   },
 
   setupMode() {
-    for (var mode of ['paged', 'infinite', 'all pages', 'catalog']) {
-      $[mode === Conf['Index Mode'] ? 'addClass' : 'rmClass'](doc, `${mode.replace(/\ /g, '-')}-mode`);
+    for (const mode of ['paged', 'infinite', 'all pages', 'catalog']) {
+      $[mode === Conf['Index Mode'] ? 'addClass' : 'rmClass'](doc, `${mode.replace(/ /g, '-')}-mode`);
     }
     Index.selectMode.value = Conf['Index Mode'];
     Index.cb.size();
     Index.showHiddenThreads = false;
-    return (($('#hidden-toggle a', Index.navLinks) as HTMLElement).textContent = 'Show');
+    ($('#hidden-toggle a', Index.navLinks) as HTMLElement).textContent = 'Show';
   },
 
   setupSort() {
-    Index.selectRev.checked = /-rev$/.test(Index.currentSort);
+    Index.selectRev.checked = Index.currentSort.endsWith('-rev');
     Index.selectSort.value  = Index.currentSort.replace(/-rev$/, '');
-    return (Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong'));
+    Index.lastLongOptions.hidden = (Index.selectSort.value !== 'lastlong');
   },
 
   getPagesNum() {
@@ -708,7 +714,7 @@ var Index: any = {
     if (pagesRoot.childElementCount !== maxPageNum) {
       const nodes: any[] = [];
       for (let i = 1, end = maxPageNum; i <= end; i++) {
-        var a = $.el('a', {
+        const a = $.el('a', {
           textContent: i.toString(),
           href: i === 1 ? './' : i.toString()
         }
@@ -721,7 +727,7 @@ var Index: any = {
   },
 
   setPage() {
-    let a, strong;
+    let strong;
     const pageNum    = Index.currentPage;
     const maxPageNum = Index.getMaxPageNum();
     const pagesRoot  = $('.pages', Index.pagelist) as HTMLElement;
@@ -737,14 +743,18 @@ var Index: any = {
     (next.firstElementChild as HTMLButtonElement).disabled = href === pageNum;
 
     // <strong> current page
-    if (strong = $('strong', pagesRoot)) {
-      if (+strong.textContent! === pageNum) { return; }
+    const existingStrong = $('strong', pagesRoot);
+    if (existingStrong) {
+      strong = existingStrong;
+      const text = strong.textContent;
+      if (text && +text === pageNum) { return; }
       $.replace(strong, strong.firstChild!);
     } else {
       strong = $.el('strong');
     }
 
-    if (a = pagesRoot.children[pageNum - 1]) {
+    const a = pagesRoot.children[pageNum - 1];
+    if (a) {
       $.before(a, strong);
       return $.add(strong, a);
     }
@@ -753,7 +763,7 @@ var Index: any = {
   updateHideLabel() {
     if (!Index.hideLabel) { return; }
     let hiddenCount = 0;
-    for (var threadID of Index.liveThreadIDs) {
+    for (const threadID of Index.liveThreadIDs) {
       if (Index.isHidden(threadID)) {
         hiddenCount++;
       }
@@ -764,10 +774,10 @@ var Index: any = {
       return;
     }
     Index.hideLabel.hidden = false;
-    return (($('#hidden-count', Index.navLinks) as HTMLElement).textContent = hiddenCount === 1 ?
+    ($('#hidden-count', Index.navLinks) as HTMLElement).textContent = hiddenCount === 1 ?
       '1 hidden thread'
     :
-      `${hiddenCount} hidden threads`);
+      `${hiddenCount} hidden threads`;
   },
 
   /**
@@ -775,8 +785,8 @@ var Index: any = {
    * @param {boolean} [firstTime] - Indicates if this is the initial load.
    */
   update(firstTime?: boolean) {
-    let oldReq;
-    if (oldReq = Index.req) {
+    const oldReq = Index.req;
+    if (oldReq) {
       delete Index.req;
       oldReq.abort();
     }
@@ -784,16 +794,16 @@ var Index: any = {
     if (Conf['Index Refresh Notifications']) {
       // Optional notification for manual refreshes
       if (!Index.notice) { Index.notice = new Notice('info', 'Refreshing index...'); }
-      if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => {
+      if (!Index.nTimeout) {
+        Index.nTimeout = setTimeout(() => {
           if (Index.notice) {
             Index.notice.el.lastElementChild!.textContent += ' (disable JSON Index if this takes too long)';
           }
-        }
-        , 3 * SECOND); }
-    } else {
+        }, 3 * SECOND);
+      }
+    } else if (!Index.nTimeout) {
       // Also display notice if Index Refresh is taking too long
-      if (!Index.nTimeout) { Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)'))
-      , 3 * SECOND); }
+      Index.nTimeout = setTimeout(() => Index.notice || (Index.notice = new Notice('info', 'Refreshing index... (disable JSON Index if this takes too long)')), 3 * SECOND);
     }
 
     // Hard refresh in case of incomplete page load.
@@ -810,11 +820,32 @@ var Index: any = {
     return $.addClass(Index.button, 'spin');
   },
 
+  handleLoadError(status: number, statusText: string, notice: any) {
+    const statusMsg = status ? `Error ${statusText} (${status})` : 'Connection Error';
+    const err = `Index refresh failed. ${statusMsg}`;
+    if (notice) {
+      notice.setType('warning');
+      notice.el.lastElementChild.textContent = err;
+      setTimeout(notice.close, SECOND);
+    } else {
+      const _notice = new Notice('warning', err, 1);
+    }
+  },
+
+  handleLoadNotice(notice: any) {
+    if (Conf['Index Refresh Notifications']) {
+      notice.setType('success');
+      notice.el.lastElementChild.textContent = 'Index refreshed!';
+      setTimeout(notice.close, SECOND);
+    } else {
+      notice.close();
+    }
+  },
+
   /**
    * Callback for the JSON catalog request. Parses the response and updates the index view.
    */
   load(this: any) {
-    let err;
     if (this !== Index.req) { return; } // aborted
 
     $.rmClass(Index.button, 'spin');
@@ -825,14 +856,7 @@ var Index: any = {
     delete Index.notice;
 
     if (![200, 304].includes(this.status)) {
-      err = `Index refresh failed. ${this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error'}`;
-      if (notice) {
-        notice.setType('warning');
-        notice.el.lastElementChild.textContent = err;
-        setTimeout(notice.close, SECOND);
-      } else {
-        new Notice('warning', err, 1);
-      }
+      Index.handleLoadError(this.status, this.statusText, notice);
       return;
     }
 
@@ -843,26 +867,19 @@ var Index: any = {
         Index.pageLoad();
       }
     } catch (error: any) {
-      err = error;
-      c.error(`Index failure: ${err.message}`, err.stack);
+      c.error(`Index failure: ${error.message}`, error.stack);
       if (notice) {
         notice.setType('error');
         notice.el.lastElementChild.textContent = 'Index refresh failed.';
         setTimeout(notice.close, SECOND);
       } else {
-        new Notice('error', 'Index refresh failed.', 1);
+        const _notice = new Notice('error', 'Index refresh failed.', 1);
       }
       return;
     }
 
     if (notice) {
-      if (Conf['Index Refresh Notifications']) {
-        notice.setType('success');
-        notice.el.lastElementChild.textContent = 'Index refreshed!';
-        setTimeout(notice.close, SECOND);
-      } else {
-        notice.close();
-      }
+      Index.handleLoadNotice(notice);
     }
 
     const timeEl = $('#index-last-refresh time', Index.navLinks) as HTMLElement;
@@ -896,33 +913,33 @@ var Index: any = {
     Index.parsedThreads     = dict();
     Index.replyData         = dict();
     for (let i = 0; i < Index.liveThreadData.length; i++) {
-      var obj: any, results: any;
-      var data = Index.liveThreadData[i];
+      let obj: any;
+      const data = Index.liveThreadData[i];
       Index.liveThreadDict[data.no] = data;
       Index.threadPosition[data.no] = i;
       Index.parsedThreads[data.no] = (obj = g.SITE.Build.parseJSON(data, g.BOARD));
-      results = Filter.test(obj);
+      const results = Filter.test(obj);
       obj.isOnTop  = results.top;
       obj.isHidden = results.hide || ThreadHiding.isHidden(obj.boardID, obj.threadID);
       if (data.last_replies) {
-        for (var reply of data.last_replies) {
-          Index.replyData[`${g.BOARD}.${reply.no}`] = reply;
+        for (const reply of data.last_replies) {
+          Index.replyData[`${g.BOARD!.ID}.${reply.no}`] = reply;
         }
       }
     }
     if (Index.liveThreadData[0]) {
-      g.SITE.Build.spoilerRange[g.BOARD.ID] = Index.liveThreadData[0].custom_spoiler;
+      g.SITE.Build.spoilerRange[g.BOARD!.ID] = Index.liveThreadData[0].custom_spoiler;
     }
-    g.BOARD.threads.forEach(function(thread: any) {
+    g.BOARD!.threads.forEach(function(thread: any) {
       if (!Index.liveThreadIDs.includes(thread.ID)) { return thread.collect(); }
     });
     ($.event as any)('IndexUpdate',
-      {threads: ((Index.liveThreadIDs.map((ID: any) => `${g.BOARD}.${ID}`)))});
+      {threads: ((Index.liveThreadIDs.map((ID: any) => `${g.BOARD!.ID}.${ID}`)))});
   },
 
   isHidden(threadID: number) {
-    let thread;
-    if ((thread = g.BOARD.threads.get(threadID)) && thread.OP && !thread.OP.isFetchedQuote) {
+    const thread = g.BOARD!.threads.get(threadID);
+    if (thread?.OP && !thread.OP.isFetchedQuote) {
       return thread.isHidden;
     } else {
       return Index.parsedThreads[threadID].isHidden;
@@ -933,6 +950,62 @@ var Index: any = {
     return PostHiding.isHidden(g.BOARD.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD));
   },
 
+  buildSingleThread(
+    ID: number,
+    isCatalog: boolean,
+    withReplies: boolean | undefined,
+    newThreads: any[],
+    newPosts: any[]
+  ): { thread: any; opRoot?: HTMLElement; error?: any } {
+    let opRoot: HTMLElement | undefined;
+    try {
+      let thread: any;
+      let OP: any;
+      const threadData = Index.liveThreadDict[ID];
+
+      const existingThread = g.BOARD!.threads.get(ID);
+      if (existingThread) {
+        thread = existingThread;
+        const isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
+        if (isStale) {
+          thread.setCount('post', threadData.replies + 1,                threadData.bumplimit);
+          thread.setCount('file', threadData.images  + !!threadData.ext, threadData.imagelimit);
+          thread.setStatus('Sticky', !!threadData.sticky);
+          thread.setStatus('Closed', !!threadData.closed);
+        }
+        if (thread.catalogView) {
+          $.rm(thread.catalogView.nodes.replies);
+          thread.catalogView.nodes.replies = null;
+        }
+      } else {
+        thread = new Thread(ID.toString(), g.BOARD as any);
+        newThreads.push(thread);
+      }
+      const lastPost = threadData.last_replies?.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
+      if (lastPost > thread.lastPost) { thread.lastPost = lastPost; }
+      thread.json = threadData;
+
+      OP = thread.OP;
+      if (OP && !OP.isFetchedQuote) {
+        OP.setCatalogOP(isCatalog);
+        thread.setPage(Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1);
+      } else {
+        const obj = Index.parsedThreads[ID];
+        opRoot = g.SITE.Build.post(obj);
+        OP = new Post(opRoot!, thread, g.BOARD as any);
+        OP.filterResults = obj.filterResults;
+        newPosts.push(OP);
+      }
+
+      if (!isCatalog || !thread.nodes.root) {
+        g.SITE.Build.thread(thread, threadData, withReplies);
+      }
+      return { thread };
+    } catch (err: any) {
+      return { thread: ID, opRoot, error: err };
+    }
+  },
+
   /**
    * Creates or updates Thread and Post objects for the given thread IDs.
    * @param {Array<number>} threadIDs - List of thread IDs to build.
@@ -941,62 +1014,26 @@ var Index: any = {
    * @returns {Array<Thread>} Array of built or updated Thread objects.
    */
   buildThreads(threadIDs: number[], isCatalog: boolean, withReplies?: boolean) {
-    let errors: any[];
+    let errors: any[] | undefined;
     const threads: any[]    = [];
     const newThreads: any[] = [];
     let newPosts: any[]   = [];
-    for (var ID of threadIDs) {
-      var opRoot: HTMLElement | undefined, thread: any;
-      try {
-        var OP: any;
-        var threadData = Index.liveThreadDict[ID];
 
-        if (thread = g.BOARD.threads.get(ID)) {
-          var isStale = (thread.json !== threadData) && (JSON.stringify(thread.json) !== JSON.stringify(threadData));
-          if (isStale) {
-            thread.setCount('post', threadData.replies + 1,                threadData.bumplimit);
-            thread.setCount('file', threadData.images  + !!threadData.ext, threadData.imagelimit);
-            thread.setStatus('Sticky', !!threadData.sticky);
-            thread.setStatus('Closed', !!threadData.closed);
-          }
-          if (thread.catalogView) {
-            $.rm(thread.catalogView.nodes.replies);
-            thread.catalogView.nodes.replies = null;
-          }
-        } else {
-          thread = new Thread(ID.toString(), g.BOARD as any);
-          newThreads.push(thread);
-        }
-        var lastPost = threadData.last_replies && threadData.last_replies.length ? threadData.last_replies[threadData.last_replies.length - 1].no : ID;
-        if (lastPost > thread.lastPost) { thread.lastPost = lastPost; }
-        thread.json = threadData;
-        threads.push(thread);
-
-        if ((OP = thread.OP) && !OP.isFetchedQuote) {
-          OP.setCatalogOP(isCatalog);
-          thread.setPage(Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1);
-        } else {
-          var obj = Index.parsedThreads[ID];
-          opRoot = g.SITE.Build.post(obj);
-          OP = new Post(opRoot!, thread, g.BOARD as any);
-          OP.filterResults = obj.filterResults;
-          newPosts.push(OP);
-        }
-
-        if (!isCatalog || !thread.nodes.root) {
-          g.SITE.Build.thread(thread, threadData, withReplies);
-        }
-      } catch (err: any) {
-        // Skip posts that we failed to parse.
-        if (!errors!) { errors = []; }
-        errors!.push({
-          message: `Parsing of Thread No.${thread} failed. Thread will be skipped.`,
-          error: err,
-          html: opRoot?.outerHTML
+    for (const ID of threadIDs) {
+      const result = Index.buildSingleThread(ID, isCatalog, withReplies, newThreads, newPosts);
+      if (result.error) {
+        errors ??= [];
+        errors.push({
+          message: `Parsing of Thread No.${result.thread} failed. Thread will be skipped.`,
+          error: result.error,
+          html: result.opRoot?.outerHTML
         });
+      } else {
+        threads.push(result.thread);
       }
     }
-    if (errors!) { Callbacks.errorHandler?.(errors!); }
+
+    if (errors) { Callbacks.errorHandler?.(errors); }
 
     if (withReplies) {
       newPosts = newPosts.concat(Index.buildReplies(threads));
@@ -1011,25 +1048,25 @@ var Index: any = {
   },
 
   buildReplies(threads: any[]) {
-    let errors: any[];
+    let errors: any[] | undefined;
     const posts: any[] = [];
-    for (var thread of threads) {
-      var lastReplies;
-      if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { continue; }
-      var nodes: HTMLElement[] = [];
-      for (var data of lastReplies) {
-        var node, post;
-        if ((post = thread.posts.get(data.no)) && !post.isFetchedQuote) {
+    for (const thread of threads) {
+      const lastReplies = Index.liveThreadDict[thread.ID].last_replies;
+      if (!lastReplies) { continue; }
+      const nodes: HTMLElement[] = [];
+      for (const data of lastReplies) {
+        const post = thread.posts.get(data.no);
+        if (post && !post.isFetchedQuote) {
           nodes.push(post.nodes.root);
           continue;
         }
-        nodes.push(node = g.SITE.Build.postFromObject(data, thread.board.ID));
+        const node = g.SITE.Build.postFromObject(data, thread.board.ID);
+        nodes.push(node);
         try {
           posts.push(new Post(node, thread, thread.board));
         } catch (err: any) {
-          // Skip posts that we failed to parse.
-          if (!errors!) { errors = []; }
-          errors!.push({
+          errors ??= [];
+          errors.push({
             message: `Parsing of Post No.${data.no} failed. Post will be skipped.`,
             error: err,
             html: node?.outerHTML
@@ -1039,17 +1076,17 @@ var Index: any = {
       $.add(thread.nodes.root, nodes);
     }
 
-    if (errors!) { Callbacks.errorHandler?.(errors!); }
+    if (errors) { Callbacks.errorHandler?.(errors); }
     return posts;
   },
 
   buildCatalogViews(threads: any[]) {
     const catalogThreads: any[] = [];
-    for (var thread of threads) {
+    for (const thread of threads) {
       if (!thread.catalogView) {
-        var {ID} = thread;
-        var page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
-        var root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
+        const {ID} = thread;
+        const page = Math.floor(Index.threadPosition[ID] / Index.threadsNumPerPage) + 1;
+        const root = g.SITE.Build.catalogThread(thread, Index.liveThreadDict[ID], page);
         catalogThreads.push(new CatalogThread(root, thread));
       }
     }
@@ -1059,25 +1096,25 @@ var Index: any = {
   sizeCatalogViews(threads: any[]) {
     // XXX When browsers support CSS3 attr(), use it instead.
     const size = Conf['Index Size'] === 'small' ? 150 : 250;
-    for (var thread of threads) {
-      var {thumb} = thread.catalogView.nodes;
-      var {width, height} = thumb.dataset;
+    for (const thread of threads) {
+      const {thumb} = thread.catalogView.nodes;
+      const {width, height} = thumb.dataset;
       if (!width) { continue; }
-      var ratio = size / Math.max(width, height);
-      thumb.style.width  = (width  * ratio) + 'px';
-      thumb.style.height = (height * ratio) + 'px';
+      const ratio = size / Math.max(Number(width), Number(height));
+      thumb.style.width  = (Number(width)  * ratio) + 'px';
+      thumb.style.height = (Number(height) * ratio) + 'px';
     }
   },
 
   buildCatalogReplies(thread: any) {
-    let lastReplies;
     const {nodes} = thread.catalogView;
-    if (!(lastReplies = Index.liveThreadDict[thread.ID].last_replies)) { return; }
+    const lastReplies = Index.liveThreadDict[thread.ID].last_replies;
+    if (!lastReplies) { return; }
 
     const replies: HTMLElement[] = [];
-    for (var data of lastReplies) {
+    for (const data of lastReplies) {
       if (Index.isHiddenReply(thread.ID, data)) { continue; }
-      var reply = g.SITE.Build.catalogReply(thread, data);
+      const reply = g.SITE.Build.catalogReply(thread, data);
       RelativeDates.update($('time', reply) as HTMLElement);
       $.on($('.catalog-reply-preview', reply)!, 'mouseover', runQuotePreviewMouseover);
       replies.push(reply);
@@ -1096,34 +1133,35 @@ var Index: any = {
     let threadIDs;
     const {liveThreadIDs, liveThreadData} = Index;
     if (!liveThreadData) { return; }
-    const tmp_time = new Date().getTime()/1000;
+    const tmp_time = Date.now() / 1000;
     const sortType = Index.currentSort.replace(/-rev$/, '');
     Index.sortedThreadIDs = (() => { switch (sortType) {
-      case 'lastreply': case 'lastlong':
-        var repliesAvailable = liveThreadData.some((thread: any) => thread.last_replies?.length);
-        var lastlong = function(thread: any) {
+      case 'lastreply': case 'lastlong': {
+        const repliesAvailable = liveThreadData.some((thread: any) => thread.last_replies?.length);
+        const lastlong = function(thread: any) {
           if (!repliesAvailable) {
             return thread.last_modified;
           }
           const iterable = thread.last_replies || [];
           for (let i = iterable.length - 1; i >= 0; i--) {
-            var r = iterable[i];
+            const r = iterable[i];
             if (Index.isHiddenReply(thread.no, r)) { continue; }
             if (sortType === 'lastreply') {
               return r;
             }
-            var len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
+            const len = r.com ? g.SITE.Build.parseComment(r.com).replace(/[^a-z]/ig, '').length : 0;
             if (len >= Index.lastLongThresholds[+!!r.ext]) {
               return r;
             }
           }
           if (thread.omitted_posts && thread.last_replies?.length) { return thread.last_replies[0]; } else { return thread; }
         };
-        var lastlongD = dict();
-        for (var thread of liveThreadData) {
+        const lastlongD = dict();
+        for (const thread of liveThreadData) {
           lastlongD[thread.no] = lastlong(thread).no;
         }
         return [...liveThreadData].sort((a, b) => lastlongD[b.no] - lastlongD[a.no]).map(post => post.no);
+      }
       case 'bump':       return liveThreadIDs;
       case 'birth':      return [...liveThreadIDs ].sort((a, b) => b - a);
       case 'replycount': return [...liveThreadData].sort((a, b) => b.replies - a.replies).map(post => post.no);
@@ -1131,7 +1169,7 @@ var Index: any = {
       case 'activity':   return [...liveThreadData].sort((a, b) => ((tmp_time-a.time)/(a.replies+1)) - ((tmp_time-b.time)/(b.replies+1))).map(post => post.no);
       default: return liveThreadIDs;
     } })();
-    if (/-rev$/.test(Index.currentSort)) {
+    if (Index.currentSort.endsWith('-rev')) {
       Index.sortedThreadIDs.reverse();
     }
     if (Index.search && (threadIDs = Index.querySearch(Index.search))) {
@@ -1148,10 +1186,11 @@ var Index: any = {
   sortOnTop(match: (obj: any) => boolean) {
     const topThreads: number[]    = [];
     const bottomThreads: number[] = [];
-    for (var ID of Index.sortedThreadIDs) {
+    for (const ID of Index.sortedThreadIDs) {
       (match(Index.parsedThreads[ID]) ? topThreads : bottomThreads).push(ID);
     }
-    return (Index.sortedThreadIDs = topThreads.concat(bottomThreads));
+    Index.sortedThreadIDs = topThreads.concat(bottomThreads);
+    return Index.sortedThreadIDs;
   },
 
   /**
@@ -1166,7 +1205,7 @@ var Index: any = {
         threadIDs = Index.sortedThreadIDs;
         break;
       case 'catalog':
-        threadIDs = Index.sortedThreadIDs.filter((ID: number) => !Index.isHidden(ID) !== Index.showHiddenThreads);
+        threadIDs = Index.sortedThreadIDs.filter((ID: number) => Index.isHidden(ID) === Index.showHiddenThreads);
         break;
       default:
         threadIDs = Index.threadsOnPage(Index.currentPage);
@@ -1193,7 +1232,7 @@ var Index: any = {
   buildStructure(threadIDs: number[]) {
     const threads = Index.buildThreads(threadIDs, false, Conf['Show Replies']);
     const nodes: any[] = [];
-    for (var thread of threads) {
+    for (const thread of threads) {
       nodes.push(thread.nodes.root, $.el('hr'));
     }
     $.add(Index.root, nodes);
@@ -1207,7 +1246,7 @@ var Index: any = {
     let i = 0;
     const n = threadIDs.length;
     let node0: HTMLElement | null = null;
-    var fn = function() {
+    const fn = function() {
       if (node0 && !node0.parentNode) { return; } // Index.root cleared
       const j = (i > 0) && Index.root.parentNode ? n : i + 30;
       node0 = Index.buildCatalogPart(threadIDs.slice(i, j))[0];
@@ -1218,7 +1257,7 @@ var Index: any = {
         if (Index.root.parentNode) {
           ($.event as any)('PostsInserted', null, Index.root);
         }
-        return (Index.loaded = true);
+        Index.loaded = true;
       }
     };
     fn();
@@ -1229,7 +1268,7 @@ var Index: any = {
     Index.buildCatalogViews(threads);
     Index.sizeCatalogViews(threads);
     const nodes: HTMLElement[] = [];
-    for (var thread of threads) {
+    for (const thread of threads) {
       thread.OP.setCatalogOP(true);
       $.add(thread.catalogView.nodes.root, thread.OP.nodes.root);
       nodes.push(thread.catalogView.nodes.root);
@@ -1249,10 +1288,10 @@ var Index: any = {
   setupSearch() {
     Index.searchInput.value = Index.search;
     if (Index.search) {
-      return (Index.searchInput.dataset.searching = "1");
+      Index.searchInput.dataset.searching = "1";
     } else {
       // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=1021289
-      return Index.searchInput.removeAttribute('data-searching');
+      delete Index.searchInput.dataset.searching;
     }
   },
 
@@ -1267,30 +1306,31 @@ var Index: any = {
   },
 
   querySearch(query: string) {
-    let keywords: string[] | null, match: string[] | null;
-    if (match = query.match(/^([\w+]+):\/(.*)\/(\w*)$/)) {
+    const match = /^([\w+]+):\/(.*)\/(\w*)$/.exec(query);
+    if (match) {
       let regexp: RegExp;
       try {
-        regexp = RegExp(match[2], match[3]);
-      } catch (error) {
+        regexp = new RegExp(match[2], match[3]);
+      } catch (error_) { // NOSONAR
         return [];
       }
-      return Index.sortedThreadIDs.filter((ID: number) => regexp.test(Filter.values(match![1], Index.parsedThreads[ID]).join('\n')));
+      return Index.sortedThreadIDs.filter((ID: number) => regexp.test(Filter.values(match[1], Index.parsedThreads[ID]).join('\n')));
     }
-    if (!(keywords = query.toLowerCase().match(/\S+/g))) { return; }
-    return Index.sortedThreadIDs.filter((ID: number) => Index.searchMatch(Index.parsedThreads[ID], keywords!));
+    const keywords = query.toLowerCase().match(/\S+/g);
+    if (!keywords) { return; }
+    return Index.sortedThreadIDs.filter((ID: number) => Index.searchMatch(Index.parsedThreads[ID], keywords));
   },
 
   searchMatch(obj: any, keywords: string[]) {
     const {info, file} = obj;
-    if (info.comment == null) { info.comment = g.SITE.Build.parseComment(info.commentHTML.innerHTML); }
-    let text: string[] = [];
-    for (var key of ['comment', 'subject', 'name', 'tripcode']) {
+    info.comment ??= g.SITE.Build.parseComment(info.commentHTML.innerHTML);
+    const text: string[] = [];
+    for (const key of ['comment', 'subject', 'name', 'tripcode']) {
       if (key in info) { text.push(info[key]); }
     }
     if (file) { text.push(file.name); }
     const combinedText = text.join(' ').toLowerCase();
-    for (var keyword of keywords) {
+    for (const keyword of keywords) {
       if (-1 === combinedText.indexOf(keyword)) { return false; }
     }
     return true;

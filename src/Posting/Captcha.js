@@ -42,7 +42,8 @@ const Captcha = {
       let hasTicket = false;
       try {
         hasTicket = !!(localStorage.getItem('4chan-tc-ticket') || localStorage.getItem('4chan_pass_token'));
-      } catch (e) {}
+      } catch (e_) { // NOSONAR
+      }
       return (hasCT || hasTicket) && (QRState.posts[0].thread !== 'new');
     },
 
@@ -50,7 +51,8 @@ const Captcha = {
       let captcha;
       delete this.prerequested;
       this.clear();
-      if (captcha = this.captchas.shift()) {
+      captcha = this.captchas.shift();
+      if (captcha) {
         this.count();
         return captcha;
       } else {
@@ -78,7 +80,8 @@ const Captcha = {
 
     saveAPI(captcha) {
       let cb;
-      if (cb = this.submitCB) {
+      cb = this.submitCB;
+      if (cb) {
         delete this.submitCB;
         cb(captcha);
         return this.updateCount();
@@ -89,7 +92,8 @@ const Captcha = {
 
     noCaptcha(detail) {
       let cb;
-      if (cb = this.submitCB) {
+      cb = this.submitCB;
+      if (cb) {
         if (!this.haveCookie() || detail?.error) {
           QRState.error(detail?.error || 'Failed to retrieve captcha.');
           QRState.captcha.setup(d.activeElement === QRState.nodes.status);
@@ -102,7 +106,8 @@ const Captcha = {
 
     save(captcha) {
       let cb;
-      if (cb = this.submitCB) {
+      cb = this.submitCB;
+      if (cb) {
         this.abort();
         cb(captcha);
         return;
@@ -117,7 +122,7 @@ const Captcha = {
         let i;
         const now = Date.now();
         for (i = 0; i < this.captchas.length; i++) {
-          var captcha = this.captchas[i];
+          const captcha = this.captchas[i];
           if (captcha.timeout > now) { break; }
         }
         if (i) {
@@ -146,9 +151,11 @@ const Captcha = {
 
     init() {
       if (isPassEnabled()) { return; }
-      if (!(this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm'))) { return; }
-
-      if (this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled')) {
+      this.isEnabled = !!$('#g-recaptcha, #captcha-forced-noscript') || !$.id('postForm');
+      if (!this.isEnabled) { return; }
+ 
+      this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled');
+      if (this.noscript) {
         $.addClass(QRState.nodes.el, 'noscript-captcha');
       }
 
@@ -195,9 +202,9 @@ const Captcha = {
     prevNeeded: 0,
 
     noscriptURL() {
-      let lang;
       let url = `https://www.google.com/recaptcha/api/fallback?k=${meta.recaptchaKey}`;
-      if (lang = Conf['captchaLanguage'].trim()) {
+      const lang = Conf['captchaLanguage'].trim();
+      if (lang) {
         url += `&hl=${encodeURIComponent(lang)}`;
       }
       return url;
@@ -210,7 +217,7 @@ const Captcha = {
         if (needed && !this.prevNeeded) {
           this.setup(QRState.cooldown.auto && (d.activeElement === QRState.nodes.status));
         }
-        return this.prevNeeded = needed;
+        this.prevNeeded = needed;
       });
     },
 
@@ -283,11 +290,12 @@ const Captcha = {
     },
 
     afterSetup(mutations) {
-      for (var mutation of mutations) {
-        for (var node of mutation.addedNodes) {
-          var iframe, textarea;
-          if (iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node)) { this.setupIFrame(iframe); }
-          if (textarea = $.x('./descendant-or-self::textarea', node)) { this.setupTextArea(textarea); }
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          const iframe = $.x('./descendant-or-self::iframe[starts-with(@src, "https://www.google.com/recaptcha/")]', node);
+          if (iframe) { this.setupIFrame(iframe); }
+          const textarea = $.x('./descendant-or-self::textarea', node);
+          if (textarea) { this.setupTextArea(textarea); }
         }
       }
     },
@@ -303,7 +311,7 @@ const Captcha = {
       this.restoreCommentFocus();
       // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
       if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
-        return $.on(iframe.parentNode, 'scroll', function () { return this.scrollTop = 0; });
+        return $.on(iframe.parentNode, 'scroll', function () { this.scrollTop = 0; });
       }
     },
 
@@ -334,7 +342,8 @@ const Captcha = {
       if (!QRState.nodes?.el) { return; }
       try {
         QRState.nodes.com.focus();
-      } catch (error) {}
+      } catch (error_) { // NOSONAR
+      }
     },
 
     restoreCommentFocus() {
@@ -367,7 +376,7 @@ const Captcha = {
     fixQRPosition() {
       if (QRState.nodes.el.getBoundingClientRect().bottom > doc.clientHeight) {
         QRState.nodes.el.style.top = '';
-        return QRState.nodes.el.style.bottom = '0px';
+        QRState.nodes.el.style.bottom = '0px';
       }
     },
 
@@ -390,6 +399,28 @@ const Captcha = {
       return Captcha.cache.getOne(isReply);
     },
 
+    saveNeeded(focus) {
+      if (focus) {
+        if (QRState.cooldown.auto || Conf['Post on Captcha Completion']) {
+          this.nodes.counter.focus();
+        } else {
+          QRState.nodes.status.focus();
+        }
+      }
+      this.reload();
+    },
+
+    saveNotNeeded(pasted, focus) {
+      if (pasted) {
+        this.destroy();
+      } else if (this.timeouts.destroy == null) {
+        this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND);
+      }
+      if (focus) {
+        QRState.nodes.status.focus();
+      }
+    },
+
     save(pasted, token) {
       Captcha.cache.save({
         response: token || $('textarea', this.nodes.container).value,
@@ -398,21 +429,9 @@ const Captcha = {
 
       const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
       if (Captcha.cache.needed()) {
-        if (focus) {
-          if (QRState.cooldown.auto || Conf['Post on Captcha Completion']) {
-            this.nodes.counter.focus();
-          } else {
-            QRState.nodes.status.focus();
-          }
-        }
-        this.reload();
+        this.saveNeeded(focus);
       } else {
-        if (pasted) {
-          this.destroy();
-        } else {
-          if (this.timeouts.destroy == null) { this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND); }
-        }
-        if (focus) { QRState.nodes.status.focus(); }
+        this.saveNotNeeded(pasted, focus);
       }
 
       if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) { return QRState.submit(); }

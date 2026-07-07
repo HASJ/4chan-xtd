@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { g, Conf, doc, d } from "../globals/globals";
+import { g, Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { isPassEnabled } from "../platform/helpers";
 
@@ -22,17 +22,20 @@ const CaptchaReplace = {
   },
 
   noscript() {
-    let noscript, original, toggle;
-    if (!((original = $('#g-recaptcha')) && (noscript = $('noscript', original.parentNode)))) { return; }
+    const original = $('#g-recaptcha');
+    if (!original) { return; }
+    const noscript = $('noscript', original.parentNode);
+    if (!noscript) { return; }
     const span = $.el('span',
       {id: 'captcha-forced-noscript'});
     $.replace(noscript, span);
     $.rm(original);
-    const insert = function() {
+    const insert = () => {
       span.innerHTML = noscript.textContent;
-      this.iframe($('iframe[src^="https://www.google.com/recaptcha/"]', span));
+      CaptchaReplace.iframe($('iframe[src^="https://www.google.com/recaptcha/"]', span));
     };
-    if (toggle = $('#togglePostFormLink a, #form-link')) {
+    const toggle = $('#togglePostFormLink a, #form-link');
+    if (toggle) {
       $.on(toggle, 'click', insert);
     } else {
       insert();
@@ -40,8 +43,8 @@ const CaptchaReplace = {
   },
 
   iframe(iframe) {
-    let lang;
-    if (lang = Conf['captchaLanguage'].trim()) {
+    const lang = Conf['captchaLanguage'].trim();
+    if (lang) {
       const src = /[?&]hl=/.test(iframe.src) ?
         iframe.src.replace(/([?&]hl=)[^&]*/, '$1' + encodeURIComponent(lang))
       :
