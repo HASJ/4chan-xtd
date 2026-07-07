@@ -1,9 +1,8 @@
-﻿// @ts-nocheck
 import DataBoard from "../classes/DataBoard";
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 
-const PostSuccessful = {
+const PostSuccessful: any = {
   init() {
     if (!Conf['Remember Your Posts']) { return; }
     return $.ready(this.ready);

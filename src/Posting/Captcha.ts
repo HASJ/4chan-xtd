@@ -1,4 +1,3 @@
-// @ts-nocheck
 import $ from "../platform/$";
 import CaptchaReplace from "./Captcha.replace";
 import CaptchaT from "./Captcha.t";
@@ -7,8 +6,9 @@ import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
 import { Conf, d, doc } from "../globals/globals";
 import { isPassEnabled, keyCode, MINUTE, SECOND } from "../platform/helpers";
+import { getQRCommentInput } from "./QRBridge";
 
-const Captcha = {
+const Captcha: any = {
   cache: {
     init() {
       $.on(d, 'SaveCaptcha', e => {
@@ -427,7 +427,7 @@ const Captcha = {
         timeout: Date.now() + this.lifetime
       });
 
-      const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test(d.activeElement.src);
+      const focus = (d.activeElement?.nodeName === 'IFRAME') && /https?:\/\/www\.google\.com\/recaptcha\//.test((d.activeElement as HTMLIFrameElement).src);
       if (Captcha.cache.needed()) {
         this.saveNeeded(focus);
       } else {

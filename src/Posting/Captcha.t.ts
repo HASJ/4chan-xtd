@@ -1,11 +1,10 @@
-// @ts-nocheck
 import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
 import { isPassEnabled, keyCode } from "../platform/helpers";
 
-const CaptchaT = {
+const CaptchaT: any = {
   init() {
     if (isPassEnabled()) { return; }
     if (!(this.isEnabled = !!$('#t-root') || !$.id('postForm'))) { return; }
@@ -542,7 +541,7 @@ const CaptchaT = {
   },
 
   getOne() {
-    let response = {};
+    let response: any = {};
     if (this.nodes.container) {
       for (var key of ['t-response', 't-challenge']) {
         response[key] = $(`[name='${key}']`, this.nodes.container).value;

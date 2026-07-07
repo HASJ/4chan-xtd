@@ -6,7 +6,7 @@
  * helpers so the QR/captcha dependency stays one-way and acyclic.
  *
  * IMPORTANT: To maintain the acyclic dependency graph, this module must
- * NOT import QR.ts, Captcha.js, or Captcha.t.js.
+ * NOT import QR.ts, Captcha.ts, or Captcha.t.ts.
  */
 export interface QRCaptchaPost {
   thread: string | number;

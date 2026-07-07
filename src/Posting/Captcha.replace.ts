@@ -1,9 +1,8 @@
-// @ts-nocheck
 import { g, Conf, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { isPassEnabled } from "../platform/helpers";
 
-const CaptchaReplace = {
+const CaptchaReplace: any = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || isPassEnabled()) { return; }
 

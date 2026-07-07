@@ -1,8 +1,7 @@
-﻿// @ts-nocheck
 import { d } from "../globals/globals";
 import $ from "../platform/$";
 
-const PostRedirect = {
+const PostRedirect: any = {
   init() {
     return $.on(d, 'QRPostSuccessful', e => {
       if (!e.detail.redirect) { return; }
