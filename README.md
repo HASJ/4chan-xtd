@@ -2,8 +2,13 @@
 
 4chan XTd is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has no affiliation with it.
 
-4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for [this PR](https://github.com/ccd0/4chan-x/pull/3341). It is a migration of 4chan X from CoffeeScript to TypeScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. The codebase has been fully migrated to TypeScript, and all build tools and source modules compile with strict type checks.
+4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for [this PR](https://github.com/ccd0/4chan-x/pull/3341). It is a migration of 4chan X from CoffeeScript to TypeScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. 
 
+## Architecture & Development
+
+The codebase has been fully migrated to TypeScript, and all build tools and source modules compile with strict type checks. This provides better maintainability, stricter typing, and a more robust build system.
+
+For developers and contributors, please see [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive into the repository's structure, singleton architecture, and build process.
 New features since the fork include:
 
 - Fetching the thread from an external archive and inserting deleted posts
