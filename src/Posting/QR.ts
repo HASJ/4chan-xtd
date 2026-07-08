@@ -25,6 +25,7 @@ import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import * as MimeTypes from '../globals/MimeTypes';
 import QRState from '../globals/QRState';
+import { registerQRCaptchaBridge } from './QRBridge';
 
 interface ConvertOptions {
   /** Max file size, optional, but passing it will prevent re-calculation */

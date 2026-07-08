@@ -156,7 +156,11 @@ const Captcha: any = {
  
       this.noscript = Conf['Force Noscript Captcha'] || !$.hasClass(doc, 'js-enabled');
       if (this.noscript) {
-        $.addClass(QRState.nodes.el, 'noscript-captcha');
+        if (QRState.nodes) {
+          $.addClass(QRState.nodes.el, 'noscript-captcha');
+        } else {
+          $.on(d, 'QRDialogCreation', () => $.addClass(QRState.nodes.el, 'noscript-captcha'));
+        }
       }
 
       Captcha.cache.init();

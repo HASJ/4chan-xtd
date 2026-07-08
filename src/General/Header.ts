@@ -16,13 +16,13 @@ var Header: any = {
   init() {
     $.onExists(doc, 'body', () => {
       if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
-      $.add(this.bar, [this.noticesRoot, this.toggle]);
-      $.prepend(d.body, this.bar);
+      $.add(Header.bar, [Header.noticesRoot, Header.toggle]);
+      $.prepend(d.body, Header.bar);
       $.add(d.body, UIState.hoverUI);
-      return this.setBarPosition(Conf['Bottom Header']);
+      return Header.setBarPosition(Conf['Bottom Header']);
     });
 
-    this.menu = (UIState.headerMenu = new UI.Menu('header'));
+    Header.menu = (UIState.headerMenu = new UI.Menu('header'));
 
     const menuButton = $.el('span',
       {className: 'menu-button'}
@@ -45,44 +45,44 @@ var Header: any = {
     }
     );
 
-    this.barFixedToggler     = barFixedToggler.firstElementChild;
-    this.scrollHeaderToggler = scrollHeaderToggler.firstElementChild;
-    this.barPositionToggler  = barPositionToggler.firstElementChild;
-    this.linkJustifyToggler  = linkJustifyToggler.firstElementChild;
-    this.headerToggler       = headerToggler.firstElementChild;
-    this.footerToggler       = footerToggler.firstElementChild;
-    this.shortcutToggler     = shortcutToggler.firstElementChild;
-    this.customNavToggler    = customNavToggler.firstElementChild;
+    Header.barFixedToggler     = barFixedToggler.firstElementChild;
+    Header.scrollHeaderToggler = scrollHeaderToggler.firstElementChild;
+    Header.barPositionToggler  = barPositionToggler.firstElementChild;
+    Header.linkJustifyToggler  = linkJustifyToggler.firstElementChild;
+    Header.headerToggler       = headerToggler.firstElementChild;
+    Header.footerToggler       = footerToggler.firstElementChild;
+    Header.shortcutToggler     = shortcutToggler.firstElementChild;
+    Header.customNavToggler    = customNavToggler.firstElementChild;
 
-    $.on(menuButton,           'click',  this.menuToggle);
-    $.on(this.headerToggler,       'change', this.toggleBarVisibility);
-    $.on(this.barFixedToggler,     'change', this.toggleBarFixed);
-    $.on(this.barPositionToggler,  'change', this.toggleBarPosition);
-    $.on(this.scrollHeaderToggler, 'change', this.toggleHideBarOnScroll);
-    $.on(this.linkJustifyToggler,  'change', this.toggleLinkJustify);
-    $.on(this.footerToggler,       'change', this.toggleFooterVisibility);
-    $.on(this.shortcutToggler,     'change', this.toggleShortcutIcons);
-    $.on(this.customNavToggler,    'change', this.toggleCustomNav);
-    $.on(editCustomNav,        'click',  this.editCustomNav);
+    $.on(menuButton,           'click',  Header.menuToggle);
+    $.on(Header.headerToggler,       'change', Header.toggleBarVisibility);
+    $.on(Header.barFixedToggler,     'change', Header.toggleBarFixed);
+    $.on(Header.barPositionToggler,  'change', Header.toggleBarPosition);
+    $.on(Header.scrollHeaderToggler, 'change', Header.toggleHideBarOnScroll);
+    $.on(Header.linkJustifyToggler,  'change', Header.toggleLinkJustify);
+    $.on(Header.footerToggler,       'change', Header.toggleFooterVisibility);
+    $.on(Header.shortcutToggler,     'change', Header.toggleShortcutIcons);
+    $.on(Header.customNavToggler,    'change', Header.toggleCustomNav);
+    $.on(editCustomNav,        'click',  Header.editCustomNav);
 
-    this.setBarFixed(Conf['Fixed Header']);
-    this.setHideBarOnScroll(Conf['Header auto-hide on scroll']);
-    this.setBarVisibility(Conf['Header auto-hide']);
-    this.setLinkJustify(Conf['Centered links']);
-    this.setShortcutIcons(Conf['Shortcut Icons']);
-    this.setFooterVisibility(Conf['Bottom Board List']);
+    Header.setBarFixed(Conf['Fixed Header']);
+    Header.setHideBarOnScroll(Conf['Header auto-hide on scroll']);
+    Header.setBarVisibility(Conf['Header auto-hide']);
+    Header.setLinkJustify(Conf['Centered links']);
+    Header.setShortcutIcons(Conf['Shortcut Icons']);
+    Header.setFooterVisibility(Conf['Bottom Board List']);
 
-    $.sync('Fixed Header',               this.setBarFixed);
-    $.sync('Header auto-hide on scroll', this.setHideBarOnScroll);
-    $.sync('Bottom Header',              this.setBarPosition);
-    $.sync('Shortcut Icons',             this.setShortcutIcons);
-    $.sync('Header auto-hide',           this.setBarVisibility);
-    $.sync('Centered links',             this.setLinkJustify);
-    $.sync('Bottom Board List',          this.setFooterVisibility);
+    $.sync('Fixed Header',               Header.setBarFixed);
+    $.sync('Header auto-hide on scroll', Header.setHideBarOnScroll);
+    $.sync('Bottom Header',              Header.setBarPosition);
+    $.sync('Shortcut Icons',             Header.setShortcutIcons);
+    $.sync('Header auto-hide',           Header.setBarVisibility);
+    $.sync('Centered links',             Header.setLinkJustify);
+    $.sync('Bottom Board List',          Header.setFooterVisibility);
 
     UIState.addShortcut('menu', menuButton, 900);
 
-    this.menu.addEntry({
+    Header.menu.addEntry({
       el: $.el('span',
         {textContent: 'Header'}),
       order: 107,
@@ -106,11 +106,11 @@ var Header: any = {
           {el: editCustomNav}
       ]});
 
-    $.on(d, 'CreateNotification', this.createNotification);
+    $.on(d, 'CreateNotification', Header.createNotification);
 
-    this.setBoardList();
+    Header.setBoardList();
 
-    $.onExists(doc, `${g.SITE.selectors.boardList} + *`, this.generateFullBoardList);
+    $.onExists(doc, `${g.SITE.selectors.boardList} + *`, Header.generateFullBoardList);
 
     $.ready(function() {
       const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
@@ -126,11 +126,11 @@ var Header: any = {
         $.before(absbot, footer);
         $.global('stubCloneTopNav');
       }
-      if (this.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
-        for (var a of $$('a', this.bottomBoardList)) {
+      if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
+        for (var a of $$('a', Header.bottomBoardList)) {
           if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
         }
-        return updateBoardListLinks(this.bottomBoardList);
+        return updateBoardListLinks(Header.bottomBoardList);
       }
     });
 
@@ -148,7 +148,7 @@ var Header: any = {
       $.on(cs, 'click', () => $.id('settingsWindowLink').click());
     }
 
-    return this.enableDesktopNotifications();
+    return Header.enableDesktopNotifications();
   },
 
   bar: UIState.headerBar,
@@ -164,20 +164,20 @@ var Header: any = {
 
   setBoardList() {
     let boardList;
-    this.boardList = (boardList = $.el('span',
+    Header.boardList = (boardList = $.el('span',
       {id: 'board-list'}));
     $.extend(boardList, {innerHTML: "<span id=\"custom-board-list\"></span><span id=\"full-board-list\" hidden><span class=\"hide-board-list-container brackets-wrap\"><a href=\"javascript:;\" class=\"hide-board-list-button\">&nbsp;-&nbsp;</a></span> <span class=\"boardList\"></span></span>"});
 
     const btn = $('.hide-board-list-button', boardList);
-    $.on(btn, 'click', this.toggleBoardList);
+    $.on(btn, 'click', Header.toggleBoardList);
 
-    $.prepend(this.bar, [this.boardList, this.shortcuts]);
+    $.prepend(Header.bar, [Header.boardList, Header.shortcuts]);
 
-    this.setCustomNav(Conf['Custom Board Navigation']);
-    this.generateBoardList(Conf['boardnav']);
+    Header.setCustomNav(Conf['Custom Board Navigation']);
+    Header.generateBoardList(Conf['boardnav']);
 
-    $.sync('Custom Board Navigation', this.setCustomNav);
-    return $.sync('boardnav', this.generateBoardList);
+    $.sync('Custom Board Navigation', Header.setCustomNav);
+    return $.sync('boardnav', Header.generateBoardList);
   },
 
   generateFullBoardList() {
@@ -187,7 +187,7 @@ var Header: any = {
     } else {
       nodes = [...$(g.SITE.selectors.boardList).cloneNode(true).childNodes];
     }
-    const fullBoardList = $('.boardList', this.boardList);
+    const fullBoardList = $('.boardList', Header.boardList);
     $.add(fullBoardList, nodes);
     for (var a of $$('a', fullBoardList)) {
       if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
@@ -196,7 +196,7 @@ var Header: any = {
   },
 
   generateBoardList(boardnav: string) {
-    const list = $('#custom-board-list', this.boardList);
+    const list = $('#custom-board-list', Header.boardList);
     $.rmAll(list);
     if (!boardnav) return;
     boardnav = boardnav.replace(/(\r\n|\n|\r)/g, ' ');
@@ -215,7 +215,7 @@ var Header: any = {
         currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
       } else {
         const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
-        const segmentNodes = (segment.match(re) || []).map((t) => this.mapCustomNavigation(t));
+        const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
         segmentNodes.forEach(node => currentContainer.appendChild(node));
       }
     });
@@ -249,7 +249,7 @@ var Header: any = {
         href: 'javascript:;'
       }
       );
-      $.on(a, 'click', this.toggleBoardList);
+      $.on(a, 'click', Header.toggleBoardList);
       return a;
     }
 
@@ -373,7 +373,7 @@ var Header: any = {
   },
 
   setLinkJustify(centered) {
-    this.linkJustifyToggler.checked = centered;
+    Header.linkJustifyToggler.checked = centered;
     if (centered) {
       return $.addClass(doc, 'centered-links');
     } else {
@@ -385,32 +385,32 @@ var Header: any = {
     $.event('CloseMenu', null);
     const centered = this.nodeName === 'INPUT' ?
       this.checked : undefined;
-    this.setLinkJustify(centered);
+    Header.setLinkJustify(centered);
     return $.set('Centered links', centered);
   },
 
   setBarFixed(fixed) {
-    this.barFixedToggler.checked = fixed;
+    Header.barFixedToggler.checked = fixed;
     if (fixed) {
       $.addClass(doc, 'fixed');
-      return $.addClass(this.bar, 'dialog');
+      return $.addClass(Header.bar, 'dialog');
     } else {
       $.rmClass(doc, 'fixed');
-      return $.rmClass(this.bar, 'dialog');
+      return $.rmClass(Header.bar, 'dialog');
     }
   },
 
   toggleBarFixed() {
     $.event('CloseMenu', null);
 
-    this.setBarFixed(this.checked);
+    Header.setBarFixed(this.checked);
 
     Conf['Fixed Header'] = this.checked;
     return $.set('Fixed Header',  this.checked);
   },
 
   setShortcutIcons(show) {
-    this.shortcutToggler.checked = show;
+    Header.shortcutToggler.checked = show;
     if (show) {
       return $.addClass(doc, 'shortcut-icons');
     } else {
@@ -421,16 +421,16 @@ var Header: any = {
   toggleShortcutIcons() {
     $.event('CloseMenu', null);
 
-    this.setShortcutIcons(this.checked);
+    Header.setShortcutIcons(this.checked);
 
     Conf['Shortcut Icons'] = this.checked;
     return $.set('Shortcut Icons',  this.checked);
   },
 
   setBarVisibility(hide) {
-    this.headerToggler.checked = hide;
+    Header.headerToggler.checked = hide;
     $.event('CloseMenu', null);
-    (hide ? $.addClass : $.rmClass)(this.bar, 'autohide');
+    (hide ? $.addClass : $.rmClass)(Header.bar, 'autohide');
     return (hide ? $.addClass : $.rmClass)(doc, 'autohide');
   },
 
@@ -438,11 +438,11 @@ var Header: any = {
     const hide = this.nodeName === 'INPUT' ?
       this.checked
     :
-      !$.hasClass(this.bar, 'autohide');
+      !$.hasClass(Header.bar, 'autohide');
 
     Conf['Header auto-hide'] = hide;
     $.set('Header auto-hide', hide);
-    this.setBarVisibility(hide);
+    Header.setBarVisibility(hide);
     const message = `The header bar will ${hide ?
       'automatically hide itself.'
     :
@@ -451,34 +451,34 @@ var Header: any = {
   },
 
   setHideBarOnScroll(hide) {
-    this.scrollHeaderToggler.checked = hide;
+    Header.scrollHeaderToggler.checked = hide;
     if (hide) {
-      $.on(window, 'scroll', this.hideBarOnScroll);
+      $.on(window, 'scroll', Header.hideBarOnScroll);
       return;
     }
-    $.off(window, 'scroll', this.hideBarOnScroll);
-    $.rmClass(this.bar, 'scroll');
-    return this.bar.classList.toggle('autohide', Conf['Header auto-hide']);
+    $.off(window, 'scroll', Header.hideBarOnScroll);
+    $.rmClass(Header.bar, 'scroll');
+    return Header.bar.classList.toggle('autohide', Conf['Header auto-hide']);
   },
 
   toggleHideBarOnScroll() {
     const hide = this.checked;
     $.cb.checked.call(this);
-    return this.setHideBarOnScroll(hide);
+    return Header.setHideBarOnScroll(hide);
   },
 
   hideBarOnScroll() {
     const offsetY = window.pageYOffset;
-    if (offsetY > (this.previousOffset || 0)) {
-      $.addClass(this.bar, 'autohide', 'scroll');
+    if (offsetY > (Header.previousOffset || 0)) {
+      $.addClass(Header.bar, 'autohide', 'scroll');
     } else {
-      $.rmClass(this.bar,  'autohide', 'scroll');
+      $.rmClass(Header.bar,  'autohide', 'scroll');
     }
-    return this.previousOffset = offsetY;
+    return Header.previousOffset = offsetY;
   },
 
   setBarPosition(bottom) {
-    if (this.barPositionToggler) this.barPositionToggler.checked = bottom;
+    if (Header.barPositionToggler) Header.barPositionToggler.checked = bottom;
     $.event('CloseMenu', null);
     const args = bottom ? [
       'bottom-header',
@@ -492,16 +492,16 @@ var Header: any = {
 
     $.addClass(doc, args[0]);
     $.rmClass(doc, args[1]);
-    return $[args[2]](this.bar, UIState.noticesRoot);
+    return $[args[2]](Header.bar, UIState.noticesRoot);
   },
 
   toggleBarPosition() {
     $.cb.checked.call(this);
-    return this.setBarPosition(this.checked);
+    return Header.setBarPosition(this.checked);
   },
 
   setFooterVisibility(hide) {
-    this.footerToggler.checked = hide;
+    Header.footerToggler.checked = hide;
     return doc.classList.toggle('hide-bottom-board-list', hide);
   },
 
@@ -511,7 +511,7 @@ var Header: any = {
       this.checked
     :
       $.hasClass(doc, 'hide-bottom-board-list');
-    this.setFooterVisibility(hide);
+    Header.setFooterVisibility(hide);
     $.set('Bottom Board List', hide);
     const message = hide ?
       'The bottom navigation will now be hidden.'
@@ -521,16 +521,16 @@ var Header: any = {
   },
 
   setCustomNav(show) {
-    this.customNavToggler.checked = show;
-    const cust = $('#custom-board-list', this.bar);
-    const full = $('#full-board-list',   this.bar);
+    Header.customNavToggler.checked = show;
+    const cust = $('#custom-board-list', Header.bar);
+    const full = $('#full-board-list',   Header.bar);
     const btn = $('.hide-board-list-container', full);
     return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
   },
 
   toggleCustomNav() {
     $.cb.checked.call(this);
-    return this.setCustomNav(this.checked);
+    return Header.setCustomNav(this.checked);
   },
 
   editCustomNav() {

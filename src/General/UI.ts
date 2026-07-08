@@ -19,6 +19,20 @@ export const dialog = function(id: string, properties: any) {
     id
   });
   if (properties) { $.extend(el, properties); }
+  
+  if (Conf[`${id}.position`]) {
+    el.style.cssText = Conf[`${id}.position`];
+  }
+
+  const move = $('.move', el) as HTMLElement;
+  if (move) {
+    $.on(move, 'touchstart mousedown', dragstart);
+    for (const child of Array.from(move.children)) {
+      if (!child.tagName) { continue; }
+      $.on(child as HTMLElement, 'touchstart mousedown', e => e.stopPropagation());
+    }
+  }
+
   return el;
 };
 
