@@ -21,13 +21,13 @@ var Nav: any = {
     const span = $.el('span',
       {id: 'navlinks'});
     const prev = $.el('a', {
-      textContent: 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â²',
+      textContent: '▲',
       className: 'navlinks-navlink navlink-prev',
       href: 'javascript:;'
     }
     );
     const next = $.el('a', {
-      textContent: 'ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¼',
+      textContent: '▼',
       className: 'navlinks-navlink navlink-next',
       href: 'javascript:;'
     }

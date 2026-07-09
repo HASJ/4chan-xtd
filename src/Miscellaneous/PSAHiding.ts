@@ -38,7 +38,7 @@ var PSAHiding: any = {
       title:       'Mark announcement as read and hide.',
       className:   'hide-announcement-button',
       href:        'javascript:;',
-      textContent: 'Ã¢Å¾â€“Ã¯Â¸Å½',
+      textContent: '➖︎',
     }
     ));
     Icon.set(btn, 'squareMinus');
