@@ -3,6 +3,16 @@
  * Modifies the underlying ArrayBuffer in-place.
  */
 
+interface Mp4BoxHeader {
+  size: number;
+  boxOffset: number;
+}
+
+interface Vint {
+  val: number;
+  length: number;
+}
+
 export class VideoStripper {
   static async stripAudio(file: File): Promise<File> {
     try {
@@ -14,7 +24,7 @@ export class VideoStripper {
       if (file.type === 'video/mp4' || file.name.endsWith('.mp4')) {
         patched = this.stripMp4(uint8, dataView);
       } else if (file.type === 'video/webm' || file.name.endsWith('.webm')) {
-        patched = this.stripWebm(uint8, dataView);
+        patched = this.stripWebm(uint8);
       }
 
       if (patched) {
@@ -26,183 +36,227 @@ export class VideoStripper {
     return file; // If parsing fails or audio not found, return original file
   }
 
+  // --- MP4 (ISO BMFF) ---
+
+  private static readMp4BoxHeader(uint8: Uint8Array, view: DataView, offset: number): Mp4BoxHeader | null {
+    if (offset + 8 > uint8.length) return null;
+    let size = view.getUint32(offset, false);
+    let boxOffset = offset;
+
+    if (size === 1) {
+      if (offset + 16 > uint8.length) return null;
+      // 64-bit size, we only read the lower 32 bits since MP4 files on 4chan aren't that huge
+      size = view.getUint32(offset + 12, false);
+      boxOffset += 8;
+    }
+
+    if (size === 0) {
+      // Box extends to end of file
+      size = uint8.length - offset;
+    }
+
+    return { size, boxOffset };
+  }
+
+  private static mdiaHasAudioHandler(
+    uint8: Uint8Array,
+    view: DataView,
+    mdiaOffset: number,
+    mdiaEnd: number,
+    decoder: TextDecoder
+  ): boolean {
+    while (mdiaOffset < mdiaEnd) {
+      if (mdiaOffset + 8 > mdiaEnd) break;
+      let boxSize = view.getUint32(mdiaOffset, false);
+      if (boxSize === 0) boxSize = mdiaEnd - mdiaOffset;
+
+      const boxType = decoder.decode(uint8.subarray(mdiaOffset + 4, mdiaOffset + 8));
+      if (boxType === 'hdlr' && mdiaOffset + 20 <= mdiaEnd) {
+        const handlerType = decoder.decode(uint8.subarray(mdiaOffset + 16, mdiaOffset + 20));
+        if (handlerType === 'soun') return true;
+      }
+      mdiaOffset += boxSize;
+    }
+    return false;
+  }
+
+  private static isAudioTrak(
+    uint8: Uint8Array,
+    view: DataView,
+    trakOffset: number,
+    trakEnd: number,
+    decoder: TextDecoder
+  ): boolean {
+    while (trakOffset < trakEnd) {
+      if (trakOffset + 8 > trakEnd) break;
+      let boxSize = view.getUint32(trakOffset, false);
+      if (boxSize === 0) boxSize = trakEnd - trakOffset;
+
+      const boxType = decoder.decode(uint8.subarray(trakOffset + 4, trakOffset + 8));
+      if (boxType === 'mdia' && this.mdiaHasAudioHandler(uint8, view, trakOffset + 8, trakOffset + boxSize, decoder)) {
+        return true;
+      }
+      trakOffset += boxSize;
+    }
+    return false;
+  }
+
+  private static stripAudioTraks(
+    uint8: Uint8Array,
+    view: DataView,
+    moovOffset: number,
+    moovEnd: number,
+    decoder: TextDecoder
+  ): boolean {
+    let stripped = false;
+    while (moovOffset < moovEnd) {
+      if (moovOffset + 8 > moovEnd) break;
+      let boxSize = view.getUint32(moovOffset, false);
+      if (boxSize === 0) boxSize = moovEnd - moovOffset;
+
+      const boxType = decoder.decode(uint8.subarray(moovOffset + 4, moovOffset + 8));
+      if (boxType === 'trak' && this.isAudioTrak(uint8, view, moovOffset + 8, moovOffset + boxSize, decoder)) {
+        // Overwrite 'trak' with 'free'
+        uint8[moovOffset + 4] = 0x66; // 'f'
+        uint8[moovOffset + 5] = 0x72; // 'r'
+        uint8[moovOffset + 6] = 0x65; // 'e'
+        uint8[moovOffset + 7] = 0x65; // 'e'
+        stripped = true;
+      }
+      moovOffset += boxSize;
+    }
+    return stripped;
+  }
+
   private static stripMp4(uint8: Uint8Array, view: DataView): boolean {
     let offset = 0;
     let stripped = false;
-    const utf8Decoder = new TextDecoder('utf8');
+    const decoder = new TextDecoder('utf8');
 
     while (offset < uint8.length) {
-      if (offset + 8 > uint8.length) break;
-      let size = view.getUint32(offset, false);
-      let boxOffset = offset;
-      
-      if (size === 1) {
-        if (offset + 16 > uint8.length) break;
-        // 64-bit size, we only read the lower 32 bits since MP4 files on 4chan aren't that huge
-        size = view.getUint32(offset + 12, false);
-        boxOffset += 8;
-      }
-      
-      if (size === 0) {
-        // Box extends to end of file
-        size = uint8.length - offset;
-      }
+      const header = this.readMp4BoxHeader(uint8, view, offset);
+      if (!header) break;
+      const { size, boxOffset } = header;
 
-      const type = utf8Decoder.decode(uint8.subarray(boxOffset + 4, boxOffset + 8));
-      
-      if (type === 'moov') {
-        let moovOffset = boxOffset + 8;
-        let moovEnd = offset + size;
-        
-        while (moovOffset < moovEnd) {
-          if (moovOffset + 8 > moovEnd) break;
-          let boxSize = view.getUint32(moovOffset, false);
-          if (boxSize === 0) boxSize = moovEnd - moovOffset;
-          
-          let boxType = utf8Decoder.decode(uint8.subarray(moovOffset + 4, moovOffset + 8));
-          if (boxType === 'trak') {
-            let isAudio = false;
-            let trakOffset = moovOffset + 8;
-            let trakEnd = moovOffset + boxSize;
-            
-            while (trakOffset < trakEnd) {
-              if (trakOffset + 8 > trakEnd) break;
-              let tBoxSize = view.getUint32(trakOffset, false);
-              if (tBoxSize === 0) tBoxSize = trakEnd - trakOffset;
-              
-              let tBoxType = utf8Decoder.decode(uint8.subarray(trakOffset + 4, trakOffset + 8));
-              if (tBoxType === 'mdia') {
-                let mdiaOffset = trakOffset + 8;
-                let mdiaEnd = trakOffset + tBoxSize;
-                
-                while (mdiaOffset < mdiaEnd) {
-                  if (mdiaOffset + 8 > mdiaEnd) break;
-                  let mBoxSize = view.getUint32(mdiaOffset, false);
-                  if (mBoxSize === 0) mBoxSize = mdiaEnd - mdiaOffset;
-                  
-                  let mBoxType = utf8Decoder.decode(uint8.subarray(mdiaOffset + 4, mdiaOffset + 8));
-                  if (mBoxType === 'hdlr') {
-                    if (mdiaOffset + 20 <= mdiaEnd) {
-                      let handlerType = utf8Decoder.decode(uint8.subarray(mdiaOffset + 16, mdiaOffset + 20));
-                      if (handlerType === 'soun') {
-                        isAudio = true;
-                      }
-                    }
-                  }
-                  mdiaOffset += mBoxSize;
-                }
-              }
-              trakOffset += tBoxSize;
-            }
-            if (isAudio) {
-              // Overwrite 'trak' with 'free'
-              uint8[moovOffset + 4] = 0x66; // 'f'
-              uint8[moovOffset + 5] = 0x72; // 'r'
-              uint8[moovOffset + 6] = 0x65; // 'e'
-              uint8[moovOffset + 7] = 0x65; // 'e'
-              stripped = true;
-            }
-          }
-          moovOffset += boxSize;
-        }
+      const type = decoder.decode(uint8.subarray(boxOffset + 4, boxOffset + 8));
+      if (type === 'moov' && this.stripAudioTraks(uint8, view, boxOffset + 8, offset + size, decoder)) {
+        stripped = true;
       }
       offset += size;
     }
     return stripped;
   }
 
-  private static stripWebm(uint8: Uint8Array, view: DataView): boolean {
+  // --- WebM (EBML/Matroska) ---
+
+  private static readVint(uint8: Uint8Array, off: number): Vint {
+    if (off >= uint8.length) return { val: 0, length: 1 };
+    const byte = uint8[off];
+    let mask = 0x80;
+    let length = 1;
+    while (!(byte & mask) && length < 8) {
+      mask >>= 1;
+      length++;
+    }
+    let val = byte & ~mask;
+    for (let i = 1; i < length; i++) {
+      if (off + i >= uint8.length) break;
+      val = (val << 8) | uint8[off + i];
+    }
+    // Handle unknown size
+    if (length === 8 && val === 0xffffffffffffff) val = -1;
+    return { val, length };
+  }
+
+  private static skipVintElement(uint8: Uint8Array, offset: number): number {
+    let idLength = 1;
+    while (!(uint8[offset] & (0x80 >> (idLength - 1))) && idLength < 8) idLength++;
+    const sizeInfo = this.readVint(uint8, offset + idLength);
+    return offset + idLength + sizeInfo.length + sizeInfo.val;
+  }
+
+  private static isAudioTrackEntry(uint8: Uint8Array, entryDataOffset: number, entryEnd: number): boolean {
+    let curr = entryDataOffset;
+    while (curr < entryEnd) {
+      if (curr >= uint8.length) break;
+      if (uint8[curr] === 0x83) {
+        // TrackType
+        const typeSizeInfo = this.readVint(uint8, curr + 1);
+        const typeValInfo = this.readVint(uint8, curr + 1 + typeSizeInfo.length);
+        if (typeValInfo.val === 2) return true; // Audio
+        curr += 1 + typeSizeInfo.length + typeSizeInfo.val;
+      } else {
+        curr = this.skipVintElement(uint8, curr);
+      }
+    }
+    return false;
+  }
+
+  private static processTracks(uint8: Uint8Array, tracksOffset: number, tracksEnd: number): boolean {
+    let stripped = false;
+    while (tracksOffset < tracksEnd) {
+      if (tracksOffset >= uint8.length) break;
+      if (uint8[tracksOffset] === 0xae) {
+        // TrackEntry
+        const entryStart = tracksOffset;
+        const entrySizeInfo = this.readVint(uint8, tracksOffset + 1);
+        const entryDataOffset = tracksOffset + 1 + entrySizeInfo.length;
+        const entryEnd = entryDataOffset + entrySizeInfo.val;
+
+        if (this.isAudioTrackEntry(uint8, entryDataOffset, entryEnd)) {
+          // Overwrite 'TrackEntry' (AE) with 'Void' (EC)
+          uint8[entryStart] = 0xec;
+          stripped = true;
+        }
+        tracksOffset = entryEnd;
+      } else {
+        tracksOffset = this.skipVintElement(uint8, tracksOffset);
+      }
+    }
+    return stripped;
+  }
+
+  private static processSegment(uint8: Uint8Array, segStart: number, segEnd: number): { stripped: boolean; offset: number } {
+    let stripped = false;
+    let offset = segStart;
+
+    while (offset < segEnd) {
+      if (offset + 3 >= uint8.length) break;
+      // Tracks
+      if (uint8[offset] === 0x16 && uint8[offset + 1] === 0x54 && uint8[offset + 2] === 0xae && uint8[offset + 3] === 0x6b) {
+        const tSizeInfo = this.readVint(uint8, offset + 4);
+        const tracksOffset = offset + 4 + tSizeInfo.length;
+        const tracksEnd = tracksOffset + tSizeInfo.val;
+        if (this.processTracks(uint8, tracksOffset, tracksEnd)) stripped = true;
+        offset = tracksEnd;
+      } else {
+        offset = this.skipVintElement(uint8, offset);
+      }
+    }
+    return { stripped, offset };
+  }
+
+  private static stripWebm(uint8: Uint8Array): boolean {
     let offset = 0;
     let stripped = false;
-    
-    function readVint(off: number) {
-      if (off >= uint8.length) return { val: 0, length: 1 };
-      let byte = uint8[off];
-      let mask = 0x80;
-      let length = 1;
-      while (!(byte & mask) && length < 8) {
-        mask >>= 1;
-        length++;
-      }
-      let val = byte & ~mask;
-      for (let i = 1; i < length; i++) {
-        if (off + i >= uint8.length) break;
-        val = (val << 8) | uint8[off + i];
-      }
-      // Handle unknown size
-      if (length === 8 && val === 0xFFFFFFFFFFFFFF) val = -1;
-      return { val, length };
-    }
 
     while (offset < uint8.length) {
       if (offset + 3 >= uint8.length) break;
       // EBML header
-      if (uint8[offset] === 0x1A && uint8[offset+1] === 0x45 && uint8[offset+2] === 0xDF && uint8[offset+3] === 0xA3) {
-        let sizeInfo = readVint(offset + 4);
+      if (uint8[offset] === 0x1a && uint8[offset + 1] === 0x45 && uint8[offset + 2] === 0xdf && uint8[offset + 3] === 0xa3) {
+        const sizeInfo = this.readVint(uint8, offset + 4);
         offset += 4 + sizeInfo.length + sizeInfo.val;
         continue;
       }
       // Segment
-      if (uint8[offset] === 0x18 && uint8[offset+1] === 0x53 && uint8[offset+2] === 0x80 && uint8[offset+3] === 0x67) {
-        let sizeInfo = readVint(offset + 4);
-        offset += 4 + sizeInfo.length;
-        let segEnd = sizeInfo.val === -1 ? uint8.length : offset + sizeInfo.val;
-        
-        while (offset < segEnd) {
-          if (offset + 3 >= uint8.length) break;
-          // Tracks
-          if (uint8[offset] === 0x16 && uint8[offset+1] === 0x54 && uint8[offset+2] === 0xAE && uint8[offset+3] === 0x6B) {
-            let tSizeInfo = readVint(offset + 4);
-            let tracksOffset = offset + 4 + tSizeInfo.length;
-            let tracksEnd = tracksOffset + tSizeInfo.val;
-            
-            while (tracksOffset < tracksEnd) {
-              if (tracksOffset >= uint8.length) break;
-              if (uint8[tracksOffset] === 0xAE) { // TrackEntry
-                let entryStart = tracksOffset;
-                let entrySizeInfo = readVint(tracksOffset + 1);
-                let entryDataOffset = tracksOffset + 1 + entrySizeInfo.length;
-                let entryEnd = entryDataOffset + entrySizeInfo.val;
-                
-                let isAudio = false;
-                let curr = entryDataOffset;
-                while (curr < entryEnd) {
-                  if (curr >= uint8.length) break;
-                  if (uint8[curr] === 0x83) { // TrackType
-                    let typeSizeInfo = readVint(curr + 1);
-                    let typeValInfo = readVint(curr + 1 + typeSizeInfo.length);
-                    if (typeValInfo.val === 2) isAudio = true; // Audio
-                    curr += 1 + typeSizeInfo.length + typeSizeInfo.val;
-                  } else {
-                    // Variable length ID
-                    let idLength = 1;
-                    while (!(uint8[curr] & (0x80 >> (idLength - 1))) && idLength < 8) idLength++;
-                    let eSizeInfo = readVint(curr + idLength);
-                    curr += idLength + eSizeInfo.length + eSizeInfo.val;
-                  }
-                }
-                if (isAudio) {
-                  // Overwrite 'TrackEntry' (AE) with 'Void' (EC)
-                  uint8[entryStart] = 0xEC;
-                  stripped = true;
-                }
-                tracksOffset = entryEnd;
-              } else {
-                let idLength = 1;
-                while (!(uint8[tracksOffset] & (0x80 >> (idLength - 1))) && idLength < 8) idLength++;
-                let teSizeInfo = readVint(tracksOffset + idLength);
-                tracksOffset += idLength + teSizeInfo.length + teSizeInfo.val;
-              }
-            }
-            offset = tracksEnd;
-          } else {
-            // Skip other segment elements
-            let idLength = 1;
-            while (!(uint8[offset] & (0x80 >> (idLength - 1))) && idLength < 8) idLength++;
-            let eSizeInfo = readVint(offset + idLength);
-            offset += idLength + eSizeInfo.length + eSizeInfo.val;
-          }
-        }
+      if (uint8[offset] === 0x18 && uint8[offset + 1] === 0x53 && uint8[offset + 2] === 0x80 && uint8[offset + 3] === 0x67) {
+        const sizeInfo = this.readVint(uint8, offset + 4);
+        const segStart = offset + 4 + sizeInfo.length;
+        const segEnd = sizeInfo.val === -1 ? uint8.length : segStart + sizeInfo.val;
+
+        const result = this.processSegment(uint8, segStart, segEnd);
+        if (result.stripped) stripped = true;
+        offset = result.offset;
       } else {
         break;
       }
