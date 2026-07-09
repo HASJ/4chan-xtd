@@ -142,20 +142,20 @@ body.hasDropDownNav{
 }
 
 /* Tinyboard / vichan conflicts */
-#menu > .hide-thread-link {
+.menu > .hide-thread-link {
   width: auto;
   height: auto;
   overflow: visible;
   background-image: none;
 }
-#menu label.entry {
+.menu label.entry {
   display: block;
 }
 #fourchanx-settings label {
   display: inline;
 }
 .intro a[href="javascript:;"],
-#menu a {
+.menu a {
   margin: 0;
 }
 .gal-buttons.gal-buttons a {
@@ -223,7 +223,7 @@ audio.controls-added {
 #qp, #ihover {
   z-index: 60;
 }
-#menu, .gal-buttons {
+.menu, .gal-buttons {
   z-index: 50;
 }
 #updater, #thread-stats {
@@ -2144,12 +2144,12 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
 .postInfo > .menu-button {
   margin: 0 4px;
 }
-#menu {
+.menu {
   position: fixed;
   outline: none;
   font-weight: normal;
 }
-#menu, .submenu {
+.menu, .submenu {
   border-radius: 3px;
   padding-top: 1px;
   padding-bottom: 3px;
