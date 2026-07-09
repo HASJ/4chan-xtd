@@ -140,7 +140,8 @@
     "build:crx": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -platform=crx",
     "build:userscript:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript",
     "build:crx:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=crx",
-    "build:all": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=crx"
+    "build:all": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=crx",
+    "sonar": "node tools/sonar-local.mjs"
   },
   "allowScripts": {
     "@fortawesome/fontawesome-common-types@6.5.1": true,
