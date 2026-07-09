@@ -45,7 +45,7 @@ export const Menu = class Menu {
     this.type = type;
     this.entries = [];
     this.el = $.el('div', {
-      className: 'menu',
+      className: 'dialog menu',
       id:        `${this.type}-menu`,
       tabIndex:  0
     });
@@ -54,7 +54,7 @@ export const Menu = class Menu {
     });
     $.on(this.el, 'keydown', (e: KeyboardEvent) => this.onKeydown(e));
     $.on(d, 'click CloseMenu 4chanXInitFinished', () => this.close());
-    $.on(d, 'scroll visibilitychange', () => this.close());
+    $.on(d, 'visibilitychange', () => this.close());
   }
 
   onKeydown(e: KeyboardEvent) {
@@ -189,11 +189,16 @@ export const Menu = class Menu {
     e.preventDefault();
     $.event('CloseMenu', undefined);
     for (var entry of this.entries) {
-      var show = !entry.open || entry.open({
-        thread:  post.thread,
-        post,
-        isReply: post.isReply
-      });
+      var show;
+      try {
+        show = !entry.open || entry.open(post);
+      } catch (err) {
+        Callbacks.errorHandler?.([{
+          message: `Error in building the ${this.type} menu.`,
+          error: err
+        }]);
+        show = false;
+      }
       if (show) {
         $.add(this.el, entry.el);
       } else {
@@ -203,14 +208,26 @@ export const Menu = class Menu {
     if (!this.el.children.length) { return; }
 
     $.add(d.body, this.el);
-    const rect = a.getBoundingClientRect();
+    const bRect   = a.getBoundingClientRect();
+    const mRect   = this.el.getBoundingClientRect();
+    const cHeight = doc.clientHeight;
+    const cWidth  = doc.clientWidth;
+    const [top, bottom] = (bRect.top + bRect.height + mRect.height) < cHeight ?
+      [`${bRect.bottom}px`, '']
+    :
+      ['', `${cHeight - bRect.top}px`];
+    const [left, right] = (bRect.left + mRect.width) < cWidth ?
+      [`${bRect.left}px`, '']
+    :
+      ['', `${cWidth - bRect.right}px`];
     const {style} = this.el;
-    const top  = (rect.top + (rect.height / 2)) - (this.el.offsetHeight / 2);
-    const left = rect.left + rect.width;
-    style.top  = `${top  + window.pageYOffset}px`;
-    style.left = `${left + window.pageXOffset}px`;
+    style.top    = top;
+    style.bottom = bottom;
+    style.left   = left;
+    style.right  = right;
+    this.el.classList.toggle('left', !!right);
 
-    this.el.focus();
+    this.el.focus({preventScroll: true});
     return e.stopPropagation();
   }
 

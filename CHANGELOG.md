@@ -3,6 +3,13 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.2 (2026-07-09)
+
+- Bugfixes
+  - Fixed the post/header/gallery/thread-watcher dropdown menus (`...`) not opening at all: an argument-shape mismatch introduced during the TS migration made one entry (Copy Text) throw on every open, which aborted the whole menu with no error isolation to catch it.
+  - Fixed the menu closing itself instantly after opening, caused by focusing the newly-shown menu triggering a scroll-into-view that our own "close on scroll" listener picked up.
+  - Fixed the menu rendering with a transparent background and appearing at the bottom of the page instead of anchored to its button: it had lost its shared `dialog` styling class, and the stylesheet still targeted the old static `#menu` id instead of the current per-menu id.
+
 ### 2.30.1 (2026-07-09)
 
 - Bugfixes
