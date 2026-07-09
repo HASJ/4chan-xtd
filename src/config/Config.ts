@@ -484,10 +484,6 @@ const Config = {
         'The thread watcher will be visible when the page is loaded.',
         1
       ],
-      'Mark New IPs': [
-        false,
-        'Label each post from a new IP with the thread\'s current IP count.'
-      ],
       'Reply Pruning': [
         true,
         'Add option in header menu to hide old replies in long threads. Activated by default in stickies.'

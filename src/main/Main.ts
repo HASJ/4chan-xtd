@@ -67,7 +67,6 @@ import ThreadLinks from "../Miscellaneous/ThreadLinks";
 import Time from "../Miscellaneous/Time";
 import Tinyboard from "../Miscellaneous/Tinyboard";
 import Favicon from "../Monitoring/Favicon";
-import MarkNewIPs from "../Monitoring/MarkNewIPs";
 import ReplyPruning from "../Monitoring/ReplyPruning";
 import ThreadStats from "../Monitoring/ThreadStats";
 import ThreadUpdater from "../Monitoring/ThreadUpdater";
@@ -1033,7 +1032,6 @@ User agent: ${navigator.userAgent}\
     ['Thread Updater',            ThreadUpdater],
     ['Thread Watcher',            ThreadWatcher],
     ['Thread Watcher (Menu)',     ThreadWatcher.menu],
-    ['Mark New IPs',              MarkNewIPs],
     ['Index Navigation',          Nav],
     ['Keybinds',                  Keybinds],
     ['Banner',                    Banner],
