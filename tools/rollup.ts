@@ -31,6 +31,19 @@ const tsPlugin = (typescript as any)({
   compilerOptions: {
     outDir: buildDir,
     noEmit: false,
+    sourceMap: minify,
+  },
+});
+const eventPageTsPlugin = (typescript as any)({
+  tsconfig: false,
+  include: ["src/meta/**/*.ts", "src/PageContext/**/*.ts"],
+  compilerOptions: {
+    module: "ES2022",
+    moduleResolution: "bundler",
+    target: "ES2020",
+    importHelpers: true,
+    noEmit: false,
+    sourceMap: false,
   },
 });
 
@@ -194,7 +207,7 @@ const tsPlugin = (typescript as any)({
     const eventPage = await rollup({
       input: resolve(repoRoot, 'src/meta/eventPage.ts'),
       plugins: [
-        tsPlugin,
+        eventPageTsPlugin,
         noFormat ? undefined : fixTsOutputFormat({ include: ["**/*.ts", "**/*.tsx"] }),
         cleanupPlugin,
       ].filter(Boolean),

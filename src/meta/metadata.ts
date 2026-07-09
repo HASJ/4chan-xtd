@@ -21,7 +21,8 @@ export default async function generateMetadata(packageJson: any, fileName: any, 
 // @namespace    ${packageJson.name}
 // @description  ${packageJson.description}
 // @license      MIT; ${meta.license}
-//`;
+//
+`;
 
   output += (function () {
     return ([] as any[]).concat(
@@ -39,7 +40,8 @@ export default async function generateMetadata(packageJson: any, fileName: any, 
 // @connect      4channel.org
 // @connect      4cdn.org
 // @connect      4chenz.github.io
-//`;
+//
+`;
   output += archives.map(function (archive: any) {
     return '// @connect      ' + archive.domain;
   }).join('\n');
@@ -53,7 +55,8 @@ export default async function generateMetadata(packageJson: any, fileName: any, 
 // @connect      vimeo.com
 // @connect      www.youtube.com
 // @connect      *
-//`;
+//
+`;
   output += meta.grants.map(function (grant: any) {
     return '// @grant        ' + grant;
   }).join('\n');
