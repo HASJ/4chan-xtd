@@ -4,7 +4,7 @@ import $ from "../platform/$";
 import { dict } from "../platform/helpers";
 import QR from "../Posting/QR";
 import Menu from "./Menu";
-var DeleteLink: any = {
+const DeleteLink: any = {
   auto: [dict(), dict()],
 
   init() {
@@ -62,8 +62,8 @@ var DeleteLink: any = {
   },
 
   menuText() {
-    let seconds;
-    if ((seconds = DeleteLink.cooldown.seconds[DeleteLink.post.fullID])) {
+    const seconds = DeleteLink.cooldown.seconds[DeleteLink.post.fullID];
+    if (seconds) {
       return `Delete (${seconds})`;
     } else {
       return 'Delete';
@@ -107,7 +107,7 @@ var DeleteLink: any = {
     };
     form[+post.ID] = 'delete';
 
-    return $.ajax($.id('delform').action.replace(`/${g.BOARD}/`, `/${post.board}/`), {
+    return $.ajax($.id('delform').action.replace(`/${g.BOARD!.ID}/`, `/${post.board.ID}/`), {
       responseType: 'document',
       withCredentials: true,
       onloadend() { return DeleteLink.load(link, post, fileOnly, this.response); },
@@ -117,32 +117,35 @@ var DeleteLink: any = {
   },
 
   load(link, post, fileOnly, resDoc) {
-    let msg;
     if (!resDoc) {
-      new Notice('warning', 'Connection error, please retry.', 20);
       if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
-      return;
+      return new Notice('warning', 'Connection error, please retry.', 20);
     }
 
     link.textContent = DeleteLink.linkText(fileOnly);
     if (resDoc.title === '4chan - Banned') { // Ban/warn check
       const el = $.el('span', {innerHTML: "You can&#039;t delete posts because you are <a href=\"//www.4chan.org/banned\" target=\"_blank\">banned</a>."});
       return new Notice('warning', el, 20);
-    } else if (msg = resDoc.getElementById('errmsg')) { // error!
-      new Notice('warning', msg.textContent, 20);
+    }
+
+    const msg = resDoc.getElementById('errmsg');
+    if (msg) { // error!
       if (post.fullID === DeleteLink.post.fullID) { $.on(link, 'click', DeleteLink.toggle); }
       if (QR.cooldown.data && Conf['Cooldown'] && /\bwait\b/i.test(msg.textContent)) {
         DeleteLink.cooldown.start(post, 5);
         DeleteLink.auto[+fileOnly][post.fullID] = true;
-        return DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
+        DeleteLink.nodes.links[+fileOnly].textContent = DeleteLink.linkText(fileOnly);
       }
-    } else {
-      if (!fileOnly) { QR.cooldown.delete(post); }
-      if (resDoc.title === 'Updating index...') {
-        // We're 100% sure.
-        (post.origin || post).kill(fileOnly);
-      }
-      if (post.fullID === DeleteLink.post.fullID) { return link.textContent = 'Deleted'; }
+      return new Notice('warning', msg.textContent, 20);
+    }
+
+    if (!fileOnly) { QR.cooldown.delete(post); }
+    if (resDoc.title === 'Updating index...') {
+      // We're 100% sure.
+      (post.origin || post).kill(fileOnly);
+    }
+    if (post.fullID === DeleteLink.post.fullID) {
+      link.textContent = 'Deleted';
     }
   },
 
@@ -153,7 +156,7 @@ var DeleteLink: any = {
       // Already counting.
       if (DeleteLink.cooldown.seconds[post.fullID] != null) { return; }
 
-      if (seconds == null) { seconds = QR.cooldown.secondsDeletion(post); }
+      seconds ??= QR.cooldown.secondsDeletion(post);
       if (seconds > 0) {
         DeleteLink.cooldown.seconds[post.fullID] = seconds;
         return DeleteLink.cooldown.count(post);
@@ -167,7 +170,7 @@ var DeleteLink: any = {
         setTimeout(DeleteLink.cooldown.count, 1000, post);
       } else {
         delete DeleteLink.cooldown.seconds[post.fullID];
-        for (var fileOnly of [false, true]) {
+        for (const fileOnly of [false, true]) {
           if (DeleteLink.auto[+fileOnly][post.fullID]) {
             DeleteLink.delete(post, fileOnly);
           }

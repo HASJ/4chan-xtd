@@ -2,7 +2,7 @@ import { g, Conf, d } from "../globals/globals";
 import $ from "../platform/$";
 import Menu from "./Menu";
 
-var CopyTextLink: any = {
+const CopyTextLink: any = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
 
@@ -33,8 +33,10 @@ var CopyTextLink: any = {
     $.add(d.body, el);
     el.select();
     try {
-      d.execCommand('copy');
-    } catch (error) {}
+      (d as any).execCommand('copy');
+    } catch (error) {
+      console.warn('Copy failed', error);
+    }
     return $.rm(el);
   }
 };

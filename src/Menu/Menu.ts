@@ -4,7 +4,7 @@ import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
 
-var Menu: any = {
+const Menu: any = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
 

@@ -20,7 +20,7 @@ const ArchiveLink: any = {
       subEntries: []
     };
 
-    for (var type of [
+    for (const type of [
       ['Post',      'post'],
       ['Name',      'name'],
       ['Tripcode',  'tripcode'],
