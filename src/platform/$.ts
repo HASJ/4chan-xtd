@@ -23,7 +23,7 @@ $.ready = function(fc) {
     $.queueTask(fc);
     return;
   }
-  var cb = function() {
+  const cb = function() {
     $.off(d, 'DOMContentLoaded', cb);
     fc();
   };
@@ -35,8 +35,8 @@ $.formData = function(form) {
     return new FormData(form);
   }
   const fd = new FormData();
-  for (var key in form) {
-    var val = form[key];
+  for (const key in form) {
+    const val = form[key];
     if (val) {
       if ((typeof val === 'object') && 'newName' in val) {
         fd.append(key, val, val.newName);
@@ -49,8 +49,8 @@ $.formData = function(form) {
 };
 
 $.extend = function(object, properties) {
-  for (var key in properties) {
-    var val = properties[key];
+  for (const key in properties) {
+    const val = properties[key];
     object[key] = val;
   }
 };
@@ -66,11 +66,13 @@ $.ajax = (function() {
   if (window.wrappedJSObject && !XMLHttpRequest.wrappedJSObject) {
     try {
       pageXHR = XPCNativeWrapper(window.wrappedJSObject.XMLHttpRequest);
-    } catch (e) {}
+    } catch (e) {
+      c.warn(e);
+    }
   }
 
   return function (url, options={}) {
-    if (options.responseType == null) { options.responseType = 'json'; }
+    options.responseType ??= 'json';
     if (!options.type) { options.type = (options.form && 'post') || 'get'; }
     // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
     url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
@@ -79,8 +81,8 @@ $.ajax = (function() {
     try {
       r.open(type, url, true);
       const object = headers || {};
-      for (var key in object) {
-        var value = object[key];
+      for (const key in object) {
+        const value = object[key];
         r.setRequestHeader(key, value);
       }
       $.extend(r, {onloadend, timeout, responseType, withCredentials});
@@ -124,9 +126,9 @@ $.whenModified = function(url, bucket, cb, options={}) {
 (function() {
   const reqs = dict();
   $.cache = function(url, cb, options={}) {
-    let req;
+    let req = reqs[url];
     const {ajax} = options;
-    if (req = reqs[url]) {
+    if (req) {
       if (req.callbacks) {
         req.callbacks.push(cb);
       } else {
@@ -138,35 +140,39 @@ $.whenModified = function(url, bucket, cb, options={}) {
       if (!this.status) {
         delete reqs[url];
       }
-      for (cb of this.callbacks) {
-        (cb => $.queueTask(() => cb.call(this, {isCached: false})))(cb);
+      for (const callback of this.callbacks) {
+        $.queueTask(() => callback.call(this, {isCached: false}));
       }
       return delete this.callbacks;
     };
     req = (ajax || $.ajax)(url, {onloadend});
     req.callbacks = [cb];
-    return reqs[url] = req;
+    reqs[url] = req;
+    return req;
   };
-  return $.cleanCache = function(testf) {
-    for (var url in reqs) {
+  $.cleanCache = function(testf) {
+    for (const url in reqs) {
       if (testf(url)) {
         delete reqs[url];
       }
     }
   };
+  return $.cleanCache;
 })();
 
 $.cb = {
   checked(this: HTMLInputElement) {
     if ($.hasOwn(Conf, this.name)) {
       $.set(this.name, this.checked);
-      return Conf[this.name] = this.checked;
+      Conf[this.name] = this.checked;
+      return Conf[this.name];
     }
   },
   value(this: HTMLInputElement | HTMLTextAreaElement) {
     if ($.hasOwn(Conf, this.name)) {
       $.set(this.name, this.value.trim());
-      return Conf[this.name] = this.value;
+      Conf[this.name] = this.value;
+      return Conf[this.name];
     }
   }
 };
@@ -180,13 +186,14 @@ $.asap = function(test, cb) {
 };
 
 $.onExists = function(root, selector, cb) {
-  let el;
-  if (el = $(selector, root)) {
+  let el = $(selector, root);
+  if (el) {
     cb(el);
     return;
   }
-  var observer = new MutationObserver(function() {
-    if (el = $(selector, root)) {
+  const observer = new MutationObserver(function() {
+    el = $(selector, root);
+    if (el) {
       observer.disconnect();
       cb(el);
     }
@@ -251,11 +258,11 @@ $.tn = s => d.createTextNode(s);
 $.frag = () => d.createDocumentFragment();
 
 $.nodes = function(nodes) {
-  if (!(nodes instanceof Array)) {
+  if (!Array.isArray(nodes)) {
     return nodes;
   }
   const frag = $.frag();
-  for (var node of nodes) {
+  for (const node of nodes) {
     frag.appendChild(node);
   }
   return frag;
@@ -283,19 +290,19 @@ $.el = function <K extends keyof HTMLElementTagNameMap>(
 };
 
 $.on = function (el: EventTarget, events: string, handler: (event: Event) => void) {
-  for (var event of events.split(' ')) {
+  for (const event of events.split(' ')) {
     el.addEventListener(event, handler, false);
   }
 };
 
 $.off = function(el, events, handler) {
-  for (var event of events.split(' ')) {
+  for (const event of events.split(' ')) {
     el.removeEventListener(event, handler, false);
   }
 };
 
 $.one = function(el, events, handler) {
-  var cb = function(e) {
+  const cb = function(e) {
     $.off(el, events, cb);
     return handler.call(this, e);
   };
@@ -316,24 +323,25 @@ if (platform === 'userscript') {
   (function() {
     if (!/PaleMoon\//.test(navigator.userAgent) || (+GM_info?.version?.split('.')[0] < 2) || (typeof cloneInto !== 'undefined')) { return; }
 
+    const unsafeConstructors = {
+      Object: unsafeWindow.Object,
+      Array:  unsafeWindow.Array
+    };
+    const clone = function(obj) {
+      if (obj == null || typeof obj !== 'object') { return obj; }
+      const constructor = unsafeConstructors[obj.constructor.name];
+      if (!constructor) { return obj; }
+      const obj2 = new constructor();
+      for (const key in obj) { obj2[key] = clone(obj[key]); }
+      return obj2;
+    };
+
     try {
-      return new CustomEvent('x', {detail: {}});
+      new CustomEvent('x', {detail: {}});
+      return;
     } catch (err) {
-      const unsafeConstructors = {
-        Object: unsafeWindow.Object,
-        Array:  unsafeWindow.Array
-      };
-      var clone = function(obj) {
-        let constructor;
-        if ((obj != null) && (typeof obj === 'object') && (constructor = unsafeConstructors[obj.constructor.name])) {
-          const obj2 = new constructor();
-          for (var key in obj) { var val = obj[key]; obj2[key] = clone(val); }
-          return obj2;
-        } else {
-          return obj;
-        }
-      };
-      return $.event = (event, detail, root=d) => root.dispatchEvent(new CustomEvent(event, {bubbles: true, cancelable: true, detail: clone(detail)}));
+      c.warn(err);
+      $.event = (event, detail, root=d) => root.dispatchEvent(new CustomEvent(event, {bubbles: true, cancelable: true, detail: clone(detail)}));
     }
   })();
 }
@@ -341,13 +349,8 @@ if (platform === 'userscript') {
 $.modifiedClick = e => e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || (e.button !== 0);
 
 if (!globalThis.chrome?.extension) {
-  $.open =
-    (GM?.openInTab != null) ?
-      GM.openInTab
-    : (typeof GM_openInTab !== 'undefined' && GM_openInTab !== null) ?
-      GM_openInTab
-    :
-      url => window.open(url, '_blank');
+  const gmOpenInTab = (typeof GM_openInTab !== 'undefined' && GM_openInTab !== null) ? GM_openInTab : undefined;
+  $.open = GM?.openInTab ?? gmOpenInTab ?? (url => window.open(url, '_blank'));
 } else {
   $.open =
     url => window.open(url, '_blank');
@@ -389,23 +392,21 @@ if (platform === 'crx') {
 $.global = async function(fn: string, data?: Record<string, string>) {
   if (platform === 'crx' && chrome.runtime.getManifest().manifest_version === 3) {
     return $.eventPageRequest({ type: 'runInPageContext', fn, data });
+  } else if (doc) {
+    const script = $.el('script',
+      {textContent: `(${PageContextFunctions[fn]})(document.currentScript.dataset);`});
+    if (data) { $.extend(script.dataset, data); }
+    $.add((d.head || doc), script);
+    $.rm(script);
+    return script.dataset;
   } else {
-    if (doc) {
-      const script = $.el('script',
-        {textContent: `(${PageContextFunctions[fn]})(document.currentScript.dataset);`});
-      if (data) { $.extend(script.dataset, data); }
-      $.add((d.head || doc), script);
-      $.rm(script);
-      return script.dataset;
-    } else {
     // XXX dwb
-      try {
-        PageContextFunctions[fn](data);
-      } catch (error) {
-        console.error(error);
-      }
-      return data;
+    try {
+      PageContextFunctions[fn](data);
+    } catch (error) {
+      console.error(error);
     }
+    return data;
   }
 };
 
@@ -427,13 +428,7 @@ $.bytesToString = function(size) {
   return `${size} ${['B', 'KB', 'MB', 'GB'][unit]}`;
 };
 
-$.minmax = (value, min, max) => value < min ?
-  min
-:
-  value > max ?
-    max
-  :
-    value;
+$.minmax = (value, min, max) => Math.min(Math.max(value, min), max);
 
 $.hasAudio = video =>
   video.mozHasAudio || !!video.webkitAudioDecodedByteCount ||
@@ -443,7 +438,7 @@ $.luma = rgb => (rgb[0] * 0.299) + (rgb[1] * 0.587) + (rgb[2] * 0.114);
 
 $.unescape = function(text) {
   if (text == null) { return text; }
-  return text.replace(/<[^>]*>/g, '').replace(/&(amp|#039|quot|lt|gt|#44);/g, c => ({'&amp;': '&', '&#039;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>', '&#44;': ','})[c]);
+  return text.replace(/<[^>]{0,1000}>/g, '').replace(/&(amp|#039|quot|lt|gt|#44);/g, c => ({'&amp;': '&', '&#039;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>', '&#44;': ','})[c]);
 };
 
 $.isImage = url => /\.(jpe?g|jfif|png|gif|bmp|webp|avif|jxl)$/i.test(url);
@@ -462,6 +457,7 @@ $.hasStorage = (function() {
     localStorage.setItem(g.NAMESPACE + 'hasStorage', 'true');
     return localStorage.getItem(g.NAMESPACE + 'hasStorage') === 'true';
   } catch (error) {
+    c.warn(error);
     return false;
   }
 })();
@@ -499,11 +495,11 @@ if (platform === 'crx') {
   };
 
   chrome.storage.onChanged.addListener(function(changes, area) {
-    for (var key in changes) {
-      var oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+    for (const key in changes) {
+      const oldValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
       $.oldValue[area][key] = dict.clone(changes[key].newValue);
-      var newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
-      var cb = $.syncing[key];
+      const newValue = $.oldValue.local[key] ?? $.oldValue.sync[key];
+      const cb = $.syncing[key];
       if (cb && (JSON.stringify(newValue) !== JSON.stringify(oldValue))) {
         cb(newValue, key);
       }
@@ -517,7 +513,9 @@ if (platform === 'crx') {
       if (chrome.runtime.getManifest()) {
         return true;
       }
-    } catch (error) {}
+    } catch (error) {
+      c.warn(error);
+    }
     if (!$.crxWarningShown) {
       const msg = $.el('div',
         {innerHTML: `${meta.name} seems to have been updated. You will need to <a href="javascript:;">reload</a> the page.`});
@@ -545,7 +543,7 @@ if (platform === 'crx') {
         }
         if (keys === null) {
           const result2 = dict();
-          for (key in result) { var val = result[key]; if ($.hasOwn(data, key)) { result2[key] = val; } }
+          for (key in result) { const val = result[key]; if ($.hasOwn(data, key)) { result2[key] = val; } }
           result = result2;
         }
         for (key in data) {
@@ -577,7 +575,7 @@ if (platform === 'crx') {
       if (typeof keys === 'string') {
         keys = [keys];
       }
-      for (var key of keys) {
+      for (const key of keys) {
         delete items.local[key];
         delete items.sync[key];
       }
@@ -586,14 +584,14 @@ if (platform === 'crx') {
     };
 
     const timeout = {};
-    var setArea = function(area, cb) {
+    const setArea = function(area, cb) {
       const data = dict();
       $.extend(data, items[area]);
       if (!Object.keys(data).length || (timeout[area] > Date.now())) { return; }
       return chrome.storage[area].set(data, function() {
-        let err;
+        const err = chrome.runtime.lastError;
         let key;
-        if (err = chrome.runtime.lastError) {
+        if (err) {
           c.error(err.message);
           setTimeout(setArea, MINUTE, area);
           timeout[area] = Date.now() + MINUTE;
@@ -603,7 +601,7 @@ if (platform === 'crx') {
         delete timeout[area];
         for (key in data) { if (items[area][key] === data[key]) { delete items[area][key]; } }
         if (area === 'local') {
-          for (key in data) { var val = data[key]; if (!exceedsQuota(key, val)) { items.sync[key] = val; } }
+          for (key in data) { const val = data[key]; if (!exceedsQuota(key, val)) { items.sync[key] = val; } }
           setSync();
         } else {
           chrome.storage.local.remove(((() => {
@@ -620,7 +618,7 @@ if (platform === 'crx') {
       });
     };
 
-    var setSync = debounce(SECOND, () => setArea('sync'));
+    const setSync = debounce(SECOND, () => setArea('sync'));
 
     $.set = $.oneItemSugar(function(data, cb) {
       if (!$.crxWorking()) { return; }
@@ -629,7 +627,7 @@ if (platform === 'crx') {
       return setArea('local', cb);
     });
 
-    return $.clear = function(cb) {
+    $.clear = function(cb) {
       if (!$.crxWorking()) { return; }
       items.local = dict();
       items.sync =  dict();
@@ -639,33 +637,30 @@ if (platform === 'crx') {
         if (chrome.runtime.lastError) {
           c.error(chrome.runtime.lastError.message);
         }
-        if (err == null) { err = chrome.runtime.lastError; }
+        err ??= chrome.runtime.lastError;
         if (!--count) { return cb?.(err); }
       };
       chrome.storage.local.clear(done);
       return chrome.storage.sync.clear(done);
     };
+    return $.clear;
   })();
-} else {
+} else if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
 
   // http://wiki.greasespot.net/Main_Page
   // https://tampermonkey.net/documentation.php
 
-  if ((GM?.deleteValue != null) && window.BroadcastChannel && (typeof GM_addValueChangeListener === 'undefined' || GM_addValueChangeListener === null)) {
-
     $.syncChannel = new BroadcastChannel(g.NAMESPACE + 'sync');
 
-    $.on($.syncChannel, 'message', e => (() => {
-      const result = [];
-      for (var key in e.data) {
-        var cb;
-        var val = e.data[key];
-        if (cb = $.syncing[key]) {
-          result.push(cb(dict.json(JSON.stringify(val)), key));
+    $.on($.syncChannel, 'message', e => {
+      for (const key in e.data) {
+        const val = e.data[key];
+        const cb = $.syncing[key];
+        if (cb) {
+          cb(dict.json(JSON.stringify(val)), key);
         }
       }
-      return result;
-    })());
+    });
 
     $.sync = (key, cb) => $.syncing[key] = cb;
 
@@ -673,7 +668,7 @@ if (platform === 'crx') {
 
     $.delete = function(keys, cb) {
       let key;
-      if (!(keys instanceof Array)) {
+      if (!Array.isArray(keys)) {
         keys = [keys];
       }
       Promise.all(keys.map(key => GM.deleteValue(g.NAMESPACE + key))).then(function() {
@@ -688,7 +683,7 @@ if (platform === 'crx') {
       const keys = Object.keys(items);
       return Promise.all(keys.map((key) => GM.getValue(g.NAMESPACE + key))).then(function(values) {
         for (let i = 0; i < values.length; i++) {
-          var val = values[i];
+          const val = values[i];
           if (val) {
             items[keys[i]] = dict.json(val);
           }
@@ -699,35 +694,22 @@ if (platform === 'crx') {
 
     $.set = $.oneItemSugar(function(items, cb) {
       $.securityCheck(items);
-      return Promise.all((() => {
-        const result = [];
-        for (var key in items) {
-          var val = items[key];
-          result.push(GM.setValue(g.NAMESPACE + key, JSON.stringify(val)));
-        }
-        return result;
-      })()).then(function() {
+      return Promise.all(Object.entries(items).map(([key, val]) =>
+        GM.setValue(g.NAMESPACE + key, JSON.stringify(val))
+      )).then(function() {
         $.syncChannel.postMessage(items);
         return cb?.();
       });
     });
 
     $.clear = cb => GM.listValues().then(keys => $.delete(keys.map(key => key.replace(g.NAMESPACE, '')), cb)).catch( () => $.delete(Object.keys(Conf).concat(['previousversion', 'QR Size', 'QR.persona']), cb));
-  } else {
+} else {
     if (typeof GM_deleteValue !== 'undefined' && GM_deleteValue !== null) {
       $.getValue   = GM_getValue;
       $.listValues = () => GM_listValues(); // error when called if missing
     } else if ($.hasStorage) {
       $.getValue = key => localStorage.getItem(key);
-      $.listValues = () => (() => {
-        const result = [];
-        for (var key in localStorage) {
-          if (key.slice(0, g.NAMESPACE.length) === g.NAMESPACE) {
-            result.push(key);
-          }
-        }
-        return result;
-      })();
+      $.listValues = () => Object.keys(localStorage).filter(key => key.startsWith(g.NAMESPACE));
     } else {
       $.getValue   = function() {};
       $.listValues = () => [];
@@ -781,13 +763,14 @@ if (platform === 'crx') {
       $.sync = function(key, cb) {
         key = g.NAMESPACE + key;
         $.syncing[key] = cb;
-        return $.oldValue[key] = $.getValue(key);
+        $.oldValue[key] = $.getValue(key);
+        return $.oldValue[key];
       };
 
       (function() {
         const onChange = function({key, newValue}) {
-          let cb;
-          if (!(cb = $.syncing[key])) { return; }
+          const cb = $.syncing[key];
+          if (!cb) { return; }
           if (newValue != null) {
             if (newValue === $.oldValue[key]) { return; }
             $.oldValue[key] = newValue;
@@ -800,13 +783,14 @@ if (platform === 'crx') {
         };
         $.on(window, 'storage', onChange);
 
-        return $.forceSync = function(key) {
+        $.forceSync = function(key) {
           // Storage events don't work across origins
           // e.g. http://boards.4chan.org and https://boards.4chan.org
           // so force a check for changes to avoid lost data.
           key = g.NAMESPACE + key;
           return onChange({key, newValue: $.getValue(key)});
         };
+        return $.forceSync;
       })();
     } else {
       $.sync = function() {};
@@ -814,10 +798,10 @@ if (platform === 'crx') {
     }
 
     $.delete = function(keys) {
-      if (!(keys instanceof Array)) {
+      if (!Array.isArray(keys)) {
         keys = [keys];
       }
-      for (var key of keys) {
+      for (const key of keys) {
         $.deleteValue(g.NAMESPACE + key);
       }
     };
@@ -825,9 +809,9 @@ if (platform === 'crx') {
     $.get = $.oneItemSugar((items, cb) => $.queueTask($.getSync, items, cb));
 
     $.getSync = function(items, cb) {
-      for (var key in items) {
-        var val2;
-        if (val2 = $.getValue(g.NAMESPACE + key)) {
+      for (const key in items) {
+        const val2 = $.getValue(g.NAMESPACE + key);
+        if (val2) {
           try {
             items[key] = dict.json(val2);
           } catch (err) {
@@ -844,8 +828,8 @@ if (platform === 'crx') {
     $.set = $.oneItemSugar(function(items, cb) {
       $.securityCheck(items);
       return $.queueTask(function() {
-        for (var key in items) {
-          var value = items[key];
+        for (const key in items) {
+          const value = items[key];
           $.setValue(g.NAMESPACE + key, JSON.stringify(value));
         }
         return cb?.();
@@ -859,10 +843,11 @@ if (platform === 'crx') {
       $.delete(['previousversion', 'QR Size', 'QR.persona']);
       try {
         $.delete($.listValues().map(key => key.replace(g.NAMESPACE, '')));
-      } catch (error) {}
+      } catch (error) {
+        c.warn(error);
+      }
       return cb?.();
     };
-  }
 }
 
 export default $;
