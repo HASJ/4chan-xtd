@@ -6,7 +6,7 @@ import { g, Conf, d, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { DAY, HOUR, MINUTE, SECOND } from "../platform/helpers";
 
-var RelativeDates = {
+const RelativeDates = {
   INTERVAL: 30000,
 
   init() {
@@ -53,25 +53,8 @@ var RelativeDates = {
   relative(diff: number, now: Date, date: Date, abbrev: boolean): string {
     let number: number;
     let unit: string;
-        if ((number = (diff / DAY)) >= 1) {
-      const years = now.getFullYear() - date.getFullYear();
-      let months = now.getMonth() - date.getMonth();
-      const days = now.getDate() - date.getDate();
-      if (years > 1) {
-        number = years - ((months < 0) || ((months === 0) && (days < 0)));
-        unit = 'year';
-      } else if ((years === 1) && ((months > 0) || ((months === 0) && (days >= 0)))) {
-        number = years;
-        unit = 'year';
-      } else if ((months = months + (12*years)) > 1) {
-        number = months - (days < 0);
-        unit = 'month';
-      } else if ((months === 1) && (days >= 0)) {
-        number = months;
-        unit = 'month';
-      } else {
-        unit = 'day';
-      }
+    if ((number = (diff / DAY)) >= 1) {
+      ({ number, unit } = RelativeDates.calendarRelative(number, now, date));
     } else if ((number = (diff / HOUR)) >= 1) {
       unit = 'hour';
     } else if ((number = (diff / MINUTE)) >= 1) {
@@ -86,11 +69,37 @@ var RelativeDates = {
 
     if (abbrev) {
       unit = unit === 'month' ? 'mo' : unit[0];
-    } else {
-      if (rounded !== 1) { unit += 's'; } // pluralize
+    } else if (rounded !== 1) {
+      unit += 's';
     }
 
-    if (abbrev) { return `${rounded}${unit}`; } else { return `${rounded} ${unit} ago`; }
+    if (abbrev) { return `${rounded}${unit}`; }
+    return `${rounded} ${unit} ago`;
+  },
+
+  calendarRelative(number: number, now: Date, date: Date) {
+    const years = now.getFullYear() - date.getFullYear();
+    let months = now.getMonth() - date.getMonth();
+    const days = now.getDate() - date.getDate();
+
+    if (years > 1) {
+      return {
+        number: years - Number((months < 0) || ((months === 0) && (days < 0))),
+        unit: 'year'
+      };
+    }
+    if ((years === 1) && ((months > 0) || ((months === 0) && (days >= 0)))) {
+      return { number: years, unit: 'year' };
+    }
+
+    months += 12 * years;
+    if (months > 1) {
+      return { number: months - Number(days < 0), unit: 'month' };
+    }
+    if ((months === 1) && (days >= 0)) {
+      return { number: months, unit: 'month' };
+    }
+    return { number, unit: 'day' };
   },
 
   // Changing all relative dates as soon as possible incurs many annoying
@@ -108,7 +117,7 @@ var RelativeDates = {
     if (d.hidden) { return; }
 
     const now = new Date();
-    for (var data of RelativeDates.stale) { RelativeDates.update(data, now); }
+    for (const data of RelativeDates.stale) { RelativeDates.update(data, now); }
     RelativeDates.stale = [];
 
     // Reset automatic flush.
@@ -138,34 +147,41 @@ var RelativeDates = {
     const diff = now - date;
     const relative = RelativeDates.relative(diff, now, date, abbrev);
     if (isPost) {
-      for (var singlePost of [data].concat(data.clones)) {
-        const node = singlePost.nodes.date;
-        if (Conf.RelativeTime === 'Show') {
-          node.textContent = relative;
-        } else {
-          let full = node.dataset.fullTime;
-          if (!full) {
-            full = node.textContent;
-            node.dataset.fullTime = full;
-          }
-          node.textContent = Conf.RelativeTime === 'Both' ? `${full}, ${relative}` : `${relative}, ${full}`;
-        }
-      }
+      RelativeDates.updatePostDates(data, relative);
     } else {
       data.firstChild.textContent = relative;
     }
     RelativeDates.setOwnTimeout(diff, data);
   },
 
+  updatePostDates(post, relative) {
+    for (const singlePost of [post].concat(post.clones)) {
+      const node = singlePost.nodes.date;
+      if (Conf.RelativeTime === 'Show') {
+        node.textContent = relative;
+        continue;
+      }
+
+      let full = node.dataset.fullTime;
+      if (!full) {
+        full = node.textContent;
+        node.dataset.fullTime = full;
+      }
+      node.textContent = Conf.RelativeTime === 'Both' ? `${full}, ${relative}` : `${relative}, ${full}`;
+    }
+  },
+
   setOwnTimeout(diff, data) {
-    const delay = diff < MINUTE ?
-      SECOND - ((diff + (SECOND / 2)) % SECOND)
-    : diff < HOUR ?
-      MINUTE - ((diff + (MINUTE / 2)) % MINUTE)
-    : diff < DAY ?
-      HOUR - ((diff + (HOUR / 2)) % HOUR)
-    :
-      DAY - ((diff + (DAY / 2)) % DAY);
+    let delay;
+    if (diff < MINUTE) {
+      delay = SECOND - ((diff + (SECOND / 2)) % SECOND);
+    } else if (diff < HOUR) {
+      delay = MINUTE - ((diff + (MINUTE / 2)) % MINUTE);
+    } else if (diff < DAY) {
+      delay = HOUR - ((diff + (HOUR / 2)) % HOUR);
+    } else {
+      delay = DAY - ((diff + (DAY / 2)) % DAY);
+    }
     setTimeout(RelativeDates.markStale, delay, data);
   },
 
@@ -177,4 +193,3 @@ var RelativeDates = {
   }
 };
 export default RelativeDates;
-

@@ -5,7 +5,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Icon from "../Icons/icon";
 
-var Nav: any = {
+const Nav: any = {
   init() {
     switch (g.VIEW) {
       case 'index':
@@ -40,7 +40,7 @@ var Nav: any = {
     $.on(next, 'click', this.next);
 
     $.add(span, [prev, $.tn(' '), next]);
-    var append = function() {
+    const append = function() {
       $.off(d, '4chanXInitFinished', append);
       return $.add(d.body, span);
     };
@@ -64,10 +64,10 @@ var Nav: any = {
   },
 
   getThread() {
-    if (g.VIEW === 'thread') { return g.threads.get(`${g.BOARD}.${g.THREADID}`).nodes.root; }
+    if (g.VIEW === 'thread') { return g.threads.get(`${g.BOARD.ID}.${g.THREADID}`).nodes.root; }
     if ($.hasClass(doc, 'catalog-mode')) { return; }
-    for (var threadRoot of $$(g.SITE.selectors.thread)) {
-      var thread = Get.threadFromRoot(threadRoot);
+    for (const threadRoot of $$(g.SITE.selectors.thread)) {
+      const thread = Get.threadFromRoot(threadRoot);
       if (thread.isHidden && !thread.stub) { continue; }
       if (UIState.getTopOf(threadRoot) >= -threadRoot.getBoundingClientRect().height) { // not scrolled past
         return threadRoot;
@@ -84,7 +84,8 @@ var Nav: any = {
       'following'
     :
       'preceding';
-    if (next = $.x(`${axis}-sibling::${g.SITE.xpath.thread}[not(@hidden)][1]`, thread)) {
+    next = $.x(`${axis}-sibling::${g.SITE.xpath.thread}[not(@hidden)][1]`, thread);
+    if (next) {
       // Unless we're not at the beginning of the current thread,
       // and thus wanting to move to beginning,
       // or we're above the first thread and don't want to skip it.
@@ -106,7 +107,7 @@ var Nav: any = {
   removeExtra() {
     const extra = doc.clientHeight - d.body.getBoundingClientRect().bottom;
     if (extra > 0) {
-      return d.body.style.marginBottom = `${extra}px`;
+      d.body.style.marginBottom = `${extra}px`;
     } else {
       d.body.style.marginBottom = '';
       delete Nav.haveExtra;

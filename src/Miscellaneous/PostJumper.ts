@@ -4,7 +4,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import Icon from "../Icons/icon";
 
-var PostJumper: any = { 
+const PostJumper: any = { 
   init() {
     if (!Conf['Unique ID and Capcode Navigation'] || !['index', 'thread'].includes(g.VIEW)) { return; }
 
@@ -20,7 +20,7 @@ var PostJumper: any = {
 
   node() {
     if (this.isClone) {
-      for (var buttons of $$('.postJumper', this.nodes.info)) {
+      for (const buttons of $$('.postJumper', this.nodes.info)) {
         PostJumper.addListeners(buttons);
       }
       return;
@@ -49,26 +49,31 @@ var PostJumper: any = {
   },
 
   buttonClick() {
-    let toJumper;
     const dir = $.hasClass(this, 'prev') ? -1 : 1;
-    if (toJumper = PostJumper.find(this.parentNode, dir)) {
+    const toJumper = PostJumper.find(this.parentNode, dir);
+    if (toJumper) {
       return PostJumper.scroll(this.parentNode, toJumper);
     }
   },
 
   find(jumper, dir) {
     const {type, value} = jumper.dataset;
-    const xpath = `span[contains(@class,\"postJumper\") and @data-value=\"${value}\" and @data-type=\"${type}\"]`;
+    const xpath = `span[contains(@class,"postJumper") and @data-value="${value}" and @data-type="${type}"]`;
     const axis = dir < 0 ? 'preceding' : 'following';
     let jumper2 = jumper;
-    while (jumper2 = $.x(`${axis}::${xpath}`, jumper2)) {
+    jumper2 = $.x(`${axis}::${xpath}`, jumper2);
+    while (jumper2) {
+      if (jumper2.getBoundingClientRect().height) { return jumper2; }
+      jumper2 = $.x(`${axis}::${xpath}`, jumper2);
+    }
+    jumper2 = $.x(`(//${xpath})[${dir < 0 ? 'last()' : '1'}]`);
+    if (jumper2) {
       if (jumper2.getBoundingClientRect().height) { return jumper2; }
     }
-    if (jumper2 = $.x(`(//${xpath})[${dir < 0 ? 'last()' : '1'}]`)) {
+    jumper2 = $.x(`${axis}::${xpath}`, jumper2);
+    while (jumper2 && (jumper2 !== jumper)) {
       if (jumper2.getBoundingClientRect().height) { return jumper2; }
-    }
-    while ((jumper2 = $.x(`${axis}::${xpath}`, jumper2)) && (jumper2 !== jumper)) {
-      if (jumper2.getBoundingClientRect().height) { return jumper2; }
+      jumper2 = $.x(`${axis}::${xpath}`, jumper2);
     }
     return null;
   },

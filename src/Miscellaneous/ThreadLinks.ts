@@ -1,7 +1,7 @@
 import Callbacks from "../classes/Callbacks";
 import { g, Conf } from "../globals/globals";
 
-var ThreadLinks: any = {
+const ThreadLinks: any = {
   init() {
     if ((g.VIEW !== 'index') || !Conf['Open Threads in New Tab']) { return; }
 
@@ -25,8 +25,8 @@ var ThreadLinks: any = {
   },
 
   process(link) {
-    return link.target = '_blank';
+    link.target = '_blank';
+    return link.target;
   }
 };
 export default ThreadLinks;
-

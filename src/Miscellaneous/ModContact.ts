@@ -2,7 +2,7 @@ import $ from "../platform/$";
 import Callbacks from "../classes/Callbacks";
 import { g } from "../globals/globals";
 
-var ModContact: any = {
+const ModContact: any = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) { return; }
     return Callbacks.Post.push({
@@ -12,12 +12,12 @@ var ModContact: any = {
   },
 
   node() {
-    let moved;
     if (this.isClone || !$.hasOwn(ModContact.specific, this.info.capcode)) { return; }
     const links = $.el('span', {className: 'contact-links brackets-wrap'});
     $.extend(links, ModContact.template(this.info.capcode));
     $.after(this.nodes.capcode, links);
-    if ((moved = this.info.comment.match(/This thread was moved to >>>\/(\w+)\//)) && $.hasOwn(ModContact.moveNote, moved[1])) {
+    const moved = this.info.comment.match(/This thread was moved to >>>\/(\w+)\//);
+    if (moved && $.hasOwn(ModContact.moveNote, moved[1])) {
       const moveNote = $.el('div', {className: 'move-note'});
       $.extend(moveNote, ModContact.moveNote[moved[1]]);
       return $.add(this.nodes.post, moveNote);
