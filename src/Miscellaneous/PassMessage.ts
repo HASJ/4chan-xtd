@@ -9,14 +9,14 @@ const PassMessage: any = {
     ,
       PassMessagePage);
     msg.style.cssText = 'padding-bottom: 0;';
-    const close = $('a', msg);
+    const close = $('.close-button', msg);
     $.on(close, 'click', function() {
       $.rm(msg);
       return $.set('passMessageClosed', true);
     });
     return $.ready(function() {
-      let hd;
-      if (hd = $.id('hd')) {
+      const hd = $.id('hd');
+      if (hd) {
         return $.after(hd, msg);
       } else {
         return $.prepend(d.body, msg);
