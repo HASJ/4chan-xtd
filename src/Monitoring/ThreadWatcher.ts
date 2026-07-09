@@ -1067,7 +1067,7 @@ const ThreadWatcher: ThreadWatcherType = {
           return true;
         }
       });
-      $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads.get(`${g.BOARD}.${g.THREADID}`), true));
+      $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads.get(`${g.BOARD.ID}.${g.THREADID}`), true));
     },
 
     addMenuEntries() {
