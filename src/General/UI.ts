@@ -53,7 +53,7 @@ export const Menu = class Menu {
       if ((e.target as HTMLElement).nodeName !== 'A') { return e.stopPropagation(); }
     });
     $.on(this.el, 'keydown', (e: KeyboardEvent) => this.onKeydown(e));
-    $.on(d, 'CloseMenu 4chanXInitFinished', () => this.close());
+    $.on(d, 'click CloseMenu 4chanXInitFinished', () => this.close());
     $.on(d, 'scroll visibilitychange', () => this.close());
   }
 
@@ -180,12 +180,13 @@ export const Menu = class Menu {
     a.dataset.fullID = post.fullID;
     Icon.set(a, 'caretDown');
     $.on(a, 'click', (e: MouseEvent) => {
-      return this.open(e, a, post);
+      return this.toggle(e, a, post);
     });
     return a;
   }
 
-  open(e: MouseEvent, a: HTMLElement, post: any) {
+  toggle(e: MouseEvent, a: HTMLElement, post: any) {
+    e.preventDefault();
     $.event('CloseMenu', undefined);
     for (var entry of this.entries) {
       var show = !entry.open || entry.open({
