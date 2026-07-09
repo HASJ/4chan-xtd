@@ -182,7 +182,8 @@ const ThreadWatcher: ThreadWatcherType = {
 
   init() {
     let sc: HTMLElement;
-    if (!(this.enabled = Conf['Thread Watcher'])) { return; }
+    this.enabled = Conf['Thread Watcher'];
+    if (!this.enabled) { return; }
 
     this.shortcut = (sc = $.el('a', {
       id:    'watcher-link',
@@ -283,7 +284,8 @@ const ThreadWatcher: ThreadWatcherType = {
 
   setToggler(toggler: HTMLElement, isWatched: boolean) {
     toggler.classList.toggle('watched', isWatched);
-    return toggler.title = `${isWatched ? 'Unwatch' : 'Watch'} Thread`;
+    toggler.title = `${isWatched ? 'Unwatch' : 'Watch'} Thread`;
+    return toggler.title;
   },
 
   node(this: any) {
@@ -542,7 +544,7 @@ const ThreadWatcher: ThreadWatcherType = {
     ThreadWatcher.status.textContent = '...';
     $.addClass(ThreadWatcher.refreshButton, 'spin');
     ThreadWatcher.syncing = true;
-    const dbs = [ThreadWatcher.db, ThreadWatcher.unreaddb, QuoteYou.db].filter(x => x);
+    const dbs = [ThreadWatcher.db, ThreadWatcher.unreaddb, QuoteYou.db].filter(Boolean);
     let n = 0;
     return dbs.map((dbi) =>
       dbi.forceSync(() => {
@@ -831,7 +833,8 @@ const ThreadWatcher: ThreadWatcherType = {
       }
       prefixes[siteID] = prefix;
     }
-    return ThreadWatcher.prefixes = prefixes;
+    ThreadWatcher.prefixes = prefixes;
+    return ThreadWatcher.prefixes;
   },
 
   build() {
@@ -860,8 +863,8 @@ const ThreadWatcher: ThreadWatcherType = {
       const isWatched = ThreadWatcher.isWatched(thread);
       if (thread.OP) {
         for (const post of [thread.OP, ...thread.OP.clones]) {
-          let toggler: HTMLElement | null;
-          if ((toggler = $('.watch-thread-link', post.nodes.info) as HTMLElement | null)) {
+          const toggler = $('.watch-thread-link', post.nodes.info) as HTMLElement | null;
+          if (toggler) {
             ThreadWatcher.setToggler(toggler, isWatched);
           }
         }
@@ -911,8 +914,8 @@ const ThreadWatcher: ThreadWatcherType = {
   },
 
   set404(boardID, threadID, cb) {
-    let data: any;
-    if (!(data = ThreadWatcher.db?.get({ boardID, threadID }))) { return cb(); }
+    const data: any = ThreadWatcher.db?.get({ boardID, threadID });
+    if (!data) { return cb(); }
     if (Conf['Auto Prune']) {
       ThreadWatcher.db.delete({ boardID, threadID });
       return cb();
@@ -986,7 +989,7 @@ const ThreadWatcher: ThreadWatcherType = {
         el: entryEl,
         order: 60,
         open() {
-          const [addClass, rmClass, text] = !!ThreadWatcher.db.get({ boardID: g.BOARD.ID, threadID: g.THREADID }) ?
+          const [addClass, rmClass, text] = ThreadWatcher.db.get({ boardID: g.BOARD.ID, threadID: g.THREADID }) ?
             ['unwatch-thread', 'watch-thread', 'Unwatch thread']
           :
             ['watch-thread', 'unwatch-thread', 'Watch thread'];
