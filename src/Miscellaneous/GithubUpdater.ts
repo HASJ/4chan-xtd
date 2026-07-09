@@ -21,7 +21,7 @@ const GithubUpdater = {
   },
 
   check(timestamp: number) {
-    const match = meta.page.match(/github\.com\/([^/]+)\/([^/]+)/);
+    const match = /github\.com\/([^/]+)\/([^/]+)/.exec(meta.page);
     const repo = match ? `${match[1]}/${match[2]}` : 'HASJ/4chan-xtd';
     const url = `https://api.github.com/repos/${repo}/releases/latest`;
 

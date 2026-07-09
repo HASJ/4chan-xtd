@@ -5,7 +5,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 
-var Banner: any = {
+const Banner: any = {
   init() {
     if (Conf['Custom Board Titles']) {
       this.db = new DataBoard('customTitles', null, true);
@@ -53,7 +53,8 @@ var Banner: any = {
       Unread.title = title;
       return Unread.update();
     } else {
-      return d.title = title;
+      d.title = title;
+      return d.title;
     }
   },
 
@@ -62,16 +63,19 @@ var Banner: any = {
       if (!Banner.choices?.length) {
         Banner.choices = Conf['knownBanners'].split(',').slice();
       }
-      const i = Math.floor(Banner.choices.length * Math.random());
+      const randomValue = crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+      const i = Math.floor(Banner.choices.length * randomValue);
       const banner = Banner.choices.splice(i, 1);
-      return $('img', this.parentNode).src = `//s.4cdn.org/image/title/${banner}`;
+      const img = $('img', this.parentNode) as HTMLImageElement;
+      img.src = `//s.4cdn.org/image/title/${banner}`;
+      return img.src;
     },
 
     click(e) {
       if (!e.ctrlKey && !e.metaKey) { return; }
-      if (Banner.original[this.className] == null) { Banner.original[this.className] = this.cloneNode(true); }
+      Banner.original[this.className] ??= this.cloneNode(true);
       this.contentEditable = true;
-      for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
+      for (const br of $$('br', this)) { $.replace(br, $.tn('\n')); }
       return this.focus();
     },
 
@@ -81,8 +85,11 @@ var Banner: any = {
     },
 
     blur() {
-      for (var br of $$('br', this)) { $.replace(br, $.tn('\n')); }
-      if (this.textContent = this.textContent.replace(/\n*$/, '')) {
+      for (const br of $$('br', this)) { $.replace(br, $.tn('\n')); }
+      let trimmed = this.textContent;
+      while (trimmed.endsWith('\n')) { trimmed = trimmed.slice(0, -1); }
+      this.textContent = trimmed;
+      if (trimmed) {
         this.contentEditable = false;
         return Banner.db.set({
           boardID:  g.BOARD.ID,
@@ -111,14 +118,16 @@ var Banner: any = {
     child.title = `Ctrl/\u2318+click to edit board ${className.slice(5).toLowerCase()}`;
     child.spellcheck = false;
 
-    for (var event of ['click', 'keydown', 'blur']) {
+    for (const event of ['click', 'keydown', 'blur']) {
       $.on(child, event, Banner.cb[event]);
     }
 
-    if (data = Banner.db.get({boardID: g.BOARD.ID, threadID: className})) {
+    data = Banner.db.get({boardID: g.BOARD.ID, threadID: className});
+    if (data) {
       if (Conf['Persistent Custom Board Titles'] || (data.orig === child.textContent)) {
         Banner.original[className] = child.cloneNode(true);
-        return child.textContent = data.title;
+        child.textContent = data.title;
+        return child.textContent;
       } else {
         return Banner.db.delete({boardID: g.BOARD.ID, threadID: className});
       }

@@ -5,7 +5,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import ExpandComment from "./ExpandComment";
 
-var Fourchan: any = {
+const Fourchan: any = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
     BoardConfig.ready(this.initBoard);
@@ -15,9 +15,10 @@ var Fourchan: any = {
   initBoard() {
     if ((g.BOARD.config as any).code_tags) {
       $.on(window, 'prettyprint:cb', function(e) {
-        let post, pre;
-        if (!(post = g.posts.get(e.detail.ID))) { return; }
-        if (!(pre  = $$('.prettyprint', post.nodes.comment)[+e.detail.i])) { return; }
+        const post = g.posts.get(e.detail.ID);
+        if (!post) { return; }
+        const pre = $$('.prettyprint', post.nodes.comment)[+e.detail.i];
+        if (!pre) { return; }
         if (!$.hasClass(pre, 'prettyprinted')) {
           pre.innerHTML = e.detail.html;
           return $.addClass(pre, 'prettyprinted');
@@ -61,7 +62,7 @@ var Fourchan: any = {
     return $.ready(() => {
       const iterable = $$('.prettyprint', this.nodes.comment);
       for (let i = 0; i < iterable.length; i++) {
-        var pre = iterable[i];
+        const pre = iterable[i];
         if (!$.hasClass(pre, 'prettyprinted')) {
           $.event('prettyprint', {ID: this.fullID, i, html: pre.innerHTML}, window);
         }
@@ -70,14 +71,14 @@ var Fourchan: any = {
   },
 
   math() {
-    let wbrs;
     if (!/\[(math|eqn)\]/.test(this.nodes.comment.textContent)) { return; }
     // XXX <wbr> tags frequently break MathJax; remove them.
-    if ((wbrs = $$('wbr', this.nodes.comment)).length) {
-      for (var wbr of wbrs) { $.rm(wbr); }
+    const wbrs = $$('wbr', this.nodes.comment);
+    if (wbrs.length) {
+      for (const wbr of wbrs) { $.rm(wbr); }
       this.nodes.comment.normalize();
     }
-    var cb = () => {
+    const cb = () => {
       if (!doc.contains(this.nodes.comment)) { return; }
       $.off(d, 'PostsInserted', cb);
       return $.event('mathjax', null, this.nodes.comment);
