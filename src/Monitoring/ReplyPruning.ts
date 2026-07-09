@@ -25,6 +25,10 @@ interface ReplyPruningType {
   node(this: any): void;
   updateCount(e: Event): void;
   update(): void;
+  hidePosts(hidden2: number, posts: any): void;
+  showPosts(hidden2: number, posts: any): void;
+  updateSummary(): void;
+  maintainScrollPosition(hidden1: number, hidden2: number, oldPos: number): void;
 }
 
 const ReplyPruning: ReplyPruningType = {
@@ -140,7 +144,6 @@ const ReplyPruning: ReplyPruningType = {
   },
 
   update() {
-    let boardTop: number, node: Node | null, post: any;
     const hidden1 = ReplyPruning.hidden;
     const hidden2 = ReplyPruning.active ?
       Math.max(ReplyPruning.total - +Conf["Max Replies"], 0)
@@ -153,44 +156,63 @@ const ReplyPruning: ReplyPruningType = {
     const { posts } = ReplyPruning.thread;
 
     if (ReplyPruning.hidden < hidden2) {
-      while ((ReplyPruning.hidden < hidden2) && (ReplyPruning.position < posts.keys.length)) {
-        post = posts.get(posts.keys[ReplyPruning.position++]);
-        if (post.isReply && !post.isFetchedQuote) {
-          while ((node = ReplyPruning.summary.nextSibling) && (node !== post.nodes.root)) {
-            $.add(ReplyPruning.container, node);
-          }
-          $.add(ReplyPruning.container, post.nodes.root);
-          ReplyPruning.hidden++;
-          if (post.file) { ReplyPruning.hiddenFiles++; }
-        }
-      }
+      ReplyPruning.hidePosts(hidden2, posts);
     } else if (ReplyPruning.hidden > hidden2) {
-      const frag = $.frag();
-      while ((ReplyPruning.hidden > hidden2) && (ReplyPruning.position > 0)) {
-        post = posts.get(posts.keys[--ReplyPruning.position]);
-        if (post.isReply && !post.isFetchedQuote) {
-          while ((node = ReplyPruning.container.lastChild) && (node !== post.nodes.root)) {
-            $.prepend(frag, node);
-          }
-          $.prepend(frag, post.nodes.root);
-          ReplyPruning.hidden--;
-          if (post.file) { ReplyPruning.hiddenFiles--; }
-        }
-      }
-      $.after(ReplyPruning.summary, frag);
-      $.event('PostsInserted', null, ReplyPruning.summary.parentNode as HTMLElement);
+      ReplyPruning.showPosts(hidden2, posts);
     }
 
+    ReplyPruning.updateSummary();
+
+    // Maintain position in thread when posts are added/removed above
+    ReplyPruning.maintainScrollPosition(hidden1, hidden2, oldPos);
+  },
+
+  hidePosts(hidden2, posts) {
+    while ((ReplyPruning.hidden < hidden2) && (ReplyPruning.position < posts.keys.length)) {
+      const post = posts.get(posts.keys[ReplyPruning.position++]);
+      if (!post.isReply || post.isFetchedQuote) { continue; }
+      let node: Node | null = ReplyPruning.summary.nextSibling;
+      while (node && (node !== post.nodes.root)) {
+        $.add(ReplyPruning.container, node);
+        node = ReplyPruning.summary.nextSibling;
+      }
+      $.add(ReplyPruning.container, post.nodes.root);
+      ReplyPruning.hidden++;
+      if (post.file) { ReplyPruning.hiddenFiles++; }
+    }
+  },
+
+  showPosts(hidden2, posts) {
+    const frag = $.frag();
+    while ((ReplyPruning.hidden > hidden2) && (ReplyPruning.position > 0)) {
+      const post = posts.get(posts.keys[--ReplyPruning.position]);
+      if (!post.isReply || post.isFetchedQuote) { continue; }
+      let node: Node | null = ReplyPruning.container.lastChild;
+      while (node && (node !== post.nodes.root)) {
+        $.prepend(frag, node);
+        node = ReplyPruning.container.lastChild;
+      }
+      $.prepend(frag, post.nodes.root);
+      ReplyPruning.hidden--;
+      if (post.file) { ReplyPruning.hiddenFiles--; }
+    }
+    $.after(ReplyPruning.summary, frag);
+    $.event('PostsInserted', null, ReplyPruning.summary.parentNode as HTMLElement);
+  },
+
+  updateSummary() {
     ReplyPruning.summary.textContent = ReplyPruning.active ?
       (g.SITE.Build as any).summaryText('+', ReplyPruning.hidden, ReplyPruning.hiddenFiles)
     :
       (g.SITE.Build as any).summaryText('-', ReplyPruning.total, ReplyPruning.totalFiles);
     ReplyPruning.summary.hidden = (ReplyPruning.total <= +Conf["Max Replies"]);
+  },
 
-    // Maintain position in thread when posts are added/removed above
-    if ((hidden1 !== hidden2) && ((boardTop = UIState.getTopOf($('.board') as HTMLElement)) < 0)) {
-      window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
-    }
+  maintainScrollPosition(hidden1, hidden2, oldPos) {
+    if (hidden1 === hidden2) { return; }
+    const boardTop = UIState.getTopOf($('.board') as HTMLElement);
+    if (boardTop >= 0) { return; }
+    window.scrollBy(0, Math.max(d.body.clientHeight - oldPos, window.scrollY + boardTop) - window.scrollY);
   }
 };
 

@@ -47,7 +47,6 @@ const ThreadStats: ThreadStatsType = {
   lastPageUpdate: undefined,
 
   init() {
-    let sc: HTMLElement;
     if ((g.VIEW !== 'thread') || !Conf['Thread Stats']) { return; }
 
     if (Conf['Page Count in Stats']) {
@@ -57,31 +56,8 @@ const ThreadStats: ThreadStatsType = {
     const statsHTML = {
       innerHTML: `<span id="post-count">?</span> / <span id="file-count">?</span>${(Conf["IP Count in Stats"] && (g.SITE as any).hasIPCount) ? " / <span id=\"ip-count\">?</span>" : ""}${(Conf["Page Count in Stats"]) ? " / <span id=\"page-count\">?</span>" : ""}`
     };
-    let statsTitle = 'Posts / Files';
-    if (Conf['IP Count in Stats'] && (g.SITE as any).hasIPCount) { statsTitle += ' / IPs'; }
-    if (Conf['Page Count in Stats']) {
-      if (this.showPurgePos) {
-        statsTitle += ' / Purge Position';
-      } else {
-        statsTitle += ' / Page';
-        if (Conf['Purge Position']) statsTitle += ' (Purge Position)';
-      }
-    }
-
-    if (Conf['Updater and Stats in Header']) {
-      this.dialog = (sc = $.el('span', {
-        id:    'thread-stats',
-        title: statsTitle
-      }));
-      $.extend(sc, statsHTML);
-      UIState.addShortcut('stats', sc, 200);
-    } else {
-      this.dialog = (sc = UI.dialog('thread-stats', {
-        innerHTML: `<div class="move" title="${E(statsTitle) as string}">${statsHTML.innerHTML}</div>`
-      }));
-      $.addClass(doc, 'float');
-      $.ready(() => $.add(d.body, sc));
-    }
+    const statsTitle = ThreadStats.buildStatsTitle();
+    const sc = ThreadStats.buildDialog(statsHTML, statsTitle);
 
     this.postCountEl = $('#post-count', sc) as HTMLElement;
     this.fileCountEl = $('#file-count', sc) as HTMLElement;
@@ -94,6 +70,39 @@ const ThreadStats: ThreadStatsType = {
       name: 'Thread Stats',
       cb:   this.node
     });
+  },
+
+  buildStatsTitle() {
+    let statsTitle = 'Posts / Files';
+    if (Conf['IP Count in Stats'] && (g.SITE as any).hasIPCount) { statsTitle += ' / IPs'; }
+    if (Conf['Page Count in Stats']) {
+      if (ThreadStats.showPurgePos) {
+        statsTitle += ' / Purge Position';
+      } else {
+        statsTitle += ' / Page';
+        if (Conf['Purge Position']) statsTitle += ' (Purge Position)';
+      }
+    }
+    return statsTitle;
+  },
+
+  buildDialog(statsHTML: { innerHTML: string }, statsTitle: string) {
+    let sc: HTMLElement;
+    if (Conf['Updater and Stats in Header']) {
+      ThreadStats.dialog = (sc = $.el('span', {
+        id:    'thread-stats',
+        title: statsTitle
+      }));
+      $.extend(sc, statsHTML);
+      UIState.addShortcut('stats', sc, 200);
+    } else {
+      ThreadStats.dialog = (sc = UI.dialog('thread-stats', {
+        innerHTML: `<div class="move" title="${E(statsTitle) as string}">${statsHTML.innerHTML}</div>`
+      }));
+      $.addClass(doc, 'float');
+      $.ready(() => $.add(d.body, sc));
+    }
+    return sc;
   },
 
   node(this: any) {
@@ -184,45 +193,57 @@ const ThreadStats: ThreadStatsType = {
 
   onThreadsLoad(this: any) {
     if (this.status === 200) {
-      let page: any, thread: any;
       if (ThreadStats.showPurgePos && ThreadStats.pageCountEl) {
-        let purgePos = 1;
-        for (page of this.response) {
-          for (thread of page.threads) {
-            if (thread.no < ThreadStats.thread.ID) {
-              purgePos++;
-            }
-          }
-        }
-        ThreadStats.pageCountEl.textContent = String(purgePos);
-        ThreadStats.pageCountEl.classList.toggle('warning', (purgePos === 1));
+        ThreadStats.updatePurgePosition(this.response);
       } else if (ThreadStats.pageCountEl) {
-        let nThreads = 0;
-        let i = 0;
-        for (page of this.response) {
-          nThreads += page.threads.length;
-        }
-        for (let pageNum = 0; pageNum < this.response.length; pageNum++) {
-          page = this.response[pageNum];
-          for (thread of page.threads) {
-            if (thread.no === ThreadStats.thread.ID) {
-              ThreadStats.pageCountEl.textContent = String(pageNum + 1);
-              const hasWarning = (i >= (nThreads - this.response[0].threads.length));
-              ThreadStats.pageCountEl.classList.toggle('warning', hasWarning);
-              if (hasWarning && Conf['Purge Position']) {
-                ThreadStats.pageCountEl.textContent += ` (${nThreads - i - 1})`;
-              }
-              ThreadStats.lastPageUpdate = new Date(thread.last_modified * SECOND);
-              ThreadStats.retry();
-              return;
-            }
-            i++;
-          }
-        }
+        ThreadStats.updatePageNumber(this.response);
       }
     } else if (this.status === 304) {
       ThreadStats.retry();
     }
+  },
+
+  updatePurgePosition(response: any[]) {
+    let purgePos = 1;
+    for (const page of response) {
+      for (const thread of page.threads) {
+        if (thread.no < ThreadStats.thread.ID) {
+          purgePos++;
+        }
+      }
+    }
+    ThreadStats.pageCountEl!.textContent = String(purgePos);
+    ThreadStats.pageCountEl!.classList.toggle('warning', (purgePos === 1));
+  },
+
+  updatePageNumber(response: any[]) {
+    let nThreads = 0;
+    for (const page of response) {
+      nThreads += page.threads.length;
+    }
+    let i = 0;
+    for (let pageNum = 0; pageNum < response.length; pageNum++) {
+      const page = response[pageNum];
+      for (const thread of page.threads) {
+        if (thread.no === ThreadStats.thread.ID) {
+          ThreadStats.finishPageUpdate(pageNum, thread, i, nThreads, response[0].threads.length);
+          return;
+        }
+        i++;
+      }
+    }
+  },
+
+  finishPageUpdate(pageNum: number, thread: any, i: number, nThreads: number, firstPageLength: number) {
+    const pageCountEl = ThreadStats.pageCountEl!;
+    pageCountEl.textContent = String(pageNum + 1);
+    const hasWarning = (i >= (nThreads - firstPageLength));
+    pageCountEl.classList.toggle('warning', hasWarning);
+    if (hasWarning && Conf['Purge Position']) {
+      pageCountEl.textContent += ` (${nThreads - i - 1})`;
+    }
+    ThreadStats.lastPageUpdate = new Date(thread.last_modified * SECOND);
+    ThreadStats.retry();
   },
 
   retry() {
