@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.1 (2026-07-09)
+
+- Bugfixes
+  - Fixed the post menu (`...`) not closing when clicking elsewhere on the page.
+  - Fixed the shipped userscript's version header being stuck at an old version since the v2.30 release, so auto-update now reports the correct version again.
+
 ### [2.30.0](https://github.com/HASJ/4chan-xtd/compare/v2.26.20...v2.30.0) (2026-07-07)
 
 - Architecture
