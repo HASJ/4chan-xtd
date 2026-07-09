@@ -1,4 +1,4 @@
-export default function generateManifestJson(p, xtVersion, manifestVersion) {
+export default function generateManifestJson(p: any, xtVersion: any, manifestVersion: any) {
   const manifest: any = {
     "name": p.meta.name,
     "version": xtVersion.version,
@@ -33,7 +33,7 @@ export default function generateManifestJson(p, xtVersion, manifestVersion) {
     manifest.host_permissions = p.meta.matches_only.concat(p.meta.matches);
     manifest.optional_host_permissions = ["*://*/"];
   } else {
-    manifest.background.scripts = ["eventPage.js"],
+    manifest.background.scripts = ["eventPage.js"];
     manifest.background.persistent = false;
 
     manifest.permissions = p.meta.matches_only.concat(p.meta.matches, ["storage"]);
