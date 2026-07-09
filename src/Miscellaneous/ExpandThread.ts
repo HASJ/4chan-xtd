@@ -7,7 +7,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 
-var ExpandThread: any = {
+const ExpandThread: any = {
   statuses: dict(),
   init() {
     if (!((g.VIEW === 'index') && Conf['Thread Expansion'])) { return; }
@@ -32,10 +32,10 @@ var ExpandThread: any = {
 
   disconnect(refresh) {
     if ((g.VIEW === 'thread') || !Conf['Thread Expansion']) { return; }
-    for (var threadID in ExpandThread.statuses) {
-      var oldReq;
-      var status = ExpandThread.statuses[threadID];
-      if (oldReq = status.req) {
+    for (const threadID in ExpandThread.statuses) {
+      const status = ExpandThread.statuses[threadID];
+      const oldReq = status.req;
+      if (oldReq) {
         delete status.req;
         oldReq.abort();
       }
@@ -90,10 +90,10 @@ var ExpandThread: any = {
   },
 
   contract(thread, a, threadRoot) {
-    let oldReq;
     const status = ExpandThread.statuses[thread];
     delete ExpandThread.statuses[thread];
-    if (oldReq = status.req) {
+    const oldReq = status.req;
+    if (oldReq) {
       delete status.req;
       oldReq.abort();
       if (a) { a.textContent = g.SITE.Build.summaryText('+', ...a.textContent.match(/\d+/g)); }
@@ -104,9 +104,9 @@ var ExpandThread: any = {
     if (status.numReplies) { replies = replies.slice(0, (-status.numReplies)); }
     let postsCount = 0;
     let filesCount = 0;
-    for (var reply of replies) {
+    for (const reply of replies) {
       // rm clones
-      if (Conf['Quote Inlining']) { var inlined;
+      if (Conf['Quote Inlining']) { let inlined;
       while ((inlined = $('.inlined', reply))) { inlined.click(); } }
       postsCount++;
       if ('file' in Get.postFromRoot(reply)) { filesCount++; }
@@ -117,6 +117,21 @@ var ExpandThread: any = {
     }
     a.textContent = g.SITE.Build.summaryText('+', postsCount, filesCount);
     $.rm($('.summary-bottom', threadRoot));
+  },
+
+  processPostData(postData, thread, posts, files) {
+    if (postData.no === thread.ID) { return null; }
+    let post = thread.posts.get(postData.no);
+    let root;
+    if (post && !post.isFetchedQuote) {
+      root = post.nodes.root;
+    } else {
+      root = g.SITE.Build.postFromObject(postData, thread.board.ID);
+      post = new Post(root, thread, thread.board);
+      posts.push(post);
+    }
+    if ('file' in post) { files.count++; }
+    return root;
   },
 
   parse(req, thread, a) {
@@ -130,22 +145,15 @@ var ExpandThread: any = {
 
     const posts      = [];
     const postsRoot  = [];
-    let filesCount = 0;
-    for (var postData of req.response.posts) {
-      var post;
-      if (postData.no === thread.ID) { continue; }
-      if ((post = thread.posts.get(postData.no)) && !post.isFetchedQuote) {
-        if ('file' in post) { filesCount++; }
-        ({root} = post.nodes);
+    const files = { count: 0 };
+    for (const postData of req.response.posts) {
+      const currentRoot = ExpandThread.processPostData(postData, thread, posts, files);
+      if (currentRoot) {
+        root = currentRoot;
         postsRoot.push(root);
-        continue;
       }
-      root = g.SITE.Build.postFromObject(postData, thread.board.ID);
-      post = new Post(root, thread, thread.board);
-      if ('file' in post) { filesCount++; }
-      posts.push(post);
-      postsRoot.push(root);
     }
+    let filesCount = files.count;
     for (const post of posts) { Callbacks.Post.execute(post); }
     $.after(a, postsRoot);
     $.event('PostsInserted', null, a.parentNode);

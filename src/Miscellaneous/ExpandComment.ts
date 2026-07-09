@@ -4,7 +4,7 @@ import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 
-var ExpandComment: any = {
+const ExpandComment: any = {
   init() {
     if ((g.VIEW !== 'index') || !Conf['Comment Expansion'] || Conf['JSON Index']) { return; }
 
@@ -15,8 +15,8 @@ var ExpandComment: any = {
   },
 
   node() {
-    let a;
-    if (a = $('.abbr > a:not([onclick])', this.nodes.comment)) {
+    const a = $('.abbr > a:not([onclick])', this.nodes.comment);
+    if (a) {
       return $.on(a, 'click', ExpandComment.cb);
     }
   },
@@ -29,13 +29,13 @@ var ExpandComment: any = {
   },
 
   expand(post) {
-    let a;
     if (post.nodes.longComment && !post.nodes.longComment.parentNode) {
       $.replace(post.nodes.shortComment, post.nodes.longComment);
       post.nodes.comment = post.nodes.longComment;
       return;
     }
-    if (!(a = $('.abbr > a', post.nodes.comment))) { return; }
+    const a = $('.abbr > a', post.nodes.comment);
+    if (!a) { return; }
     a.textContent = `Post No.${post} Loading...`;
     return $.cache(g.SITE.urls.threadJSON({boardID: post.boardID, threadID: post.threadID}), function() { return ExpandComment.parse(this, a, post); });
   },
@@ -45,11 +45,12 @@ var ExpandComment: any = {
     const a = $('.abbr > a', post.nodes.shortComment);
     a.textContent = 'here';
     $.replace(post.nodes.longComment, post.nodes.shortComment);
-    return post.nodes.comment = post.nodes.shortComment;
+    post.nodes.comment = post.nodes.shortComment;
+    return post.nodes.comment;
   },
 
   parse(req, a, post) {
-    let postObj, spoilerRange;
+    let postObj;
     const {status} = req;
     if (![200, 304].includes(status)) {
       a.textContent = status ? `Error ${req.statusText} (${status})` : 'Connection Error';
@@ -59,7 +60,8 @@ var ExpandComment: any = {
     const {
       posts
     } = req.response;
-    if (spoilerRange = posts[0].custom_spoiler) {
+    const spoilerRange = posts[0].custom_spoiler;
+    if (spoilerRange) {
       g.SITE.Build.spoilerRange[g.BOARD.ID] = spoilerRange;
     }
 
@@ -75,8 +77,8 @@ var ExpandComment: any = {
     const clone = comment.cloneNode(false);
     clone.innerHTML = postObj.com;
     // Fix pathnames
-    for (var quote of $$('.quotelink', clone)) {
-      var href = quote.getAttribute('href');
+    for (const quote of $$('.quotelink', clone)) {
+      const href = quote.getAttribute('href');
       if (href[0] === '/') { continue; } // Cross-board quote, or board link
       if (href[0] === '#') {
         quote.href = `${a.pathname.split(/\/+/).splice(0,4).join('/')}${href}`;
@@ -90,7 +92,7 @@ var ExpandComment: any = {
     post.parseComment();
     post.parseQuotes();
 
-    for (var callback of ExpandComment.callbacks) {
+    for (const callback of ExpandComment.callbacks) {
       callback.call(post);
     }
   }
