@@ -24,19 +24,26 @@ If you're reporting a bug, the more detail you can give, the better. If I can't 
   - Alternatively, if you already have a local 4chan X repo, you can add XTd as a remote:
     `git remote add xtd https://github.com/HASJ/4chan-xtd.git`
 - Open the directory: `cd 4chan-xtd`
-- Fetch needed dependencies with: `npm install`
+- Install the locked dependencies with: `npm ci`. Use `npm install` only when intentionally changing dependencies.
 
 ### Build and Verify
 
-- Build with `npm run build`. Options are in the readme.
+- Build commands:
+  - `npm run build`: default development output (userscript and CRX).
+  - `npm run build:userscript` / `npm run build:crx`: a single target.
+  - `npm run build:min`: minified userscript.
+  - `npm run build:all`: minified userscript, unminified userscript, and CRX.
 - Check for circular dependencies with `npm run check:cycles`.
+- Before opening a pull request, also run `npm run typecheck`, `npm test`, and `npm run build:userscript`.
+- `npm run test:coverage` writes an informational local report; it does not enforce a percentage threshold.
+- See [docs/TESTING.md](docs/TESTING.md) for fixtures, jsdom boundaries, and regression-test guidance.
 
 ### Contribute
 
 - Use TypeScript for new files. If you want to convert a .js file to .ts, use a separate commit so the file history is
   tracked past the rename
 - Edit the sources in the src/ directory (not the compiled scripts in builds/).
-- Fetch needed dependencies with: `npm install`
+- Install dependencies with `npm ci`, then run the relevant checks above.
 - Compile the script with: `npm run build`
 - Verify that there are no circular dependencies with: `npm run check:cycles`
 - Install the compiled script (found in the builds/ directory), and test your changes.

@@ -2,13 +2,10 @@
 
 4chan XTd is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has no affiliation with it.
 
-4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x) for [this PR](https://github.com/ccd0/4chan-x/pull/3341). It is a migration of 4chan X from CoffeeScript to TypeScript. It is named XT both as a continuation of eXTended, and a T for TypeScript. 
+4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x). It is named XT both as a continuation of eXTended, and a T for TypeScript, the language it's written in.
 
-## Architecture & Development
+## Features
 
-The codebase has been fully migrated to TypeScript, and all build tools and source modules compile as TypeScript (`allowJs`/`checkJs` disabled). Modules are also being incrementally brought up to a stricter, SonarQube-clean type-safety standard. This provides better maintainability and a more robust build system.
-
-For developers and contributors, please see [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive into the repository's structure, singleton architecture, and build process.
 New features since the fork include:
 
 - Fetching the thread from an external archive and inserting deleted posts
@@ -43,21 +40,11 @@ To run an user script, you need an user script manager like Violentmonkey ([Chro
 
 This fork is distributed through [GitHub releases](https://github.com/HASJ/4chan-xtd/releases) and [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd). There are known issues with updating user scripts through GitHub: [#34](https://github.com/HASJ/4chan-xtd/issues/34) [violentmonkey#1673](https://github.com/violentmonkey/violentmonkey/issues/1673), but Greasy Fork doesn't allow the minified version. Automatic updates are supported for the user script version, but not the Chrome extension.
 
-## Build from source
+## Development
 
-The standard build commands are:
-- `npm run build`: builds the default development output (userscript and CRX).
-- `npm run build:userscript`: builds the userscript target.
-- `npm run build:crx`: builds the browser extension target.
-- `npm run build:min`: builds a minified userscript.
-- `npm run build:all`: builds minified userscript, unminified userscript, and CRX outputs.
+Want to build from source or contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) for build commands, and [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive into the codebase's structure.
 
-You can also pass arguments directly to the compiled build script after `npm run build:tooling` (e.g., `node ./builds/ts-tools/tools/rollup.js -min`):
-
-- `-min`: Minified output.
-- `-platform=userscript`, `-platform=crx`: Target a specific platform.
-- `-no-format` Skips post-processing formatting steps. This results in faster building, but also a larger output size.
-- `-test` Include tests in build.
+Run `npm test` for the deterministic Vitest/jsdom suite, or `npm run test:coverage` for an informational V8 report. The contributor verification checklist and fixture guidance are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Troubleshooting
 If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), then report it to the [issue tracker](https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc). If the bug seems to be caused by a script update, you can install an old version from the [GitHub releases](https://github.com/HASJ/4chan-xtd/releases) or from [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd/versions).
@@ -68,13 +55,4 @@ If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), th
 - [Frequently Asked Questions for upstream, most should still apply](https://github.com/ccd0/4chan-x/wiki/Frequently-Asked-Questions)
 - [Report Bugs](https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc)
 - [Contributing](CONTRIBUTING.md)
-
-<details>
-<summary>Click to expand</summary>
-
-- The project aims for zero circular dependencies in the source graph. Run `npm run check:cycles` to verify.
-- The codebase is 100% TypeScript. `allowJs` and `checkJs` have been disabled in `tsconfig.json`. Full `strict`/`strictNullChecks` are not yet enabled project-wide; that's being tightened incrementally as part of an ongoing SonarQube cleanup pass, module by module.
-- the es 2020 target was chosen for optional chaining
-- @violentmonkey/types was chosen over @types/greasemonkey because @types/greasemonkey only declares the GM object, and not GM\_ functions
-
-</details>
+- [Testing](docs/TESTING.md)
