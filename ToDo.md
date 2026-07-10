@@ -91,14 +91,14 @@ This checklist tracks the staged reliability work. Check an item only after its 
 
 ### 9. Add browser-test infrastructure
 
-- [ ] Select Playwright only after the unit/jsdom baseline is stable.
-- [ ] Add a local fixture server/page set; do not browse or modify live boards.
-- [ ] Mock userscript and extension APIs at the harness boundary.
-- [ ] Provide deterministic seed data for thread, catalog, and posting pages.
-- [ ] Add Chromium smoke coverage for thread display and catalog display.
-- [ ] Add Chromium smoke coverage for filtering, quote interactions, and Quick Reply.
+- [x] Select Playwright only after the unit/jsdom baseline is stable.
+- [x] Add a local fixture server/page set; do not browse or modify live boards.
+- [x] Mock userscript and extension APIs at the harness boundary.
+- [x] Provide deterministic seed data for thread, catalog, and posting pages.
+- [x] Add Chromium smoke coverage for thread display and catalog display.
+- [x] Add Chromium smoke coverage for filtering, quote interactions, and Quick Reply.
 - [ ] Repeat the smoke suite in Firefox.
-- [ ] Document local browser installation, CI browser caching, failure artifacts, and fixture updates.
+- [x] Document local browser installation, CI browser caching, failure artifacts, and fixture updates.
 
 ### 10. Maintain the coverage program
 

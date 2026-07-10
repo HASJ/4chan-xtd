@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    exclude: ['builds/**'],
+    exclude: ['builds/**', 'tests/browser/**'],
     environmentOptions: {
       jsdom: { url: 'https://boards.4chan.org/g/thread/1' },
     },
@@ -20,7 +20,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      exclude: ['**/*.test.ts', 'src/test/**', 'builds/**', 'tools/**'],
+      exclude: ['**/*.test.ts', 'src/test/**', 'tests/browser/**', 'builds/**', 'tools/**'],
     },
   },
 });

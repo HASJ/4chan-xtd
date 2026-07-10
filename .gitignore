@@ -33,6 +33,8 @@ pnpm-debug.log*
 # TypeScript and coverage
 *.tsbuildinfo
 /coverage/
+/playwright-report/
+/test-results/
 /.nyc_output/
 /.cache/
 
@@ -60,4 +62,4 @@ Desktop.ini
 GEMINI.md
 AGENTS.md
 /conductor/
-.agents/
+/.agents/

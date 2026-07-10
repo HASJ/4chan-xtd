@@ -45,6 +45,7 @@ const Get: any = {
       if (!threadID) { threadID = 0; }
     } else {
       const match = link.href.match(g.SITE.regexp.quotelink);
+      if (!match) { return undefined; }
       [boardID, threadID, postID] = match.slice(1);
       if (!postID) { postID = threadID; }
     }
@@ -88,10 +89,9 @@ const Get: any = {
     // Third:
     //   Filter out irrelevant quotelinks.
     return quotelinks.filter(function(quotelink) {
-      const {boardID, postID} = Get.postDataFromLink(quotelink);
-      return (boardID === post.board.ID) && (postID === post.ID);
+      const data = Get.postDataFromLink(quotelink);
+      return data && (data.boardID === post.board.ID) && (data.postID === post.ID);
     });
   }
 };
 export default Get;
-

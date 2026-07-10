@@ -91,6 +91,7 @@
   "devDependencies": {
     "@fortawesome/free-regular-svg-icons": "^6.5.1",
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
+    "@playwright/test": "^1.61.1",
     "@rollup/plugin-alias": "^5.1.1",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.1.1",
@@ -136,6 +137,8 @@
     "typecheck": "npm run typecheck:src && npm run typecheck:extension && npm run typecheck:tools",
     "test": "vitest run --reporter=dot",
     "test:coverage": "vitest run --coverage --reporter=dot",
+    "test:browser": "npm run build:userscript && playwright test",
+    "test:browser:install": "playwright install chromium firefox",
     "build": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js",
     "check:cycles": "npm run build:tooling && node ./builds/ts-tools/tools/check-cycles.js",
     "build:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript",

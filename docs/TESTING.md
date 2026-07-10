@@ -21,13 +21,26 @@ npm run build:userscript
 
 GitHub Actions runs those same commands on pushes and pull requests.
 
+## Browser smoke tests
+
+Install the two supported Playwright browsers once per machine, then run the local browser suite:
+
+```sh
+npm run test:browser:install
+npm run test:browser
+```
+
+`test:browser` builds the userscript, starts the local fixture server, and exercises the bundle in Chromium and Firefox. It never requests a live board: `tests/browser/fixtures/` contains small synthetic thread, catalog, and posting pages; `tests/browser/server.mjs` supplies their deterministic board JSON; and `tests/browser/app.spec.ts` mocks userscript APIs before the bundle loads. Keep fixture changes hand-maintained and add a browser regression only for behavior jsdom cannot cover.
+
+The browser CI job uses Node 22, caches Playwright downloads, and uploads `playwright-report/` plus `test-results/` on failure. For a failure, rerun the named project locally (`npx playwright test --project=chromium` or `--project=firefox`) and inspect the trace in its test-results directory. Release verification includes the unit suite, browser suite, typecheck, cycle check, and userscript build.
+
 ## Test boundaries
 
 Unit tests live beside the module they cover as `*.test.ts` and run in jsdom. Prefer observable public behavior: adapters, parsers, collection classes, DOM utilities, filter outcomes, and quote-link transformations. Do not mock a large UI singleton's internal call sequence merely to raise coverage.
 
 `src/test/setup.ts` is the shared boundary for browser/userscript shims and DOM cleanup. Add a shim there only when several tests need the same platform API; local test data should stay in the test that uses it.
 
-Browser smoke coverage is a future layer. It will use local pages and mocked extension/userscript APIs, never live boards.
+Browser smoke coverage uses local pages and mocked extension/userscript APIs, never live boards.
 
 ## Fixtures and regressions
 
