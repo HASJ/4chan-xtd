@@ -16,6 +16,14 @@ interface QuotifyType {
   fixDeadlink(deadlink: HTMLElement): void;
 }
 
+// Linear-time equivalent of `(/\d+$/.exec(s) || [])[0]`: scans backwards from
+// the end instead of retrying `\d+` at every start position.
+function trailingDigits(s: string): string | undefined {
+  let i = s.length;
+  while (i > 0 && s.charCodeAt(i - 1) >= 48 && s.charCodeAt(i - 1) <= 57) { i--; }
+  return i < s.length ? s.slice(i) : undefined;
+}
+
 const Quotify: QuotifyType = {
   init() {
     if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Resurrect Quotes']) { return; }
@@ -69,7 +77,7 @@ const Quotify: QuotifyType = {
     }
 
     const quote = deadlink.textContent || '';
-    postID = (/\d+$/.exec(quote) || [])[0];
+    postID = trailingDigits(quote);
     if (!postID) { return; }
     if (postID.startsWith('0')) {
       // Fix quotelinks that start with a 0.
