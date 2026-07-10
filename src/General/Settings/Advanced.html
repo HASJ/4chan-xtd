@@ -1,6 +1,7 @@
 <fieldset>
   <legend>Archives</legend>
   <div class="warning" data-feature="404 Redirect"><code>404 Redirect</code> is disabled.</div>
+  <label for="archive-board-select">Archive board</label>
   <select id="archive-board-select"></select>
   <table id="archive-table">
     <thead>
@@ -13,10 +14,10 @@
   </table>
   <br>
   <div>
-    <b>Archive Lists</b>: Each line below should be an archive list in <a href="https://github.com/4chenz/archives.json/blob/gh-pages/CONTRIBUTING.md" target="_blank">this format</a> or a URL to load an archive list from.<br>
+    <label for="archive-lists"><b>Archive Lists</b></label>: Each line below should be an archive list in <a href="https://github.com/4chenz/archives.json/blob/gh-pages/CONTRIBUTING.md" target="_blank">this format</a> or a URL to load an archive list from.<br>
     Archive properties can be overriden by another item with the same <code>uid</code> (or if absent, its <code>name</code>).
   </div>
-  <textarea hidden name="archiveLists" class="field" spellcheck="false"></textarea>
+  <textarea hidden id="archive-lists" name="archiveLists" class="field" spellcheck="false"></textarea>
   <button id="update-archives">Update now</button> Last updated: <time id="lastarchivecheck"></time> <label><input type="checkbox" name="archiveAutoUpdate"> Auto-update</label>
 </fieldset>
 
@@ -27,25 +28,26 @@
     URLs of external catalog sites, where <code>%board</code> is to be replaced by the board name.<br>
     Each URL should be followed by <code>;boards:</code> and optionally <code>;exclude:</code> and a list of supported/excluded boards in the format explained in the Filter guide.
   </div>
-  <textarea hidden name="externalCatalogURLs" class="field" spellcheck="false"></textarea>
+  <label for="external-catalog-urls">External catalog URLs</label>
+  <textarea hidden id="external-catalog-urls" name="externalCatalogURLs" class="field" spellcheck="false"></textarea>
 </fieldset>
 
 <fieldset>
   <legend>Override 4chan Image Host</legend>
   <div>Change 4chan image links to this domain. Leave blank for no change.</div>
-  <div><input name="fourchanImageHost" class="field" spellcheck="false" list="list-fourchanImageHost"></div>
+  <div><label for="fourchan-image-host">Image host</label> <input id="fourchan-image-host" name="fourchanImageHost" class="field" spellcheck="false" list="list-fourchanImageHost"></div>
   <datalist id="list-fourchanImageHost"></datalist>
 </fieldset>
 
 <fieldset>
   <legend>Captcha Language</legend>
   <div>Choose from <a href="https://developers.google.com/recaptcha/docs/language" target="_blank">list of language codes</a>. Leave blank to autoselect.</div>
-  <div><input name="captchaLanguage" class="field" spellcheck="false"></div>
+  <div><label for="captcha-language">Language</label> <input id="captcha-language" name="captchaLanguage" class="field" spellcheck="false"></div>
 </fieldset>
 
 <fieldset>
   <legend>Custom Board Navigation</legend>
-  <div><textarea hidden name="boardnav" class="field" spellcheck="false"></textarea></div>
+  <div><label for="board-navigation">Board navigation</label> <textarea hidden id="board-navigation" name="boardnav" class="field" spellcheck="false"></textarea></div>
   <span class="note">New lines will be converted into spaces.</span><br><br>
   <div class="note">In the following examples for /g/, <code>g</code> can be changed to a different board ID (<code>a</code>, <code>b</code>, etc...), the current board (<code>current</code>), or the Twitter link (<code>@</code>).</div>
   <div>Board link: <code>g</code></div>
@@ -85,7 +87,7 @@
     Time Formatting
     <span class="warning" data-feature="Time Formatting">is disabled, relative time setting still applies.</span>
   </legend>
-  <div><input name="time" class="field" spellcheck="false">: <span class="time-preview"></span></div>
+  <div><label for="time-format">Format</label> <input id="time-format" name="time" class="field" spellcheck="false">: <span class="time-preview"></span></div>
   <div>Supported <a href="http://man7.org/linux/man-pages/man1/date.1.html" target="_blank">format specifiers</a>:</div>
   <div>Day: <code>%a</code>, <code>%A</code>, <code>%d</code>, <code>%e</code></div>
   <div>Month: <code>%m</code>, <code>%b</code>, <code>%B</code>, <code>%n</code> (Not zero padded)</div>
@@ -94,9 +96,9 @@
   <div>Minute: <code>%M</code></div>
   <div>Second: <code>%S</code></div>
   <div>Literal <code>%</code>: <code>%%</code></div>
-  <div><a href="https://www.w3.org/International/articles/language-tags/" target="_blank">Language tag</a>: <input name="timeLocale" class="field" spellcheck="false"></div>
+  <div><label for="time-locale">Language tag</label> (<a href="https://www.w3.org/International/articles/language-tags/" target="_blank">reference</a>): <input id="time-locale" name="timeLocale" class="field" spellcheck="false"></div>
   <div>Relative time, like "3 minutes ago":
-    <select name="RelativeTime">
+    <label for="relative-time">Relative time</label> <select id="relative-time" name="RelativeTime">
       <option value="No">Disabled</option>
       <option value="Hover">Show when hovering on the date</option>
       <option value="Show">Show relative time, and time and date on hover</option>
@@ -108,17 +110,17 @@
 
 <fieldset>
   <legend>Quote Backlinks formatting <span class="warning" data-feature="Quote Backlinks">is disabled.</span></legend>
-  <div><input name="backlink" class="field" spellcheck="false">: <span class="backlink-preview"></span></div>
+  <div><label for="backlink-format">Format</label> <input id="backlink-format" name="backlink" class="field" spellcheck="false">: <span class="backlink-preview"></span></div>
 </fieldset>
 
 <fieldset>
   <legend>Default pasted content filename</legend>
-  <div><input name="pastedname" class="field" spellcheck="false">.png</div>
+  <div><label for="pasted-name">Filename</label> <input id="pasted-name" name="pastedname" class="field" spellcheck="false">.png</div>
 </fieldset>
 
 <fieldset>
   <legend>File Info Formatting <span class="warning" data-feature="File Info Formatting">is disabled.</span></legend>
-  <div><input name="fileInfo" class="field" spellcheck="false">: <span class="file-info file-info-preview"></span></div>
+  <div><label for="file-info-format">Format</label> <input id="file-info-format" name="fileInfo" class="field" spellcheck="false">: <span class="file-info file-info-preview"></span></div>
   <div>Link: <code>%l</code> (truncated), <code>%L</code> (untruncated), <code>%T</code> (4chan filename)</div>
   <div>Filename: <code>%n</code> (truncated), <code>%N</code> (untruncated), <code>%t</code> (4chan filename)</div>
   <div>Download button: <code>%d</code></div>
@@ -132,7 +134,8 @@
 
 <fieldset>
   <legend>Quick Reply Personas</legend>
-  <textarea hidden class="personafield field" name="QR.personas" spellcheck="false"></textarea>
+  <label for="personas">Personas</label>
+  <textarea hidden id="personas" class="personafield field" name="QR.personas" spellcheck="false"></textarea>
   <p>
     One item per line.<br>
     Items will be added in the relevant input&#039;s auto-completion list.<br>
@@ -149,7 +152,8 @@
 
 <fieldset>
   <legend>Unread Favicon <span class="warning" data-feature="Unread Favicon">is disabled.</span></legend>
-  <select name="favicon">
+  <label for="favicon">Favicon</label>
+  <select id="favicon" name="favicon">
     <option value="ferongr">ferongr</option>
     <option value="xat-">xat-</option>
     <option value="4chanJS">4chanJS</option>
@@ -163,14 +167,14 @@
 <fieldset>
   <legend>Thread Updater <span class="warning" data-feature="Thread Updater">is disabled.</span></legend>
   <div>
-    Interval: <input type="number" name="Interval" class="field" min="1"> seconds
+    <label for="updater-interval">Interval</label>: <input id="updater-interval" type="number" name="Interval" class="field" min="1"> seconds
   </div>
 </fieldset>
 
 <fieldset>
     <legend>Custom Cooldown Time</legend>
     <div>
-        Seconds: <input type="number" name="customCooldown" class="field" min="0">
+        <label for="custom-cooldown">Seconds</label>: <input id="custom-cooldown" type="number" name="customCooldown" class="field" min="0">
     </div>
 </fieldset>
 
@@ -180,7 +184,8 @@
   </legend>
   <div>For more information about customizing 4chan X&#039;s CSS, see the <a href="<%= meta.cssGuide %>" target="_blank">styling guide</a>.</div>
   <button id="apply-css">Apply CSS</button>
-  <textarea hidden name="usercss" class="field" spellcheck="false"></textarea>
+  <label for="user-css">Custom CSS</label>
+  <textarea hidden id="user-css" name="usercss" class="field" spellcheck="false"></textarea>
 </fieldset>
 
 <fieldset>
@@ -189,13 +194,15 @@
     Sources from which Javascript is allowed to be loaded by <a href="http://content-security-policy.com/#source_list" target="_blank">Content Security Policy</a>.<br>
     Lines starting with a <code>#</code> will be ignored. Remove or comment out all lines to allow everything.
   </div>
-  <textarea hidden name="jsWhitelist" class="field" spellcheck="false"></textarea>
+  <label for="javascript-whitelist">Javascript whitelist</label>
+  <textarea hidden id="javascript-whitelist" name="jsWhitelist" class="field" spellcheck="false"></textarea>
 </fieldset>
 
 <fieldset>
   <legend>Known Banners</legend>
   <div>List of known banners, used for click-to-change feature.</div>
-  <textarea hidden name="knownBanners" class="field" spellcheck="false"></textarea>
+  <label for="known-banners">Known banners</label>
+  <textarea hidden id="known-banners" name="knownBanners" class="field" spellcheck="false"></textarea>
 </fieldset>
 
 <fieldset>
