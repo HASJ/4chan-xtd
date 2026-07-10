@@ -7,7 +7,7 @@ export default {
 
   transform(code, id) {
     if (id.includes('@fortawesome')) {
-      const name = id.match(/[\\\/]fa([^\.]+)\.js$/)[1];
+      const name = id.match(/[\\/]fa([^.]+)\.js$/)[1];
 
       return {
         code: // `// ${name}\n` +

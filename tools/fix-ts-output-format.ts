@@ -19,7 +19,7 @@ import { createFilter } from "@rollup/pluginutils";
  */
 export default function fixTsOutputFormat(opts) {
   if (!opts.include) {
-    throw Error("include option should be specified");
+    throw new Error("include option should be specified");
   }
 
   const filter = createFilter(opts.include, opts.exclude);

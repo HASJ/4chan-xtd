@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createFilter } from "@rollup/pluginutils";
 
 /**
@@ -10,7 +10,7 @@ import { createFilter } from "@rollup/pluginutils";
  */
 export default function importBase64(opts) {
   if (!opts.include) {
-    throw Error("include option should be specified");
+    throw new Error("include option should be specified");
   }
   const filter = createFilter(opts.include, opts.exclude);
 

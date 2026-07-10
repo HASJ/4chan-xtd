@@ -12,7 +12,7 @@ import MagicString from 'magic-string';
  */
 export default function removeTestCode(opts) {
   if (!opts.include) {
-    throw Error("include option should be specified");
+    throw new Error("include option should be specified");
   }
 
   const filter = createFilter(opts.include, opts.exclude);

@@ -175,7 +175,7 @@ const eventPageTsPlugin = (typescript as any)({
   if (platform !== 'crx') {
     await bundle.write({
       ...sharedBundleOpts,
-      banner: (metaNoDownload + license).replaceAll(/\r\n/, '\n'),
+      banner: (metaNoDownload + license).replaceAll('\r\n', '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
       plugins: minify ? [(terser as any)({
@@ -195,7 +195,7 @@ const eventPageTsPlugin = (typescript as any)({
     const crxDir = resolve(buildDir, 'crx');
     await bundle.write({
       ...sharedBundleOpts,
-      banner: license.replaceAll(/\r\n/, '\n'),
+      banner: license.replaceAll('\r\n', '\n'),
       file: resolve(crxDir, 'script.js'),
     });
 

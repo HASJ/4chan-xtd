@@ -32,7 +32,7 @@ function resolveImport(from: string, specifier: string) {
     ...extensions.map(extension => join(base, 'index' + extension)),
   ];
 
-  return candidates.map(normalize).find(candidate => fileSet.has(candidate)) || null;
+  return candidates.map(candidate => normalize(candidate)).find(candidate => fileSet.has(candidate)) || null;
 }
 
 const graph = new Map<string, string[]>(files.map(file => [file, []]));

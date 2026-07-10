@@ -2,7 +2,7 @@ import { createFilter } from "@rollup/pluginutils";
 
 export default function setupFileInliner(packageJson) {
   /** @param {string} string */
-  const escape = (string) => string.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\\${');
+  const escape = (string) => string.replaceAll('\\', '\\\\').replaceAll('`', '\\`').replaceAll('${', '\\${');
 
   /**
    * @param {Object} opts
@@ -15,7 +15,7 @@ export default function setupFileInliner(packageJson) {
    */
   return function inlineFile(opts) {
     if (!opts.include) {
-      throw Error("include option should be specified");
+      throw new Error("include option should be specified");
     }
 
     if (opts.transformer && typeof opts.transformer !== 'function') {
@@ -31,7 +31,7 @@ export default function setupFileInliner(packageJson) {
 
       async transform(code, id) {
         if (filter(id)) {
-          code = code.replace(/\r\n/g, '\n');
+          code = code.replaceAll('\r\n', '\n');
           if (opts.transformer) {
             code = opts.transformer(code);
           }
