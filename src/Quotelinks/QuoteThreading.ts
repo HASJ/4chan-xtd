@@ -13,7 +13,7 @@ import { dict } from "../platform/helpers";
   <3 aeosynth
 */
 
-var QuoteThreading = {
+const QuoteThreading = {
   init() {
     if (!Conf['Quote Threading'] || (g.VIEW !== 'thread')) { return; }
 
@@ -36,11 +36,11 @@ var QuoteThreading = {
     $.on(this.threadNewLink.firstElementChild, 'click', this.rethread);
     $.on(d, '4chanXInitFinished', () => { this.ready = true; });
 
-    UIState.headerMenu.addEntry(this.entry = {
+    this.entry = {
       el:    this.controls,
       order: 99
-    }
-    );
+    };
+    UIState.headerMenu.addEntry(this.entry);
 
     Callbacks.Thread.push({
       name: 'Quote Threading',
@@ -79,7 +79,8 @@ var QuoteThreading = {
     QuoteThreading.thread = this;
     $.asap((() => !Conf['Thread Updater'] || $('.navLinksBot > .updatelink')), function() {
       let navLinksBot;
-      if (navLinksBot = $('.navLinksBot')) { $.add(navLinksBot, [$.tn(' '), QuoteThreading.threadNewLink]); }
+      navLinksBot = $('.navLinksBot');
+      if (navLinksBot) { $.add(navLinksBot, [$.tn(' '), QuoteThreading.threadNewLink]); }
     });
   },
 
@@ -89,8 +90,9 @@ var QuoteThreading = {
 
     const parents = new Set();
     let lastParent = null;
-    for (var quote of this.quotes) {
-      if ((parent = g.posts.get(quote))) {
+    for (let quote of this.quotes) {
+      parent = g.posts.get(quote);
+      if (parent) {
         if (!parent.isFetchedQuote && parent.isReply && (parent.ID < this.ID)) {
           parents.add(parent.ID);
           if (!lastParent || (parent.ID > lastParent.ID)) { lastParent = parent; }
@@ -113,16 +115,53 @@ var QuoteThreading = {
   descendants(post) {
     let children;
     let posts = [post];
-    if (children = QuoteThreading.children[post.fullID]) {
-      for (var child of children) {
+    children = QuoteThreading.children[post.fullID];
+    if (children) {
+      for (let child of children) {
         posts = posts.concat(QuoteThreading.descendants(child));
       }
     }
     return posts;
   },
 
+  hasUnread(descendants) {
+    for (let x of descendants) { if (Unread.posts.has(x.ID)) { return true; } }
+    return false;
+  },
+
+  findInsertIndex(children, post) {
+    let i = children.length;
+    for (let j = children.length - 1; j >= 0; j--) { if (children[j].ID >= post.ID) { i--; } }
+    return i;
+  },
+
+  findLastDescendantParent(parent) {
+    let prev2;
+    let prev = parent;
+    for (;;) {
+      prev2 = QuoteThreading.children[prev.fullID];
+      if (!prev2?.length) { break; }
+      prev = prev2[prev2.length-1];
+    }
+    return prev;
+  },
+
+  insertBefore(children, i, post, nodes, descendants, order) {
+    const next = children[i];
+    for (const x of descendants) { order.before(order[next.ID], order[x.ID]); }
+    children.splice(i, 0, post);
+    $.before(next.nodes.root, nodes);
+  },
+
+  insertAfter(children, post, parent, nodes, descendants, order, threadContainer) {
+    const prev = QuoteThreading.findLastDescendantParent(parent);
+    for (let k = descendants.length - 1; k >= 0; k--) { order.after(order[prev.ID], order[descendants[k].ID]); }
+    children.push(post);
+    $.add(threadContainer, nodes);
+  },
+
   insert(post) {
-    let parent, x;
+    let parent;
     if (!(
       Conf['Thread Quotes'] &&
       (parent = QuoteThreading.parent[post.fullID]) &&
@@ -130,11 +169,9 @@ var QuoteThreading = {
     )) { return false; }
 
     const descendants = QuoteThreading.descendants(post);
-    if (!Unread.posts.has(parent.ID)) {
-      if ((function() { for (var x of descendants) { if (Unread.posts.has(x.ID)) { return true; } } })()) {
-        QuoteThreading.threadNewLink.hidden = false;
-        return false;
-      }
+    if (!Unread.posts.has(parent.ID) && QuoteThreading.hasUnread(descendants)) {
+      QuoteThreading.threadNewLink.hidden = false;
+      return false;
     }
 
     const {order} = Unread;
@@ -143,22 +180,11 @@ var QuoteThreading = {
     const nodes = [post.nodes.root];
     if (post.nodes.threadContainer) { nodes.push(post.nodes.threadContainer); }
 
-    let i = children.length;
-    for (let j = children.length - 1; j >= 0; j--) { var child = children[j]; if (child.ID >= post.ID) { i--; } }
+    const i = QuoteThreading.findInsertIndex(children, post);
     if (i !== children.length) {
-      const next = children[i];
-      for (x of descendants) { order.before(order[next.ID], order[x.ID]); }
-      children.splice(i, 0, post);
-      $.before(next.nodes.root, nodes);
+      QuoteThreading.insertBefore(children, i, post, nodes, descendants, order);
     } else {
-      let prev2;
-      let prev = parent;
-      while ((prev2 = QuoteThreading.children[prev.fullID]) && prev2.length) {
-        prev = prev2[prev2.length-1];
-      }
-      for (let k = descendants.length - 1; k >= 0; k--) { x = descendants[k]; order.after(order[prev.ID], order[x.ID]); }
-      children.push(post);
-      $.add(threadContainer, nodes);
+      QuoteThreading.insertAfter(children, post, parent, nodes, descendants, order, threadContainer);
     }
 
     QuoteThreading.inserted[post.fullID] = true;

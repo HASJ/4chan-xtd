@@ -13,6 +13,8 @@ interface QuoteBacklinkType {
   firstNode(this: any): void;
   secondNode(this: any): void;
   getContainer(id: string | number): HTMLElement;
+  getContainersForQuote(quote: string | number): HTMLElement[];
+  appendBacklink(container: HTMLElement, a: HTMLAnchorElement): void;
 }
 
 const QuoteBacklink: QuoteBacklinkType = {
@@ -20,11 +22,12 @@ const QuoteBacklink: QuoteBacklinkType = {
   bottomBacklinks: undefined,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Backlinks']) { return; }
+    if (!g.VIEW || !['index', 'thread'].includes(g.VIEW) || !Conf['Quote Backlinks']) { return; }
 
     // Add a class to differentiate when backlinks are at
     // the top (default) or bottom of a post
-    if ((this.bottomBacklinks = Conf['Bottom Backlinks'])) {
+    this.bottomBacklinks = Conf['Bottom Backlinks'];
+    if (this.bottomBacklinks) {
       $.addClass(doc, 'bottom-backlinks');
     }
 
@@ -48,31 +51,38 @@ const QuoteBacklink: QuoteBacklinkType = {
     });
     if (markYours) { $.add(a, QuoteYou.mark.cloneNode(true)); }
     for (const quote of this.quotes) {
-      let post: any;
-      const containers = [QuoteBacklink.getContainer(quote)];
-      if ((post = g.posts.get(quote)) && post.nodes.backlinkContainer) {
-        // Don't add OP clones when OP Backlinks is disabled,
-        // as the clones won't have the backlink containers.
-        for (const clone of post.clones) {
-          containers.push(clone.nodes.backlinkContainer);
-        }
-      }
-      for (const container of containers) {
-        const link = a.cloneNode(true) as HTMLAnchorElement;
-        const nodes: (Node | string)[] = container.firstChild ? [$.tn(' '), link] : [link];
-        if (Conf['Quote Previewing']) {
-          $.on(link, 'mouseover', QuotePreview.mouseover);
-        }
-        if (Conf['Quote Inlining']) {
-          $.on(link, 'click', QuoteInline.toggle);
-          if (Conf['Quote Hash Navigation']) {
-            const hash = QuoteInline.qiQuote(link, $.hasClass(link, 'filtered'));
-            nodes.push(hash);
-          }
-        }
-        $.add(container, nodes);
+      for (const container of QuoteBacklink.getContainersForQuote(quote)) {
+        QuoteBacklink.appendBacklink(container, a);
       }
     }
+  },
+
+  getContainersForQuote(quote: string | number): HTMLElement[] {
+    const containers = [QuoteBacklink.getContainer(quote)];
+    const post = g.posts?.get(quote) as any;
+    if (post?.nodes.backlinkContainer) {
+      // Don't add OP clones when OP Backlinks is disabled,
+      // as the clones won't have the backlink containers.
+      for (const clone of post.clones) {
+        containers.push(clone.nodes.backlinkContainer);
+      }
+    }
+    return containers;
+  },
+
+  appendBacklink(container: HTMLElement, a: HTMLAnchorElement) {
+    const link = a.cloneNode(true) as HTMLAnchorElement;
+    const nodes: (Node | string)[] = container.firstChild ? [$.tn(' '), link] : [link];
+    if (Conf['Quote Previewing']) {
+      $.on(link, 'mouseover', QuotePreview.mouseover);
+    }
+    if (Conf['Quote Inlining']) {
+      $.on(link, 'click', QuoteInline.toggle);
+      if (Conf['Quote Hash Navigation']) {
+        nodes.push(QuoteInline.qiQuote(link, $.hasClass(link, 'filtered')));
+      }
+    }
+    $.add(container, nodes);
   },
 
   secondNode(this: any) {

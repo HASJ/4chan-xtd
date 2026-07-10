@@ -14,7 +14,7 @@ const QuoteCT: QuoteCTType = {
   mark: null as any,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark Cross-thread Quotes']) { return; }
+    if (!g.VIEW || !['index', 'thread'].includes(g.VIEW) || !Conf['Mark Cross-thread Quotes']) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);

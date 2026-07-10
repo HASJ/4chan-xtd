@@ -48,7 +48,7 @@ const QuoteYou: QuoteYouType = {
       });
     });
 
-    if (!['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+    if (!(g.VIEW && ['index', 'thread', 'archive'].includes(g.VIEW))) { return; }
 
     if (Conf['Highlight Own Posts']) {
       $.addClass(doc, 'highlight-own');
@@ -154,11 +154,13 @@ const QuoteYou: QuoteYouType = {
       let highlighted: HTMLElement | null, post: HTMLElement | null;
       let result: XPathResult;
       const highlight = g.SITE.classes.highlight;
-      if ((highlighted = $(`.${highlight}`))) { $.rmClass(highlighted, highlight); }
+      highlighted = $(`.${highlight}`);
+      if (highlighted) { $.rmClass(highlighted, highlight); }
 
       if (!QuoteYou.lastRead || !doc.contains(QuoteYou.lastRead) || !$.hasClass(QuoteYou.lastRead, 'quotesYou')) {
-        if (!(post = (QuoteYou.lastRead = $('.quotesYou') as HTMLElement))) {
-          new Notice('warning', 'No posts are currently quoting you, loser.', 20);
+        post = (QuoteYou.lastRead = $('.quotesYou') as HTMLElement);
+        if (!post) {
+          const _notice = new Notice('warning', 'No posts are currently quoting you, loser.', 20);
           return;
         }
         if (QuoteYou.cb.scroll(post)) { return; }
@@ -168,7 +170,10 @@ const QuoteYou: QuoteYouType = {
 
       const str = `${type}::div[contains(@class,'quotesYou')]`;
 
-      while ((post = (result = $.X(str, post)).snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0) as HTMLElement)) {
+      for (;;) {
+        result = $.X(str, post);
+        post = result.snapshotItem(type === 'preceding' ? result.snapshotLength - 1 : 0) as HTMLElement;
+        if (!post) { break; }
         if (QuoteYou.cb.scroll(post)) { return; }
       }
 
