@@ -1,5 +1,5 @@
 import BoardConfig from "../General/BoardConfig";
-import { d, g } from "../globals/globals";
+import { g } from "../globals/globals";
 import SimpleDict from "./SimpleDict";
 import type Post from "./Post";
 import type Thread from "./Thread";
@@ -23,11 +23,11 @@ export default class Board {
     this.posts   = new SimpleDict();
     this.config  = BoardConfig.boards?.[this.ID] || {};
 
-    g.boards[this.ID] = this;
+    Object.assign(g.boards, { [this.ID]: this });
   }
 
   cooldowns() {
-    const c2 = (this.config || {}).cooldowns || {};
+    const c2 = this.config?.cooldowns ?? {};
     const c = {
       thread: c2.threads || 0,
       reply:  c2.replies || 0,
@@ -36,7 +36,7 @@ export default class Board {
     };
     // Pass users have reduced cooldowns.
     if (isPassEnabled()) {
-      for (var key of ['reply', 'image']) {
+      for (const key of ['reply', 'image']) {
         c[key] = Math.ceil(c[key] / 2);
       }
     }

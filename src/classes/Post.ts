@@ -11,6 +11,8 @@ import type Board from "./Board";
 import Callbacks from "./Callbacks";
 import type Thread from "./Thread";
 
+let cloneSuffix = 0;
+
 export interface File {
   text:        string,
   link:        HTMLAnchorElement,
@@ -64,8 +66,8 @@ export default class Post {
   declare isFetchedQuote: boolean | undefined;
   declare isClone:        boolean | undefined;
   declare quotes:         string[];
-  declare file:           ReturnType<Post['parseFile']>;
-  declare files:          ReturnType<Post['parseFile']>[];
+  declare file:           File;
+  declare files:          File[];
   declare forBuildTest?:  boolean;
   declare normalizedOriginal?: any;
   declare highlights?:    string[];
@@ -89,7 +91,7 @@ export default class Post {
   };
 
   // because of a circular dependency $ might not be initialized, so we can't use $.el
-  static deadMark = (() => {
+  static readonly deadMark = (() => {
     const el = document.createElement('span');
     // \u00A0 is nbsp
     el.textContent = '\u00A0(Dead)';
@@ -105,13 +107,13 @@ export default class Post {
     // #endregion
 
     // Skip initialization for PostClone
-    if (root === undefined && thread === undefined && board === undefined) return;
+    if (!(root && thread && board)) return;
 
     this.root = root;
     this.thread = thread;
     this.board = board;
     $.extend(this, flags);
-    this.ID       = +root.id.match(/\d*$/)[0];
+    this.ID       = +(/\d*$/.exec(root.id)?.[0] ?? '');
     this.postID   = this.ID;
     this.threadID = this.thread.ID;
     this.boardID  = this.board.ID;
@@ -124,19 +126,7 @@ export default class Post {
 
     this.nodes = this.parseNodes(root);
 
-    if (!this.isReply) {
-      this.thread.OP = this;
-      for (var key of ['isSticky', 'isClosed', 'isArchived']) {
-        var selector;
-        if (selector = g.SITE.selectors.icons[key]) {
-          this.thread[key] = !!$(selector, this.nodes.info);
-        }
-      }
-      if (this.thread.isArchived) {
-        this.thread.isClosed = true;
-        this.thread.kill();
-      }
-    }
+    this.initializeOP();
 
     const name = this.nodes.name?.textContent;
     const tripcode = this.nodes.tripcode?.textContent;
@@ -148,9 +138,9 @@ export default class Post {
       tripcode,
       uniqueID:  this.nodes.uniqueID?.textContent,
       capcode:   this.nodes.capcode?.textContent.replace('## ', ''),
-      pass:      this.nodes.pass?.title.match(/\d*$/)[0],
-      flagCode:  this.nodes.flag?.className.match(/flag-(\w+)/)?.[1].toUpperCase(),
-      flagCodeTroll: this.nodes.flag?.className.match(/bfl-(\w+)/)?.[1].toUpperCase(),
+      pass:      /\d*$/.exec(this.nodes.pass?.title ?? '')?.[0],
+      flagCode:  /flag-(\w+)/.exec(this.nodes.flag?.className ?? '')?.[1].toUpperCase(),
+      flagCodeTroll: /bfl-(\w+)/.exec(this.nodes.flag?.className ?? '')?.[1].toUpperCase(),
       flag:      this.nodes.flag?.title,
       date:      this.nodes.date ? g.SITE.parseDate(this.nodes.date) : undefined,
       nameBlock: Conf['Anonymize'] ? 'Anonymous' : `${name || ''} ${tripcode || ''}`.trim(),
@@ -170,10 +160,30 @@ export default class Post {
     // #region tests_enabled
     if (this.forBuildTest)  return;
     // #endregion
-    if (g.posts.get(this.fullID)) {
+    this.register();
+  }
+
+  initializeOP() {
+    if (this.isReply) return;
+
+    this.thread.OP = this;
+    for (const key of ['isSticky', 'isClosed', 'isArchived']) {
+      const selector = g.SITE.selectors.icons[key];
+      if (selector) this.thread[key] = !!$(selector, this.nodes.info);
+    }
+    if (this.thread.isArchived) {
+      this.thread.isClosed = true;
+      this.thread.kill();
+    }
+  }
+
+  register() {
+    const posts = g.posts!;
+    const existingPost = posts.get(this.fullID);
+    if (existingPost) {
       this.isRebuilt = true;
-      this.clones = g.posts.get(this.fullID).clones;
-      for (var clone of this.clones) { clone.origin = this; }
+      this.clones = existingPost.clones;
+      for (const clone of this.clones) { clone.origin = this; }
     }
 
     if (!this.isFetchedQuote && (this.ID > this.thread.lastPost)) { this.thread.lastPost = this.ID; }
@@ -181,11 +191,11 @@ export default class Post {
     if (this.ID < this.thread.lastPost && g.VIEW === 'thread') {
       this.board.posts.insert(this.ID, this);
       this.thread.posts.insert(this.ID, this);
-      g.posts.insert(this.fullID, this, key => +(key.split('.')[1]) < this.ID);
+      posts.insert(this.fullID, this, key => +(key.split('.')[1] ?? 0) < this.ID);
     } else {
       this.board.posts.push(this.ID, this);
       this.thread.posts.push(this.ID, this);
-      g.posts.push(this.fullID, this);
+      posts.push(this.fullID, this);
     }
   }
 
@@ -224,8 +234,8 @@ export default class Post {
       uniqueIDRoot: undefined as any,
       uniqueID:     undefined as any,
     };
-    for (var key in s.info) {
-      var selector = s.info[key];
+    for (const key in s.info) {
+      const selector = s.info[key];
       nodes[key] = $(selector, info);
     }
     g.SITE.parseNodes?.(this, nodes);
@@ -244,9 +254,12 @@ export default class Post {
     // Remove:
     //   'Comment too long'...
     //   EXIF data. (/p/)
-    this.nodes.commentClean = (bq = this.nodes.comment.cloneNode(true));
+    bq = this.nodes.comment.cloneNode(true);
+    this.nodes.commentClean = bq;
     g.SITE.cleanComment?.(bq);
-    return this.info.comment = this.nodesToText(bq);
+    const comment = this.nodesToText(bq);
+    this.info.comment = comment;
+    return comment;
   }
 
   commentDisplay() {
@@ -283,14 +296,14 @@ export default class Post {
 
   cleanSpoilers(bq) {
     const spoilers = $$(g.SITE.selectors.spoiler, bq);
-    for (var node of spoilers) {
+    for (const node of spoilers) {
       $.replace(node, $.tn('[spoiler]'));
     }
   }
 
   parseQuotes() {
     this.quotes = [];
-    for (var quotelink of $$(g.SITE.selectors.quotelink, this.nodes.comment)) {
+    for (const quotelink of $$(g.SITE.selectors.quotelink, this.nodes.comment)) {
       this.parseQuote(quotelink);
     }
   }
@@ -302,12 +315,12 @@ export default class Post {
     //  - catalog links. (>>>/b/catalog or >>>/b/search)
     //  - rules links. (>>>/a/rules)
     //  - text-board quotelinks. (>>>/img/1234)
-    const match = quotelink.href.match(g.SITE.regexp.quotelink);
+    const match = g.SITE.regexp.quotelink.exec(quotelink.href);
     if (!match && (!this.isClone || !quotelink.dataset.postID)) { return; } // normal or resurrected quote
 
     this.nodes.quotelinks.push(quotelink);
 
-    if (this.isClone) { return; }
+    if (this.isClone || !match) { return; }
 
     // ES6 Set when?
     const fullID = `${match[1]}.${match[3]}`;
@@ -315,20 +328,24 @@ export default class Post {
   }
 
   parseFiles() {
-    let file;
+    let file: File | undefined;
     this.files = [];
     const fileRoots = this.fileRoots();
     let index = 0;
     for (let docIndex = 0; docIndex < fileRoots.length; docIndex++) {
-      var fileRoot = fileRoots[docIndex];
-      if (file = this.parseFile(fileRoot)) {
+      const fileRoot = fileRoots[docIndex];
+      if (fileRoot && (file = this.parseFile(fileRoot))) {
         file.index = (index++);
         file.docIndex = docIndex;
         this.files.push(file);
       }
     }
     if (this.files.length) {
-      return this.file = this.files[0];
+      const file = this.files[0];
+      if (file) {
+        this.file = file;
+        return file;
+      }
     }
   }
 
@@ -344,14 +361,15 @@ export default class Post {
 
 
     const file: Partial<File> = { isDead: false };
-    for (var key in g.SITE.selectors.file) {
-      var selector = g.SITE.selectors.file[key];
+    for (const key in g.SITE.selectors.file) {
+      const selector = g.SITE.selectors.file[key];
       file[key] = $(selector, fileRoot);
     }
     file.thumbLink = file.thumb?.parentNode as HTMLElement;
 
     if (!(file.text && file.link)) { return; }
     if (!g.SITE.parseFile(this, file)) { return; }
+    if (!file.size) { return; }
 
     $.extend(file, {
       url:     file.link.href,
@@ -359,8 +377,11 @@ export default class Post {
       isVideo: $.isVideo(file.link.href)
     }
     );
-    let size  = +file.size.match(/[\d.]+/)[0];
-    let unit  = ['B', 'KB', 'MB', 'GB'].indexOf(file.size.match(/\w+$/)[0]);
+    const sizeMatch = /[\d.]+/.exec(file.size);
+    const unitMatch = /\w+$/.exec(file.size);
+    if (!(sizeMatch && unitMatch)) { return; }
+    let size  = +sizeMatch[0];
+    let unit  = ['B', 'KB', 'MB', 'GB'].indexOf(unitMatch[0]);
     while (unit-- > 0) { size *= 1024; }
     file.sizeInBytes = size;
 
@@ -370,8 +391,9 @@ export default class Post {
   kill(file = false, index = 0) {
     let strong;
     if (file) {
-      if (this.isDead || this.files[index].isDead) { return; }
-      this.files[index].isDead = true;
+      const target = this.files[index];
+      if (this.isDead || !target || target.isDead) { return; }
+      target.isDead = true;
       $.addClass(this.nodes.root, 'deleted-file');
     } else {
       if (this.isDead) { return; }
@@ -380,7 +402,8 @@ export default class Post {
       $.addClass(this.nodes.root, 'deleted-post');
     }
 
-    if (!(strong = $('strong.warning', this.nodes.info))) {
+    strong = $('strong.warning', this.nodes.info);
+    if (!strong) {
       strong = $.el('strong',
         {className: 'warning'});
       $.after($('input', this.nodes.info), strong);
@@ -388,14 +411,14 @@ export default class Post {
     strong.textContent = file ? '[File deleted]' : '[Deleted]';
 
     if (this.isClone) { return; }
-    for (var clone of this.clones) {
+    for (const clone of this.clones) {
       clone.kill(file, index);
     }
 
     if (file) { return; }
     // Get quotelinks/backlinks to this post
     // and paint them (Dead).
-    for (var quotelink of Get.allQuotelinksLinkingTo(this)) {
+    for (const quotelink of Get.allQuotelinksLinkingTo(this)) {
       if (!$.hasClass(quotelink, 'deadlink')) {
         $.add(quotelink, Post.deadMark.cloneNode(true));
         $.addClass(quotelink, 'deadlink');
@@ -413,10 +436,10 @@ export default class Post {
     $.addClass(this.nodes.root, 'from-archive');
 
     if (this.isClone) { return; }
-    for (var clone of this.clones) {
+    for (const clone of this.clones) {
       clone.markAsFromArchive();
     }
-    for (var quotelink of Get.allQuotelinksLinkingTo(this) as HTMLAnchorElement[]) {
+    for (const quotelink of Get.allQuotelinksLinkingTo(this) as HTMLAnchorElement[]) {
       $.addClass(quotelink, 'from-archive-link');
     }
   }
@@ -436,11 +459,11 @@ export default class Post {
     }
 
     if (this.isClone) { return; }
-    for (var clone of this.clones) {
+    for (const clone of this.clones) {
       clone.resurrect();
     }
 
-    for (var quotelink of Get.allQuotelinksLinkingTo(this) as HTMLAnchorElement[]) {
+    for (const quotelink of Get.allQuotelinksLinkingTo(this) as HTMLAnchorElement[]) {
       if ($.hasClass(quotelink, 'deadlink')) {
         $.rm($('.qmark-dead', quotelink));
       }
@@ -449,7 +472,7 @@ export default class Post {
   }
 
   collect() {
-    g.posts.rm(this.fullID);
+    g.posts!.rm(this.fullID);
     this.thread.posts.rm(this);
     this.board.posts.rm(this);
   }
@@ -462,7 +485,7 @@ export default class Post {
 
   rmClone(index) {
     this.clones.splice(index, 1);
-    for (var clone of this.clones.slice(index)) {
+    for (const clone of this.clones.slice(index)) {
       clone.nodes.root.dataset.clone = index++;
     }
   }
@@ -472,39 +495,37 @@ export default class Post {
     this.nodes.root.classList.toggle('opContainer', !isCatalogOP);
     this.nodes.post.classList.toggle('catalog-post', isCatalogOP);
     this.nodes.post.classList.toggle('op', !isCatalogOP);
-    this.nodes.post.style.left = (this.nodes.post.style.right = null);
+    this.nodes.post.style.right = '';
+    this.nodes.post.style.left = '';
   }
 };
 
 export class PostClone extends Post {
   declare origin: Post;
 
-  static suffix = 0;
-
   constructor(origin, context, contractThumb) {
     super();
     this.isClone = true;
 
-    let file, fileRoots, key;
     this.origin = origin;
     this.context = context;
-    for (key of ['ID', 'postID', 'threadID', 'boardID', 'siteID', 'fullID', 'board', 'thread', 'info', 'quotes', 'isReply']) {
+    for (const key of ['ID', 'postID', 'threadID', 'boardID', 'siteID', 'fullID', 'board', 'thread', 'info', 'quotes', 'isReply']) {
       // Copy or point to the origin's key value.
       this[key] = this.origin[key];
     }
 
     const { nodes } = this.origin;
     const root = contractThumb ? this.cloneWithoutVideo(nodes.root) : nodes.root.cloneNode(true);
-    for (var node of [root, ...$$('[id]', root)]) {
-      node.id += `_${PostClone.suffix}`;
+    for (const node of [root, ...$$('[id]', root)]) {
+      node.id += `_${cloneSuffix}`;
     }
-    PostClone.suffix++;
+    cloneSuffix++;
 
     // Remove inlined posts inside of this post.
-    for (var inline of $$('.inline', root)) {
+    for (const inline of $$('.inline', root)) {
       $.rm(inline);
     }
-    for (var inlined of $$('.inlined', root)) {
+    for (const inlined of $$('.inlined', root)) {
       $.rmClass(inlined, 'inlined');
     }
 
@@ -525,25 +546,10 @@ export class PostClone extends Post {
     this.parseQuotes();
     this.quotes = [...this.origin.quotes];
 
-    this.files = [];
-    if (this.origin.files.length) { fileRoots = this.fileRoots(); }
-    for (var originFile of this.origin.files) {
-      // Copy values, point to relevant elements.
-      file = { ...originFile };
-      var fileRoot = fileRoots[file.docIndex];
-      for (key in g.SITE.selectors.file) {
-        var selector = g.SITE.selectors.file[key];
-        file[key] = $(selector, fileRoot);
-      }
-      file.thumbLink = file.thumb?.parentNode;
-      if (file.thumbLink) { file.fullImage = $('.full-image', file.thumbLink); }
-      file.videoControls = $('.video-controls', file.text);
-      if (file.videoThumb) { file.thumb.muted = true; }
-      this.files.push(file);
-    }
+    this.cloneFiles();
 
     if (this.files.length) {
-      this.file = this.files[0];
+      this.file = this.files[0]!;
 
       // Contract thumbnails in quote preview
       if (this.file.thumb && contractThumb) { ImageExpand.contract(this); }
@@ -551,7 +557,26 @@ export class PostClone extends Post {
 
     if (this.origin.isDead) { this.isDead = true; }
     root.dataset.clone = this.origin.clones.push(this) - 1;
-    return this;
+  }
+
+  cloneFiles() {
+    this.files = [];
+    const fileRoots = this.origin.files.length ? this.fileRoots() : [];
+    for (const originFile of this.origin.files) {
+      // Copy values, point to relevant elements.
+      const file = { ...originFile };
+      const fileRoot = fileRoots[file.docIndex!];
+      if (!fileRoot) continue;
+      for (const key in g.SITE.selectors.file) {
+        const selector = g.SITE.selectors.file[key];
+        file[key] = $(selector, fileRoot);
+      }
+      file.thumbLink = file.thumb?.parentNode as HTMLElement;
+      if (file.thumbLink) { file.fullImage = $('.full-image', file.thumbLink); }
+      file.videoControls = $('.video-controls', file.text);
+      if (file.videoThumb && file.thumb) { (file.thumb as HTMLVideoElement).muted = true; }
+      this.files.push(file);
+    }
   }
 
   cloneWithoutVideo(node) {
@@ -559,7 +584,7 @@ export class PostClone extends Post {
       return [];
     } else if ((node.nodeType === Node.ELEMENT_NODE) && $('video', node)) {
       const clone = node.cloneNode(false);
-      for (var child of node.childNodes) { $.add(clone, this.cloneWithoutVideo(child)); }
+      for (const child of node.childNodes) { $.add(clone, this.cloneWithoutVideo(child)); }
       return clone;
     } else {
       return node.cloneNode(true);

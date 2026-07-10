@@ -20,7 +20,7 @@ export default class Thread {
   declare postLimit: boolean;
   declare fileLimit: boolean;
   declare lastPost: number;
-  declare ipCount: number;
+  declare ipCount?: number;
   declare json: any;
   declare OP: any;
   declare catalogView: any;
@@ -56,19 +56,19 @@ export default class Thread {
       {root: null};
 
     this.board.threads.push(this.ID, this);
-    g.threads.push(this.fullID, this);
+    g.threads!.push(this.fullID, this);
   }
 
   setPage(pageNum) {
-    let icon;
     const {info, reply} = this.OP.nodes;
-    if (!(icon = $('.page-num', info))) {
+    let icon = $('.page-num', info);
+    if (!icon) {
       icon = $.el('span', {className: 'page-num'});
       $.replace(reply.parentNode.previousSibling, [$.tn(' '), icon, $.tn(' ')]);
     }
     icon.title       = `This thread is on page ${pageNum} in the original index.`;
     icon.textContent = `[${pageNum}]`;
-    if (this.catalogView) { return this.catalogView.nodes.pageCount.textContent = pageNum; }
+    if (this.catalogView) { this.catalogView.nodes.pageCount.textContent = pageNum; }
   }
 
   setCount(type, count, reachedLimit) {
@@ -106,7 +106,7 @@ export default class Thread {
       className: `${typeLC}Icon retina`
     }
     );
-    if (g.BOARD.ID === 'f') {
+    if (g.BOARD!.ID === 'f') {
       icon.style.cssText = 'height: 18px; width: 18px;';
     }
 
@@ -121,7 +121,7 @@ export default class Thread {
   }
 
   kill() {
-    return this.isDead = true;
+    this.isDead = true;
   }
 
   collect() {
@@ -134,7 +134,7 @@ export default class Thread {
       }
     });
     if (!n) {
-      g.threads.rm(this.fullID);
+      g.threads!.rm(this.fullID);
       return this.board.threads.rm(this);
     }
   }
