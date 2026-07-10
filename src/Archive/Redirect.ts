@@ -47,7 +47,8 @@ const Redirect = {
 
   indexArchivesByBoard(o) {
     const archives = dict();
-    for (const data of Conf['archives']) {
+    for (const data of Array.isArray(Conf['archives']) ? Conf['archives'] : []) {
+      if (!data || typeof data !== 'object') { continue; }
       Redirect.normalizeArchiveBoards(data);
       if (!Redirect.isCompatibleArchive(data)) { continue; }
       archives[JSON.stringify(data.uid ?? data.name)] = data;
@@ -84,6 +85,7 @@ const Redirect = {
   applySelectedArchives(o, archives) {
     for (const boardID in Conf['selectedArchives']) {
       const record = Conf['selectedArchives'][boardID];
+      if (!record || typeof record !== 'object') { continue; }
       for (const [type, id] of Object.entries(record)) {
         const archive = archives[JSON.stringify(id)];
         if (!archive || !$.hasOwn(o, type)) { continue; }
@@ -105,9 +107,8 @@ const Redirect = {
   collectArchiveListUrls(): string[] {
     const urls: string[] = [];
     for (const raw of Conf['archiveLists'].split('\n')) {
-      if (raw[0] === '#') { continue; }
       const url = raw.trim();
-      if (url) { urls.push(url); }
+      if (url && !url.startsWith('#')) { urls.push(url); }
     }
     return urls;
   },
