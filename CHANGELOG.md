@@ -3,6 +3,15 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.5 (2026-07-10)
+
+- Bugfixes
+  - `VideoStripper.readVint`: fixed the EBML unknown-size check comparing a bitwise-truncated `val` against a 56-bit numeric literal that could never match; now detected from the raw bytes.
+  - `Linkify.extendAcrossNodes`: resolved a SonarQube parameter-reassignment finding (`endNode` read-before-write ambiguity) with no behavior change.
+
+- Security
+  - `sonar-local.mjs` now resolves `npx` from Node's own install directory instead of the shell/PATH, closing a PATH-hijack finding (SonarQube).
+
 ### 2.30.4 (2026-07-10)
 
 - Bugfixes
