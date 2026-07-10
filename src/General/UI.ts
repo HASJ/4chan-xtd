@@ -39,6 +39,7 @@ export const Menu = class Menu {
   type: string;
   entries: any[];
   el: HTMLElement;
+  lastButton: HTMLElement | null = null;
 
   constructor(type: string) {
     this.type = type;
@@ -192,7 +193,12 @@ export const Menu = class Menu {
 
   toggle(e: MouseEvent, a: HTMLElement, post: any) {
     e.preventDefault();
+    const reclicked = !!this.el.parentNode && this.lastButton === a;
     $.event('CloseMenu', undefined);
+    if (reclicked) {
+      return e.stopPropagation();
+    }
+    this.lastButton = a;
     for (const entry of this.entries) {
       let show;
       try {
@@ -238,6 +244,7 @@ Callbacks.handleErrors([{
 
   close() {
     if (this.el.parentNode) {
+      this.lastButton = null;
       return $.rm(this.el);
     }
   }
