@@ -6,7 +6,7 @@ import Icon from "../Icons/icon";
 
 const Menu: any = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu']) { return; }
 
     this.button = $.el('a', {
       className: 'menu-button',
@@ -45,7 +45,7 @@ const Menu: any = {
 
   makeButton(post, button) {
     if (!button) { button = Menu.button.cloneNode(true); }
-    $.on(button, 'click', function(e) {
+    $.on(button, 'click', function(this: HTMLElement, e) {
       return Menu.menu.toggle(e, this, post);
     });
     return button;

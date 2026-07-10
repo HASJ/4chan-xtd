@@ -4,7 +4,7 @@ import Menu from "./Menu";
 
 const CopyTextLink: any = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu'] || !Conf['Copy Text Link']) { return; }
 
     const a = $.el('a', {
       className: 'copy-text-link',

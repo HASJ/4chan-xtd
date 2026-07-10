@@ -8,7 +8,7 @@ const DeleteLink: any = {
   auto: [dict(), dict()],
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Delete Link']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu'] || !Conf['Delete Link']) { return; }
 
     const div = $.el('div', {
       className: 'delete-link',
