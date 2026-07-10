@@ -61,6 +61,26 @@ Legend: `[x]` done · `[ ]` deferred/left (with reason).
 - [x] `platform/helpers.ts:99,101` — `String.fromCharCode` → `String.fromCodePoint` (inputs bounded to BMP)
 - [x] `SW.yotsuba.tsx:406` — pseudorandom flagged as cosmetic (spoiler image variance), `NOSONAR` with rationale
 
+### Round 2 (re-scan of main, 2026-07-10)
+- [x] `Linkify.ts:126` — `(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$` → linear `trailingUrlTail()`
+      (equivalence fuzz-verified, 200k cases; supersedes earlier "unprovable" deferral)
+- [x] `Linkify.ts:131` — `regString` NOSONAR moved onto the regex-literal line (scanner ignored it on the property line)
+- [x] `QR.ts:1184` — false positive (disjoint `\d`/`\s`); NOSONAR justification added on the line
+- [x] `VideoStripper.ts:167` — genuine bug behind the "literal precision" message: `(val << 8) | next`
+      coerces to 32-bit, wrapping vints of length ≥ 5 → `val * 256 + next` (exact to 2^53)
+- [x] `VideoStripper.ts:239` — complexity already ≤15 after earlier extraction; no change
+- [x] `SW.tinyboard.ts:239` — `/(\s*ID:\s*)(\S+)/` leading `\s*` retried per start position → linear `matchPosterId()`
+      (revises the earlier false-positive call)
+- [x] `SW.yotsuba.tsx:294` — `/\d+(?=\.\w+$)/` → linear `digitsBeforeExtension()` (only the last dot can satisfy the lookahead)
+- [x] `SW.yotsuba.tsx:394` — `/\.?[^.]*$/` → `trailingExtension()` (`lastIndexOf('.')` + slice)
+- [x] `Main.ts:115` — `toError` now stringifies non-Error objects via `JSON.stringify` (fallback `String`);
+      known delta: `undefined` input yields message `""` instead of `"undefined"`
+- [x] `tools/rollup.ts:126,128,178,198` — `.replace(/…/g, …)` → `.replaceAll(…)` (identical semantics)
+- [x] `tools/sonar-local.mjs:16` — S4036 PATH warning: spawn already uses an absolute `npx` path from
+      `process.execPath`, no shell; NOSONAR with justification
+- [x] `vitest.config.ts` — exclude `**/.worktrees/**` so the stray `test-coverage` worktree checkout
+      doesn't leak its test files into the root suite
+
 ---
 
 ## Deferred / left (with reason)
@@ -74,17 +94,16 @@ Legend: `[x]` done · `[ ]` deferred/left (with reason).
 ### False positives (no change needed)
 - [ ] `classes/Fetcher.ts:14` — "make readonly": the static `flagCSS` is reassigned
       lazily (`Fetcher.flagCSS = …` at lines 78/80); `readonly` would break compilation.
-- [ ] `QR.ts:1184` — `/\d+\s+(?:minute|second)/`: disjoint char classes, already linear.
-- [ ] `SW.tinyboard.ts:209,239,275,277` — single-quantifier patterns, already linear.
-- [ ] `SW.yotsuba.tsx:281,294,394,512` — linear / atomic-emulated patterns, already safe.
-- [ ] `Main.ts:115` — already uses `String(error)`; finding stale.
+- [ ] `SW.tinyboard.ts:209,275,277` — single-quantifier patterns, already linear
+      (`:239` reclassified and fixed in round 2).
+- [ ] `SW.yotsuba.tsx:281,512` — linear / atomic-emulated patterns, already safe
+      (`:294`/`:394` reclassified and fixed in round 2).
 
 ### Left for behaviour-safety (no provable behaviour-preserving rewrite)
 - [ ] `Fetcher.ts:79` — `\d+(?=\.css$)`: bounded CSS-href input, not attacker-scalable.
 - [ ] `Post.ts:276` — `/\s+$/gm`: multiline trailing-whitespace; `\s` includes `\n`, no safe rewrite.
 - [ ] `Embedding.tsx:438,461,587,672` (incl. complexity 29 @587) — capture values consumed downstream; restructuring risks silently changing which match wins.
-- [ ] `Linkify.ts:126` — domain-tail regex whose match content is consumed; equivalence unprovable.
-- [ ] `Linkify.ts:132` (regex + complexity 71) — large core regex used everywhere; too risky to rewrite (carries a prior `NOSONAR`).
+- [ ] `Linkify.ts:132` (regex + complexity 71) — large core regex used everywhere; too risky to rewrite (suppressed via `NOSONAR` on the literal line since round 2).
 - [ ] `SW.tinyboard.ts:270` — `/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/`: genuinely polynomial but no safe rewrite (filenames may contain `)`); input short and non-scalable.
 - [ ] `SW.yotsuba.tsx:528` — `/\s+$/gm`: same multiline constraint as `Post.ts:276`.
 
