@@ -9,7 +9,7 @@ import { isPassEnabled, keyCode, MINUTE, SECOND } from "../platform/helpers";
 import { getQRCommentInput } from "./QRBridge";
 
 const Captcha: any = {
-  cache: {
+  cache: <any>{
     init() {
       $.on(d, 'SaveCaptcha', e => {
         return this.saveAPI(e.detail);
@@ -146,7 +146,7 @@ const Captcha: any = {
   },
   replace: CaptchaReplace,
   t: CaptchaT,
-  v2: {
+  v2: <any>{
     lifetime: 2 * MINUTE,
 
     init() {
@@ -315,7 +315,7 @@ const Captcha: any = {
       this.restoreCommentFocus();
       // XXX Make sure scroll on space prevention (see src/css/style.css) doesn't cause scrolling of div
       if (['blink', 'edge'].includes($.engine) && (needle = iframe.parentNode, $$('#qr .captcha-container > div > div:first-of-type').includes(needle))) {
-        return $.on(iframe.parentNode, 'scroll', function () { this.scrollTop = 0; });
+        return $.on(iframe.parentNode, 'scroll', function (this: HTMLElement) { this.scrollTop = 0; });
       }
     },
 
@@ -417,8 +417,8 @@ const Captcha: any = {
     saveNotNeeded(pasted, focus) {
       if (pasted) {
         this.destroy();
-      } else if (this.timeouts.destroy == null) {
-        this.timeouts.destroy = setTimeout(this.destroy.bind(this), 3 * SECOND);
+      } else {
+        this.timeouts.destroy ??= setTimeout(this.destroy.bind(this), 3 * SECOND);
       }
       if (focus) {
         QRState.nodes.status.focus();
