@@ -1,18 +1,9 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "ES2022",
     "moduleResolution": "bundler",
-    "noImplicitAny": false,
-    "removeComments": false,
-    "sourceMap": true,
-    "target": "ES2020",
-    "allowJs": false,
-    "resolveJsonModule": false,
     "noEmit": true,
-    "newLine": "lf",
-    "jsx": "react",
-    "jsxFactory": "h",
-    "jsxFragmentFactory": "hFragment",
     "types": [
       "@violentmonkey/types",
       "@types/chrome"
@@ -23,22 +14,36 @@
       "ES2020"
     ],
     "outDir": "builds/test/crx/tsOutput",
-    "importHelpers": true,
     "paths": {
       "@fa/*": ["./node_modules/@fortawesome/free-regular-svg-icons/*"],
       "@fas/*": ["./node_modules/@fortawesome/free-solid-svg-icons/*"],
       "@fortawesome/fontawesome-common-types": ["./node_modules/@fortawesome/fontawesome-common-types/index.d.ts"]
-    },
-    "skipDefaultLibCheck": true
+    }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.d.ts"
+    "src/Archive/**/*",
+    "src/classes/**/*",
+    "src/config/**/*",
+    "src/css/**/*",
+    "src/Filtering/**/*",
+    "src/General/**/*",
+    "src/globals/**/*",
+    "src/Icons/**/*",
+    "src/Images/**/*",
+    "src/Linkification/**/*",
+    "src/main/**/*",
+    "src/Menu/**/*",
+    "src/Miscellaneous/**/*",
+    "src/Monitoring/**/*",
+    "src/PageContext/**/*",
+    "src/platform/**/*",
+    "src/Posting/**/*",
+    "src/Quotelinks/**/*",
+    "src/site/**/*",
+    "src/types/**/*"
   ],
   "exclude": [
     "builds/",
-    "tools/",
-    "src/meta/"
+    "tools/"
   ]
 }

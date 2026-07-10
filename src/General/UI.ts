@@ -2,7 +2,6 @@ import { Conf, d, doc } from "../globals/globals";
 import Callbacks from "../classes/Callbacks";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
-import UIState from "../globals/UIState";
 import { getHeaderDialogBorders } from "./HeaderLayout";
 import Icon from "../Icons/icon";
 
@@ -40,6 +39,7 @@ export const Menu = class Menu {
   type: string;
   entries: any[];
   el: HTMLElement;
+  lastButton: HTMLElement | null = null;
 
   constructor(type: string) {
     this.type = type;
@@ -61,7 +61,7 @@ export const Menu = class Menu {
     let entry = d.activeElement as HTMLElement;
     if (!this.el.contains(entry)) { return; }
 
-    if (e.keyCode === 27) { // Esc
+    if (e.key === 'Escape') {
       this.close();
       return;
     }
@@ -69,19 +69,23 @@ export const Menu = class Menu {
     let next: HTMLElement | null;
     let submenu: HTMLElement | null;
 
-    switch (e.keyCode) {
-      case 38: // Up
-        if (next = this.findNextEntry(entry, -1)) {
+    switch (e.key) {
+      case 'ArrowUp':
+        next = this.findNextEntry(entry, -1);
+        if (next) {
           this.focus(next);
         }
         break;
-      case 40: // Down
-        if (next = this.findNextEntry(entry, +1)) {
+      case 'ArrowDown':
+        next = this.findNextEntry(entry, +1);
+        if (next) {
           this.focus(next);
         }
         break;
-      case 39: // Right
-        if ((submenu = $('.submenu', entry)) && (next = submenu.firstElementChild as HTMLElement)) {
+      case 'ArrowRight':
+        submenu = $('.submenu', entry);
+        next = submenu?.firstElementChild as HTMLElement | null;
+        if (next) {
           let nextPrev: HTMLElement | null;
           while ((nextPrev = this.findNextEntry(next, -1))) {
             next = nextPrev;
@@ -89,8 +93,9 @@ export const Menu = class Menu {
           this.focus(next);
         }
         break;
-      case 37: // Left
-        if (next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry) as HTMLElement) {
+      case 'ArrowLeft':
+        next = $.x('parent::*[contains(@class,"submenu")]/parent::*', entry) as HTMLElement;
+        if (next) {
           this.focus(next);
         }
         break;
@@ -144,7 +149,8 @@ export const Menu = class Menu {
     style.top    = top;
     style.bottom = bottom;
     style.left   = left;
-    return style.right  = right;
+    style.right = right;
+    return style.right;
   }
 
   addEntry(entry: any) {
@@ -160,7 +166,7 @@ export const Menu = class Menu {
     if (!subEntries) { return; }
     $.addClass(el, 'has-submenu');
     const submenu = $.el('div', {className: 'submenu'});
-    for (var subEntry of subEntries) {
+    for (const subEntry of subEntries) {
       this.parseEntry(subEntry);
       $.add(submenu, subEntry.el);
     }
@@ -187,13 +193,18 @@ export const Menu = class Menu {
 
   toggle(e: MouseEvent, a: HTMLElement, post: any) {
     e.preventDefault();
+    const reclicked = !!this.el.parentNode && this.lastButton === a;
     $.event('CloseMenu', undefined);
-    for (var entry of this.entries) {
-      var show;
+    if (reclicked) {
+      return e.stopPropagation();
+    }
+    this.lastButton = a;
+    for (const entry of this.entries) {
+      let show;
       try {
         show = !entry.open || entry.open(post);
       } catch (err) {
-        Callbacks.errorHandler?.([{
+Callbacks.handleErrors([{
           message: `Error in building the ${this.type} menu.`,
           error: err
         }]);
@@ -233,6 +244,7 @@ export const Menu = class Menu {
 
   close() {
     if (this.el.parentNode) {
+      this.lastButton = null;
       return $.rm(this.el);
     }
   }
@@ -243,7 +255,8 @@ export const dragstart = function (this: HTMLElement, e: any) {
   if ((e.type === 'mousedown') && (e.button !== 0)) { return; } // not LMB
   // prevent text selection
   e.preventDefault();
-  if (isTouching = e.type === 'touchstart') {
+  isTouching = e.type === 'touchstart';
+  if (isTouching) {
     e = e.changedTouches[e.changedTouches.length - 1];
   }
   // distance from pointer to el edge is constant; calculate it here.
@@ -280,7 +293,7 @@ export const dragstart = function (this: HTMLElement, e: any) {
 };
 
 export const touchmove = function (this: any, e: TouchEvent) {
-  for (var touch of (e.changedTouches as any)) {
+  for (const touch of (e.changedTouches as any)) {
     if (touch.identifier === this.identifier) {
       drag.call(this, touch);
       return;
@@ -292,20 +305,22 @@ export const drag = function (this: any, e: any) {
   const {clientX, clientY} = e;
 
   let left: string | number = clientX - this.dx;
-  left = left < 10 ?
-    0
-  : (this.width - left) < 10 ?
-    ''
-  :
-    ((left / this.screenWidth) * 100) + '%';
+  if (left < 10) {
+    left = 0;
+  } else if ((this.width - left) < 10) {
+    left = '';
+  } else {
+    left = `${(left / this.screenWidth) * 100}%`;
+  }
 
   let top: string | number = clientY - this.dy;
-  top = top < (10 + this.topBorder) ?
-    this.topBorder + 'px'
-  : (this.height - top) < (10 + this.bottomBorder) ?
-    ''
-  :
-    ((top / this.screenHeight) * 100) + '%';
+  if (top < (10 + this.topBorder)) {
+    top = `${this.topBorder}px`;
+  } else if ((this.height - top) < (10 + this.bottomBorder)) {
+    top = '';
+  } else {
+    top = `${(top / this.screenHeight) * 100}%`;
+  }
 
   const right = left === '' ?
     0
@@ -325,7 +340,7 @@ export const drag = function (this: any, e: any) {
 };
 
 export const touchend = function (this: any, e: TouchEvent) {
-  for (var touch of (e.changedTouches as any)) {
+  for (const touch of (e.changedTouches as any)) {
     if (touch.identifier === this.identifier) {
       dragend.call(this);
       return;
@@ -414,7 +429,8 @@ export const hover = function (this: any, e: any) {
   const {style} = this;
   style.top   = top + 'px';
   style.left  = left;
-  return style.right = right;
+  style.right = right;
+  return style.right;
 };
 
 export const hoverend = function (this: any, e: any) {
@@ -425,11 +441,11 @@ export const hoverend = function (this: any, e: any) {
   $.off(this.root, 'mousemove', this.hover);
   // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=674955
   $.off(doc,   'mousemove', this.workaround);
-  if (this.cb) { return this.cb.call(this); }
+  if (this.cb) { return this.cb(); }
 };
 
 export const checkbox = function (name: string, text: string, checked?: boolean) {
-  if (checked == null) { checked = Conf[name]; }
+  checked ??= Conf[name];
   const label = $.el('label');
   const input = $.el('input', {type: 'checkbox', name, checked});
   $.add(label, [input, $.tn(` ${text}`)]);

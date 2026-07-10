@@ -19,13 +19,13 @@ interface HideOptions {
   byId?: boolean;
 };
 
-var PostHiding = {
-  db: undefined as DataBoard,
+const PostHiding = {
+  db: undefined as DataBoard | undefined,
   /** poster Ids to filter */
-  posterIdDb: undefined as DataBoard,
+  posterIdDb: undefined as DataBoard | undefined,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || (!Conf['Reply Hiding Buttons'] && !(Conf['Menu'] && Conf['Reply Hiding Link']))) { return; }
+    if (!['index', 'thread'].includes(g.VIEW!) || (!Conf['Reply Hiding Buttons'] && !(Conf['Menu'] && Conf['Reply Hiding Link']))) { return; }
 
     if (Conf['Reply Hiding Buttons']) {
       $.addClass(doc, "reply-hide");
@@ -40,15 +40,15 @@ var PostHiding = {
   },
 
   isHidden(boardID, threadID, postID) {
-    return !!(PostHiding.db && PostHiding.db.get({boardID, threadID, postID}));
+    return !!PostHiding.db?.get({boardID, threadID, postID});
   },
 
   node(this: Post) {
     if (!this.isReply || this.isClone || this.isFetchedQuote) return;
 
-    let data: HideOptions = PostHiding.db.get({boardID: this.board.ID, threadID: this.thread.ID, postID: this.ID});
+    let data: HideOptions = PostHiding.db!.get({boardID: this.board.ID, threadID: this.thread.ID, postID: this.ID});
     if (!data && this.info.uniqueID) {
-      const hiddenPosterIds: Record<string, HideOptions> = PostHiding.posterIdDb.get(
+      const hiddenPosterIds: Record<string, HideOptions> = PostHiding.posterIdDb!.get(
         { boardID: this.board.ID, threadID: this.thread.ID }
       );
       if (hiddenPosterIds && this.info.uniqueID in hiddenPosterIds) {
@@ -80,10 +80,10 @@ var PostHiding = {
   },
 
   menu: {
-    post: undefined as Post,
+    post: undefined as Post | undefined,
 
     async init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Reply Hiding Link']) return;
+      if (!['index', 'thread'].includes(g.VIEW!) || !Conf['Menu'] || !Conf['Reply Hiding Link']) return;
 
       await new Promise(res => BoardConfig.ready(res));
 
@@ -100,7 +100,7 @@ var PostHiding = {
         { el: UI.checkbox('replies', 'Hide replies', Conf['Recursive Hiding']) },
         { el: UI.checkbox('makeStub', 'Make stub', Conf['Stubs']) },
       ];
-      if (g.BOARD.config.user_ids) {
+      if (g.BOARD!.config.user_ids) {
         hideOptions.push({ el: UI.checkbox('byId', 'By poster id', false) });
       }
 
@@ -141,7 +141,7 @@ var PostHiding = {
         { el: replies },
       ];
       let byId: any;
-      if (g.BOARD.config.user_ids) {
+      if (g.BOARD!.config.user_ids) {
         byId = UI.checkbox('byId', 'By poster id', false);
         showOptions.push({ el: byId });
       }
@@ -156,7 +156,7 @@ var PostHiding = {
           if (!post.isReply || post.isClone || !post.isHidden) {
             return false;
           }
-          const data = PostHiding.db.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID});
+          const data = PostHiding.db!.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID});
           if (!data) return false;
 
           PostHiding.menu.post = post;
@@ -172,19 +172,20 @@ var PostHiding = {
         el: hideStubLink,
         order: 15,
         open(post) {
-          let data;
           if (!post.isReply || post.isClone || !post.isHidden) {
             return false;
           }
-          if (!(data = PostHiding.db.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID}))) {
+          const data = PostHiding.db!.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID});
+          if (!data) {
             return false;
           }
-          return PostHiding.menu.post = post;
+          PostHiding.menu.post = post;
+          return true;
         }
       });
     },
 
-    hide() {
+    hide(this: HTMLElement) {
       const parent   = this.parentNode;
       const thisPost = $('input[name=thisPost]', parent).checked;
       const replies  = $('input[name=replies]',  parent).checked;
@@ -201,18 +202,19 @@ var PostHiding = {
       }
       if (byId) {
         const msg = `Hidden because of poster ID ${post.info.uniqueID}`;
-        g.posts.forEach((p) => {
+        g.posts!.forEach((p) => {
           if (p.info.uniqueID === post.info.uniqueID && p !== post) {
             PostHiding.hide(p, makeStub, replies, msg);
             PostHiding.saveHiddenState(p, true, thisPost, makeStub, replies, byId);
           }
         });
-        const data: Record<string, HideOptions> = PostHiding.posterIdDb.get(
+        const data: Record<string, HideOptions> = PostHiding.posterIdDb!.get(
           { boardID: post.boardID, threadID: post.threadID, defaultValue: dict() }
         );
-        if (!(post.info.uniqueID in data)) {
-          data[post.info.uniqueID] = { makeStub, hideRecursively: replies };
-          PostHiding.posterIdDb.set({ boardID: post.boardID, threadID: post.threadID, val: data });
+        const uniqueID = post.info.uniqueID!;
+        if (!(uniqueID in data)) {
+          data[uniqueID] = { makeStub, hideRecursively: replies };
+          PostHiding.posterIdDb!.set({ boardID: post.boardID, threadID: post.threadID, val: data });
         }
       }
 
@@ -220,7 +222,7 @@ var PostHiding = {
       $.event('CloseMenu', null);
     },
 
-    show() {
+    show(this: HTMLElement) {
       const parent   = this.parentNode;
       const thisPost = $('input[name=thisPost]', parent).checked;
       const replies  = $('input[name=replies]',  parent).checked;
@@ -237,32 +239,33 @@ var PostHiding = {
         Recursive.rm(PostHiding.hide, post);
       }
       if (byId) {
-        g.posts.forEach((p) => {
+        g.posts!.forEach((p) => {
           if (p.info.uniqueID === post.info.uniqueID && p !== post) {
             PostHiding.show(p, replies);
-            const data = PostHiding.db.get({ boardID, threadID, postID });
+            const data = PostHiding.db!.get({ boardID, threadID, postID });
             if (data) {
               PostHiding.saveHiddenState(post, !(thisPost && replies), !thisPost, data.makeStub, !replies, byId);
             }
           }
         });
-        const byIdState: Record<string, HideOptions> = PostHiding.posterIdDb.get({ boardID, threadID });
-        if (byIdState && post.info.uniqueID in byIdState) {
-          delete byIdState[post.info.uniqueID];
-          PostHiding.posterIdDb.set({ boardID, threadID, val: byIdState });
+        const byIdState: Record<string, HideOptions> = PostHiding.posterIdDb!.get({ boardID, threadID });
+        const uniqueID = post.info.uniqueID!;
+        if (byIdState && uniqueID in byIdState) {
+          delete byIdState[uniqueID];
+          PostHiding.posterIdDb!.set({ boardID, threadID, val: byIdState });
         }
       }
 
-      const data = PostHiding.db.get({ boardID, threadID, postID })
+      const data = PostHiding.db!.get({ boardID, threadID, postID })
       if (data) {
         PostHiding.saveHiddenState(post, !(thisPost && replies), !thisPost, data.makeStub, !replies, byId);
       }
       $.event('CloseMenu', null);
     },
     hideStub() {
-      let data;
-      const {post} = PostHiding.menu;
-      if (data = PostHiding.db.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID})) {
+      const {post} = PostHiding.menu as { post: Post };
+      const data = PostHiding.db!.get({boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID});
+      if (data) {
         PostHiding.show(post, data.hideRecursively);
         PostHiding.hide(post, false, data.hideRecursively);
         PostHiding.saveHiddenState(post, true, true, false, data.hideRecursively, data.byId);
@@ -301,13 +304,13 @@ var PostHiding = {
     if (isHiding) {
       data.val = {
         thisPost: thisPost !== false, // undefined -> true
-        makeStub,
-        hideRecursively,
+        makeStub: !!makeStub,
+        hideRecursively: !!hideRecursively,
         byId
       } satisfies HideOptions;
-      PostHiding.db.set(data);
+      PostHiding.db!.set(data);
     } else {
-      PostHiding.db.delete(data);
+      PostHiding.db!.delete(data);
     }
   },
 
@@ -330,7 +333,7 @@ var PostHiding = {
       PostHiding.hideRecursive(post, makeStub);
     }
 
-    for (var quotelink of Get.allQuotelinksLinkingTo(post)) {
+    for (const quotelink of Get.allQuotelinksLinkingTo(post)) {
       $.addClass(quotelink, 'filtered');
     }
 
@@ -353,7 +356,7 @@ var PostHiding = {
 
     $.add(post.nodes.stub, a);
 
-    if (!Conf['Filter Reason'] && reasons) post.nodes.stub.title = reasons.join(' & ');
+    if (!Conf['Filter Reason'] && reasons) post.nodes.stub!.title = reasons.join(' & ');
     if (Conf['Menu']) {
       $.add(post.nodes.stub, Menu.makeButton(post));
     }
@@ -376,7 +379,7 @@ var PostHiding = {
       Recursive.apply(PostHiding.show, post, true);
       Recursive.rm(PostHiding.hide, post);
     }
-    for (var quotelink of Get.allQuotelinksLinkingTo(post)) {
+    for (const quotelink of Get.allQuotelinksLinkingTo(post)) {
       $.rmClass(quotelink, 'filtered');
     }
   }

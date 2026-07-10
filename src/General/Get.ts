@@ -1,10 +1,11 @@
 import { Conf, g } from "../globals/globals";
 import $ from "../platform/$";
 
-var Get: any = {
+const Get: any = {
   url(type, IDs, ...args) {
-    let f, site;
-    if ((site = g.sites[IDs.siteID]) && (f = $.getOwn(site.urls, type))) {
+    const site = g.sites[IDs.siteID];
+    const f = site && $.getOwn(site.urls, type);
+    if (f) {
       return f(IDs, ...args);
     } else {
       return undefined;
@@ -23,14 +24,14 @@ var Get: any = {
   threadFromRoot(root) {
     if (root == null) { return null; }
     const {board} = root.dataset;
-    return g.threads.get(`${board ? encodeURIComponent(board) : g.BOARD.ID}.${root.id.match(/\d*$/)[0]}`);
+    return g.threads!.get(`${board ? encodeURIComponent(board) : g.BOARD!.ID}.${root.id.match(/\d*$/)[0]}`);
   },
   threadFromNode(node) {
     return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.thread}`, node));
   },
   postFromRoot(root) {
     if (root == null) { return null; }
-    const post  = g.posts.get(root.dataset.fullID);
+    const post  = g.posts!.get(root.dataset.fullID);
     const index = root.dataset.clone;
     if (index) { return post.clones[+index]; } else { return post; }
   },
@@ -55,12 +56,12 @@ var Get: any = {
   },
   allQuotelinksLinkingTo(post) {
     // Get quotelinks & backlinks linking to the given post.
-    const quotelinks = [];
-    const {posts} = g;
+    const quotelinks: any[] = [];
+    const posts = g.posts!;
     const {fullID} = post;
     const handleQuotes = function(qPost, type) {
       quotelinks.push(...(qPost.nodes[type] || []));
-      for (var clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
+      for (const clone of qPost.clones) { quotelinks.push(...(clone.nodes[type] || [])); }
     };
     // First:
     //   In every posts,
@@ -78,8 +79,10 @@ var Get: any = {
     //   and their clones,
     //   get all of their backlinks.
     if (Conf['Quote Backlinks']) {
-      for (var quote of post.quotes) { var qPost;
-      if ((qPost = posts.get(quote))) { handleQuotes(qPost, 'backlinks'); } }
+      for (const quote of post.quotes) {
+        const qPost = posts.get(quote);
+        if (qPost) { handleQuotes(qPost, 'backlinks'); }
+      }
     }
 
     // Third:

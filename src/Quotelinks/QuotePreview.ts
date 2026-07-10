@@ -28,7 +28,7 @@ const QuotePreview: QuotePreviewType = {
       });
     }
 
-    if (!['index', 'thread'].includes(g.VIEW)) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW))) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);
@@ -58,7 +58,7 @@ const QuotePreview: QuotePreviewType = {
     });
 
     $.add(UIState.hoverUI, qp);
-    new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
+    const _fetcher = new Fetcher(boardID, +threadID, String(postID), qp, Get.postFromNode(this));
 
     UI.hover({
       root: this,
@@ -68,7 +68,7 @@ const QuotePreview: QuotePreviewType = {
       cb: QuotePreview.mouseout
     } as any);
 
-    if (Conf['Quote Highlighting'] && (origin = g.posts.get(`${boardID}.${postID}`))) {
+    if (Conf['Quote Highlighting'] && (origin = g.posts?.get(`${boardID}.${postID}`))) {
       const posts = [origin].concat(origin.clones);
       // Remove the clone that's in the qp from the array.
       posts.pop();
@@ -81,7 +81,8 @@ const QuotePreview: QuotePreviewType = {
   mouseout(this: { el: HTMLElement }) {
     // Stop if it only contains text.
     let root: HTMLElement | null;
-    if (!(root = this.el.firstElementChild as HTMLElement)) { return; }
+    root = this.el.firstElementChild as HTMLElement;
+    if (!root) { return; }
 
     $.event('PostsRemoved', null, UIState.hoverUI);
 

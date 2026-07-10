@@ -35,8 +35,8 @@ const SWTinyboard = {
 
   detect(): { [key: string]: any } | false {
     for (const script of $$('script:not([src])', d.head)) {
-      let m: RegExpMatchArray | null;
-      if (m = script.textContent!.match(/\bvar configRoot=(".*?")/)) {
+      const m = script.textContent!.match(/\bvar configRoot=(".*?")/);
+      if (m) {
         const properties = dict();
         try {
           const root = JSON.parse(m[1]);
@@ -45,7 +45,9 @@ const SWTinyboard = {
           } else if (/^https?:/.test(root)) {
             properties.root = root;
           }
-        } catch (error) {}
+        } catch {
+          return properties;
+        }
         return properties;
       }
     }
@@ -53,8 +55,7 @@ const SWTinyboard = {
   },
 
   awaitBoard(cb: () => void): any {
-    let reactUI: HTMLElement | null;
-    if (reactUI = $.id('react-ui')) {
+    if ($.id('react-ui')) {
       const s = (this.selectors = Object.create(this.selectors));
       s.boardFor = {index: '.page-container'};
       s.thread = 'div[id^="thread_"]';
@@ -66,11 +67,12 @@ const SWTinyboard = {
 
   urls: {
     thread({siteID, boardID, threadID}: {siteID: string, boardID: string, threadID: string | number}, isArchived?: boolean): string {
-      return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.html`;
+      const root = Conf['siteProperties'][siteID]?.root || `http://${siteID}/`;
+      return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.html`;
     },
     post({postID}: {postID: string | number}): string { return `#${postID}`; },
-    index({siteID, boardID}: {siteID: string, boardID: string}): string { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/`; },
-    catalog({siteID, boardID}: {siteID: string, boardID: string}): string { return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/catalog.html`; },
+    index({siteID, boardID}: {siteID: string, boardID: string}): string { const root = Conf['siteProperties'][siteID]?.root || `http://${siteID}/`; return `${root}${boardID}/`; },
+    catalog({siteID, boardID}: {siteID: string, boardID: string}): string { const root = Conf['siteProperties'][siteID]?.root || `http://${siteID}/`; return `${root}${boardID}/catalog.html`; },
     threadJSON({siteID, boardID, threadID}: {siteID: string, boardID: string, threadID: string | number}, isArchived?: boolean): string {
       const root = Conf['siteProperties'][siteID]?.root;
       if (root) { return `${root}${boardID}/${isArchived ? 'archive/' : ''}res/${threadID}.json`; } else { return ''; }
@@ -91,7 +93,8 @@ const SWTinyboard = {
       if (root) { return `${root}${boardID}/catalog.json`; } else { return ''; }
     },
     file({siteID, boardID}: {siteID: string, boardID: string}, filename: string): string {
-      return `${Conf['siteProperties'][siteID]?.root || `http://${siteID}/`}${boardID}/${filename}`;
+      const root = Conf['siteProperties'][siteID]?.root || `http://${siteID}/`;
+      return `${root}${boardID}/${filename}`;
     },
     thumb(board: any, filename: string): string {
       return SWTinyboard.urls.file(board, filename);
@@ -166,17 +169,9 @@ const SWTinyboard = {
 
   regexp: {
     quotelink:
-      new RegExp(`\
-/\\
-([^/]+)\\
-/res/\\
-(\\d+)\\
-(?:\\.\\w+)?#\\
-(\\d+)\\
-$\
-`),
+      /\/([^/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)$/,
     quotelinkHTML:
-      /<a [^>]*\bhref="[^"]*\/([^\/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
+      /<a [^>]*\bhref="[^"]*\/([^/]+)\/res\/(\d+)(?:\.\w+)?#(\d+)"/g
   },
 
   Build: {
@@ -221,12 +216,13 @@ $\
   },
 
   isFileURL(url: { pathname: string }): boolean {
-    return /\/src\/[^\/]+/.test(url.pathname);
+    return /\/src\/[^/]+/.test(url.pathname);
   },
 
   preParsingFixes(board: HTMLElement): void {
     let broken: HTMLElement | null;
-    if (broken = $('a > input[name="board"]', board)) {
+    broken = $('a > input[name="board"]', board);
+    if (broken) {
       $.before(broken.parentNode!, broken);
     }
   },
@@ -235,12 +231,13 @@ $\
     if (nodes.uniqueID) { return; }
     let text = '';
     let node = nodes.nameBlock.nextSibling;
-    while (node && (node.nodeType === 3)) {
+    while (node?.nodeType === 3) {
       text += node.textContent;
       node = node.nextSibling;
     }
-    let m: RegExpMatchArray | null;
-    if (m = text.match(/(\s*ID:\s*)(\S+)/)) {
+    let m: RegExpExecArray | null;
+    m = /(\s*ID:\s*)(\S+)/.exec(text);
+    if (m) {
       let uniqueID: HTMLSpanElement;
       nodes.info.normalize();
       let nextSibling = nodes.nameBlock.nextSibling as Text;
@@ -255,9 +252,9 @@ $\
   parseDate(node: HTMLElement): Date | undefined {
     const datetime = node.getAttribute('datetime');
     let date = Date.parse(datetime?.trim() || '');
-    if (!isNaN(date)) { return new Date(date); }
+    if (!Number.isNaN(date)) { return new Date(date); }
     date = Date.parse(node.textContent!.trim() + ' UTC');
-    if (!isNaN(date)) { return new Date(date); }
+    if (!Number.isNaN(date)) { return new Date(date); }
     return undefined;
   },
 
@@ -266,7 +263,7 @@ $\
     if ($.x(`ancestor::${this.xpath.postContainer}[1]`, text) !== post.nodes.root) { return false; }
 
     const nextSibling = link.nextSibling;
-    const hasParen = nextSibling && nextSibling.textContent && nextSibling.textContent.includes('(');
+    const hasParen = nextSibling?.textContent?.includes('(');
     const infoNode = hasParen ? nextSibling : link.nextElementSibling;
     if (!infoNode) { return false; }
 
@@ -289,7 +286,7 @@ $\
   },
 
   isThumbExpanded(file: any): boolean {
-    return $.hasClass(file.thumb.parentNode, 'expanded') || (file.thumb.parentNode.dataset.expanded === 'true');
+    return $.hasClass(file.thumb.parentNode, 'expanded') || file.thumb.parentNode?.dataset.expanded === 'true';
   },
 
   isLinkified(link: HTMLAnchorElement): boolean {
@@ -297,7 +294,8 @@ $\
   },
 
   catalogPin(threadRoot: HTMLElement): string {
-    return threadRoot.dataset.sticky = 'true';
+    threadRoot.dataset.sticky = 'true';
+    return threadRoot.dataset.sticky;
   }
 };
 

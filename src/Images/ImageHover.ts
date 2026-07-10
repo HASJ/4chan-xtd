@@ -12,12 +12,16 @@ interface ImageHoverType {
   node(this: any): void;
   catalogNode(this: any): void;
   mouseover(post: any, file: any): (this: HTMLElement, e: MouseEvent) => void;
+  resolveHoverElement(post: any, file: any, error: any): HTMLImageElement | HTMLVideoElement;
+  setupVideoHover(el: HTMLVideoElement, root: HTMLElement): void;
+  computeHoverDimensions(file: any): { width?: number; height?: number };
   error(post: any, file: any): (this: HTMLImageElement | HTMLVideoElement) => void;
 }
 
 const ImageHover: ImageHoverType = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW)) { return; }
+    const view = g.VIEW;
+    if (!view || !['index', 'thread'].includes(view)) { return; }
     if (Conf['Image Hover']) {
       Callbacks.Post.push({
         name: 'Image Hover',
@@ -45,20 +49,11 @@ const ImageHover: ImageHoverType = {
 
   mouseover(post: any, file: any) {
     return function(this: HTMLElement, e: MouseEvent) {
-      let el: HTMLImageElement | HTMLVideoElement, height: number | undefined, width: number | undefined;
       if (!doc.contains(this)) { return; }
       const { isVideo } = file;
       if (file.isExpanding || file.isExpanded || (g.SITE as any).isThumbExpanded?.(file)) { return; }
       const error = ImageHover.error(post, file);
-      if (ImageCommon.cache?.dataset.fileID === `${post.fullID}.${file.index}`) {
-        el = ImageCommon.popCache();
-        $.on(el, 'error', error);
-      } else {
-        el = $.el((isVideo ? 'video' : 'img')) as HTMLImageElement | HTMLVideoElement;
-        el.dataset.fileID = `${post.fullID}.${file.index}`;
-        $.on(el, 'error', error);
-        el.src = file.url;
-      }
+      const el = ImageHover.resolveHoverElement(post, file, error);
 
       if (Conf['Restart when Opened']) {
         ImageCommon.rewind(el);
@@ -66,27 +61,11 @@ const ImageHover: ImageHoverType = {
       }
       el.id = 'ihover';
       $.add(UIState.hoverUI, el);
-      if (isVideo) {
-        const video = el as HTMLVideoElement;
-        video.loop     = true;
-        video.controls = false;
-        Volume.setup(video);
-        if (Conf['Autoplay']) {
-          video.play();
-          if (this.nodeName === 'VIDEO') {
-            (this as HTMLVideoElement).currentTime = video.currentTime;
-          }
-        }
-      }
-      if (file.dimensions) {
-        const dims = file.dimensions.split('x').map((x: string) => +x);
-        width = dims[0];
-        height = dims[1];
-        const maxWidth = doc.clientWidth;
-        const maxHeight = doc.clientHeight - (UI.hover as any).padding;
-        const scale = Math.min(1, maxWidth / width, maxHeight / height);
-        width *= scale;
-        height *= scale;
+      if (isVideo) { ImageHover.setupVideoHover(el as HTMLVideoElement, this); }
+
+      const { width, height } = ImageHover.computeHoverDimensions(file);
+      if (file.dimensions && (width == null || height == null)) { return; }
+      if (width != null && height != null) {
         el.style.maxWidth  = `${width}px`;
         el.style.maxHeight = `${height}px`;
       }
@@ -107,6 +86,46 @@ const ImageHover: ImageHoverType = {
         }
       } as any);
     };
+  },
+
+  resolveHoverElement(post: any, file: any, error: any): HTMLImageElement | HTMLVideoElement {
+    const { isVideo } = file;
+    if (ImageCommon.cache?.dataset.fileID === `${post.fullID}.${file.index}`) {
+      const el = ImageCommon.popCache();
+      $.on(el, 'error', error);
+      return el;
+    }
+    const el = $.el((isVideo ? 'video' : 'img')) as HTMLImageElement | HTMLVideoElement;
+    el.dataset.fileID = `${post.fullID}.${file.index}`;
+    $.on(el, 'error', error);
+    el.src = file.url;
+    return el;
+  },
+
+  setupVideoHover(video: HTMLVideoElement, root: HTMLElement) {
+    video.loop     = true;
+    video.controls = false;
+    Volume.setup(video);
+    if (Conf['Autoplay']) {
+      video.play();
+      if (root.nodeName === 'VIDEO') {
+        (root as HTMLVideoElement).currentTime = video.currentTime;
+      }
+    }
+  },
+
+  computeHoverDimensions(file: any): { width?: number; height?: number } {
+    if (!file.dimensions) { return {}; }
+    const dims = file.dimensions.split('x').map((x: string) => +x);
+    let width = dims[0];
+    let height = dims[1];
+    if (width == null || height == null) { return { width, height }; }
+    const maxWidth = doc.clientWidth;
+    const maxHeight = doc.clientHeight - (UI.hover as any).padding;
+    const scale = Math.min(1, maxWidth / width, maxHeight / height);
+    width *= scale;
+    height *= scale;
+    return { width, height };
   },
 
   error(post: any, file: any) {

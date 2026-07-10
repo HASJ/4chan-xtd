@@ -47,6 +47,24 @@ interface UnreadType {
   [key: string]: any;
 }
 
+function unreadTitle(count: number, countQuotingYou: number): string {
+  const titleQuotingYou = Conf['Quoted Title'] && countQuotingYou ? '(!) ' : '';
+  const titleCount = count || !Conf['Hide Unread Count at (0)'] ? `(${count}) ` : '';
+  let titleDead = Unread.title;
+  if (Unread.thread.isDead) {
+    const deadText = Unread.thread.isArchived ? '- Archived -' : '- 404 -';
+    titleDead = Unread.title.replace('-', deadText);
+  }
+  return `${titleQuotingYou}${titleCount}${titleDead}`;
+}
+
+function unreadFaviconKey(count: number, countQuotingYou: number): string {
+  const { isDead } = Unread.thread;
+  if (countQuotingYou) { return isDead ? 'unreadDeadY' : 'unreadY'; }
+  if (count) { return isDead ? 'unreadDead' : 'unread'; }
+  return isDead ? 'dead' : 'default';
+}
+
 const Unread: UnreadType = {
   hr: null as any,
   posts: null as any,
@@ -141,8 +159,8 @@ const Unread: UnreadType = {
 
   scroll() {
     // Let the header's onload callback handle it.
-    let hash: RegExpMatchArray | null;
-    if ((hash = location.hash.match(/\d+/)) && hash[0] in Unread.thread.posts) { return; }
+    const hash = /\d+/.exec(location.hash);
+    if (hash && hash[0] in Unread.thread.posts) { return; }
 
     let position = Unread.positionPrev();
     while (position) {
@@ -212,15 +230,18 @@ const Unread: UnreadType = {
     if (this.isFetchedQuote || this.isClone) return;
     Unread.order.push(this);
     if ((this.ID <= Unread.lastReadPost!) || this.isHidden || QuoteYou.isYou(this)) return;
-    Unread.posts.add((Unread.posts.last = this.ID));
+    Unread.posts.last = this.ID;
+    Unread.posts.add(this.ID);
     Unread.addPostQuotingYou(this);
-    return Unread.position != null ? Unread.position : (Unread.position = Unread.order[this.ID]);
+    Unread.position ??= Unread.order[this.ID];
+    return Unread.position;
   },
 
   addPostQuotingYou(post: any) {
     for (const quotelink of post.nodes.quotelinks) {
       if (QuoteYou.db?.get(Get.postDataFromLink(quotelink))) {
-        Unread.postsQuotingYou.add((Unread.postsQuotingYou.last = post.ID));
+        Unread.postsQuotingYou.last = post.ID;
+        Unread.postsQuotingYou.add(post.ID);
         Unread.openNotification(post);
         return;
       }
@@ -316,7 +337,8 @@ const Unread: UnreadType = {
     if (!Conf['Unread Line']) { return; }
     if (Unread.hr.hidden || d.hidden || (force === true)) {
       const oldPosition = Unread.linePosition;
-      if ((Unread.linePosition = Unread.positionPrev())) {
+      Unread.linePosition = Unread.positionPrev();
+      if (Unread.linePosition) {
         if (Unread.linePosition !== oldPosition) {
           let node = Unread.linePosition.data.nodes.bottom;
           if (node.nextSibling?.tagName === 'BR') { node = node.nextSibling; }
@@ -334,27 +356,13 @@ const Unread: UnreadType = {
     const countQuotingYou = Unread.postsQuotingYou.size;
 
     if (Conf['Unread Count']) {
-      const titleQuotingYou = Conf['Quoted Title'] && countQuotingYou ? '(!) ' : '';
-      const titleCount = count || !Conf['Hide Unread Count at (0)'] ? `(${count}) ` : '';
-      const titleDead = Unread.thread.isDead ?
-        Unread.title.replace('-', (Unread.thread.isArchived ? '- Archived -' : '- 404 -'))
-      :
-        Unread.title;
-      d.title = `${titleQuotingYou}${titleCount}${titleDead}`;
+      d.title = unreadTitle(count, countQuotingYou);
     }
 
     Unread.saveThreadWatcherCount();
 
     if (Conf['Unread Favicon'] && (g.SITE.software === 'yotsuba')) {
-      const { isDead } = Unread.thread;
-      Favicon.set(
-        countQuotingYou ?
-          (isDead ? 'unreadDeadY' : 'unreadY')
-        : count ?
-          (isDead ? 'unreadDead' : 'unread')
-        :
-          (isDead ? 'dead' : 'default')
-      );
+      Favicon.set(unreadFaviconKey(count, countQuotingYou));
     }
   },
 

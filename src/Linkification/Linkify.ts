@@ -10,9 +10,9 @@ import $$ from "../platform/$$";
 import Embedding from "./Embedding";
 import { registerLinkifyProcessor } from "./LinkifyActions";
 
-var Linkify: any = {
+const Linkify: any = {
   init() {
-    if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify']) { return; }
+    if (!(g.VIEW && ['index', 'thread', 'archive'].includes(g.VIEW)) || !Conf['Linkify']) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);
@@ -43,60 +43,24 @@ var Linkify: any = {
   },
 
   process(node) {
-    let length;
     const test     = /[^\s"]+/g;
-    const space    = /[\s"]/;
     const snapshot = $.X('.//br|.//text()', node);
     let i = 0;
-    const links = [];
+    const links: Range[] = [];
     while ((node = snapshot.snapshotItem(i++))) {
-      var result;
-      var {data} = node;
+      let result: RegExpExecArray | null;
+      const {data} = node;
       if (!data || (node.parentElement.nodeName === "A")) { continue; }
 
       while ((result = test.exec(data))) {
-        var {index} = result;
-        var endNode = node;
-        var word    = result[0];
+        const {index} = result;
+        let endNode = node;
+        let word    = result[0];
+        let length  = index + word.length;
+
         // End of node, not necessarily end of space-delimited string
-        if ((length = index + word.length) === data.length) {
-          var saved;
-          test.lastIndex = 0;
-
-          while (saved = snapshot.snapshotItem(i++)) {
-            var end;
-            if ((saved.nodeName === 'BR') || ((saved.parentElement.nodeName === 'P') && !saved.previousSibling)) {
-              var part1, part2;
-              if (
-                // link deliberately split
-                (part1 = word.match(/(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i)) &&
-                (part2 = snapshot.snapshotItem(i)?.data?.match(/^(\.[a-z\d-]+)*\//i)) &&
-                ((part1[0] + part2[0]).search(Linkify.regString) === 0)
-              ) {
-                continue;
-              } else {
-                break;
-              }
-            }
-
-            if ((saved.parentElement.nodeName === "A") && !Linkify.regString.test(word)) {
-              break;
-            }
-
-            endNode  = saved;
-            ({data}   = saved);
-
-            if (end = space.exec(data)) {
-              // Set our snapshot and regex to start on this node at this position when the loop resumes
-              word += data.slice(0, end.index);
-              test.lastIndex = (length = end.index);
-              i--;
-              break;
-            } else {
-              ({length} = data);
-              word    += data;
-            }
-          }
+        if (length === data.length) {
+          ({i, endNode, word, length} = Linkify.extendAcrossNodes(snapshot, i, node, word, test));
         }
 
         if (Linkify.regString.test(word)) {
@@ -120,20 +84,51 @@ var Linkify: any = {
     return links;
   },
 
-  regString: new RegExp(`(\
-\
-(https?|mailto|git|magnet|ftp|irc):(\
-[a-z\\d%/?]\
-)\
-|\
-([-a-z\\d]+[.])+(\
-aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post|pro|tel|travel|xxx|xyz|edu|gov|mil|[a-z]{2}\
-)([:/]|(?![^\\s"]))\
-|\
-[\\d]{1,3}\\.[\\d]{1,3}\\.[\\d]{1,3}\\.[\\d]{1,3}\
-|\
-[-\\w\\d.@]+@[a-z\\d.-]+\\.[a-z\\d]\
-)`, 'i'),
+  // Continue a word past the end of its text node, across <br> tags and
+  // adjacent text nodes, until whitespace or an incompatible node is found.
+  extendAcrossNodes(snapshot, i, endNode, word, test) {
+    const space = /[\s"]/;
+    let length;
+    let saved;
+    test.lastIndex = 0;
+
+    while (saved = snapshot.snapshotItem(i++)) {
+      if ((saved.nodeName === 'BR') || ((saved.parentElement.nodeName === 'P') && !saved.previousSibling)) {
+        if (Linkify.canBridgeLineBreak(word, snapshot, i)) { continue; } else { break; }
+      }
+
+      if ((saved.parentElement.nodeName === "A") && !Linkify.regString.test(word)) {
+        break;
+      }
+
+      endNode = saved;
+      const {data} = saved;
+
+      const end = space.exec(data);
+      if (end) {
+        // Set our snapshot and regex to start on this node at this position when the loop resumes
+        word += data.slice(0, end.index);
+        test.lastIndex = (length = end.index);
+        i--;
+        break;
+      } else {
+        ({length} = data);
+        word += data;
+      }
+    }
+
+    return {i, endNode, word, length};
+  },
+
+  // Whether a link may legitimately span a line break (e.g. wrapped domain/path).
+  canBridgeLineBreak(word, snapshot, i) {
+    const part1 = /(https?:\/\/)?([a-z\d-]+\.)*[a-z\d-]+$/i.exec(word);
+    const part2 = snapshot.snapshotItem(i)?.data?.match(/^(\.[a-z\d-]+)*\//i);
+    return !!(part1 && part2 && ((part1[0] + part2[0]).search(Linkify.regString) === 0));
+  },
+
+  regString: // NOSONAR complex intentionally, matches URL/bare-domain/IPv4/email in one pass
+    /((https?|mailto|git|magnet|ftp|irc):([a-z\d%/?])|([-a-z\d]+\.)+(aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post|pro|tel|travel|xxx|xyz|edu|gov|mil|[a-z]{2})([:/]|(?![^\s"]))|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[-\w.@]+@[a-z\d.-]+\.[a-z\d])/i,
 
   makeRange(startNode, endNode, startOffset, endOffset) {
     const range = document.createRange();
@@ -142,8 +137,19 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     return range;
   },
 
+  // Number of trailing chars (closing brackets/punctuation) to trim off a matched link.
+  countTrailingPunctuation(text) {
+    let i = 0;
+    let t = text.charAt(text.length - (1 + i));
+    while (/[)\]}>.,]/.test(t)) {
+      if (!/[.,]/.test(t) && !((text.match(/[()[\]{}<>]/g)).length % 2)) { break; }
+      i++;
+      t = text.charAt(text.length - (1 + i));
+    }
+    return i;
+  },
+
   makeLink(range) {
-    let t;
     let encodedDomain;
     let text = range.toString();
 
@@ -158,11 +164,7 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
 
     // Clean end of range
-    i = 0;
-    while (/[)\]}>.,]/.test(t = text.charAt(text.length - (1 + i)))) {
-      if (!/[.,]/.test(t) && !((text.match(/[()\[\]{}<>]/g)).length % 2)) { break; }
-      i++;
-    }
+    i = Linkify.countTrailingPunctuation(text);
 
     if (i) {
       text = text.slice(0, -i);
@@ -184,9 +186,10 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
     }
 
     // Decode percent-encoded characters in domain so that they behave consistently across browsers.
-    if (encodedDomain = text.match(/^(https?:\/\/[^/]*%[0-9a-f]{2})(.*)$/i)) {
+    encodedDomain = text.match(/^(https?:\/\/[^/]*%[0-9a-f]{2})(.*)$/i);
+    if (encodedDomain) {
       text = encodedDomain[1].replace(/%([0-9a-f]{2})/ig, function(x, y) {
-        if (y === '25') { return x; } else { return String.fromCharCode(parseInt(y, 16)); }
+        if (y === '25') { return x; } else { return String.fromCodePoint(Number.parseInt(y, 16)); }
       }) + encodedDomain[2];
     }
 
@@ -208,4 +211,3 @@ aero|asia|biz|cat|com|coop|dance|info|int|jobs|mobi|moe|museum|name|net|org|post
 registerLinkifyProcessor(Linkify.process);
 
 export default Linkify;
-

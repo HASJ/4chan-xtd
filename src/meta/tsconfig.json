@@ -1,6 +1,0 @@
-{
-  "compilerOptions": {
-    "moduleResolution": "node16"
-  },
-  "extends": "../../package.json"
-}

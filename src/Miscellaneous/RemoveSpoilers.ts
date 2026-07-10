@@ -3,7 +3,7 @@ import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 
-var RemoveSpoilers: any = {
+const RemoveSpoilers: any = {
   init() {
     if (Conf['Reveal Spoilers']) {
       $.addClass(doc, 'reveal-spoilers');
@@ -27,12 +27,11 @@ var RemoveSpoilers: any = {
 
   unspoiler(el) {
     const spoilers = $$(g.SITE.selectors.spoiler, el);
-    for (var spoiler of spoilers) {
-      var span = $.el('span', {className: 'removed-spoiler'});
+    for (const spoiler of spoilers) {
+      const span = $.el('span', {className: 'removed-spoiler'});
       $.replace(spoiler, span);
       $.add(span, [...spoiler.childNodes]);
     }
   }
 };
 export default RemoveSpoilers;
-

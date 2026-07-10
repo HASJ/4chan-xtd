@@ -23,7 +23,7 @@ interface FilterObj {
   mask: any;
   hide: boolean;
   stub: any;
-  hl: string;
+  hl?: string;
   top?: boolean;
   noti?: boolean;
   poster?: boolean;
@@ -128,12 +128,13 @@ function parseFilterLine(key: FilterType | 'general', line: string): FilterObj |
     try {
       regexp = new RegExp(regexpMatch[1], regexpMatch[2]);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       const _notice = new Notice('warning', [
         $.tn(`Invalid ${key} filter:`),
         $.el('br'),
         $.tn(line),
         $.el('br'),
-        $.tn(err.message)
+        $.tn(message)
       ], 60);
       return null;
     }
@@ -221,7 +222,7 @@ function evaluateFilter(
   if (filter.hl && !state.hl?.includes(filter.hl)) {
     (state.hl || (state.hl = [])).push(filter.hl);
   }
-  if (!state.top) { state.top = filter.top; }
+  if (!state.top) { state.top = !!filter.top; }
   if (filter.noti) state.noti = true;
   if (filter.poster) state.poster = true;
   if (filter.replies) state.replies = true;
@@ -250,7 +251,7 @@ function addPosterFilter(post: Post, hide: boolean, stub: boolean, replies: bool
 }
 
 function hideSamePosterReplies(post: Post, stub: boolean, replies: boolean, reason: string) {
-  g.posts.forEach((p) => {
+  g.posts!.forEach((p) => {
     if (p.info.uniqueID === post.info.uniqueID && p !== post) {
       PostHiding.hide(p, stub, replies, reason);
       if (replies) {
@@ -275,7 +276,7 @@ function applyPostHiding(post: Post, stub: boolean, replies: boolean, poster: bo
 }
 
 function highlightSamePosterReplies(post: Post, hl: string[], replies: boolean, hlFn: (p: Post, ...h: string[]) => void) {
-  g.posts.forEach((p) => {
+  g.posts!.forEach((p) => {
     if (p.info.uniqueID === post.info.uniqueID && p !== post) {
       $.addClass(p.nodes.root, ...hl);
       if (replies) Recursive.applyAndAdd(hlFn, p, ...hl);
@@ -378,7 +379,7 @@ const Filter = {
   filters: new Map<FilterType, FilterObj[] | Map<string, FilterObj[]>>(),
 
   init(this: typeof Filter) {
-    if (!['index', 'thread', 'catalog'].includes(g.VIEW) || !Conf['Filter']) return;
+    if (!['index', 'thread', 'catalog'].includes(g.VIEW!) || !Conf['Filter']) return;
     if ((g.VIEW === 'catalog') && !Conf['Filter in Native Catalog']) return;
 
     if (!Conf['Filtered Backlinks']) {
@@ -466,7 +467,7 @@ const Filter = {
       (!this.isReply && !this.thread.nodes.root)
     ) return;
 
-    const {hide, stub, hl, noti, poster, replies }: FilterResults = Filter.test(
+    const {hide, stub = true, hl, noti, poster = false, replies = false }: FilterResults = Filter.test(
       this,
       (!this.isFetchedQuote && (this.isReply || (g.VIEW === 'index')))
     );
@@ -475,7 +476,7 @@ const Filter = {
     let reason = '';
     if (poster && this.info.uniqueID) {
       reason = `Hidden because it's the same poster as ${this.ID} (${this.filterResults.reasons})`;
-      addPosterFilter(this, hide, stub, replies, hl, reason);
+      addPosterFilter(this, hide, stub, replies, hl ?? undefined, reason);
     }
 
     if (hide) {
@@ -484,7 +485,7 @@ const Filter = {
     if (hl) {
       applyPostHighlight(this, hl, replies, poster);
     }
-    if (noti && Unread.posts && (this.ID > Unread.lastReadPost) && !QuoteYou.isYou(this)) {
+    if (noti && Unread.posts && (this.ID > Unread.lastReadPost!) && !QuoteYou.isYou(this)) {
       Unread.openNotification(this, ' triggered a notification filter');
     }
     if (this.file?.thumbLink) {
@@ -498,7 +499,7 @@ const Filter = {
   },
 
   catalog() {
-    const url = g.SITE.urls.catalogJSON?.(g.BOARD);
+    const url = g.SITE.urls.catalogJSON?.(g.BOARD!);
     if (!url) { return; }
     Filter.catalogData = dict();
     $.ajax(url,
@@ -509,7 +510,7 @@ const Filter = {
     });
   },
 
-  catalogParse() {
+  catalogParse(this: XMLHttpRequest) {
     if (![200, 404].includes(this.status)) {
       const statusText = this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error';
       const _notice = new Notice('warning', `Failed to fetch catalog JSON data. ${statusText}`, 1);
@@ -520,7 +521,7 @@ const Filter = {
         Filter.catalogData[item.no] = item;
       }
     }
-    g.BOARD.threads.forEach(function(thread) {
+    g.BOARD!.threads.forEach(function(thread) {
       if (thread.catalogViewNative) {
         return Filter.catalogNode.call(thread.catalogViewNative);
       }
@@ -528,7 +529,7 @@ const Filter = {
   },
 
   catalogNode(this: Post) {
-    if ((this.boardID !== g.BOARD.ID) || !Filter.catalogData[this.ID]) { return; }
+    if ((this.boardID !== g.BOARD!.ID) || !Filter.catalogData[this.ID]) { return; }
     if (QuoteYou.db?.get({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.ID, postID: this.ID})) { return; }
     const {hide, hl, top} = Filter.test(g.SITE.Build.parseJSON(Filter.catalogData[this.ID], this));
     if (hide) {
@@ -554,23 +555,23 @@ const Filter = {
     uniqueID(post) { return [post.info.uniqueID || '']; },
     tripcode(post) { return post.info.tripcode === undefined ? [] : [post.info.tripcode]; },
     capcode(post) { return post.info.capcode === undefined ? [] : [post.info.capcode]; },
-    pass(post) { return [post.info.pass]; },
-    email(post) { return [post.info.email]; },
+    pass(post) { return post.info.pass === undefined ? [] : [post.info.pass]; },
+    email(post) { return post.info.email === undefined ? [] : [post.info.email]; },
     subject(post) { return [post.info.subject || (post.isReply ? undefined : '')]; },
     comment(post) {
       post.info.comment ??= g.sites[post.siteID]?.Build?.parseComment?.((post.info.commentHTML as any).innerHTML);
       return [post.info.comment];
     },
     flag(post) { return post.info.flag === undefined ? [] : [post.info.flag]; },
-    filename(post) { return post.files.map(f => f.name); },
-    dimensions(post) { return post.files.map(f => f.dimensions); },
-    filesize(post) { return post.files.map(f => f.size); },
-    MD5(post) { return post.files.map(f => f.MD5); }
-  } satisfies Record<FilterType, (post: Post) => string[]>,
+    filename(post) { return post.files.map(f => f!.name); },
+    dimensions(post) { return post.files.map(f => f!.dimensions); },
+    filesize(post) { return post.files.map(f => f!.size); },
+    MD5(post) { return post.files.map(f => f!.MD5); }
+  } satisfies Record<FilterType, (post: Post) => (string | undefined)[]>,
 
   values(key: FilterType, post: Post): string[] {
     if ($.hasOwn(Filter.valueF, key)) {
-      return Filter.valueF[key](post).filter(v => v != null);
+      return Filter.valueF[key](post).filter((v): v is string => v != null);
     } else {
       return [key.split('+').map(function(k) {
         const f = $.getOwn(Filter.valueF, k);
@@ -615,15 +616,15 @@ const Filter = {
     return openFilterSettings(type);
   },
 
-  quickFilterMD5() {
-    const post: Post = (this && 'ID' in this) ? this as Post : Get.postFromNode(this as any);
-    const files = post.files.filter(f => f.MD5);
+  quickFilterMD5(this: any) {
+    const post: Post = (this && 'ID' in this) ? this as unknown as Post : Get.postFromNode(this);
+    const files = post.files.filter(f => f!.MD5);
     if (!files.length) { return; }
-    const filter = files.map(f => `/${f.MD5}/`).join('\n');
+    const filter = files.map(f => `/${f!.MD5}/`).join('\n');
     Filter.addFilter('MD5', filter);
     const origin = (post as any).origin || post;
     if (origin.isReply) {
-      PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f.MD5}`).join(' & '));
+      PostHiding.hide(origin, undefined, undefined, files.map(f => `Filtered MD5 ${f!.MD5}`).join(' & '));
     } else if (g.VIEW === 'index') {
       ThreadHiding.hide(origin.thread);
     }
@@ -655,11 +656,11 @@ const Filter = {
   },
 
   quickFilterCB: {
-    show() {
+    show(this: any) {
       Filter.showFilters('MD5');
       return this.close();
     },
-    undo() {
+    undo(this: any) {
       Filter.removeFilters('MD5', this.filters);
       for (const post of this.posts) {
         if (post.isReply) {
@@ -684,7 +685,7 @@ const Filter = {
 
   menu: {
     init() {
-      if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Filter']) { return; }
+      if (!['index', 'thread'].includes(g.VIEW!) || !Conf['Menu'] || !Conf['Filter']) { return; }
 
       const div = $.el('div',
         {textContent: 'Filter'});
@@ -696,7 +697,7 @@ const Filter = {
           Filter.menu.post = post;
           return true;
         },
-        subEntries: []
+        subEntries: [] as any[]
       };
 
       for (const type of [
@@ -738,7 +739,7 @@ const Filter = {
       };
     },
 
-    makeFilter() {
+    makeFilter(this: HTMLElement & { dataset: { type: FilterType } }) {
       const {type} = this.dataset;
       // Convert value -> regexp, unless type is MD5
       const values = Filter.values(type, Filter.menu.post);

@@ -3,10 +3,10 @@ import typescript from '@rollup/plugin-typescript';
 import setupFileInliner from './rollup-plugin-inline-file.js';
 import faFix from './rollup-plugin-fa.js';
 import { resolve } from 'path';
-import generateMetadata from '../src/meta/metadata.js';
+import generateMetadata from './meta/metadata.js';
 import { copyFile, readFile, writeFile } from 'fs/promises';
 import importBase64 from './rollup-plugin-base64.js';
-import generateManifestJson from '../src/meta/manifestJson.js';
+import generateManifestJson from './meta/manifestJson.js';
 import terser from '@rollup/plugin-terser';
 import fixTsOutputFormat from './fix-ts-output-format.js';
 import cleanup from 'rollup-plugin-cleanup';
@@ -31,6 +31,14 @@ const tsPlugin = (typescript as any)({
   compilerOptions: {
     outDir: buildDir,
     noEmit: false,
+    sourceMap: minify,
+  },
+});
+const eventPageTsPlugin = (typescript as any)({
+  tsconfig: resolve(repoRoot, 'src/extension/tsconfig.json'),
+  compilerOptions: {
+    noEmit: false,
+    sourceMap: false,
   },
 });
 
@@ -192,9 +200,9 @@ const tsPlugin = (typescript as any)({
     });
 
     const eventPage = await rollup({
-      input: resolve(repoRoot, 'src/meta/eventPage.ts'),
+      input: resolve(repoRoot, 'src/extension/eventPage.ts'),
       plugins: [
-        tsPlugin,
+        eventPageTsPlugin,
         noFormat ? undefined : fixTsOutputFormat({ include: ["**/*.ts", "**/*.tsx"] }),
         cleanupPlugin,
       ].filter(Boolean),

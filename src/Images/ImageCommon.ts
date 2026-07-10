@@ -35,10 +35,11 @@ const ImageCommon: ImageCommonType = {
   rewind(el: HTMLElement) {
     if (el.nodeName === 'VIDEO') {
       const v = el as HTMLVideoElement;
-      if (v.readyState >= v.HAVE_METADATA) { return v.currentTime = 0; }
-    } else if (/\.gif$/.test((el as HTMLImageElement).src)) {
+      if (v.readyState >= v.HAVE_METADATA) { v.currentTime = 0; return; }
+    } else if ((el as HTMLImageElement).src.endsWith('.gif')) {
       const img = el as HTMLImageElement;
-      return $.queueTask(() => img.src = img.src);
+      const src = img.src;
+      return $.queueTask(() => { img.removeAttribute('src'); img.src = src; });
     }
   },
 
@@ -59,10 +60,10 @@ const ImageCommon: ImageCommonType = {
   },
 
   decodeError(file: any, fileObj: any): boolean {
-    let message: HTMLElement | null;
+    let message = $('.warning', fileObj.thumb.parentNode) as HTMLElement | null;
     if (file.error?.code !== MediaError.MEDIA_ERR_DECODE) { return false; }
-    if (!(message = $('.warning', fileObj.thumb.parentNode))) {
-      message = $.el('div', { className: 'warning' });
+    if (!message) {
+      message = $.el('div', { className: 'warning' }) as HTMLElement;
       $.after(fileObj.thumb, message);
     }
     message.textContent = 'Error: Corrupt or unplayable video';
@@ -122,7 +123,8 @@ const ImageCommon: ImageCommonType = {
         post.kill(true);
         return redirect();
       } else {
-        return url = fileObj.url;
+        const url = fileObj.url;
+        return url;
       }
     };
     return $.ajax(threadJSON, { onloadend() { return parseJSON.call(this); } });

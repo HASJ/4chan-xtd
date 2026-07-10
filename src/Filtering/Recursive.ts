@@ -8,7 +8,7 @@ const Recursive = {
   recursives: new Map<string, { recursives: ((...args: any) => void)[], args: any[][] }>(),
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW)) return;
+    if (!['index', 'thread'].includes(g.VIEW!)) return;
     Callbacks.Post.push({
       name: 'Recursive',
       cb:   this.node
@@ -54,7 +54,7 @@ const Recursive = {
     ...args: DropFirst<Parameters<Fn>>
   ) {
     const {fullID} = post;
-    g.posts.forEach(function(post) {
+    g.posts!.forEach(function(post) {
       if (post.quotes.includes(fullID)) {
         recursive(post, ...args);
       }

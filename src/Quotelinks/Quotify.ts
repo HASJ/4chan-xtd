@@ -11,12 +11,14 @@ interface QuotifyType {
   node(this: any): void;
   parseArchivelink(this: any, link: HTMLAnchorElement): void;
   parseDeadlink(this: any, deadlink: HTMLElement): void;
+  buildExistingPostLink(post: any, boardID: string, postID: string, quote: string): HTMLAnchorElement;
+  buildDeadPostLink(boardID: string, postID: string, quote: string): HTMLAnchorElement | undefined;
   fixDeadlink(deadlink: HTMLElement): void;
 }
 
 const Quotify: QuotifyType = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Resurrect Quotes']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Resurrect Quotes']) { return; }
 
     $.addClass(doc, 'resurrect-quotes');
 
@@ -44,12 +46,13 @@ const Quotify: QuotifyType = {
   },
 
   parseArchivelink(this: any, link: HTMLAnchorElement) {
-    let m: RegExpMatchArray | null;
-    if (!(m = link.pathname.match(/^\/([^/]+)\/thread\/S?(\d+)\/?$/))) { return; }
+    let m: RegExpExecArray | null;
+    m = /^\/([^/]+)\/thread\/S?(\d+)\/?$/.exec(link.pathname);
+    if (!m) { return; }
     if (['boards.4chan.org', 'boards.4channel.org'].includes(link.hostname)) { return; }
     const boardID = m[1];
     const threadID = m[2];
-    const postID = (link.hash.match(/^#[pq]?(\d+)$|$/) || [])[1] || threadID;
+    const postID = (/^#[pq]?(\d+)$|$/.exec(link.hash) || [])[1] || threadID;
     if (Redirect.to('post', { boardID, postID })) {
       $.addClass(link, 'quotelink');
       $.extend(link.dataset, { boardID, threadID, postID });
@@ -58,7 +61,7 @@ const Quotify: QuotifyType = {
   },
 
   parseDeadlink(this: any, deadlink: HTMLElement) {
-    let a: HTMLAnchorElement | undefined, m: RegExpMatchArray | null, post: any, postID: string | undefined;
+    let a: HTMLAnchorElement | undefined, m: RegExpExecArray | null, post: any, postID: string | undefined;
     if ($.hasClass(deadlink.parentNode as HTMLElement, 'prettyprint')) {
       // Don't quotify deadlinks inside code tags, un-span them.
       Quotify.fixDeadlink(deadlink);
@@ -66,51 +69,19 @@ const Quotify: QuotifyType = {
     }
 
     const quote = deadlink.textContent || '';
-    if (!(postID = (quote.match(/\d+$/) || [])[0])) { return; }
-    if (postID[0] === '0') {
+    postID = (/\d+$/.exec(quote) || [])[0];
+    if (!postID) { return; }
+    if (postID.startsWith('0')) {
       // Fix quotelinks that start with a 0.
       Quotify.fixDeadlink(deadlink);
       return;
     }
-    const boardID = (m = quote.match(/^>>>\/([a-z\d]+)/)) ? m[1] : this.board.ID;
+    m = /^>>>\/([a-z\d]+)/.exec(quote);
+    const boardID = m ? m[1] : this.board.ID;
     const quoteID = `${boardID}.${postID}`;
 
-    if ((post = g.posts.get(quoteID))) {
-      if (!post.isDead) {
-        // Don't (Dead) when quotifying in an archived post, and we know the post still exists.
-        a = $.el('a', {
-          href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
-          className:   'quotelink',
-          textContent: quote
-        }) as HTMLAnchorElement;
-      } else {
-        // Replace the .deadlink span if we can redirect.
-        a = $.el('a', {
-          href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
-          className:   'quotelink deadlink',
-          textContent: quote
-        }) as HTMLAnchorElement;
-        $.add(a, Post.deadMark.cloneNode(true));
-        $.extend(a.dataset, { boardID, threadID: post.thread.ID, postID });
-      }
-    } else {
-      const redirect = Redirect.to('thread', { boardID, threadID: 0, postID });
-      const fetchable = Redirect.to('post', { boardID, postID });
-      if (redirect || fetchable) {
-        // Replace the .deadlink span if we can redirect or fetch the post.
-        a = $.el('a', {
-          href:        redirect || 'javascript:;',
-          className:   'deadlink',
-          textContent: quote
-        }) as HTMLAnchorElement;
-        $.add(a, Post.deadMark.cloneNode(true));
-        if (fetchable) {
-          // Make it function as a normal quote if we can fetch the post.
-          $.addClass(a, 'quotelink');
-          $.extend(a.dataset, { boardID, postID });
-        }
-      }
-    }
+    post = g.posts?.get(quoteID);
+    a = post ? Quotify.buildExistingPostLink(post, boardID, postID, quote) : Quotify.buildDeadPostLink(boardID, postID, quote);
 
     if (!this.quotes.includes(quoteID)) { this.quotes.push(quoteID); }
 
@@ -125,9 +96,49 @@ const Quotify: QuotifyType = {
     }
   },
 
+  buildExistingPostLink(post: any, boardID: string, postID: string, quote: string): HTMLAnchorElement {
+    if (!post.isDead) {
+      // Don't (Dead) when quotifying in an archived post, and we know the post still exists.
+      return $.el('a', {
+        href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
+        className:   'quotelink',
+        textContent: quote
+      }) as HTMLAnchorElement;
+    }
+    // Replace the .deadlink span if we can redirect.
+    const a = $.el('a', {
+      href:        g.SITE.Build.postURL(boardID, post.thread.ID, postID),
+      className:   'quotelink deadlink',
+      textContent: quote
+    }) as HTMLAnchorElement;
+    $.add(a, Post.deadMark.cloneNode(true));
+    $.extend(a.dataset, { boardID, threadID: post.thread.ID, postID });
+    return a;
+  },
+
+  buildDeadPostLink(boardID: string, postID: string, quote: string): HTMLAnchorElement | undefined {
+    const redirect = Redirect.to('thread', { boardID, threadID: 0, postID });
+    const fetchable = Redirect.to('post', { boardID, postID });
+    if (!redirect && !fetchable) { return undefined; }
+    // Replace the .deadlink span if we can redirect or fetch the post.
+    const a = $.el('a', {
+      href:        redirect || 'javascript:;',
+      className:   'deadlink',
+      textContent: quote
+    }) as HTMLAnchorElement;
+    $.add(a, Post.deadMark.cloneNode(true));
+    if (fetchable) {
+      // Make it function as a normal quote if we can fetch the post.
+      $.addClass(a, 'quotelink');
+      $.extend(a.dataset, { boardID, postID });
+    }
+    return a;
+  },
+
   fixDeadlink(deadlink: HTMLElement) {
     let el: Node | null;
-    if (!(el = deadlink.previousSibling) || (el.nodeName === 'BR')) {
+    el = deadlink.previousSibling;
+    if (!el || (el.nodeName === 'BR')) {
       const green = $.el('span', { className: 'quote' });
       $.before(deadlink, green);
       $.add(green, deadlink);

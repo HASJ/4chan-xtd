@@ -14,7 +14,7 @@ export interface CrossOriginAjaxOptions {
   headers?: Record<string, string>;
 }
 
-var CrossOrigin = {
+const CrossOrigin = {
   binary(url, cb, headers = dict()) {
     // XXX https://forums.lanik.us/viewtopic.php?f=64&t=24173&p=78310
     url = url.replace(/^((?:https?:)?\/\/(?:\w+\.)?(?:4chan|4channel|4cdn)\.org)\/adv\//, '$1//adv/');
@@ -38,7 +38,7 @@ var CrossOrigin = {
           }
         });
       };
-      if ((typeof window.GM_xmlhttpRequest === 'undefined' || window.GM_xmlhttpRequest === null)) {
+      if (window.GM_xmlhttpRequest === undefined || window.GM_xmlhttpRequest === null) {
         fallback();
         return;
       }
@@ -58,7 +58,7 @@ var CrossOrigin = {
             data = new Uint8Array(r.length);
             let i = 0;
             while (i < r.length) {
-              data[i] = r.charCodeAt(i);
+              data[i] = r.codePointAt(i)!;
               i++;
             }
           }
@@ -74,6 +74,7 @@ var CrossOrigin = {
       try {
         return (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
       } catch (error) {
+        console.error('Cross-origin request failed; using the standard request instead.', error);
         return fallback();
       }
     }
@@ -82,19 +83,20 @@ var CrossOrigin = {
   file(url: string, cb: (result: File) => void) {
     return CrossOrigin.binary(url, function(data, headers) {
       if (data == null) { return cb(null); }
-      let name = url.match(/([^\/?#]+)\/*(?:$|[?#])/)?.[1];
-      const contentType        = headers.match(/Content-Type:\s*(.*)/i)?.[1];
-      const contentDisposition = headers.match(/Content-Disposition:\s*(.*)/i)?.[1];
-      let mime = contentType?.match(/[^;]*/)[0] || 'application/octet-stream';
-      const match =
-        contentDisposition?.match(/\bfilename\s*=\s*"((\\"|[^"])+)"/i)?.[1] ||
-        contentType?.match(/\bname\s*=\s*"((\\"|[^"])+)"/i)?.[1];
+      let name = /([^/?#]{1,255})\/{0,10}(?:$|[?#])/.exec(url)?.[1];
+      const contentType        = /Content-Type:\s*(.*)/i.exec(headers)?.[1];
+      const contentDisposition = /Content-Disposition:\s*(.*)/i.exec(headers)?.[1];
+      let mime = /[^;]*/.exec(contentType ?? '')?.[0] || 'application/octet-stream';
+      const quotedFilenamePattern = /\bfilename\s*=\s*"((?:[^"\\]|\\.)*)"/i;
+      const quotedNamePattern = /\bname\s*=\s*"((?:[^"\\]|\\.)*)"/i;
+      const match = quotedFilenamePattern.exec(contentDisposition ?? '')?.[1] ||
+        quotedNamePattern.exec(contentType ?? '')?.[1];
       if (match) {
         name = match.replace(/\\"/g, '"');
       }
       if (/^text\/plain;\s*charset=x-user-defined$/i.test(mime)) {
         // In JS Blocker (Safari) content type comes back as 'text/plain; charset=x-user-defined'; guess from filename instead.
-        mime = $.getOwn(typeFromExtension, name.match(/[^.]*$/)[0].toLowerCase()) || 'application/octet-stream';
+        mime = $.getOwn(typeFromExtension, /[^.]{0,255}$/.exec(name)?.[0].toLowerCase()) || 'application/octet-stream';
       }
       cb(new File([data], name, { type: mime }));
     });
@@ -111,19 +113,19 @@ var CrossOrigin = {
       getResponseHeader(headerName) {
         if ((this.responseHeaders == null) && (this.responseHeaderString != null)) {
           this.responseHeaders = dict();
-          for (var header of this.responseHeaderString.split('\r\n')) {
-            var i;
+          for (const header of this.responseHeaderString.split('\r\n')) {
+            let i;
             if ((i = header.indexOf(':')) >= 0) {
-              var key = header.slice(0, i).trim().toLowerCase();
-              var val = header.slice(i+1).trim();
+              const key = header.slice(0, i).trim().toLowerCase();
+              const val = header.slice(i+1).trim();
               this.responseHeaders[key] = val;
             }
           }
         }
         return this.responseHeaders?.[headerName.toLowerCase()] ?? null;
       }
-      abort() {}
-      onloadend() {}
+      abort() { /* no-op until a request implementation is assigned. */ }
+      onloadend() { /* no-op until an onloadend callback is assigned. */ }
     };
     Request.initClass();
     return Request;
@@ -145,7 +147,7 @@ var CrossOrigin = {
   ajax(url: string, options: CrossOriginAjaxOptions ={}) {
     let gmReq;
     let {onloadend, timeout, responseType, headers} = options;
-    if (responseType == null) { responseType = 'json'; }
+    responseType ??= 'json';
 
     const req = new CrossOrigin.Request();
     req.onloadend = onloadend;
@@ -180,7 +182,9 @@ var CrossOrigin = {
               statusText: xhr.statusText,
               responseHeaderString: xhr.responseHeaders
             });
-          } catch (error) {}
+          } catch (error) {
+            console.error('Unable to process cross-origin response.', error);
+          }
           return req.onloadend();
         },
         onerror() { return req.onloadend(); },
@@ -190,6 +194,7 @@ var CrossOrigin = {
       try {
         gmReq = (GM?.xmlHttpRequest || GM_xmlhttpRequest)(gmOptions);
       } catch (error) {
+        console.error('Cross-origin request failed; using the standard request instead.', error);
         return $.ajax(url, options);
       }
 
@@ -197,7 +202,9 @@ var CrossOrigin = {
         req.abort = function() {
           try {
             return gmReq.abort();
-          } catch (error1) {}
+          } catch (error_) {
+            console.warn('Unable to abort cross-origin request.', error_);
+          }
         };
       }
     } else {
@@ -241,4 +248,3 @@ var CrossOrigin = {
   },
 };
 export default CrossOrigin;
-

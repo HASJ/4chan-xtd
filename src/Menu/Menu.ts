@@ -4,9 +4,9 @@ import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
 
-var Menu: any = {
+const Menu: any = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu']) { return; }
 
     this.button = $.el('a', {
       className: 'menu-button',
@@ -45,7 +45,7 @@ var Menu: any = {
 
   makeButton(post, button) {
     if (!button) { button = Menu.button.cloneNode(true); }
-    $.on(button, 'click', function(e) {
+    $.on(button, 'click', function(this: HTMLElement, e) {
       return Menu.menu.toggle(e, this, post);
     });
     return button;

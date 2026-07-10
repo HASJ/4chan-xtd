@@ -39,7 +39,7 @@ import { registerFilterSettingsOpener, registerSettingsOpener } from './Settings
 /**
  * The Settings singleton object managing all aspects of the configuration UI.
  */
-var Settings = {
+const Settings = {
   dialog: undefined as HTMLDivElement | undefined,
 
   /**
@@ -115,8 +115,8 @@ var Settings = {
     $.on($('input',   dialog), 'change', Settings.onImport);
 
     const links = [];
-    for (var section of Settings.sections) {
-      var link = $.el('a', {
+    for (const section of Settings.sections) {
+      const link = $.el('a', {
         className: `tab-${section.hyphenatedTitle}`,
         textContent: section.title,
         href: 'javascript:;'
@@ -128,7 +128,7 @@ var Settings = {
     }
     links.pop();
     $.add($('.sections-list', dialog), links);
-    if (openSection !== 'none') { (sectionToOpen ? sectionToOpen : links[0]).click(); }
+    if (openSection !== 'none') { (sectionToOpen || links[0]).click(); }
 
     Icon.set($('.close', dialog), 'xmark');
     $.on($('.close', dialog), 'click', Settings.close);
@@ -175,7 +175,8 @@ var Settings = {
 
   openSection() {
     let selected;
-    if (selected = $('.tab-selected', Settings.dialog)) {
+    selected = $('.tab-selected', Settings.dialog);
+    if (selected) {
       $.rmClass(selected, 'tab-selected');
     }
     $.addClass($(`.tab-${this.hyphenatedTitle}`, Settings.dialog), 'tab-selected');
@@ -226,7 +227,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       warnings.hidden = false;
     };
     for (key in Settings.warnings) {
-      var warning = Settings.warnings[key];
+      const warning = Settings.warnings[key];
       warning(addWarning);
     }
     $.add(section, warnings);
@@ -237,20 +238,20 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       const containers = [root];
       const result = [];
       for (key in obj) {
-        var arr = obj[key];
-        if (arr instanceof Array) {
-          var description = arr[1];
-          var div = $.el('div',
+        const arr = obj[key];
+        if (Array.isArray(arr)) {
+          const description = arr[1];
+          const div = $.el('div',
             { innerHTML: `<label><input type="checkbox" name="${key}">${key}</label><span class="description">: ${description}</span>` });
           div.dataset.name = key;
-          var input = $('input', div);
+          const input = $('input', div);
           $.on(input, 'change', $.cb.checked);
           $.on(input, 'change', function() { this.parentNode.parentNode.dataset.checked = this.checked; });
           items[key] = Conf[key];
           inputs[key] = input;
-          var level = arr[2] || 0;
+          const level = arr[2] || 0;
           if (containers.length <= level) {
-            var container = $.el('div', {className: 'suboption-list' });
+            const container = $.el('div', {className: 'suboption-list' });
             $.add(containers[containers.length-1].lastElementChild, container);
             containers[level] = container;
           } else if (containers.length > (level+1)) {
@@ -262,9 +263,9 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return result;
     };
 
-    for (var keyFS in Config.main) {
-      var obj = Config.main[keyFS];
-      var fs = $.el('fieldset',
+    for (const keyFS in Config.main) {
+      const obj = Config.main[keyFS];
+      const fs = $.el('fieldset',
         { innerHTML: `<legend>${keyFS}</legend>` });
       addCheckboxes(fs, obj);
       if (keyFS === 'Posting and Captchas') {
@@ -278,7 +279,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
     $.get(items, function(items) {
       for (key in items) {
-        var val = items[key];
+        const val = items[key];
         inputs[key].checked = val;
         inputs[key].parentNode.parentNode.dataset.checked = val;
       }
@@ -287,7 +288,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     const div = $.el('div',
       {innerHTML: '<button></button><span class="description">: Clear manually-hidden threads and posts on all boards. Reload the page to apply.'});
     const button = $('button', div);
-    $.get({hiddenThreads: dict(), hiddenPosts: dict()}, function({hiddenThreads, hiddenPosts}) {
+    $.get({hiddenThreads: dict(), hiddenPosts: dict()}, function({hiddenThreads, hiddenPosts}) { // NOSONAR Nested storage shape is legacy data.
       let board, ID, site, thread;
       let hiddenNum = 0;
       for (ID in hiddenThreads) {
@@ -431,7 +432,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
   onImport() {
     let file;
-    if (!(file = this.files[0])) { return; }
+    file = this.files[0];
+    if (!file) { return; }
     this.value = null;
     const output = $('.imp-exp-result');
     if (!confirm('Your current settings will be entirely overwritten, are you sure?')) {
@@ -439,23 +441,20 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
+    file.text().then(text => {
       try {
-        Settings.loadSettings(dict.json(e.target.result), function (err) {
+        Settings.loadSettings(dict.json(text), function (err) {
           if (err) {
             output.textContent = 'Import failed due to an error.';
           } else if (confirm('Import successful. Reload now?')) {
             window.location.reload();
           }
         });
-      } catch (error) {
-        const err = error;
+      } catch (err) {
         output.textContent = 'Import failed due to an error.';
         c.error(err.stack);
       }
-    };
-    reader.readAsText(file);
+    });
   },
 
   /**
@@ -466,15 +465,16 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
    * @param {string|Array} version - The version string/array from which to upgrade.
    * @returns {Object} A dictionary of changes applied during the upgrade.
    */
-  upgrade(data, version) {
+  upgrade(data, version) { // NOSONAR Migration order is version-dependent and must remain explicit.
     let corrupted, key, val;
     const changes = dict();
     const set = (key, value) => data[key] = (changes[key] = value);
     // XXX https://github.com/greasemonkey/greasemonkey/issues/2600
-    if (corrupted = (version[0] === '"')) {
+    corrupted = version[0] === '"';
+    if (corrupted) {
       try {
         version = JSON.parse(version);
-      } catch (error) {}
+      } catch (error_) { c.error(error_); }
     }
     const compareString = version.replace(/^XT /i, '').replace(/\d+/g, x => x.padStart(5, '0'));
     if (corrupted) {
@@ -482,22 +482,22 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         val = data[key];
         if (typeof val === 'string') {
           try {
-            var val2 = JSON.parse(val);
+            const val2 = JSON.parse(val);
             set(key, val2);
-          } catch (error1) {}
+          } catch (error_) { c.error(error_); }
         }
       }
     }
-    if (compareString < '00001.00014.00016.00001') {
+    if (compareString < '00001.00014.00016.00001') { // NOSONAR Migration version, not an IP address.
       if (data['archiveLists'] != null) {
         set('archiveLists', data['archiveLists'].replace('https://mayhemydg.github.io/archives.json/archives.json', 'https://nstepien.github.io/archives.json/archives.json'));
       }
     }
-    if (compareString < '00001.00014.00016.00007') {
+    if (compareString < '00001.00014.00016.00007') { // NOSONAR Migration version, not an IP address.
       if (data['sauces'] != null) {
         set('sauces', data['sauces'].replace(
           /https:\/\/www\.deviantart\.com\/gallery\/#\/d%\$1%\$2;regexp:\/\^\\w\+_by_\\w\+\[_-\]d\(\[\\da-z\]\{6\}\)\\b\|\^d\(\[\\da-z\]\{6\}\)-\[\\da-z\]\{8\}-\//g,
-          'javascript:void(open("https://www.deviantart.com/"+%$1.replace(/_/g,"-")+"/art/"+parseInt(%$2,36)));regexp:/^\\w+_by_(\\w+)[_-]d([\\da-z]{6})\\b/'
+          String.raw`javascript:void(open("https://www.deviantart.com/"+%$1.replace(/_/g,"-")+"/art/"+parseInt(%$2,36)));regexp:/^\w+_by_(\w+)[_-]d([\da-z]{6})\b/`
         ).replace(
           /\/\/imgops\.com\/%URL/g,
           '//imgops.com/start?url=%URL'
@@ -505,25 +505,25 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         );
       }
     }
-    if (compareString < '00001.00014.00017.00002') {
+    if (compareString < '00001.00014.00017.00002') { // NOSONAR Migration version, not an IP address.
       if (data['jsWhitelist'] != null) {
         set('jsWhitelist', data['jsWhitelist'] + '\n\nhttps://hcaptcha.com\nhttps://*.hcaptcha.com');
       }
     }
-    if (compareString < '00001.00014.00020.00004') {
+    if (compareString < '00001.00014.00020.00004') { // NOSONAR Migration version, not an IP address.
       if (data['archiveLists'] != null) {
         set('archiveLists', data['archiveLists'].replace('https://nstepien.github.io/archives.json/archives.json', 'https://4chenz.github.io/archives.json/archives.json'));
       }
     }
-    if (compareString < '00001.00014.00022.00003') {
+    if (compareString < '00001.00014.00022.00003') { // NOSONAR Migration version, not an IP address.
       if (data['sauces']) {
         set('sauces', data['sauces'].replace(/^#?\s*https:\/\/www\.google\.com\/searchbyimage\?image_url=%(IMG|T?URL)&safe=off(?=$|;)/mg, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
-        if (compareString === '00001.00014.00022.00002' && !/\bsbisrc=/.test(data['sauces'])) {
+        if (compareString === '00001.00014.00022.00002' && !/\bsbisrc=/.test(data['sauces'])) { // NOSONAR Migration version, not an IP address.
           set('sauces', data['sauces'].replace(/^#?\s*https:\/\/lens\.google\.com\/uploadbyurl\?url=%(IMG|T?URL)(?=$|;)/m, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
         }
       }
     }
-    if (compareString < '00002.00003.00001.00000') {
+    if (compareString < '00002.00003.00001.00000') { // NOSONAR Migration version, not an IP address.
       if (data['boardnav']) {
         set('boardnav', data['boardnav'].replace(
           '[external-text:"FAQ","4chan XT"]',
@@ -531,12 +531,14 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         ));
       }
     }
-    if (compareString < '00002.00003.00006.00000') {
-      set('RelativeTime', data['Relative Post Dates'] ? (data['Relative Date Title'] ? 'Hover' : 'Show') : 'No');
+    if (compareString < '00002.00003.00006.00000') { // NOSONAR Migration version, not an IP address.
+      const relativeTime = data['Relative Post Dates'] ? 'Show' : 'No';
+      set('RelativeTime', data['Relative Date Title'] ? 'Hover' : relativeTime);
     }
     if (compareString === '00002.00009.00000.00000') {
       set('XEmbedder', data['Embed Tweets inline with fxTwitter'] ? 'fxt' : 'tf');
-      set('fxtMaxReplies', data['Resolve Tweet Replies'] ? (data['Resolve all Tweet Replies'] ? 100 : 1) : 0);
+      const maxReplies = data['Resolve Tweet Replies'] ? 1 : 0;
+      set('fxtMaxReplies', data['Resolve all Tweet Replies'] ? 100 : maxReplies);
       set('fxtLang', data['Translate non-English Tweets to English'] ? 'en' : '');
     }
     return changes;
@@ -614,10 +616,10 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     $.on(ta, 'change', $.cb.value);
   },
 
-  advanced(section) {
+  advanced(section) { // NOSONAR Settings controls require distinct initialization paths.
     let input, name;
     $.extend(section, { innerHTML: AdvancedPage });
-    for (var warning of $$('.warning', section)) { warning.hidden = Conf[warning.dataset.feature]; }
+    for (const warning of $$('.warning', section)) { warning.hidden = Conf[warning.dataset.feature]; }
 
     const inputs = dict();
     for (input of $$('[name]', section)) {
@@ -635,7 +637,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       input = inputs[name];
       if (!['Interval', 'Custom CSS', 'timeLocale'].includes(name)) {
         items[name] = Conf[name];
-        var event = (
+        const event = (
           (input.nodeName === 'SELECT') ||
           ['checkbox', 'radio'].includes(input.type) ||
           ((input.nodeName === 'TEXTAREA') && !(name in Settings))
@@ -646,8 +648,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
 
     $.get(items, function(items) {
-      for (var key in items) {
-        var val = items[key];
+        for (const key in items) {
+          const val = items[key];
         input = inputs[key];
         input[input.type === 'checkbox' ? 'checked' : 'value'] = val;
         input.hidden = false; // XXX prevent Firefox from adding initialization to undo queue
@@ -658,7 +660,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     });
 
     const listImageHost = $.id('list-fourchanImageHost');
-    for (var textContent of ImageHost.suggestions) {
+    for (const textContent of ImageHost.suggestions) {
       $.add(listImageHost, $.el('option', {textContent}));
     }
 
@@ -701,7 +703,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     $.on(inputs.beepSource, 'change', () => { ThreadUpdater.playBeep(false); });
   },
 
-  addArchiveTable(section) {
+  addArchiveTable(section) { // NOSONAR Archive rows have four intentionally distinct availability states.
     let boardID, o;
     $('#lastarchivecheck', section).textContent = Conf['lastarchivecheck'] === 0 ?
       'never'
@@ -716,7 +718,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     $.rmAll(tbody);
 
     const archBoards = dict();
-    for (var {uid, name, boards, files, software} of Conf['archives']) {
+    for (const {uid, name, boards, files, software} of Conf['archives']) {
       if (!['fuuka', 'foolfuuka'].includes(software)) { continue; }
       for (boardID of boards) {
         o = archBoards[boardID] || (archBoards[boardID] = {
@@ -726,7 +728,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
           file:   []
         });
         if (!o.threadJSON) o.threadJSON = [];
-        var archive = [uid ?? name, name];
+        const archive = [uid ?? name, name];
         o.thread.push(archive);
         if (software === 'foolfuuka') {
           o.post.push(archive);
@@ -738,8 +740,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
     const rows = [];
     const boardOptions = [];
-    for (boardID of Object.keys(archBoards).sort()) { // Alphabetical order
-      var row = $.el('tr',
+    for (boardID of Object.keys(archBoards).sort((a, b) => a.localeCompare(b))) {
+      const row = $.el('tr',
         {className: `board-${boardID}`});
       row.hidden = boardID !== g.BOARD.ID;
 
@@ -750,7 +752,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       }));
 
       o = archBoards[boardID];
-      for (var item of ['thread', 'threadJSON', 'post', 'file']) {
+      for (const item of ['thread', 'threadJSON', 'post', 'file']) {
         $.add(row, Settings.addArchiveCell(boardID, o, item));
       }
       rows.push(row);
@@ -771,11 +773,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     $.add(tbody, rows);
 
     for (boardID in Conf['selectedArchives']) {
-      var data = Conf['selectedArchives'][boardID];
-      for (var type in data) {
-        var select;
-        var id = data[type];
-        if (select = $(`select[data-boardid='${boardID}'][data-type='${type}']`, tbody)) {
+      const data = Conf['selectedArchives'][boardID];
+      for (const type in data) {
+        const id = data[type];
+        const select = $(`select[data-boardid='${boardID}'][data-type='${type}']`, tbody);
+        if (select) {
           select.value = JSON.stringify(id);
           if (!select.value) { select.value = select.firstChild.value; }
         }
@@ -796,7 +798,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     const options = [];
     let i = 0;
     while (i < length) {
-      var archive = data[type][i++];
+      const archive = data[type][i++];
       options.push($.el('option', {
         value: JSON.stringify(archive[0]),
         textContent: archive[1]
@@ -805,10 +807,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
     $.extend(td, {innerHTML: '<select></select>'});
     const select = td.firstElementChild;
-    if (!(select.disabled = length === 1)) {
+    select.disabled = length === 1;
+    if (!select.disabled) {
       // XXX GM can't into datasets
-      select.setAttribute('data-boardid', boardID);
-      select.setAttribute('data-type', type);
+      select.dataset.boardid = boardID;
+      select.dataset.type = type;
       $.on(select, 'change', Settings.saveSelectedArchive);
     }
     $.add(select, options);
@@ -866,14 +869,17 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     const f = Favicon;
     const iterable = [f.SFW, f.unreadSFW, f.unreadSFWY, f.NSFW, f.unreadNSFW, f.unreadNSFWY, f.dead, f.unreadDead, f.unreadDeadY];
     for (let i = 0; i < iterable.length; i++) {
-      var icon = iterable[i];
+      const icon = iterable[i];
       if (!img[i]) { $.add(this.nextElementSibling, $.el('img')); }
       img[i].src = icon;
     }
   },
 
   togglecss() {
-    if (($('textarea[name=usercss]', $.x('ancestor::fieldset[1]', this)).disabled = ($.id('apply-css').disabled = !this.checked))) {
+    const disabled = !this.checked;
+    $('textarea[name=usercss]', $.x('ancestor::fieldset[1]', this)).disabled = disabled;
+    $.id('apply-css').disabled = disabled;
+    if (disabled) {
       CustomCSS.rmStyle();
     } else {
       CustomCSS.addStyle();
@@ -889,7 +895,8 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       Time.formatterCache.clear();
       $.cb.value.call(input);
       Settings.timeLocale.call(input);
-    } catch (e) {
+    } catch (error_) {
+      c.error(error_);
       input.setCustomValidity('Locale not recognized');
       input.reportValidity();
     }
@@ -906,10 +913,10 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     const items  = dict();
     const inputs = Settings.keyBindInputs;
     for (key in Config.hotkeys) {
-      var arr = Config.hotkeys[key];
-      var tr = $.el('tr',
+      const arr = Config.hotkeys[key];
+      const tr = $.el('tr',
         { innerHTML: `<td>${arr[1]}</td><td><input class="field"></td>` });
-      var input = $('input', tr);
+      const input = $('input', tr);
       input.name = key;
       input.spellcheck = false;
       items[key]  = Conf[key];
@@ -920,7 +927,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
 
     $.get(items, function (items) {
       for (key in items) {
-        var val = items[key];
+        const val = items[key];
         inputs[key].value = val;
       }
     });

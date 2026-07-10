@@ -1,7 +1,7 @@
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 
-var Flash: any = {
+const Flash: any = {
   init() {
     if ((g.BOARD.ID === 'f') && Conf['Enable Native Flash Embedding']) {
       return $.ready(Flash.initReady);

@@ -6,7 +6,7 @@
 
 ## Architecture & Development
 
-The codebase has been fully migrated to TypeScript, and all build tools and source modules compile with strict type checks. This provides better maintainability, stricter typing, and a more robust build system.
+The codebase has been fully migrated to TypeScript, and all build tools and source modules compile as TypeScript (`allowJs`/`checkJs` disabled). Modules are also being incrementally brought up to a stricter, SonarQube-clean type-safety standard. This provides better maintainability and a more robust build system.
 
 For developers and contributors, please see [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive into the repository's structure, singleton architecture, and build process.
 New features since the fork include:
@@ -73,7 +73,7 @@ If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), th
 <summary>Click to expand</summary>
 
 - The project aims for zero circular dependencies in the source graph. Run `npm run check:cycles` to verify.
-- The codebase is 100% TypeScript. `allowJs` and `checkJs` have been disabled in `tsconfig.json`, enforcing strict TypeScript compilation across all files.
+- The codebase is 100% TypeScript. `allowJs` and `checkJs` have been disabled in `tsconfig.json`. Full `strict`/`strictNullChecks` are not yet enabled project-wide; that's being tightened incrementally as part of an ongoing SonarQube cleanup pass, module by module.
 - the es 2020 target was chosen for optional chaining
 - @violentmonkey/types was chosen over @types/greasemonkey because @types/greasemonkey only declares the GM object, and not GM\_ functions
 

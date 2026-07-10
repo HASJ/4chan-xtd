@@ -7,8 +7,8 @@ const PassLink: any = {
   },
 
   ready() {
-    let styleSelector;
-    if (!(styleSelector = $.id('styleSelector'))) { return; }
+    const styleSelector = $.id('styleSelector');
+    if (!styleSelector) { return; }
 
     const passLink = $.el('span',
       {className: 'brackets-wrap pass-link-container'});

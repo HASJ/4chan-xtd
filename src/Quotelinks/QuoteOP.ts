@@ -14,7 +14,7 @@ const QuoteOP: QuoteOPType = {
   mark: null as any,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Mark OP Quotes']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Mark OP Quotes']) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);
@@ -37,7 +37,8 @@ const QuoteOP: QuoteOPType = {
     let i: number, quotelink: HTMLElement, quotes: string[];
     if (this.isClone && (this.thread === this.context.thread)) { return; }
     // Stop there if there's no quotes in that post.
-    if (!(quotes = this.quotes).length) { return; }
+    quotes = this.quotes;
+    if (!quotes.length) { return; }
     const { quotelinks } = this.nodes;
 
     // rm (OP) from cross-thread quotes.

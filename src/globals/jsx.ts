@@ -31,7 +31,7 @@ const voidElements = new Set(
 export const hFragment = Symbol('hFragment');
 
 /** Function that jsx/tsx will be compiled to. */
-export default function h(
+export default function h( // NOSONAR URI validation deliberately keeps each allowed scheme explicit.
   tag: string | typeof hFragment,
   attributes: Record<string, unknown> | null,
   ...children: unknown[]
@@ -48,8 +48,8 @@ export default function h(
         const valTrim = valStr.trim().toLowerCase();
         if (valTrim.startsWith('javascript:')) {
           const isSafeJsUri = valTrim === 'javascript:;' ||
-                              /^javascript:void\([0-9]*\);?$/.test(valTrim) ||
-                              /^javascript:quote\([0-9]+\);?$/.test(valTrim);
+                              /^javascript:void\(\d*\);?$/.test(valTrim) ||
+                              /^javascript:quote\(\d+\);?$/.test(valTrim);
           if (!isSafeJsUri) {
             valStr = 'about:invalid';
           }

@@ -1,11 +1,11 @@
-import { g, Conf, d } from "../globals/globals";
+import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import Menu from "./Menu";
 import { isPassEnabled } from "../platform/helpers";
 
-var ReportLink: any = {
+const ReportLink: any = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Report Link']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu'] || !Conf['Report Link']) { return; }
 
     const a = $.el('a', {
       className: 'report-link',

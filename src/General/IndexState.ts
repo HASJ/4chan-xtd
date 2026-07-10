@@ -1,5 +1,5 @@
-export let indexEnabled = false;
+export const indexState = { enabled: false };
 
 export function setIndexEnabled(enabled: boolean) {
-  indexEnabled = enabled;
+  indexState.enabled = enabled;
 }

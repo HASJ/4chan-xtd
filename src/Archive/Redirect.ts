@@ -7,7 +7,13 @@ import archives from './archives.json';
 
 type Archive = (typeof archives)[number];
 
-var Redirect = {
+interface ArchiveFetchResult {
+  status: number;
+  statusText?: string;
+  response: any;
+}
+
+const Redirect = {
   archives,
   /** List of archives by compatible functions. */
   data: null as {
@@ -15,7 +21,7 @@ var Redirect = {
     threadJSON: Map<string, Archive>,
     post: Map<string, Archive>,
     file: Map<string, Archive>,
-  },
+  } | null,
 
   init() {
     this.selectArchives();
@@ -33,56 +39,89 @@ var Redirect = {
       file: new Map<string, Archive>(),
     };
 
-    const archives = dict();
-    for (const data of Conf['archives']) {
-      for (var key of ['boards', 'files']) {
-        if (!(data[key] instanceof Array)) { data[key] = []; }
-      }
-      const { uid, name, boards, files, software } = data;
-      if (!['fuuka', 'foolfuuka'].includes(software)) { continue; }
-      archives[JSON.stringify(uid ?? name)] = data;
-      for (const boardID of boards) {
-        if (!o.thread.has(boardID)) o.thread.set(boardID, data);
-        if (!o.file.has(boardID) && files.includes(boardID)) o.file.set(boardID, data);
-        if (software === 'foolfuuka') {
-          if (!o.threadJSON.has(boardID)) o.threadJSON.set(boardID, data);
-          if (!o.post.has(boardID)) o.post.set(boardID, data);
-        }
-      }
-    }
-
-    for (const boardID in Conf['selectedArchives']) {
-      var record = Conf['selectedArchives'][boardID];
-      for (const [type, id] of Object.entries(record)) {
-        var archive;
-        if ((archive = archives[JSON.stringify(id)]) && $.hasOwn(o, type)) {
-          const boards = type === 'file' ? archive.files : archive.boards;
-          if (boards.includes(boardID)) { o[type].set(boardID, archive); }
-        }
-      }
-    }
+    const archives = Redirect.indexArchivesByBoard(o);
+    Redirect.applySelectedArchives(o, archives);
 
     Redirect.data = o;
   },
 
-  update(cb) {
-    let url;
-    const urls = [];
-    const responses = [];
-    let nloaded = 0;
-    for (url of Conf['archiveLists'].split('\n')) {
-      if (url[0] !== '#') {
-        url = url.trim();
-        if (url) { urls.push(url); }
+  indexArchivesByBoard(o) {
+    const archives = dict();
+    for (const data of Conf['archives']) {
+      Redirect.normalizeArchiveBoards(data);
+      if (!Redirect.isCompatibleArchive(data)) { continue; }
+      archives[JSON.stringify(data.uid ?? data.name)] = data;
+      Redirect.indexArchiveBoards(o, data);
+    }
+    return archives;
+  },
+
+  normalizeArchiveBoards(data) {
+    for (const key of ['boards', 'files']) {
+      if (!Array.isArray(data[key])) { data[key] = []; }
+    }
+  },
+
+  isCompatibleArchive({software}) {
+    return ['fuuka', 'foolfuuka'].includes(software);
+  },
+
+  indexArchiveBoards(o, data) {
+    const { boards, files, software } = data;
+    for (const boardID of boards) {
+      Redirect.registerArchiveForBoard(o, boardID, data, files, software);
+    }
+  },
+
+  registerArchiveForBoard(o, boardID, data, files, software) {
+    if (!o.thread.has(boardID)) o.thread.set(boardID, data);
+    if (!o.file.has(boardID) && files.includes(boardID)) o.file.set(boardID, data);
+    if (software !== 'foolfuuka') { return; }
+    if (!o.threadJSON.has(boardID)) o.threadJSON.set(boardID, data);
+    if (!o.post.has(boardID)) o.post.set(boardID, data);
+  },
+
+  applySelectedArchives(o, archives) {
+    for (const boardID in Conf['selectedArchives']) {
+      const record = Conf['selectedArchives'][boardID];
+      for (const [type, id] of Object.entries(record)) {
+        const archive = archives[JSON.stringify(id)];
+        if (!archive || !$.hasOwn(o, type)) { continue; }
+        const boards = type === 'file' ? archive.files : archive.boards;
+        if (boards.includes(boardID)) { o[type].set(boardID, archive); }
       }
     }
+  },
 
-    const fail = (url, action, msg) => new Notice('warning', `Error ${action} archive data from\n${url}\n${msg}`, 20);
+  update(cb?: () => void) {
+    const urls = Redirect.collectArchiveListUrls();
+    if (!urls.length) {
+      Redirect.parse([], cb);
+      return;
+    }
+    Redirect.fetchArchiveLists(urls, cb);
+  },
 
-    const load = i => (function() {
+  collectArchiveListUrls(): string[] {
+    const urls: string[] = [];
+    for (const raw of Conf['archiveLists'].split('\n')) {
+      if (raw[0] === '#') { continue; }
+      const url = raw.trim();
+      if (url) { urls.push(url); }
+    }
+    return urls;
+  },
+
+  fetchArchiveLists(urls: string[], cb?: () => void) {
+    const responses: any[] = [];
+    let nloaded = 0;
+
+    const fail = (url: string, action: string, msg: string) => new Notice('warning', `Error ${action} archive data from\n${url}\n${msg}`, 20);
+
+    const load = (i: number) => (function(this: ArchiveFetchResult) {
       if (this.status !== 200) { return fail(urls[i], 'fetching', (this.status ? `Error ${this.statusText} (${this.status})` : 'Connection Error')); }
       let {response} = this;
-      if (!(response instanceof Array)) { response = [response]; }
+      if (!Array.isArray(response)) { response = [response]; }
       responses[i] = response;
       nloaded++;
       if (nloaded === urls.length) {
@@ -90,34 +129,30 @@ var Redirect = {
       }
     });
 
-    if (urls.length) {
-      for (let i = 0; i < urls.length; i++) {
-        url = urls[i];
-        if (['[', '{'].includes(url[0])) {
-          var response;
-          try {
-            response = JSON.parse(url);
-          } catch (err) {
-            fail(url, 'parsing', err.message);
-            continue;
-          }
-          load(i).call({status: 200, response});
-        } else {
-          CrossOrigin.ajax(url,
-            {onloadend: load(i)});
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      if (['[', '{'].includes(url[0])) {
+        let response;
+        try {
+          response = JSON.parse(url);
+        } catch (err) {
+          fail(url, 'parsing', err instanceof Error ? err.message : String(err));
+          continue;
         }
+        load(i).call({status: 200, response});
+      } else {
+        CrossOrigin.ajax(url,
+          {onloadend: load(i)});
       }
-    } else {
-      Redirect.parse([], cb);
     }
   },
 
-  parse(responses, cb) {
-    const archives = [];
+  parse(responses, cb?: () => void) {
+    const archives: Archive[] = [];
     const archiveUIDs = dict();
-    for (var response of responses) {
-      for (var data of response) {
-        var uid = JSON.stringify(data.uid ?? data.name);
+    for (const response of responses) {
+      for (const data of response) {
+        const uid = JSON.stringify(data.uid ?? data.name);
         if (uid in archiveUIDs) {
           $.extend(archiveUIDs[uid], data);
         } else {
@@ -137,7 +172,7 @@ var Redirect = {
     dest: 'post' | 'thread' | 'threadJSON' | 'file' | 'board' | 'search',
     data: { boardID: string, threadID?: string | number, postID?: string | number }
   ): string {
-    const archive = (['search', 'board'].includes(dest) ? Redirect.data.thread : Redirect.data[dest]).get(data.boardID);
+    const archive = (['search', 'board'].includes(dest) ? Redirect.data!.thread : Redirect.data![dest]).get(data.boardID);
     if (!archive) { return ''; }
     return (Redirect as any)[dest](archive, data);
   },
@@ -188,8 +223,8 @@ var Redirect = {
     if (!filename) { return ''; }
     if (boardID === 'f') {
       filename = encodeURIComponent($.unescape(decodeURIComponent(filename)));
-    } else {
-      if (/[sm]\.jpg$/.test(filename)) { return ''; }
+    } else if (/[sm]\.jpg$/.test(filename)) {
+      return '';
     }
     if (archive.name.endsWith('arch.b4k.co') || archive.name.endsWith('palanq.win')) {
       const [timeStamp, ext] = filename.split('.');
@@ -206,12 +241,11 @@ var Redirect = {
   },
 
   search(archive, {boardID, type, value}) {
-    type = type === 'name' ?
-      'username'
-    : type === 'MD5' ?
-      'image'
-    :
-      type;
+    if (type === 'name') {
+      type = 'username';
+    } else if (type === 'MD5') {
+      type = 'image';
+    }
     if (type === 'capcode') {
       // https://github.com/pleebe/FoolFuuka/blob/bf4224eed04637a4d0bd4411c2bf5f9945dfec0b/src/Model/Search.php#L363
       value = $.getOwn({
@@ -222,20 +256,22 @@ var Redirect = {
       value = value.replace(/[+/=]/g, c => ({'+': '-', '/': '_', '=': ''})[c]);
     }
     value = encodeURIComponent(value);
-    const path  = archive.software === 'foolfuuka' ?
-      `${boardID}/search/${type}/${value}/`
-    : type === 'image' ?
-      `${boardID}/image/${value}`
-    :
-      `${boardID}/?task=search2&search_${type}=${value}`;
+    let path: string;
+    if (archive.software === 'foolfuuka') {
+      path = `${boardID}/search/${type}/${value}/`;
+    } else if (type === 'image') {
+      path = `${boardID}/image/${value}`;
+    } else {
+      path = `${boardID}/?task=search2&search_${type}=${value}`;
+    }
     return `${Redirect.protocol(archive)}${archive.domain}/${path}`;
   },
 
   report(boardID) {
-    const urls = [];
-    for (var archive of Conf['archives']) {
-      var {software, https, reports, boards, name, domain} = archive;
-      if ((software === 'foolfuuka') && https && reports && boards instanceof Array && boards.includes(boardID)) {
+    const urls: [string, string][] = [];
+    for (const archive of Conf['archives']) {
+      const {software, https, reports, boards, name, domain} = archive;
+      if ((software === 'foolfuuka') && https && reports && Array.isArray(boards) && boards.includes(boardID)) {
         urls.push([name, `https://${domain}/_/api/chan/offsite_report/`]);
       }
     }
@@ -243,7 +279,7 @@ var Redirect = {
   },
 
   securityCheck(url) {
-    return /^https:\/\//.test(url) ||
+    return url.startsWith('https://') ||
     (location.protocol === 'http:') ||
     Conf['Exempt Archives from Encryption'];
   },

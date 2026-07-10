@@ -26,13 +26,15 @@ export default class Fetcher {
     this.postID = postID;
     this.root = root;
     this.quoter = quoter;
-    if (post = g.posts.get(`${this.boardID}.${this.postID}`)) {
+    post = g.posts!.get(`${this.boardID}.${this.postID}`);
+    if (post) {
       this.insert(post);
       return;
     }
 
     // 4chan X catalog data
-    if ((post = Index.replyData?.[`${this.boardID}.${this.postID}`]) && (thread = g.threads.get(`${this.boardID}.${this.threadID}`))) {
+    post = Index.replyData?.[`${this.boardID}.${this.postID}`];
+    if (post && (thread = g.threads!.get(`${this.boardID}.${this.threadID}`))) {
       const board  = g.boards[this.boardID];
       post = new Post(g.SITE.Build.postFromObject(post, this.boardID), thread, board, {isFetchedQuote: true});
       Callbacks.Post.execute(post);
@@ -42,9 +44,9 @@ export default class Fetcher {
 
     this.root.textContent = `Loading post No.${this.postID}...`;
     if (this.threadID) {
-      const that = this;
-      ($ as any).cache(g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID}), function({isCached}) {
-        return that.fetchedPost(this, isCached);
+      const fetchedPost = this.fetchedPost.bind(this);
+      ($ as any).cache(g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID}), function(this: XMLHttpRequest, {isCached}) {
+        return fetchedPost(this, isCached);
       });
     } else {
       this.archivedPost();
@@ -65,8 +67,8 @@ export default class Fetcher {
 
     // Indicate links to the containing post.
     const quotes = [...clone.nodes.quotelinks, ...clone.nodes.backlinks];
-    for (var quote of quotes) {
-      var {boardID, postID} = Get.postDataFromLink(quote);
+    for (const quote of quotes) {
+      const {boardID, postID} = Get.postDataFromLink(quote);
       if ((postID === this.quoter.ID) && (boardID === this.quoter.board.ID)) {
         $.addClass(quote, 'forwardlink');
       }
@@ -91,25 +93,16 @@ export default class Fetcher {
   fetchedPost(req, isCached) {
     // In case of multiple callbacks for the same request,
     // don't parse the same original post more than once.
-    let post;
-    if (post = g.posts.get(`${this.boardID}.${this.postID}`)) {
+    let post: any;
+    post = g.posts!.get(`${this.boardID}.${this.postID}`);
+    if (post) {
       this.insert(post);
       return;
     }
 
     const {status} = req;
     if (status !== 200) {
-      // The thread can die by the time we check a quote.
-      if (status && this.archivedPost()) { return; }
-
-      $.addClass(this.root, 'warning');
-      this.root.textContent =
-        status === 404 ?
-          `Thread No.${this.threadID} 404'd.`
-        : !status ?
-          'Connection Error'
-        :
-          `Error ${req.statusText} (${req.status}).`;
+      this.reportFetchFailure(status, req);
       return;
     }
 
@@ -120,54 +113,74 @@ export default class Fetcher {
     } // we found it!
 
     if (post.no !== this.postID) {
-      // Cached requests can be stale and must be rechecked.
-      if (isCached) {
-        const api = g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID});
-        ($ as any).cleanCache(url => url === api);
-        const that = this;
-        ($ as any).cache(api, function() {
-          return that.fetchedPost(this, false);
-        });
-        return;
-      }
-
-      // The post can be deleted by the time we check a quote.
-      if (this.archivedPost()) { return; }
-
-      $.addClass(this.root, 'warning');
-      this.root.textContent = `Post No.${this.postID} was not found.`;
+      this.handleMissingPost(isCached);
       return;
     }
 
     const board = g.boards[this.boardID] ||
       new Board(this.boardID);
-    const thread = g.threads.get(`${this.boardID}.${this.threadID}`) ||
+    const thread = g.threads!.get(`${this.boardID}.${this.threadID}`) ||
       new Thread(this.threadID as any, board);
     post = new Post(g.SITE.Build.postFromObject(post, this.boardID), thread, board, {isFetchedQuote: true});
     Callbacks.Post.execute(post);
     return this.insert(post);
   }
 
+  reportFetchFailure(status, req) {
+    // The thread can die by the time we check a quote.
+    if (status && this.archivedPost()) { return; }
+
+    $.addClass(this.root, 'warning');
+    let message: string;
+    if (status === 404) {
+      message = `Thread No.${this.threadID} 404'd.`;
+    } else if (!status) {
+      message = 'Connection Error';
+    } else {
+      message = `Error ${req.statusText} (${req.status}).`;
+    }
+    this.root.textContent = message;
+  }
+
+  handleMissingPost(isCached) {
+    // Cached requests can be stale and must be rechecked.
+    if (isCached) {
+      const api = g.SITE.urls.threadJSON({siteID: g.SITE.ID, boardID: this.boardID, threadID: this.threadID});
+      ($ as any).cleanCache(url => url === api);
+      const fetchedPost = this.fetchedPost.bind(this);
+      ($ as any).cache(api, function(this: XMLHttpRequest) {
+        return fetchedPost(this, false);
+      });
+      return;
+    }
+
+    // The post can be deleted by the time we check a quote.
+    if (this.archivedPost()) { return; }
+
+    $.addClass(this.root, 'warning');
+    this.root.textContent = `Post No.${this.postID} was not found.`;
+  }
+
   archivedPost() {
-    let url: string;
     if (!Conf['Resurrect Quotes']) { return false; }
-    if (!(url = Redirect.to('post', {boardID: this.boardID, postID: this.postID}))) { return false; }
-    const archive = Redirect.data.post[this.boardID];
-    const encryptionOK = /^https:\/\//.test(url) || (location.protocol === 'http:');
+    const url = Redirect.to('post', {boardID: this.boardID, postID: this.postID});
+    if (!url) { return false; }
+    const archive = Redirect.data!.post[this.boardID];
+    const encryptionOK = url.startsWith('https://') || (location.protocol === 'http:');
     if (encryptionOK || Conf['Exempt Archives from Encryption']) {
-      const that = this;
-      CrossOrigin.cache(url, function() {
+      const parseArchivedPost = this.parseArchivedPost.bind(this);
+      CrossOrigin.cache(url, function(this: XMLHttpRequest) {
         if (!encryptionOK && this.response?.media) {
           const {media} = this.response;
-          for (var key in media) {
+          for (const key in media) {
             // Image/thumbnail URLs loaded over HTTP can be modified in transit.
             // Require them to be from an HTTP host so that no referrer is sent to them from an HTTPS page.
-            if (/_link$/.test(key)) {
+            if (key.endsWith('_link')) {
               if (!$.getOwn(media, key)?.match(/^http:\/\//)) { delete media[key]; }
             }
           }
         }
-        return that.parseArchivedPost(this.response, url, archive);
+        return parseArchivedPost(this.response, url, archive);
       });
       return true;
     }
@@ -177,8 +190,8 @@ export default class Fetcher {
   parseArchivedPost(data, url, archive) {
     // In case of multiple callbacks for the same request,
     // don't parse the same original post more than once.
-    let post: Post;
-    if (post = g.posts.get(`${this.boardID}.${this.postID}`)) {
+    let post: Post = g.posts!.get(`${this.boardID}.${this.postID}`);
+    if (post) {
       this.insert(post);
       return;
     }

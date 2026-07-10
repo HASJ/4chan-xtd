@@ -95,7 +95,7 @@ const Favicon: FaviconType = {
     if (!Favicon.el) { return; }
     Favicon.el.type = 'image/x-icon';
     const { href } = Favicon.el;
-    Favicon.isSFW   = /ws\.ico$/.test(href);
+    Favicon.isSFW   = href.endsWith('ws.ico');
     Favicon.default = href;
     Favicon.switch();
     if (Favicon.status) {

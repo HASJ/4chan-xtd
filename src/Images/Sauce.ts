@@ -10,6 +10,8 @@ interface SauceType {
   link: HTMLAnchorElement;
   init(): void;
   parseLink(link: string): Record<string, any> | null;
+  splitLinkParts(link: string): Record<string, any>;
+  resolveRegexp(parts: Record<string, any>, link: string): boolean;
   createSauceLink(link: Record<string, any>, post: any, file: any): HTMLAnchorElement | null;
   node(this: any): void;
   file(post: any, file: any): void;
@@ -21,13 +23,14 @@ const Sauce: SauceType = {
   link: null as any,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Sauce']) { return; }
+    const view = g.VIEW;
+    if (!view || !['index', 'thread'].includes(view) || !Conf['Sauce']) { return; }
     $.addClass(doc, 'show-sauce');
 
-    const links = [];
+    const links: Record<string, any>[] = [];
     for (const link of Conf['sauces'].split('\n')) {
-      let linkData: Record<string, any> | null;
-      if ((link[0] !== '#') && (linkData = this.parseLink(link))) {
+      const linkData = link[0] !== '#' ? this.parseLink(link) : null;
+      if (linkData) {
         links.push(linkData);
       }
     }
@@ -46,7 +49,20 @@ const Sauce: SauceType = {
   },
 
   parseLink(link: string): Record<string, any> | null {
-    if (!(link = link.trim())) { return null; }
+    link = link.trim();
+    if (!link) { return null; }
+    const parts = Sauce.splitLinkParts(link);
+    if (!parts['text']) {
+      parts['text'] = parts['url'].match(/(\w+)\.\w+\//)?.[1] || '?';
+    }
+    if ('boards' in parts) {
+      parts['boards'] = Filter.parseBoards(parts['boards']);
+    }
+    if ('regexp' in parts && !Sauce.resolveRegexp(parts, link)) { return null; }
+    return parts;
+  },
+
+  splitLinkParts(link: string): Record<string, any> {
     const parts = dict() as Record<string, any>;
     const iterable = link.split(/;(?=(?:text|boards|types|regexp|sandbox):?)/);
     for (let i = 0; i < iterable.length; i++) {
@@ -54,55 +70,49 @@ const Sauce: SauceType = {
       if (i === 0) {
         parts['url'] = part;
       } else {
-        const m = part.match(/^(\w*):?(.*)$/);
+        const m = /^(\w*):?(.*)$/.exec(part);
         if (m) {
           parts[m[1]] = m[2];
         }
       }
     }
-    if (!parts['text']) {
-      parts['text'] = parts['url'].match(/(\w+)\.\w+\//)?.[1] || '?';
-    }
-    if ('boards' in parts) {
-      parts['boards'] = Filter.parseBoards(parts['boards']);
-    }
-    if ('regexp' in parts) {
-      try {
-        let regexp: RegExpMatchArray | null;
-        if ((regexp = parts['regexp'].match(/^\/(.*)\/(\w*)$/))) {
-          parts['regexp'] = RegExp(regexp[1], regexp[2]);
-        } else {
-          parts['regexp'] = RegExp(parts['regexp']);
-        }
-      } catch (err: any) {
-        new Notice('warning', [
-          $.tn("Invalid regexp for Sauce link:"),
-          $.el('br'),
-          $.tn(link),
-          $.el('br'),
-          $.tn(err.message)
-        ], 60);
-        return null;
-      }
-    }
     return parts;
+  },
+
+  resolveRegexp(parts: Record<string, any>, link: string): boolean {
+    try {
+      const regexp = /^\/(.*)\/(\w*)$/.exec(parts['regexp']);
+      parts['regexp'] = regexp ? new RegExp(regexp[1], regexp[2]) : new RegExp(parts['regexp']);
+      return true;
+    } catch (err: any) {
+      const _notice = new Notice('warning', [
+        $.tn("Invalid regexp for Sauce link:"),
+        $.el('br'),
+        $.tn(link),
+        $.el('br'),
+        $.tn(err.message)
+      ], 60);
+      return false;
+    }
   },
 
   createSauceLink(link: Record<string, any>, post: any, file: any): HTMLAnchorElement | null {
     let a: HTMLAnchorElement, matches: RegExpMatchArray | null = null, needle: string;
-    const ext = (file.url.match(/[^.]*$/) || [])[0] || '';
+    const ext = /[^.]*$/.exec(file.url)?.[0] || '';
     const parts = dict() as Record<string, any>;
     $.extend(parts, link);
 
     if (parts['boards'] && !parts['boards'][`${post.siteID}/${post.boardID}`] && !parts['boards'][`${post.siteID}/*`]) { return null; }
-    if (parts['types']  && (needle = ext, !parts['types'].split(',').includes(needle))) { return null; }
-    if (parts['regexp'] && (!(matches = file.name.match(parts['regexp'])))) { return null; }
+    needle = ext;
+    if (parts['types'] && !parts['types'].split(',').includes(needle)) { return null; }
+    matches = parts['regexp'] ? parts['regexp'].exec(file.name) : null;
+    if (parts['regexp'] && !matches) { return null; }
 
     const missing: string[] = [];
     for (const key of ['url', 'text']) {
       parts[key] = parts[key].replace(/%(T?URL|IMG|[sh]?MD5|board|name|%|semi|\$\d+)/g, (orig: string, parameter: string) => {
         let type: string;
-        if (parameter[0] === '$') {
+        if (parameter.startsWith('$')) {
           if (!matches) { return orig; }
           type = matches[+parameter.slice(1)] || '';
         } else {
@@ -145,11 +155,12 @@ const Sauce: SauceType = {
   },
 
   file(post: any, file: any) {
-    let link: any, node: HTMLAnchorElement | null;
+    let link: any;
     const nodes: (Node | string)[] = [];
     const skipped: [any, HTMLAnchorElement][] = [];
     for (link of Sauce.links) {
-      if ((node = Sauce.createSauceLink(link, post, file))) {
+      const node = Sauce.createSauceLink(link, post, file);
+      if (node) {
         nodes.push($.tn(' '), node);
         if (node.dataset.skip) { skipped.push([link, node]); }
       }
@@ -180,7 +191,7 @@ const Sauce: SauceType = {
     sMD5(post: any, file: any) { return file.MD5?.replace(/[+/=]/g, (c: string) => (({'+': '-', '/': '_', '=': ''}) as Record<string, string>)[c]); },
     hMD5(post: any, file: any) {
       if (file.MD5) {
-        return Array.from(atob(file.MD5), c => c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+        return Array.from(atob(file.MD5), c => c.codePointAt(0)!.toString(16).padStart(2,'0')).join('');
       }
       return undefined;
     },

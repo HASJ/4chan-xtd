@@ -5,7 +5,7 @@ import Menu from "./Menu";
 
 const DownloadLink: any = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Menu'] || !Conf['Download Link']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Menu'] || !Conf['Download Link']) { return; }
 
     const a = $.el('a', {
       className: 'download-link',

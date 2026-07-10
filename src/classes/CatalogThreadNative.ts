@@ -29,7 +29,8 @@ export default class CatalogThreadNative {
     const parentNode = this.nodes.thumb.parentNode as HTMLAnchorElement;
     this.boardID = parentNode.pathname.split(/\/+/)[1];
     this.board = g.boards[this.boardID] || new Board(this.boardID);
-    this.ID = this.threadID = +(root.dataset.id || root.id).match(/\d*$/)![0];
+    const id = /\d*$/.exec(root.dataset.id || root.id)?.[0] ?? '';
+    this.ID = this.threadID = +id;
     this.thread = this.board.threads.get(String(this.ID)) || new Thread(String(this.ID), this.board);
   }
 }

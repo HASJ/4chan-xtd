@@ -1,27 +1,37 @@
 import { g } from "../../globals/globals";
 import h, { EscapedHtml } from "../../globals/jsx";
 
-export default function generatePostInfoHtml(
-  ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon,
-  capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID,
-  threadID,
-): EscapedHtml {
-  const nameHtml: (EscapedHtml | string)[] = [<span class={`name${capcode ? ' capcode' : ''}`}>{name}</span>];
-  if (tripcode) nameHtml.push(' ', <span class="postertrip">{tripcode}</span>);
-  if (pass) nameHtml.push(' ', <span title={`Pass user since ${pass}`} class="n-pu"></span>)
+function buildNameHtml(info, capcodeInfo): (EscapedHtml | string)[] {
+  const {tripcode, pass, capcode} = info;
+  const {capcodeLC, capcodePlural} = capcodeInfo;
+  const nameHtml: (EscapedHtml | string)[] = [<span key="name" class={`name${capcode ? ' capcode' : ''}`}>{info.name}</span>];
+  if (tripcode) { nameHtml.push(' ', <span key="tripcode" class="postertrip">{tripcode}</span>); }
+  if (pass) { nameHtml.push(' ', <span key="pass" title={`Pass user since ${pass}`} class="n-pu"></span>); }
   if (capcode) {
     nameHtml.push(
       ' ',
-      <strong class={`capcode hand id_${capcodeLC}`} title={`Highlight posts by ${capcodePlural}`}>## {capcode}</strong>
-    )
+      <strong key="capcode" class={`capcode hand id_${capcodeLC}`} title={`Highlight posts by ${capcodePlural}`}>## {capcode}</strong>
+    );
   }
+  return nameHtml;
+}
 
-  const nameBlockContent: (EscapedHtml | string)[] =
-    email ? [' ', <a href={`mailto:${email}`} class="useremail">{...nameHtml}</a>] : nameHtml;
-  if (!(boardID === "f" && !o.isReply || capcodeDescription)) nameBlockContent.push(' ');
+function buildNameBlockContent(o, info, capcodeInfo, assets): (EscapedHtml | string)[] {
+  const {email, uniqueID, capcode, flagCode, flagCodeTroll, flag} = info;
+  const {capcodeLC, capcodeDescription} = capcodeInfo;
+  const {staticPath, gifIcon} = assets;
+  const nameHtml = buildNameHtml(info, capcodeInfo);
+
+  const nameBlockContent: (EscapedHtml | string)[] = email ?
+    [' ', <a key="email" href={`mailto:${email}`} aria-label={info.name} class="useremail">{...nameHtml}</a>] :
+    nameHtml;
+
+  if (!(o.boardID === "f" && !o.isReply || capcodeDescription)) { nameBlockContent.push(' '); }
+
   if (capcodeDescription) {
     nameBlockContent.push(
       <img
+        key="identity"
         src={`${staticPath}${capcodeLC}icon${gifIcon}`}
         alt={`${capcode} Icon`}
         title={`This user is ${capcodeDescription}.`}
@@ -31,59 +41,77 @@ export default function generatePostInfoHtml(
   }
   if (uniqueID && !capcode) {
     nameBlockContent.push(
-      <span class={`posteruid id_${uniqueID}`}>
+      <span key="uniqueID" class={`posteruid id_${uniqueID}`}>
         (ID: <span class="hand" title="Highlight posts by this ID">{uniqueID}</span>)
       </span>
-    )
+    );
   }
-  if (flagCode) nameBlockContent.push(' ', <span title={flag} class={`flag flag-${flagCode.toLowerCase()}`} />);
-  if (flagCodeTroll) nameBlockContent.push(' ', <span title={flag} class={`bfl bfl-${flagCodeTroll.toLowerCase()}`} />);
+  if (flagCode) { nameBlockContent.push(' ', <span key="flag" title={flag} class={`flag flag-${flagCode.toLowerCase()}`} />); }
+  if (flagCodeTroll) { nameBlockContent.push(' ', <span key="troll" title={flag} class={`bfl bfl-${flagCodeTroll.toLowerCase()}`} />); }
+
+  return nameBlockContent;
+}
+
+function buildStickyIcon(boardID, src): EscapedHtml {
+  return boardID === "f" ?
+    <img key="sticky" src={src} alt="Sticky" title="Sticky" style="height: 18px; width: 18px;" /> :
+    <img key="sticky" src={src} alt="Sticky" title="Sticky" class="stickyIcon retina" />;
+}
+
+function buildClosedIcon(boardID, src): EscapedHtml {
+  return boardID === "f" ?
+    <img key="closed" src={src} alt="Closed" title="Closed" style="height: 18px; width: 18px;" /> :
+    <img key="closed" src={src} alt="Closed" title="Closed" class="closedIcon retina" />;
+}
+
+function buildPostNumContent(o, links, assets): (EscapedHtml | string)[] {
+  const {boardID, threadID, ID} = o;
+  const {postLink, quoteLink} = links;
+  const {staticPath, gifIcon} = assets;
 
   const postNumContent: (EscapedHtml | string)[] = [
-    <a href={postLink} title="Link to this post">No.</a>,
-    <a href={quoteLink} title="Reply to this post">{ID}</a>,
+    <a key="post" href={postLink} title="Link to this post">No.</a>,
+    <a key="quote" href={quoteLink} title="Reply to this post">{ID}</a>,
   ];
 
   if (o.isSticky) {
-    const src = `${staticPath}sticky${gifIcon}`;
-    postNumContent.push(' ');
-    if (boardID === "f") {
-      postNumContent.push(<img src={src} alt="Sticky" title="Sticky" style="height: 18px; width: 18px;" />);
-    } else {
-      postNumContent.push(<img src={src} alt="Sticky" title="Sticky" class="stickyIcon retina" />)
-    }
+    postNumContent.push(' ', buildStickyIcon(boardID, `${staticPath}sticky${gifIcon}`));
   }
   if (o.isClosed && !o.isArchived) {
-    postNumContent.push(' ');
-    const src = `${staticPath}closed${gifIcon}`
-    if (boardID === "f") {
-      postNumContent.push(<img src={src} alt="Closed" title="Closed" style="height: 18px; width: 18px;" />)
-    } else {
-      postNumContent.push(<img src={src} alt="Closed" title="Closed" class="closedIcon retina" />)
-    }
+    postNumContent.push(' ', buildClosedIcon(boardID, `${staticPath}closed${gifIcon}`));
   }
   if (o.isArchived) {
     postNumContent.push(
       ' ',
-      <img src={`${staticPath}archived${gifIcon}`} alt="Archived" title="Archived" class="archivedIcon retina" />
-    )
+      <img key="archived" src={`${staticPath}archived${gifIcon}`} alt="Archived" title="Archived" class="archivedIcon retina" />
+    );
   }
   if (!o.isReply && g.VIEW === "index") {
     postNumContent.push(
-      ' \u00A0 ', // \u00A0 is nbsp
-      <span>[<a href={`/${boardID}/thread/${threadID}`} class="replylink">Reply</a>]</span>,
+      '   ', //   is nbsp
+      <span key="reply"><a href={`/${boardID}/thread/${threadID}`} class="replylink" aria-label="Reply to this thread">Reply</a></span>,
     );
   }
+  return postNumContent;
+}
+
+export default function generatePostInfoHtml({o, capcodeInfo, assets, links}): EscapedHtml {
+  const {ID, boardID} = o;
+  const {subject} = o.info;
+  const capcodeClass = o.info.capcode ? ` capcode${o.info.capcode}` : '';
+
+  const nameBlockContent = buildNameBlockContent(o, o.info, capcodeInfo, assets);
+  const postNumContent = buildPostNumContent(o, links, assets);
 
   return <div class="postInfo desktop" id={`pi${ID}`}>
     <input type="checkbox" name={ID} value="delete" />
     {' '}
-    {...((!o.isReply || boardID === "f" || subject) ? [<span class="subject">{subject}</span>, ' '] : [])}
-    <span class={`nameBlock${capcode ? ` capcode${capcode}` : ''}`}>
+    {...((!o.isReply || boardID === "f" || subject) ? [<span key="subject" class="subject">{subject}</span>, ' '] : [])}
+    <span class={`nameBlock${capcodeClass}`}>
       {...nameBlockContent}
     </span>
     {' '}
-    <span class="dateTime" data-utc={dateUTC}>{dateText}</span>
+    <span class="dateTime" data-utc={o.info.dateUTC}>{o.info.dateText}</span>
     {' '}
     <span class={`postNum${!(boardID === " f" && !o.isReply) ? ' desktop' : ''}`} >
       {...postNumContent}

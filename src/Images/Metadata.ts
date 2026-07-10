@@ -13,7 +13,8 @@ interface MetadataType {
 
 const Metadata: MetadataType = {
   init() {
-    if (!Conf['WEBM Metadata'] || !['index', 'thread'].includes(g.VIEW)) { return; }
+    const view = g.VIEW;
+    if (!Conf['WEBM Metadata'] || !view || !['index', 'thread'].includes(view)) { return; }
 
     Callbacks.Post.push({
       name: 'WEBM Metadata',
@@ -29,12 +30,12 @@ const Metadata: MetadataType = {
         if (this.isClone) {
           el = $('.webm-title', file.text);
         } else {
-          el = $.el('span', { className: 'webm-title' });
+          el = $.el('span', { className: 'webm-title' }) as HTMLElement;
           el.dataset.index = String(i);
           $.extend(el, { innerHTML: '<a href="javascript:;"></a>' });
           $.add(file.text, [$.tn(' '), el]);
         }
-        if (el && el.children.length === 1) {
+        if (el?.children.length === 1) {
           $.one(el.lastElementChild as HTMLElement, 'mouseover focus', Metadata.load);
         }
       }
@@ -80,11 +81,10 @@ const Metadata: MetadataType = {
       const element = readInt();
       let size = readInt();
       if (element === 0x3BA9) { // Title
-        let title = '';
-        while (size-- && (i < data.length)) {
-          title += String.fromCharCode(data[i++]);
-        }
-        return decodeURIComponent(escape(title)); // UTF-8 decoding
+        const end = Math.min(i + size, data.length);
+        const title = new TextDecoder().decode(data.slice(i, end));
+        i = end;
+        return title;
       } else if (![0x8538067, 0x549A966].includes(element)) { // Segment, Info
         i += size;
       }

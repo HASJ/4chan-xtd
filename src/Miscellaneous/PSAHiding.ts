@@ -2,7 +2,7 @@ import UIState from "../globals/UIState";
 import { Conf, doc, g } from "../globals/globals";
 import $ from "../platform/$";
 import Icon from "../Icons/icon";
-var PSAHiding: any = {
+const PSAHiding: any = {
   init() {
     if (!Conf['Announcement Hiding'] || !g.SITE.selectors.psa) { return; }
     $.addClass(doc, 'hide-announcement');
@@ -59,9 +59,9 @@ var PSAHiding: any = {
     const hide = $.hasClass(this, 'hide-announcement-button');
     const set = function(hiddenPSAList) {
       if (hide) {
-        return hiddenPSAList[g.SITE.ID] = PSAHiding.text;
+        hiddenPSAList[g.SITE.ID] = PSAHiding.text;
       } else {
-        return delete hiddenPSAList[g.SITE.ID];
+        delete hiddenPSAList[g.SITE.ID];
       }
     };
     set(Conf['hiddenPSAList']);
@@ -85,4 +85,3 @@ var PSAHiding: any = {
   }
 };
 export default PSAHiding;
-

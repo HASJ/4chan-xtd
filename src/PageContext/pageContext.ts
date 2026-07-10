@@ -18,6 +18,7 @@ const PageContextFunctions = {
       settings.disableAll = true;
       localStorage.setItem('4chan-settings', JSON.stringify(settings));
     } catch (error) {
+      console.warn('Unable to disable native extension through local storage.', error);
       Object.defineProperty(window, 'Config', { value: { disableAll: true } });
     }
   },
@@ -87,7 +88,7 @@ const PageContextFunctions = {
 
   disable4chanIdHl: () => {
     (window as any).clickable_ids = false;
-    for (var node of document.querySelectorAll('.posteruid, .capcode')) {
+    for (const node of document.querySelectorAll('.posteruid, .capcode')) {
       node.removeEventListener('click', (window as any).idClick, false);
     }
   },
@@ -96,22 +97,21 @@ const PageContextFunctions = {
     threadID = +threadID;
     const form = document.querySelector<HTMLFormElement>('form[name="post"]');
     (window as any).$(document).ajaxComplete(function (event, request, settings) {
-      let postID;
       if (settings.url !== form.action) return;
-      if (!(postID = +request.responseJSON?.id)) return;
+      const postID = +request.responseJSON?.id;
+      if (!postID) return;
       const detail = { boardID, threadID, postID };
-      try {
-        const { redirect, noko } = request.responseJSON;
-        if (redirect && (originalNoko != null) && !originalNoko && !noko) {
-          detail.redirect = redirect;
-        }
-      } catch (error) { }
-      event = new CustomEvent('QRPostSuccessful', { bubbles: true, detail });
-      document.dispatchEvent(event);
+      const { redirect, noko } = request.responseJSON || {};
+      if (redirect && (originalNoko != null) && !originalNoko && !noko) {
+        detail.redirect = redirect;
+      }
+      const successEvent = new CustomEvent('QRPostSuccessful', { bubbles: true, detail });
+      document.dispatchEvent(successEvent);
     });
-    var originalNoko = (window as any).tb_settings?.ajax?.always_noko_replies;
-    let base;
-    (((base = (window as any).tb_settings || ((window as any).tb_settings = {}))).ajax || (base.ajax = {})).always_noko_replies = true;
+    const originalNoko = (window as any).tb_settings?.ajax?.always_noko_replies;
+    const base = (window as any).tb_settings || ((window as any).tb_settings = {});
+    const ajax = base.ajax || (base.ajax = {});
+    ajax.always_noko_replies = true;
   },
 
   setupCaptcha: ({ recaptchaKey }) => {
@@ -162,7 +162,7 @@ const PageContextFunctions = {
     const task = document.querySelector('#qr #t-task') as HTMLElement;
     const strips = document.querySelectorAll('#qr .captcha-strip');
     if (!slider || !task || !strips.length) return;
-    const max = parseInt(slider.getAttribute('max') || '3', 10);
+    const max = Number.parseInt(slider.getAttribute('max') || '3', 10);
     const origVal = slider.value;
     const step = (i: number) => {
       if (i > max) {
@@ -226,7 +226,7 @@ const PageContextFunctions = {
       bubbles: true,
       detail: { type: 'warning', content, lifetime: 20 }
     }));
-    var cb = function (e?: any) {
+    const cb = function (e?: any) {
       if (e) { this.removeEventListener('QRMetadata', cb, false); }
       const selected = document.getElementById('selected');
       if (!selected?.dataset.type) return error('No file to edit.');

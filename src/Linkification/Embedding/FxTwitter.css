@@ -71,7 +71,7 @@
 }
 .fxt-text {
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 .fxt-poll {
   display: flex;
@@ -121,6 +121,12 @@
 }
 .fxt-media_container {
   --maxHeightMedia: 300px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: auto;
+  grid-auto-flow: dense;
+  aspect-ratio: 16 / 9;
 }
 .fxt-media_container :is(img, video) {
   display: block;
@@ -130,14 +136,6 @@
   max-width: none;
   object-fit: contain;
   object-position: center;
-}
-.fxt-media_container {
-  display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: auto;
-  grid-auto-flow: dense;
-  aspect-ratio: 16 / 9;
 }
 .fxt-media_container .fxt-media:only-child {
   grid-column: span 2 / auto;

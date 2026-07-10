@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import { runQuickFilterMD5 } from "../Filtering/QuickFilterActions";
 import { g, Conf, E } from "../globals/globals";
@@ -9,7 +9,7 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import SW from "../site/SW";
 
-var FileInfo = {
+const FileInfo = {
   init() {
     if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['File Info Formatting']) { return; }
 
@@ -62,7 +62,7 @@ var FileInfo = {
   },
 
   formatters: {
-    t() { return { innerHTML: E(this.file.url.match(/[^/]*$/)[0]), [isEscaped]: true }; },
+    t() { return { innerHTML: E(this.file.url.split('/').pop() || ""), [isEscaped]: true }; },
     T() { return <a href={this.file.url} target="_blank">{FileInfo.formatters.t.call(this)}</a> },
     l() { return <a href={this.file.url} target="_blank">{FileInfo.formatters.n.call(this)}</a> },
     L() { return <a href={this.file.url} target="_blank">{FileInfo.formatters.N.call(this)}</a> },

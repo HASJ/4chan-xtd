@@ -95,7 +95,7 @@ const Index: any = {
     }
     this.currentSort = (history.state as any)?.sort;
     if (!this.currentSort) { this.currentSort = typeof Conf['Index Sort'] === 'object' ? (
-        Conf['Index Sort'][g.BOARD.ID] || 'bump'
+        Conf['Index Sort'][g.BOARD!.ID] || 'bump'
       ) : (
         Conf['Index Sort']
       ); }
@@ -159,8 +159,8 @@ const Index: any = {
     // Navigation links at top of index
     this.navLinks = $.el('div', {className: 'navLinks json-index'});
     $.extend(this.navLinks, {innerHTML: NavLinksPage});
-    ($('.cataloglink a', this.navLinks) as HTMLAnchorElement).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
-    if (!BoardConfig.isArchived(g.BOARD.ID)) { ($('.archlistlink', this.navLinks) as HTMLElement).hidden = true; }
+    ($('.cataloglink a', this.navLinks) as HTMLAnchorElement).href = resolveBoardURL('catalog', g.BOARD!) || Get.url('catalog', g.BOARD!);
+    if (!BoardConfig.isArchived(g.BOARD!.ID)) { ($('.archlistlink', this.navLinks) as HTMLElement).hidden = true; }
     $.on($('#index-last-refresh a', this.navLinks)!, 'click', this.cb.refreshFront);
 
     // Search field
@@ -200,7 +200,7 @@ const Index: any = {
       $.on(currentInput, 'change', this.cb.lastLongThresholds);
       const tRaw = Conf[`Last Long Reply Thresholds ${i}`];
       currentInput.value = (this.lastLongThresholds[i] =
-        typeof tRaw === 'object' ? (tRaw[g.BOARD.ID] ?? 100) : tRaw);
+        typeof tRaw === 'object' ? (tRaw[g.BOARD!.ID] ?? 100) : tRaw);
     }
 
     // Thread container
@@ -212,7 +212,7 @@ const Index: any = {
     // Page list
     this.pagelist = $.el('div', {className: 'pagelist json-index'});
     $.extend(this.pagelist, {innerHTML: PageList});
-    ($('.cataloglink a', this.pagelist) as HTMLAnchorElement).href = resolveBoardURL('catalog', g.BOARD) || Get.url('catalog', g.BOARD);
+    ($('.cataloglink a', this.pagelist) as HTMLAnchorElement).href = resolveBoardURL('catalog', g.BOARD!) || Get.url('catalog', g.BOARD!);
     $.on(this.pagelist, 'click', this.cb.pageNav);
 
     this.update(true);
@@ -223,7 +223,7 @@ const Index: any = {
       let el;
       g.SITE.Build.hat = $('.board > .thread > img:first-child') as HTMLImageElement;
       if (g.SITE.Build.hat) {
-        g.BOARD.threads.forEach(function(thread: any) {
+        g.BOARD!.threads.forEach(function(thread: any) {
           if (thread.nodes.root) {
             return $.prepend(thread.nodes.root, g.SITE.Build.hat.cloneNode(false));
           }
@@ -372,7 +372,7 @@ const Index: any = {
     postsInserted() {
       if (!Index.initFinishedFired) { return; }
       let n = 0;
-      g.posts.forEach(function(post: any) {
+      g.posts!.forEach(function(post: any) {
         if (!post.isFetchedQuote && !post.indexRefreshSeen && doc.contains(post.nodes.root)) {
           post.indexRefreshSeen = true;
           return n++;
@@ -649,7 +649,7 @@ const Index: any = {
 
   savePerBoard(key: string, value: any) {
     if (typeof Conf[key] === 'object') {
-      Conf[key][g.BOARD.ID] = value;
+      Conf[key][g.BOARD!.ID] = value;
     } else {
       Conf[key] = value;
     }
@@ -813,7 +813,7 @@ const Index: any = {
     }
 
     Index.req = $.whenModified(
-      g.SITE.urls.catalogJSON({boardID: g.BOARD.ID}),
+      g.SITE.urls.catalogJSON({boardID: g.BOARD!.ID}),
       'Index',
       Index.load
     );
@@ -947,7 +947,7 @@ const Index: any = {
   },
 
   isHiddenReply(threadID: number, replyData: any) {
-    return PostHiding.isHidden(g.BOARD.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD));
+    return PostHiding.isHidden(g.BOARD!.ID, threadID, replyData.no) || Filter.isHidden(g.SITE.Build.parseJSON(replyData, g.BOARD!));
   },
 
   buildSingleThread(
@@ -1033,7 +1033,7 @@ const Index: any = {
       }
     }
 
-    if (errors) { Callbacks.errorHandler?.(errors); }
+    if (errors) { Callbacks.handleErrors(errors); }
 
     if (withReplies) {
       newPosts = newPosts.concat(Index.buildReplies(threads));
@@ -1076,7 +1076,7 @@ const Index: any = {
       $.add(thread.nodes.root, nodes);
     }
 
-    if (errors) { Callbacks.errorHandler?.(errors); }
+    if (errors) { Callbacks.handleErrors(errors); }
     return posts;
   },
 

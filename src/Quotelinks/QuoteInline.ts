@@ -12,14 +12,15 @@ interface QuoteInlineType {
   process(link: HTMLAnchorElement, clone: boolean): void;
   qiQuote(link: HTMLAnchorElement, hidden: boolean): HTMLElement;
   toggle(this: HTMLElement, e: MouseEvent): void;
-  findRoot(quotelink: HTMLElement, isBacklink: boolean): Node;
+  findBacklinkRoot(quotelink: HTMLElement): Node;
+  findQuoteRoot(quotelink: HTMLElement): Node;
   add(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any, quoter: any): void;
   rm(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any): void;
 }
 
 const QuoteInline: QuoteInlineType = {
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Quote Inlining']) { return; }
+    if (!(g.VIEW && ['index', 'thread'].includes(g.VIEW)) || !Conf['Quote Inlining']) { return; }
 
     if (Conf['Comment Expansion']) {
       ExpandComment.callbacks.push(this.node);
@@ -60,7 +61,8 @@ const QuoteInline: QuoteInlineType = {
     if ($.modifiedClick(e)) { return; }
 
     const { boardID, threadID, postID } = Get.postDataFromLink(this);
-    if (Conf['Inline Cross-thread Quotes Only'] && (g.VIEW === 'thread') && g.posts.get(`${boardID}.${postID}`)?.nodes.root.offsetParent) { return; } // exists and not hidden
+    if (!boardID) { return; }
+    if (Conf['Inline Cross-thread Quotes Only'] && (g.VIEW === 'thread') && g.posts?.get(`${boardID}.${postID}`)?.nodes.root.offsetParent) { return; } // exists and not hidden
     if ($.hasClass(doc, 'catalog-mode')) { return; }
 
     e.preventDefault();
@@ -75,12 +77,12 @@ const QuoteInline: QuoteInlineType = {
     this.classList.toggle('inlined');
   },
 
-  findRoot(quotelink: HTMLElement, isBacklink: boolean): Node {
-    if (isBacklink) {
-      return $.x('ancestor::*[parent::*[contains(@class,"post")]][1]', quotelink);
-    } else {
-      return $.x('ancestor-or-self::*[parent::blockquote][1]', quotelink);
-    }
+  findBacklinkRoot(quotelink: HTMLElement): Node {
+    return $.x('ancestor::*[parent::*[contains(@class,"post")]][1]', quotelink);
+  },
+
+  findQuoteRoot(quotelink: HTMLElement): Node {
+    return $.x('ancestor-or-self::*[parent::blockquote][1]', quotelink);
   },
 
   add(quotelink: HTMLElement, boardID: string, threadID: string | number, postID: string | number, context: any, quoter: any) {
@@ -88,18 +90,16 @@ const QuoteInline: QuoteInlineType = {
     const isBacklink = $.hasClass(quotelink, 'backlink');
     const inline = $.el('div', { className: 'inline' });
     inline.dataset.fullID = `${boardID}.${postID}`;
-    const root = QuoteInline.findRoot(quotelink, isBacklink) as HTMLElement;
+    const root = (isBacklink ? QuoteInline.findBacklinkRoot(quotelink) : QuoteInline.findQuoteRoot(quotelink)) as HTMLElement;
     $.after(root, inline);
 
     const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root) as HTMLElement;
 
     $.addClass(qroot, 'hasInline');
-    new Fetcher(boardID, +threadID, String(postID), inline, quoter);
+    const _fetcher = new Fetcher(boardID, +threadID, String(postID), inline, quoter);
 
-    if (!(
-      (post = g.posts.get(`${boardID}.${postID}`)) &&
-      (context.thread === post.thread)
-    )) { return; }
+    post = g.posts?.get(`${boardID}.${postID}`);
+    if (!post || context.thread !== post.thread) { return; }
 
     // Hide forward post if it's a backlink of a post in this thread.
     // Will only unhide if there's no inlined backlinks of it anymore.
@@ -119,7 +119,7 @@ const QuoteInline: QuoteInlineType = {
     let inlined: HTMLElement | null;
     const isBacklink = $.hasClass(quotelink, 'backlink');
     // Select the corresponding inlined quote, and remove it.
-    let root = QuoteInline.findRoot(quotelink, isBacklink) as HTMLElement;
+    let root = (isBacklink ? QuoteInline.findBacklinkRoot(quotelink) : QuoteInline.findQuoteRoot(quotelink)) as HTMLElement;
     root = $.x(`following-sibling::div[@data-full-i-d='${boardID}.${postID}'][1]`, root) as HTMLElement;
     const qroot = $.x('ancestor::*[contains(@class,"postContainer")][1]', root) as HTMLElement;
     const parentNode = root.parentNode!;
@@ -131,16 +131,18 @@ const QuoteInline: QuoteInlineType = {
     }
 
     // Stop if it only contains text.
-    if (!(el = root.firstElementChild as HTMLElement)) { return; }
+    el = root.firstElementChild as HTMLElement;
+    if (!el) { return; }
 
     // Dereference clone.
-    const post = g.posts.get(`${boardID}.${postID}`) as any;
+    const post = g.posts?.get(`${boardID}.${postID}`) as any;
+    if (!post) { return; }
     post.rmClone(el.dataset.clone);
 
     // Decrease forward count and unhide.
     if (Conf['Forward Hiding'] &&
       isBacklink &&
-      (context.thread === g.threads.get(`${boardID}.${threadID}`)) &&
+      (context.thread === g.threads?.get(`${boardID}.${threadID}`)) &&
       !--post.forwarded) {
         delete post.forwarded;
         $.rmClass(post.nodes.root, 'forwarded');

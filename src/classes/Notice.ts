@@ -26,7 +26,7 @@ export default class Notice {
     let contentNode: Node;
     if (typeof content === 'string') {
       contentNode = $.tn(content);
-    } else if (content instanceof Array) {
+    } else if (Array.isArray(content)) {
       contentNode = $.nodes(content);
     } else {
       contentNode = content;
@@ -48,7 +48,7 @@ export default class Notice {
     }
     $.off(d, 'visibilitychange', this.add);
     $.add(UIState.noticesRoot, this.el);
-    this.el.clientHeight; // force reflow
+    this.el.getBoundingClientRect(); // force reflow
     this.el.style.opacity = '1';
     if (this.timeout) {
       this.timeoutId = setTimeout(this.close, this.timeout * SECOND) as unknown as number;
@@ -70,4 +70,3 @@ export default class Notice {
     }
   }
 }
-

@@ -61,14 +61,14 @@ export default class SimpleDict<T> {
   }
 
   forEach(fn: (data: T) => void) {
-    for (var key of this.keys) { fn(this[key]); }
+    for (const key of this.keys) { fn(this[key]); }
   }
 
   get(key): T {
     if (key === 'keys') {
-      return undefined;
+      return undefined as T;
     } else {
-      return Object.prototype.hasOwnProperty.call(this, key) ? this[key] : undefined;
+      return Object.prototype.hasOwnProperty.call(this, key) ? this[key] : undefined as T;
     }
   }
 
@@ -77,7 +77,6 @@ export default class SimpleDict<T> {
   }
 
   last(): T {
-    return this.keys.length ? this[this.keys.length - 1] : undefined;
+    return this.keys.length ? this[this.keys[this.keys.length - 1]] : undefined as T;
   }
 }
-

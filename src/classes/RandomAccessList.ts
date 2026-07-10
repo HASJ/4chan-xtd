@@ -21,7 +21,6 @@ export default class RandomAccessList {
   }
 
   push(data: any): number | undefined {
-    let item: RandomAccessListItem;
     let ID = data.ID;
     if (!ID) {
       ID = data.id;
@@ -30,14 +29,20 @@ export default class RandomAccessList {
       return;
     }
     const last = this.last;
-    this[ID] = (item = {
+    const item: RandomAccessListItem = {
       prev: last,
       next: null,
       data,
       ID
-    });
-    item.prev = last;
-    this.last = last ? (last.next = item) : (this.first = item);
+    };
+    this[ID] = item;
+    if (last) {
+      last.next = item;
+      this.last = item;
+    } else {
+      this.first = item;
+      this.last = item;
+    }
     return this.length++;
   }
 
@@ -103,7 +108,7 @@ export default class RandomAccessList {
     let item = this.first;
     if (!item) return [];
     const order: RandomAccessListItem[] = [item];
-    while (item && item.next) {
+    while (item?.next) {
       item = item.next;
       order.push(item);
     }

@@ -130,8 +130,9 @@
   "scripts": {
     "build:tooling": "tsc -p tools/tsconfig.json",
     "typecheck:src": "tsc -p tsconfig.json",
+    "typecheck:extension": "tsc -p src/extension/tsconfig.json",
     "typecheck:tools": "tsc -p tools/tsconfig.json --noEmit",
-    "typecheck": "npm run typecheck:src && npm run typecheck:tools",
+    "typecheck": "npm run typecheck:src && npm run typecheck:extension && npm run typecheck:tools",
     "test": "vitest run --reporter=dot",
     "build": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js",
     "check:cycles": "npm run build:tooling && node ./builds/ts-tools/tools/check-cycles.js",
@@ -140,12 +141,13 @@
     "build:crx": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -platform=crx",
     "build:userscript:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript",
     "build:crx:min": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=crx",
-    "build:all": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=crx"
+    "build:all": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js -min -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=userscript && node ./builds/ts-tools/tools/rollup.js -platform=crx",
+    "sonar": "node tools/sonar-local.mjs"
   },
   "allowScripts": {
     "@fortawesome/fontawesome-common-types@6.5.1": true,
     "@fortawesome/free-regular-svg-icons@6.5.1": true,
     "@fortawesome/free-solid-svg-icons@6.5.1": true
   },
-  "version": "2.30.2"
+  "version": "2.30.4"
 }

@@ -125,19 +125,9 @@ const SWYotsuba = {
 
   regexp: {
     quotelink:
-      new RegExp(`\
-^https?://boards\\.4chan(?:nel)?\\.org/+\
-([^/]+)\
-/+thread/+\
-(\\d+)\
-(?:[/?][^#]*)?\
-(?:#p\
-(\\d+)\
-)?\
-$\
-`),
+      /^https?:\/\/boards\.4chan(?:nel)?\.org\/+([^/]+)\/+thread\/+(\d+)(?:[/?][^#]*)?(?:#p(\d+))?$/,
     quotelinkHTML:
-      /<a [^>]*\bhref="(?:(?:\/\/boards\.4chan(?:nel)?\.org)?\/([^\/]+)\/thread\/)?(\d+)?(?:#p(\d+))?"/g,
+      /<a [^>]*\bhref="(?:(?:\/\/boards\.4chan(?:nel)?\.org)?\/([^/]+)\/thread\/)?(\d+)?(?:#p(\d+))?"/g,
     pass:
       /^https?:\/\/www\.4chan(?:nel)?\.org\/+pass(?:$|[?#])/,
     captcha:
@@ -180,57 +170,71 @@ $\
   initAuxiliary() {
     switch (location.hostname) {
       case 'www.4chan.org': case 'www.4channel.org':
-        if (SWYotsuba.regexp.pass.test(location.href)) {
-          PassMessage.init();
-        } else {
-          $.onExists(doc, 'body', () => $.addStyle(CSS.www));
-          Captcha.replace.init();
-        }
-        return;
+        return this.initWwwAuxiliary();
       case 'sys.4chan.org': case 'sys.4channel.org':
-        var pathname = location.pathname.split(/\/+/);
-        if (pathname[1] === 'captcha') {
-          $.onExists(doc, 'body', () => {
-            $.addClass(doc, 'captcha-t', 'captcha-iframe');
-            if (Conf['Theme Captcha']) $.addClass(doc, 'themed-captcha');
-            $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
-            Captcha.t.setupIframe();
-          });
-          return;
-        }
-        if (pathname[2] === 'imgboard.php') {
-          let match;
-          if (/\bmode=report\b/.test(location.search)) {
-            Report.init();
-          } else if (match = location.search.match(/\bres=(\d+)/)) {
-            $.ready(function() {
-              if (Conf['404 Redirect'] && ($.id('errmsg')?.textContent === 'Error: Specified thread does not exist.')) {
-                return Redirect.navigate('thread', {
-                  boardID: g.BOARD.ID,
-                  postID:  +match[1]
-                });
-              }});
-          }
-        } else if (pathname[2] === 'post') {
-          PostSuccessful.init();
-        }
-        return;
+        return this.initSysAuxiliary();
+    }
+  },
+
+  initWwwAuxiliary() {
+    if (SWYotsuba.regexp.pass.test(location.href)) {
+      PassMessage.init();
+    } else {
+      $.onExists(doc, 'body', () => $.addStyle(CSS.www));
+      Captcha.replace.init();
+    }
+  },
+
+  initSysCaptcha() {
+    $.onExists(doc, 'body', () => {
+      $.addClass(doc, 'captcha-t', 'captcha-iframe');
+      if (Conf['Theme Captcha']) $.addClass(doc, 'themed-captcha');
+      $.addStyle(CSS.sub(CSS.boards), 'fourchanx-css');
+      Captcha.t.setupIframe();
+    });
+  },
+
+  initSysImgboard() {
+    if (/\bmode=report\b/.test(location.search)) {
+      Report.init();
+      return;
+    }
+    const match = /\bres=(\d+)/.exec(location.search);
+    if (!match) return;
+    $.ready(function() {
+      if (Conf['404 Redirect'] && ($.id('errmsg')?.textContent === 'Error: Specified thread does not exist.')) {
+        return Redirect.navigate('thread', {
+          boardID: g.BOARD.ID,
+          postID:  +match[1]
+        });
+      }
+    });
+  },
+
+  initSysAuxiliary() {
+    const pathname = location.pathname.split(/\/+/);
+    if (pathname[1] === 'captcha') {
+      this.initSysCaptcha();
+    } else if (pathname[2] === 'imgboard.php') {
+      this.initSysImgboard();
+    } else if (pathname[2] === 'post') {
+      PostSuccessful.init();
     }
   },
 
   scriptData() {
-    for (var script of $$('script:not([src])', d.head)) {
+    for (const script of $$('script:not([src])', d.head)) {
       if (/\bcooldowns *=/.test(script.textContent)) { return script.textContent; }
     }
     return '';
   },
 
   parseThreadMetadata(thread) {
-    let m;
     const scriptData = this.scriptData();
     thread.postLimit = /\bbumplimit *= *1\b/.test(scriptData);
     thread.fileLimit = /\bimagelimit *= *1\b/.test(scriptData);
-    thread.ipCount   = (m = scriptData.match(/\bunique_ips *= *(\d+)\b/)) ? +m[1] : undefined;
+    const m = scriptData.match(/\bunique_ips *= *(\d+)\b/);
+    thread.ipCount = m ? +m[1] : undefined;
 
     if ((g.BOARD.ID === 'f') && thread.OP.file) {
       const {file} = thread.OP;
@@ -238,7 +242,8 @@ $\
         timeout: MINUTE,
         onloadend() {
           if (this.response) {
-            return file.text.dataset.md5 = (file.MD5 = this.response.posts[0].md5);
+            file.MD5 = this.response.posts[0].md5;
+            file.text.dataset.md5 = file.MD5;
           }
         }
       }
@@ -251,9 +256,9 @@ $\
     if (post.boardID === 'f') {
       return (() => {
         const result = [];
-        for (var type of ['Sticky', 'Closed']) {
-          var icon;
-          if (icon = $(`img[alt=${type}]`, nodes.info)) {
+        for (const type of ['Sticky', 'Closed']) {
+          const icon = $(`img[alt=${type}]`, nodes.info);
+          if (icon) {
             result.push($.addClass(icon, `${type.toLowerCase()}Icon`, 'retina'));
           }
         }
@@ -267,9 +272,9 @@ $\
   },
 
   parseFile(post, file) {
-    let info;
     const {text, link, thumb} = file;
-    if (!(info = link.nextSibling?.textContent.match(/\(([\d.]+ [KMG]?B).*\)/))) { return false; }
+    const info = link.nextSibling?.textContent.match(/\(([\d.]+ [KMG]?B).*\)/);
+    if (!info) { return false; }
     $.extend(file, {
       name:       text.title || link.title || link.textContent,
       size:       info[1],
@@ -286,30 +291,30 @@ $\
       }
       );
       if (file.isSpoiler) {
-        let m;
-        file.thumbURL = (m = link.href.match(/\d+(?=\.\w+$)/)) ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${m[0]}s.jpg` : undefined;
+        const m = link.href.match(/\d+(?=\.\w+$)/);
+        file.thumbURL = m ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${m[0]}s.jpg` : undefined;
       }
     }
     return true;
   },
 
   cleanComment(bq) {
-    let abbr;
-    if (abbr = $('.abbr', bq)) { // 'Comment too long' or 'EXIF data available'
-      for (var node of $$('.abbr + br, .exif', bq)) {
+    const abbr = $('.abbr', bq); // 'Comment too long' or 'EXIF data available'
+    if (abbr) {
+      for (const node of $$('.abbr + br, .exif', bq)) {
         $.rm(node);
       }
       for (let i = 0; i < 2; i++) {
-        var br;
-        if ((br = abbr.previousSibling) && (br.nodeName === 'BR')) { $.rm(br); }
+        const br = abbr.previousSibling;
+        if (br?.nodeName === 'BR') { $.rm(br); }
       }
       return $.rm(abbr);
     }
   },
 
   cleanCommentDisplay(bq) {
-    let b;
-    if ((b = $('b', bq)) && /^Rolled /.test(b.textContent)) { $.rm(b); }
+    const b = $('b', bq);
+    if (b?.textContent.startsWith('Rolled ')) { $.rm(b); }
     return $.rm($('.fortune', bq));
   },
 
@@ -335,7 +340,7 @@ $\
     let msg = 0;
     let i = 0;
     while (i < 8) {
-      msg = ((msg << 5) - msg) + uid.charCodeAt(i++);
+      msg = ((msg << 5) - msg) + uid.codePointAt(i++);
     }
     return (msg >> 8) & 0xFFFFFF;
   },
@@ -348,28 +353,34 @@ $\
     return $.global('testNativeExtension', {});
   },
 
+  transformBoardListText(nodeValue) {
+    const spacer = () => $.el('span', {className: 'spacer'});
+    const spans = [];
+    for (const chr of nodeValue) {
+      const span = $.el('span', {textContent: chr});
+      if (chr === ' ') { span.className = 'space'; }
+      if (chr === ']') { spans.push(spacer()); }
+      spans.push(span);
+      if (chr === '[') { spans.push(spacer()); }
+    }
+    return spans;
+  },
+
+  transformBoardListNode(node) {
+    switch (node.nodeName) {
+      case '#text': return this.transformBoardListText(node.nodeValue);
+      case 'A': return [node.cloneNode(true)];
+      default: return [];
+    }
+  },
+
   transformBoardList() {
     let node;
     const nodes = [];
-    const spacer = () => $.el('span', {className: 'spacer'});
     const items = $.X('.//a|.//text()[not(ancestor::a)]', $(SWYotsuba.selectors.boardList));
     let i = 0;
     while ((node = items.snapshotItem(i++))) {
-      switch (node.nodeName) {
-        case '#text':
-          for (var chr of node.nodeValue) {
-            var span = $.el('span', {textContent: chr});
-            if (chr === ' ') { span.className = 'space'; }
-            if (chr === ']') { nodes.push(spacer()); }
-            nodes.push(span);
-            if (chr === '[') { nodes.push(spacer()); }
-          }
-          break;
-        case 'A':
-          var a = node.cloneNode(true);
-          nodes.push(a);
-          break;
-      }
+      nodes.push(...this.transformBoardListNode(node));
     }
     return nodes;
   },
@@ -380,7 +391,7 @@ $\
     spoilerRange: Object.create(null),
 
     shortFilename(filename) {
-      const ext = filename.match(/\.?[^\.]*$/)[0];
+      const ext = filename.match(/\.?[^.]*$/)[0];
       if ((filename.length - ext.length) > 30) {
         return `${filename.match(/(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[^]){0,25}/)[0]}(...)${ext}`;
       } else {
@@ -389,9 +400,9 @@ $\
     },
 
     spoilerThumb(boardID) {
-      let spoilerRange;
-      if ((spoilerRange = this.spoilerRange[boardID])) {
-        // Randomize the spoiler image.
+      const spoilerRange = this.spoilerRange[boardID];
+      if (spoilerRange) {
+        // Randomize the spoiler image (cosmetic only, not security-sensitive).
         return `${this.staticPath}spoiler-${boardID}${Math.floor(1 + (spoilerRange * Math.random()))}.png`;
       } else {
         return `${this.staticPath}spoiler.png`;
@@ -452,7 +463,7 @@ $\
       };
       if (data.capcode) {
         o.info.capcode = data.capcode.replace(/_highlight$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        o.capcodeHighlight = /_highlight$/.test(data.capcode);
+        o.capcodeHighlight = data.capcode.endsWith('_highlight');
         delete o.info.uniqueID;
       }
       o.files = [];
@@ -462,8 +473,8 @@ $\
       }
       // Temporary JSON properties for events such as April 1 / Halloween
       o.extra = dict();
-      for (var key in data) {
-        if (key[0] === 'x') {
+      for (const key in data) {
+        if (key.startsWith('x')) {
           o.extra[key] = data[key];
         }
       }
@@ -490,7 +501,7 @@ $\
         tag: data.tag,
         hasDownscale: !!data.m_img
       };
-      if ((data.h != null) && !/\.pdf$/.test(o.url)) { o.dimensions = `${o.width}x${o.height}`; }
+      if ((data.h != null) && !o.url.endsWith('.pdf')) { o.dimensions = `${o.width}x${o.height}`; }
       return o;
     },
 
@@ -522,59 +533,32 @@ $\
       return this.post(o);
     },
 
-    post(o) {
-      const { ID, threadID, boardID, file } = o;
-      const { subject, email, name, tripcode, capcode, pass, uniqueID, flagCode, flagCodeTroll, flag, dateUTC, dateText, commentHTML } = o.info;
-      const { staticPath, gifIcon } = this;
-
-      /* Post Info */
-
-      let capcodeDescription, capcodePlural, capcodeLC;
-      if (capcode) {
-        capcodeLC = capcode.toLowerCase();
-        if (capcode === 'Founder') {
-          capcodePlural = 'the Founder';
-          capcodeDescription = "4chan's Founder";
-        } else if (capcode === 'Verified') {
-          capcodePlural = 'Verified Users';
-          capcodeDescription = '';
-        } else {
-          const capcodeLong = $.getOwn({ 'Admin': 'Administrator', 'Mod': 'Moderator' }, capcode) || capcode;
-          capcodePlural = `${capcodeLong}s`;
-          capcodeDescription = `a 4chan ${capcodeLong}`;
-        }
+    capcodeInfo(capcode) {
+      if (!capcode) return {};
+      const capcodeLC = capcode.toLowerCase();
+      if (capcode === 'Founder') {
+        return { capcodeLC, capcodePlural: 'the Founder', capcodeDescription: "4chan's Founder" };
+      } else if (capcode === 'Verified') {
+        return { capcodeLC, capcodePlural: 'Verified Users', capcodeDescription: '' };
+      } else {
+        const capcodeLong = $.getOwn({ 'Admin': 'Administrator', 'Mod': 'Moderator' }, capcode) || capcode;
+        return { capcodeLC, capcodePlural: `${capcodeLong}s`, capcodeDescription: `a 4chan ${capcodeLong}` };
       }
+    },
 
-      const url = this.threadURL(boardID, threadID);
-      const postLink = `${url}#p${ID}`;
-      const quoteLink = this.sameThread(boardID, threadID) ?
-        `javascript:quote('${+ID}');`
-        :
-        `${url}#q${ID}`;
+    fileInfo(file, boardID) {
+      if (!file) return {};
+      const protocol = /^https?:(?=\/\/i\.4cdn\.org\/)/;
+      return {
+        fileURL: file.url.replace(protocol, ''),
+        shortFilename: this.shortFilename(file.name),
+        fileThumb: file.isSpoiler ? this.spoilerThumb(boardID) : file.thumbURL.replace(protocol, '')
+      };
+    },
 
-      const postInfo = generatePostInfoHtml(
-        ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon,
-        capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID,
-        threadID,
-      );
-
-      /* File Info */
-      let protocol, fileURL, shortFilename, fileThumb;
-      if (file) {
-        protocol = /^https?:(?=\/\/i\.4cdn\.org\/)/;
-        fileURL = file.url.replace(protocol, '');
-        shortFilename = this.shortFilename(file.name);
-        fileThumb = file.isSpoiler ? this.spoilerThumb(boardID) : file.thumbURL.replace(protocol, '');
-      }
-
-      const fileBlock = generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon);
-
-      /* Whole Post */
-
-      const postClass = o.isReply ? 'reply' : 'op';
-
+    buildPostContent(o, postInfo, fileBlock, commentHTML) {
       const postContent: EscapedHtml[] = o.isReply ? [postInfo, fileBlock] : [fileBlock, postInfo];
-      postContent.push(<blockquote class="postMessage" id={`m${ID}`}>{commentHTML}</blockquote>);
+      postContent.push(<blockquote class="postMessage" id={`m${o.ID}`}>{commentHTML}</blockquote>);
       // I wonder if there's a better way to skip this in the catalog without breaking hovers.
       // Currently, this is just hidden by css.
       if (!o.isReply && o.threadReplies != null) {
@@ -582,6 +566,60 @@ $\
           {this.summaryText('', o.threadReplies, o.threadImages, true)}
         </span>);
       }
+      return postContent;
+    },
+
+    fixQuoteLinks(container, boardID, threadID) {
+      for (const quote of $$('.quotelink', container)) {
+        const href = quote.getAttribute('href');
+        if (href[0] === '#') {
+          if (!this.sameThread(boardID, threadID)) {
+            quote.href = this.threadURL(boardID, threadID) + href;
+          }
+        } else {
+          const match = quote.href.match(SWYotsuba.regexp.quotelink);
+          if (match && this.sameThread(match[1], match[2])) {
+            quote.href = href.match(/(#[^#]*)?$/)[0] || '#';
+          }
+        }
+      }
+    },
+
+    post(o) {
+      const { ID, threadID, boardID, file } = o;
+      const { capcode, commentHTML } = o.info;
+      const { staticPath, gifIcon } = this;
+
+      /* Post Info */
+
+      const { capcodeLC, capcodePlural, capcodeDescription } = this.capcodeInfo(capcode);
+
+      const url = this.threadURL(boardID, threadID);
+      const postLink = `${url}#p${ID}`;
+      // Mirrors 4chan's own inline quote() handler; not user-controlled input.
+      const quoteLink = this.sameThread(boardID, threadID) ?
+        `javascript:quote('${+ID}');`
+        :
+        `${url}#q${ID}`;
+
+      const assets = { staticPath, gifIcon };
+
+      const postInfo = generatePostInfoHtml({
+        o,
+        capcodeInfo: { capcodeLC, capcodePlural, capcodeDescription },
+        assets,
+        links: { postLink, quoteLink }
+      });
+
+      /* File Info */
+      const fileInfo = this.fileInfo(file, boardID);
+
+      const fileBlock = generateFileHtml({o, fileInfo, assets});
+
+      /* Whole Post */
+
+      const postClass = o.isReply ? 'reply' : 'op';
+      const postContent = this.buildPostContent(o, postInfo, fileBlock, commentHTML);
 
       const wholePost = <>
         {(o.isReply ? <div class="sideArrows" id={`sa${ID}`}>&gt;&gt;</div> : '')}
@@ -596,20 +634,7 @@ $\
       });
       $.extend(container, wholePost);
 
-      // Fix quotelinks
-      for (var quote of $$('.quotelink', container)) {
-        var href = quote.getAttribute('href');
-        if (href[0] === '#') {
-          if (!this.sameThread(boardID, threadID)) {
-            quote.href = this.threadURL(boardID, threadID) + href;
-          }
-        } else {
-          var match;
-          if ((match = quote.href.match(SWYotsuba.regexp.quotelink)) && (this.sameThread(match[1], match[2]))) {
-            quote.href = href.match(/(#[^#]*)?$/)[0] || '#';
-          }
-        }
-      }
+      this.fixQuoteLinks(container, boardID, threadID);
 
       return container;
     },
@@ -619,7 +644,9 @@ $\
       if (status) text += `${status} `;
       text += `${posts} post${posts == 1 ? '' : 's'}`;
       if (+files) text += ` and ${files} image repl${files > 1 ? 'ies' : 'y'}`;
-      return hoverPreview ? text : `${text} ${status === '-' ? 'shown' : 'omitted'}.`;
+      if (hoverPreview) return text;
+      const verb = status === '-' ? 'shown' : 'omitted';
+      return `${text} ${verb}.`;
     },
 
     summary(boardID, threadID, posts, files) {
@@ -632,15 +659,15 @@ $\
     },
 
     thread(thread, data, withReplies) {
-      let root;
-      if (root = thread.nodes.root) {
+      let root = thread.nodes.root;
+      if (root) {
         $.rmAll(root);
       } else {
-        thread.nodes.root = (root = $.el('div', {
+        root = $.el('div', {
           className: 'thread',
           id: `t${data.no}`
-        }
-        ));
+        });
+        thread.nodes.root = root;
       }
       if (this.hat) { $.add(root, this.hat.cloneNode(false)); }
       $.add(root, thread.OP.nodes.root);
@@ -662,10 +689,10 @@ $\
       const { tn_w, tn_h } = data;
 
       if (data.spoiler && !Conf['Reveal Spoiler Thumbnails']) {
-        let spoilerRange;
         src = `${staticPath}spoiler`;
-        if (spoilerRange = this.spoilerRange[thread.board]) {
-          // Randomize the spoiler image.
+        const spoilerRange = this.spoilerRange[thread.board];
+        if (spoilerRange) {
+          // Randomize the spoiler image (cosmetic only, not security-sensitive).
           src += (`-${thread.board}`) + Math.floor(1 + (spoilerRange * Math.random()));
         }
         src += '.png';
@@ -688,12 +715,12 @@ $\
 
       const container = $.el(
         'div',
-        generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon)
+        generateCatalogThreadHtml({thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon})
       );
       $.before(thread.OP.nodes.info, [...container.childNodes]);
 
-      for (var br of $$('br', thread.OP.nodes.comment)) {
-        if (br.previousSibling && (br.previousSibling.nodeName === 'BR')) {
+      for (const br of $$('br', thread.OP.nodes.comment)) {
+        if (br.previousSibling?.nodeName === 'BR') {
           $.addClass(br, 'extra-linebreak');
         }
       }
@@ -736,4 +763,3 @@ $\
   }
 };
 export default SWYotsuba;
-

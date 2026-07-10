@@ -1,9 +1,17 @@
+let errorHandler: ((errors: any[]) => void) | null = null;
+
 export default class Callbacks {
-  static Post: Callbacks;
-  static Thread: Callbacks;
-  static CatalogThread: Callbacks;
-  static CatalogThreadNative: Callbacks;
-  static errorHandler: ((errors: any[]) => void) | null = null;
+  static readonly Post = new Callbacks('Post');
+  static readonly Thread = new Callbacks('Thread');
+  static readonly CatalogThread = new Callbacks('Catalog Thread');
+  static readonly CatalogThreadNative = new Callbacks('Catalog Thread');
+  static setErrorHandler(handler: ((errors: any[]) => void) | null) {
+    errorHandler = handler;
+  }
+
+  static handleErrors(errors: any[]) {
+    errorHandler?.(errors);
+  }
 
   type: string;
   keys: string[];
@@ -44,12 +52,7 @@ export default class Callbacks {
     }
 
     if (errors) {
-      Callbacks.errorHandler?.(errors);
+      Callbacks.handleErrors(errors);
     }
   }
 }
-
-Callbacks.Post = new Callbacks('Post');
-Callbacks.Thread = new Callbacks('Thread');
-Callbacks.CatalogThread = new Callbacks('Catalog Thread');
-Callbacks.CatalogThreadNative = new Callbacks('Catalog Thread');

@@ -2,12 +2,13 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
-import { isPassEnabled, keyCode } from "../platform/helpers";
+import { isPassEnabled } from "../platform/helpers";
 
 const CaptchaT: any = {
   init() {
     if (isPassEnabled()) { return; }
-    if (!(this.isEnabled = !!$('#t-root') || !$.id('postForm'))) { return; }
+    this.isEnabled = !!$('#t-root') || !$.id('postForm');
+    if (!this.isEnabled) { return; }
 
     const root = $.el('div', {className: 'captcha-root'});
     this.nodes = {root};
@@ -64,7 +65,7 @@ const CaptchaT: any = {
     if (this.nodes.container) {
       const slider = $('#t-slider', this.nodes.container);
       const response = $('#t-resp', this.nodes.container);
-      if ((slider && slider.hasAttribute('max')) || response?.value) { return; }
+      if (slider?.hasAttribute('max') || response?.value) { return; }
     }
 
     // Request directly from the native API. The #t-load control is not
@@ -77,7 +78,7 @@ const CaptchaT: any = {
 
   getThread() {
     return {
-      boardID: g.BOARD.ID,
+      boardID: g.BOARD!.ID,
       threadID: QRState.posts[0].thread === 'new' ? '0' : ('' + QRState.posts[0].thread),
     };
   },
@@ -164,7 +165,9 @@ const CaptchaT: any = {
     if (!QRState.nodes?.el) { return; }
     try {
       QRState.nodes.com.focus();
-    } catch (error) {}
+    } catch {
+      // Ignore: comment node can be detached mid-focus during a QR teardown.
+    }
   },
 
   redirectCommentFocus(e) {
@@ -234,155 +237,127 @@ const CaptchaT: any = {
     return !!(el && /Verification not required/i.test(el.textContent));
   },
 
-  createStrips() {
-    const mainDiv = this.nodes.container;
-    if (!mainDiv) return;
-
+  detectChallengeState(mainDiv) {
     const slider = $('#t-slider', mainDiv);
     const taskEl = $('#t-task', mainDiv);
-    let customUiExists = !!$('.captcha-custom-ui', mainDiv);
     const tLoad = $('#t-load', mainDiv);
     const tLoadText = tLoad ? `${tLoad.value || ''} ${tLoad.textContent || ''}` : '';
     const isOnCooldown = /\(\d+\)/.test(tLoadText);
     const tNext = $('#t-next', mainDiv);
-    const tNextText = tNext ? tNext.textContent || '' : '';
+    const tNextText = tNext?.textContent || '';
     const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
     const verificationNotRequired = this.hasVerificationNotRequired(mainDiv);
 
-    if (verificationNotRequired) {
-      this.setStatusMessage(mainDiv);
-      return;
-    }
-
-    if (isOnCooldown && !hasActiveChallengeStep) {
-      this.setIdle(mainDiv);
-      return;
-    }
-    
-    // If there's no slider or it has no max attribute, it's not a real puzzle 
-    // (e.g., "Captcha expired" or initializing)
-    if (!slider || !slider.hasAttribute('max')) {
-      this.setIdle(mainDiv);
-      return;
-    }
-
     const imgEl = taskEl ? $('img', taskEl) : null;
     const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
-    const hasTaskBg = taskBg && taskBg.includes('url(');
-    
+    const hasTaskBg = taskBg?.includes('url(');
+
     // A real puzzle has task image frames. If there is no separate clue image,
     // the challenge is the odd-one-out variant.
     if (!imgEl && (hasTaskBg || hasActiveChallengeStep)) {
       this._isNotLikeOthers = true;
-    } else if (imgEl && imgEl.src) {
+    } else if (imgEl?.src) {
       this._isNotLikeOthers = false;
     }
     const isNotLikeOthers = !!this._isNotLikeOthers;
 
     let clueUrl = '';
-    if (imgEl && imgEl.src) {
-        clueUrl = `url("${imgEl.src}")`;
+    if (imgEl?.src) {
+      clueUrl = `url("${imgEl.src}")`;
     } else if (hasTaskBg) {
-        clueUrl = taskBg;
+      clueUrl = taskBg;
     }
-    
+
     const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-    if (!isChallenge) {
-      this.setIdle(mainDiv);
-      return;
-    }
-    $.rmClass(this.nodes.root, 'captcha-idle', 'captcha-status');
-    $.addClass(this.nodes.root, 'is-challenge');
+    return { slider, taskEl, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+  },
 
-    // Check if we have a NEW challenge in a sequence (e.g. Next 2/3)
-    if (customUiExists) {
-      const customUi = $('.captcha-custom-ui', mainDiv);
-      const oldStep = customUi ? customUi.dataset.step : '';
-      const tNextNode = $('#t-next', mainDiv);
-      const newStep = tNextNode ? tNextNode.textContent : '';
-      
-      let isNewChallenge = false;
-      if (oldStep && newStep && oldStep !== newStep) {
+  // Check if we have a NEW challenge in a sequence (e.g. Next 2/3); reconciles
+  // stale custom UI left over from the previous challenge step.
+  reconcileCustomUi(mainDiv, state) {
+    const customUi = $('.captcha-custom-ui', mainDiv);
+    if (!customUi) return false;
+
+    const oldStep = customUi.dataset.step;
+    const tNextNode = $('#t-next', mainDiv);
+    const newStep = tNextNode ? tNextNode.textContent : '';
+
+    let isNewChallenge = false;
+    if (oldStep && newStep && oldStep !== newStep) {
+      isNewChallenge = true;
+    } else if (state.imgEl?.src) {
+      const existingClueImage = $('.captcha-clue-image', mainDiv);
+      if (existingClueImage && existingClueImage.style.backgroundImage !== `url("${state.imgEl.src}")`) {
         isNewChallenge = true;
-      } else if (imgEl && imgEl.src) {
-        const existingClueImage = $('.captcha-clue-image', mainDiv);
-        if (existingClueImage && existingClueImage.style.backgroundImage !== `url("${imgEl.src}")`) {
-          isNewChallenge = true;
-        }
-      }
-
-      if (isNewChallenge) {
-        if (customUi) $.rm(customUi);
-        const existingClueImage = $('.captcha-clue-image', mainDiv);
-        if (existingClueImage) $.rm(existingClueImage);
-        customUiExists = false;
-        this.isCapturing = false;
-        delete this.selectedChallengeStep;
       }
     }
 
-    // If we've already built the custom UI for this challenge, or we're building it, do nothing.
-    // The custom UI will naturally be destroyed when TCaptcha wipes the container on reload.
-    if (customUiExists || this.isCapturing || !slider || !taskEl) return;
+    if (!isNewChallenge) { return true; }
 
-    // We are at the initial challenge state!
-    this.isCapturing = true;
+    $.rm(customUi);
+    const existingClueImage = $('.captcha-clue-image', mainDiv);
+    if (existingClueImage) $.rm(existingClueImage);
+    this.isCapturing = false;
+    delete this.selectedChallengeStep;
+    return false;
+  },
 
-    // Create the clue image and insert it into #t-ctrl
+  createClueImage(mainDiv, state) {
     const tCtrl = $('#t-ctrl', mainDiv);
-    if (tCtrl) {
-      if (!$('.captcha-clue-image', tCtrl)) {
-        const clueImage = $.el('div', {className: 'captcha-clue-image'});
-        if (isNotLikeOthers) {
-          clueImage.style.display = 'none';
-        } else {
-          clueImage.style.backgroundImage = clueUrl; // The actual clue icon!
-        }
-        const tNextNode = $('#t-next', tCtrl);
-        if (tNextNode) {
-          $.before(tNextNode, clueImage);
-        } else {
-          $.add(tCtrl, clueImage);
-        }
+    if (!tCtrl || $('.captcha-clue-image', tCtrl)) return;
+    const clueImage = $.el('div', {className: 'captcha-clue-image'});
+    if (state.isNotLikeOthers) {
+      clueImage.style.display = 'none';
+    } else {
+      clueImage.style.backgroundImage = state.clueUrl; // The actual clue icon!
+    }
+    const tNextNode = $('#t-next', tCtrl);
+    if (tNextNode) {
+      $.before(tNextNode, clueImage);
+    } else {
+      $.add(tCtrl, clueImage);
+    }
+  },
+
+  onStripClick(mainDiv, slider, stripsContainer, strip, i) {
+    if (this.isCapturing) return;
+    slider.value = '' + i;
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
+    $.addClass(strip, 'selected');
+    if (!this.isRestoring) {
+      const tNext = $('#t-next', mainDiv);
+      this.selectedChallengeStep = stripsContainer.dataset.step || tNext?.textContent || '';
+    }
+    if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
+      const tNext = $('#t-next', mainDiv);
+      if (tNext && !tNext.disabled) {
+        tNext.click();
       }
     }
+  },
 
-    // Create the strips container (acting as the custom UI marker)
+  // Create the strips container (acting as the custom UI marker) plus its strip elements.
+  createStripElements(mainDiv, slider, state) {
     const stripsContainer = $.el('div', {
-      className: `captcha-strips captcha-custom-ui${isNotLikeOthers ? ' is-odd-one-out' : ''}`
+      className: `captcha-strips captcha-custom-ui${state.isNotLikeOthers ? ' is-odd-one-out' : ''}`
     });
     const tNextForStep = $('#t-next', mainDiv);
     if (tNextForStep) {
       stripsContainer.dataset.step = tNextForStep.textContent;
     }
     delete this.selectedChallengeStep;
-    const minVal = parseInt(slider.getAttribute('min') || '0', 10);
-    const maxVal = parseInt(slider.getAttribute('max') || '3', 10);
+    const minVal = Number.parseInt(slider.getAttribute('min') || '0', 10);
+    const maxVal = Number.parseInt(slider.getAttribute('max') || '3', 10);
     const count = maxVal + 1;
     const startIndex = Math.max(1, minVal);
 
     for (let i = startIndex; i < count; i++) {
       const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
       strip.dataset.index = '' + i;
-      $.on(strip, 'click', () => {
-        if (this.isCapturing) return;
-        slider.value = '' + i;
-        slider.dispatchEvent(new Event('change', { bubbles: true }));
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
-        $.addClass(strip, 'selected');
-        if (!this.isRestoring) {
-          const tNext = $('#t-next', mainDiv);
-          this.selectedChallengeStep = stripsContainer.dataset.step || tNext?.textContent || '';
-        }
-        if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
-          const tNext = $('#t-next', mainDiv);
-          if (tNext && !tNext.disabled) {
-            tNext.click();
-          }
-        }
-      });
+      $.on(strip, 'click', () => this.onStripClick(mainDiv, slider, stripsContainer, strip, i));
       $.add(stripsContainer, strip);
     }
 
@@ -393,114 +368,167 @@ const CaptchaT: any = {
       $.add(mainDiv, stripsContainer);
     }
 
-    // Now capture the 4 puzzle images by programmatically moving the slider
-    const originalSliderValue = slider.value;
+    return { stripsContainer, startIndex, count };
+  },
+
+  restoreSlider(slider, value) {
+    slider.value = value;
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  },
+
+  // Capture the puzzle images by programmatically moving the slider across
+  // every step, reading back the resulting background image for each strip.
+  async captureStripImages(taskEl, slider, stripsContainer, startIndex, count) {
     let capturedImages = 0;
-    
-    const runCapture = async () => {
-      for (let i = startIndex; i < count; i++) {
-        if (slider.value !== '' + i) {
-          slider.value = '' + i;
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
-          slider.dispatchEvent(new Event('change', { bubbles: true }));
-          await new Promise(resolve => setTimeout(resolve, 150));
-        }
-
-        const stripIndex = i - startIndex;
-        const strip = stripsContainer.children[stripIndex];
-        if (strip) {
-          const taskStyle = getComputedStyle(taskEl);
-          const bg = taskEl.style.backgroundImage || taskStyle.backgroundImage;
-          if (bg && bg.includes('url(')) { capturedImages++; }
-          strip.style.backgroundImage = bg;
-          strip.style.backgroundPosition = taskEl.style.backgroundPosition || taskStyle.backgroundPosition;
-          strip.style.backgroundSize = taskEl.style.backgroundSize || taskStyle.backgroundSize;
-          strip.style.backgroundRepeat = taskEl.style.backgroundRepeat || taskStyle.backgroundRepeat;
-        }
-      }
-
-      if (!capturedImages) {
-        this.isCapturing = false;
-        this.isRestoring = true;
-        slider.value = originalSliderValue;
-        slider.dispatchEvent(new Event('change', { bubbles: true }));
+    for (let i = startIndex; i < count; i++) {
+      if (slider.value !== '' + i) {
+        slider.value = '' + i;
         slider.dispatchEvent(new Event('input', { bubbles: true }));
-        this.isRestoring = false;
-        if (!hasActiveChallengeStep) { this.setIdle(mainDiv); }
-        return;
+        slider.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise(resolve => setTimeout(resolve, 150));
       }
 
-      // Done capturing!
+      const stripIndex = i - startIndex;
+      const strip = stripsContainer.children[stripIndex];
+      if (strip) {
+        const taskStyle = getComputedStyle(taskEl);
+        const bg = taskEl.style.backgroundImage || taskStyle.backgroundImage;
+        if (bg?.includes('url(')) { capturedImages++; }
+        strip.style.backgroundImage = bg;
+        strip.style.backgroundPosition = taskEl.style.backgroundPosition || taskStyle.backgroundPosition;
+        strip.style.backgroundSize = taskEl.style.backgroundSize || taskStyle.backgroundSize;
+        strip.style.backgroundRepeat = taskEl.style.backgroundRepeat || taskStyle.backgroundRepeat;
+      }
+    }
+    return capturedImages;
+  },
+
+  async runCapture(mainDiv, taskEl, slider, stripsContainer, startIndex, count, hasActiveChallengeStep) {
+    const originalSliderValue = slider.value;
+    const capturedImages = await this.captureStripImages(taskEl, slider, stripsContainer, startIndex, count);
+
+    if (!capturedImages) {
       this.isCapturing = false;
       this.isRestoring = true;
-      // Restore slider and visually select the active strip
-      slider.value = originalSliderValue;
-      slider.dispatchEvent(new Event('change', { bubbles: true }));
-      slider.dispatchEvent(new Event('input', { bubbles: true }));
-      
-      const targetValue = parseInt(originalSliderValue, 10) || 0;
-      const targetStrip = $$('.captcha-strip', stripsContainer).find(s => parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
-      if (targetStrip) targetStrip.click();
+      this.restoreSlider(slider, originalSliderValue);
       this.isRestoring = false;
-    };
-
-    runCapture();
-
-    if (!this.keydownListener) {
-      this.keydownListener = (e) => {
-        if (!this.nodes.container || this.isCapturing) return;
-        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp') return;
-        const key = e.key;
-        if (key === ' ') {
-          const tNext = $('#t-next', this.nodes.container);
-          if (tNext && !tNext.disabled) {
-            e.preventDefault();
-            tNext.click();
-          }
-        } else if (key >= '1' && key <= '9') {
-          const index = parseInt(key, 10) - 1;
-          const stripElements = $$('.captcha-strip', this.nodes.root);
-          if (stripElements[index]) {
-            e.preventDefault();
-            stripElements[index].click();
-            stripElements[index].focus();
-          }
-        } else if (key === 'ArrowLeft') {
-          const stripElements = $$('.captcha-strip', this.nodes.root);
-          if (stripElements.length) {
-            e.preventDefault();
-            const selectedIndex = stripElements.findIndex(s => $.hasClass(s, 'selected'));
-            let newIndex = selectedIndex - 1;
-            if (selectedIndex === -1) {
-              newIndex = 0;
-            } else if (newIndex < 0) {
-              newIndex = 0;
-            }
-            if (stripElements[newIndex]) {
-              stripElements[newIndex].click();
-              stripElements[newIndex].focus();
-            }
-          }
-        } else if (key === 'ArrowRight') {
-          const stripElements = $$('.captcha-strip', this.nodes.root);
-          if (stripElements.length) {
-            e.preventDefault();
-            const selectedIndex = stripElements.findIndex(s => $.hasClass(s, 'selected'));
-            let newIndex = selectedIndex + 1;
-            if (selectedIndex === -1) {
-              newIndex = 0;
-            } else if (newIndex >= stripElements.length) {
-              newIndex = stripElements.length - 1;
-            }
-            if (stripElements[newIndex]) {
-              stripElements[newIndex].click();
-              stripElements[newIndex].focus();
-            }
-          }
-        }
-      };
-      $.on(document, 'keydown', this.keydownListener);
+      if (!hasActiveChallengeStep) { this.setIdle(mainDiv); }
+      return;
     }
+
+    // Done capturing! Restore slider and visually select the active strip.
+    this.isCapturing = false;
+    this.isRestoring = true;
+    this.restoreSlider(slider, originalSliderValue);
+
+    const targetValue = Number.parseInt(originalSliderValue, 10) || 0;
+    const targetStrip = $$('.captcha-strip', stripsContainer).find(s => Number.parseInt(s.dataset.index, 10) === targetValue) || stripsContainer.children[0];
+    if (targetStrip) targetStrip.click();
+    this.isRestoring = false;
+  },
+
+  // Shared strip navigation, used by both the main captcha and iframe keydown handlers.
+  selectStripByNumber(e, strips, key) {
+    const strip = strips[Number.parseInt(key, 10) - 1];
+    if (!strip) return;
+    e.preventDefault();
+    strip.click();
+    strip.focus();
+  },
+
+  navigateStrip(e, strips, delta) {
+    if (!strips.length) return;
+    e.preventDefault();
+    const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
+    let newIndex;
+    if (delta < 0) {
+      newIndex = selectedIndex - 1;
+      if (selectedIndex === -1 || newIndex < 0) { newIndex = 0; }
+    } else {
+      newIndex = selectedIndex + 1;
+      if (selectedIndex === -1) { newIndex = 0; }
+      else if (newIndex >= strips.length) { newIndex = strips.length - 1; }
+    }
+    const strip = strips[newIndex];
+    if (strip) { strip.click(); strip.focus(); }
+  },
+
+  handleCaptchaKeydown(e) {
+    if (!this.nodes.container || this.isCapturing) return;
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && document.activeElement?.id !== 't-resp') return;
+    const key = e.key;
+    if (key === ' ') {
+      const tNext = $('#t-next', this.nodes.container);
+      if (tNext && !tNext.disabled) {
+        e.preventDefault();
+        tNext.click();
+      }
+      return;
+    }
+    const strips = $$('.captcha-strip', this.nodes.root);
+    if (key >= '1' && key <= '9') {
+      this.selectStripByNumber(e, strips, key);
+    } else if (key === 'ArrowLeft') {
+      this.navigateStrip(e, strips, -1);
+    } else if (key === 'ArrowRight') {
+      this.navigateStrip(e, strips, 1);
+    }
+  },
+
+  registerKeydownListener() {
+    if (this.keydownListener) return;
+    this.keydownListener = (e) => this.handleCaptchaKeydown(e);
+    $.on(document, 'keydown', this.keydownListener);
+  },
+
+  createStrips() {
+    const mainDiv = this.nodes.container;
+    if (!mainDiv) return;
+
+    const state = this.detectChallengeState(mainDiv);
+    const { slider, taskEl } = state;
+
+    if (state.verificationNotRequired) {
+      this.setStatusMessage(mainDiv);
+      return;
+    }
+
+    if (state.isOnCooldown && !state.hasActiveChallengeStep) {
+      this.setIdle(mainDiv);
+      return;
+    }
+
+    // If there's no slider or it has no max attribute, it's not a real puzzle
+    // (e.g., "Captcha expired" or initializing)
+    if (!slider?.hasAttribute('max')) {
+      this.setIdle(mainDiv);
+      return;
+    }
+
+    if (!state.isChallenge) {
+      this.setIdle(mainDiv);
+      return;
+    }
+    $.rmClass(this.nodes.root, 'captcha-idle', 'captcha-status');
+    $.addClass(this.nodes.root, 'is-challenge');
+
+    const customUiExists = this.reconcileCustomUi(mainDiv, state);
+
+    // If we've already built the custom UI for this challenge, or we're building it, do nothing.
+    // The custom UI will naturally be destroyed when TCaptcha wipes the container on reload.
+    if (customUiExists || this.isCapturing || !slider || !taskEl) return;
+
+    // We are at the initial challenge state!
+    this.isCapturing = true;
+
+    this.createClueImage(mainDiv, state);
+    const { stripsContainer, startIndex, count } = this.createStripElements(mainDiv, slider, state);
+
+    // Now capture the puzzle images by programmatically moving the slider.
+    this.runCapture(mainDiv, taskEl, slider, stripsContainer, startIndex, count, state.hasActiveChallengeStep);
+
+    this.registerKeydownListener();
 
     // Apply CSS class to hide native elements
     $.addClass(this.nodes.root, 'is-challenge');
@@ -543,8 +571,8 @@ const CaptchaT: any = {
   getOne() {
     let response: any = {};
     if (this.nodes.container) {
-      for (var key of ['t-response', 't-challenge']) {
-        response[key] = $(`[name='${key}']`, this.nodes.container).value;
+      for (const key of ['t-response', 't-challenge']) {
+        response[key] = $(`[name='${key}']`, this.nodes.container)?.value;
       }
     }
     if (!response['t-response'] && !this.hasVerificationNotRequired(this.nodes.container)) {
@@ -553,26 +581,30 @@ const CaptchaT: any = {
     return response;
   },
 
+  // True while the challenge still has a step to advance to (another sequence
+  // step remains, or the current step hasn't been selected/advanced yet).
+  hasMoreChallengeSteps(tNext) {
+    const tNextText = tNext?.textContent || '';
+    const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
+    const hasRemainingChallengeSteps = stepMatch && Number.parseInt(stepMatch[1], 10) < Number.parseInt(stepMatch[2], 10);
+    const selectedCurrentStep = stepMatch && this.selectedChallengeStep === tNextText;
+    const canAdvanceChallenge = tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0);
+    return (stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge);
+  },
+
   checkCompletion() {
     if (!this.isEnabled || !this.nodes.container) return;
     const response = this.getOne();
-    if (response && response['t-response']) {
-      const tNext = $('#t-next', this.nodes.container);
-      const tNextText = tNext ? tNext.textContent || '' : '';
-      const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
-      const hasRemainingChallengeSteps = stepMatch && parseInt(stepMatch[1], 10) < parseInt(stepMatch[2], 10);
-      const selectedCurrentStep = stepMatch && this.selectedChallengeStep === tNextText;
-      const canAdvanceChallenge = tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0);
-      if ((stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge)) {
-        return;
-      }
-      if (this.isCompleted) return;
-      this.isCompleted = true;
-      if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
-        QRState.submit();
-      }
-    } else {
+    if (!response?.['t-response']) {
       this.isCompleted = false;
+      return;
+    }
+    const tNext = $('#t-next', this.nodes.container);
+    if (this.hasMoreChallengeSteps(tNext)) return;
+    if (this.isCompleted) return;
+    this.isCompleted = true;
+    if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
+      QRState.submit();
     }
   },
 
@@ -623,7 +655,7 @@ const CaptchaT: any = {
     this.createIframeStrips(mainDiv, slider);
 
     $.on(window, 'message', (e) => {
-      if (e.data && e.data.type === 'select-strip') {
+      if (e.data?.type === 'select-strip') {
         const index = e.data.index;
         const strips = $$('.captcha-strip', mainDiv);
         if (strips[index]) {
@@ -633,95 +665,65 @@ const CaptchaT: any = {
       }
     });
 
-    if (!this.keydownListener) {
-      this.keydownListener = (e) => {
-        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement?.id !== 't-resp') return;
-        const key = e.key;
-        if (key >= '1' && key <= '9') {
-          const index = parseInt(key, 10) - 1;
-          const strips = $$('.captcha-strip', mainDiv);
-          if (strips[index]) {
-            e.preventDefault();
-            strips[index].click();
-            strips[index].focus();
-          }
-        } else if (key === 'ArrowLeft') {
-          const strips = $$('.captcha-strip', mainDiv);
-          if (strips.length) {
-            e.preventDefault();
-            const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
-            let newIndex = selectedIndex - 1;
-            if (selectedIndex === -1) {
-              newIndex = 0;
-            } else if (newIndex < 0) {
-              newIndex = 0;
-            }
-            if (strips[newIndex]) {
-              strips[newIndex].click();
-              strips[newIndex].focus();
-            }
-          }
-        } else if (key === 'ArrowRight') {
-          const strips = $$('.captcha-strip', mainDiv);
-          if (strips.length) {
-            e.preventDefault();
-            const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
-            let newIndex = selectedIndex + 1;
-            if (selectedIndex === -1) {
-              newIndex = 0;
-            } else if (newIndex >= strips.length) {
-              newIndex = strips.length - 1;
-            }
-            if (strips[newIndex]) {
-              strips[newIndex].click();
-              strips[newIndex].focus();
-            }
-          }
-        }
-      };
-      $.on(document, 'keydown', this.keydownListener);
+    this.registerIframeKeydownListener(mainDiv);
+  },
+
+  handleIframeKeydown(mainDiv, e) {
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && document.activeElement?.id !== 't-resp') return;
+    const key = e.key;
+    const strips = $$('.captcha-strip', mainDiv);
+    if (key >= '1' && key <= '9') {
+      this.selectStripByNumber(e, strips, key);
+    } else if (key === 'ArrowLeft') {
+      this.navigateStrip(e, strips, -1);
+    } else if (key === 'ArrowRight') {
+      this.navigateStrip(e, strips, 1);
     }
   },
 
-  createIframeStrips(mainDiv, slider) {
+  registerIframeKeydownListener(mainDiv) {
+    if (this.keydownListener) return;
+    this.keydownListener = (e) => this.handleIframeKeydown(mainDiv, e);
+    $.on(document, 'keydown', this.keydownListener);
+  },
 
-    let strips = $('.captcha-strips', mainDiv);
-    if (!strips) {
-      const minStr = slider.getAttribute('min');
-      const minVal = minStr ? parseInt(minStr, 10) : 0;
-      const min = Math.max(1, minVal);
-      const maxStr = slider.getAttribute('max');
-      const max = maxStr ? parseInt(maxStr, 10) : 3;
-      const count = max + 1;
-
-      strips = $.el('div', {className: 'captcha-strips'});
-      for (let i = min; i < count; i++) {
-        const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
-        strip.dataset.index = i;
-        strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
-        $.on(strip, 'click', () => {
-          slider.value = i;
-          slider.dispatchEvent(new Event('change', { bubbles: true }));
-          slider.dispatchEvent(new Event('input', { bubbles: true }));
-          $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
-          $.addClass(strip, 'selected');
-          if (Conf['Next challenge on captcha selection']) {
-            const tNext = $('#t-next', mainDiv);
-            if (tNext && !tNext.disabled) {
-              tNext.click();
-            }
-          }
-        });
-        $.add(strips, strip);
+  onIframeStripClick(mainDiv, slider, strips, strip, i) {
+    slider.value = i;
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
+    $.addClass(strip, 'selected');
+    if (Conf['Next challenge on captcha selection']) {
+      const tNext = $('#t-next', mainDiv);
+      if (tNext && !tNext.disabled) {
+        tNext.click();
       }
-      $.add(mainDiv, strips);
     }
+  },
 
-    const taskEl = $('#t-task', mainDiv);
-    if (!taskEl) return;
+  buildIframeStripsContainer(mainDiv, slider) {
+    const minStr = slider.getAttribute('min');
+    const minVal = minStr ? Number.parseInt(minStr, 10) : 0;
+    const min = Math.max(1, minVal);
+    const maxStr = slider.getAttribute('max');
+    const max = maxStr ? Number.parseInt(maxStr, 10) : 3;
+    const count = max + 1;
 
+    const strips = $.el('div', {className: 'captcha-strips'});
+    for (let i = min; i < count; i++) {
+      const strip = $.el('div', {className: 'captcha-strip', tabIndex: 0});
+      strip.dataset.index = i;
+      strip.style.backgroundPositionY = `calc(-145px * ${i} - 32px)`;
+      $.on(strip, 'click', () => this.onIframeStripClick(mainDiv, slider, strips, strip, i));
+      $.add(strips, strip);
+    }
+    $.add(mainDiv, strips);
+    return strips;
+  },
+
+  updateIframeStripsBackground(strips, taskEl) {
     const bg = taskEl.style.backgroundImage;
-    const isChallenge = bg && bg.includes('url(');
+    const isChallenge = bg?.includes('url(');
     if (isChallenge) {
       $$('.captcha-strip', strips).forEach(strip => {
         strip.style.backgroundImage = bg;
@@ -733,6 +735,15 @@ const CaptchaT: any = {
       $.rmClass(document.documentElement, 'is-challenge');
       strips.style.display = 'none';
     }
+  },
+
+  createIframeStrips(mainDiv, slider) {
+    const strips = $('.captcha-strips', mainDiv) || this.buildIframeStripsContainer(mainDiv, slider);
+
+    const taskEl = $('#t-task', mainDiv);
+    if (!taskEl) return;
+
+    this.updateIframeStripsBackground(strips, taskEl);
   }
 };
 export default CaptchaT;

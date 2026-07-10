@@ -60,7 +60,7 @@ const UnreadIndex: UnreadIndexType = {
     const detail = (e as CustomEvent).detail;
     if (detail?.isCatalog) { return; }
     for (const threadID of detail?.threadIDs || []) {
-      const thread = g.threads.get(threadID);
+      const thread = g.threads!.get(threadID);
       if (thread) {
         UnreadIndex.update(thread);
       }
@@ -70,7 +70,7 @@ const UnreadIndex: UnreadIndexType = {
   onPostsInserted(e: Event) {
     if (e.target === Index.root) { return; } // onIndexRefresh handles this case
     const thread = Get.threadFromNode(e.target as Node);
-    if (!thread || (thread.nodes.root !== e.target)) { return; }
+    if (thread?.nodes.root !== e.target) { return; }
     const wasVisible = !!UnreadIndex.hr[thread.fullID]?.parentNode;
     UnreadIndex.update(thread);
     if (Conf['Scroll to Last Read Post'] && (e.type === 'PostsInserted') && !wasVisible && !!UnreadIndex.hr[thread.fullID]?.parentNode) {
@@ -79,7 +79,7 @@ const UnreadIndex: UnreadIndexType = {
   },
 
   sync() {
-    g.threads.forEach((thread: any) => {
+    g.threads!.forEach((thread: any) => {
       const lastReadPost = UnreadIndex.db!.get({
         boardID: thread.board.ID,
         threadID: thread.ID
@@ -120,13 +120,15 @@ const UnreadIndex: UnreadIndexType = {
       $.rm(hr);
     }
 
-    const hasUnread = repliesShown ?
-      (firstUnread || !repliesRead)
-    : Index.enabled ?
-      (thread.lastPost > lastReadPost)
-    :
-      (thread.OP.ID > lastReadPost);
-    thread.nodes.root.classList.toggle('unread-thread', !!hasUnread);
+    let hasUnread: boolean;
+    if (repliesShown) {
+      hasUnread = !!(firstUnread || !repliesRead);
+    } else if (Index.enabled) {
+      hasUnread = thread.lastPost > lastReadPost;
+    } else {
+      hasUnread = thread.OP.ID > lastReadPost;
+    }
+    thread.nodes.root.classList.toggle('unread-thread', hasUnread);
 
     let link = UnreadIndex.markReadLink[thread.fullID];
     if (!link) {
@@ -137,7 +139,8 @@ const UnreadIndex: UnreadIndexType = {
       }) as HTMLAnchorElement);
       $.on(link, 'click', UnreadIndex.markRead);
     }
-    if ((divider = $(g.SITE.selectors.threadDivider, thread.nodes.root) as HTMLElement | null)) { // divider inside thread as in Tinyboard
+    divider = $(g.SITE.selectors.threadDivider, thread.nodes.root) as HTMLElement | null;
+    if (divider) { // divider inside thread as in Tinyboard
       $.before(divider, link);
     } else {
       $.add(thread.nodes.root, link);

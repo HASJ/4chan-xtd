@@ -6,14 +6,19 @@ let requestID = 0;
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   const id = requestID;
   requestID++;
-  handlers[request.type](request, sender).then(data => {
-    chrome.tabs.sendMessage(sender.tab.id, { id, data });
-  });
+  const handler = (handlers as any)[request.type];
+  if (handler) {
+    handler(request, sender).then((data: any) => {
+      if (sender.tab?.id !== undefined) {
+        chrome.tabs.sendMessage(sender.tab.id, { id, data });
+      }
+    });
+  }
   sendResponse(id);
 });
 
-var handlers = {
-  permission(request) {
+const handlers = {
+  permission(request: any) {
     return new Promise(resolve => {
       const origins = request.origins || ['*://*/'];
       chrome.permissions.contains({origins}, function(result) {
@@ -25,10 +30,10 @@ var handlers = {
           });
         }
       });
-    })
+    });
   },
 
-  async ajax(request) {
+  async ajax(request: any) {
     try {
       const res = await fetch(request.url, { headers: request.headers || {} });
       if (!res.ok) {
@@ -42,24 +47,31 @@ var handlers = {
       } else {
         response = await res.text();
       }
-      const responseHeaderString = Array.from(res.headers, h => `${h[0]}: ${h[1]}\r\n`).join('');
+      let responseHeaderString = '';
+      res.headers.forEach((value, key) => {
+        responseHeaderString += `${key}: ${value}\r\n`;
+      });
       return { status: res.status, statusText: res.statusText, response, responseHeaderString };
-    } catch (e) {
+    } catch (error) {
+      console.warn('Fetch failed', error);
       return { error: true };
     }
   },
 
-  async runInPageContext(request, sender) {
-    if (typeof PageContextFunctions[request.fn] !== 'function' || !Object.prototype.hasOwnProperty.call(PageContextFunctions, request.fn)) {
+  async runInPageContext(request: any, sender: any) {
+    const fn = (PageContextFunctions as any)[request.fn];
+    if (typeof fn !== 'function' || !Object.prototype.hasOwnProperty.call(PageContextFunctions, request.fn)) {
       throw new Error("Invalid page context function requested");
     }
+    if (sender.tab?.id === undefined) {
+      throw new Error("Missing tab ID");
+    }
     const results = await chrome.scripting.executeScript({
-      func: PageContextFunctions[request.fn],
+      func: fn,
       args: request.data ? [request.data] : [],
       target: { tabId: sender.tab.id },
       world: 'MAIN',
     });
-    return results[0].result
+    return results[0].result;
   }
 };
-

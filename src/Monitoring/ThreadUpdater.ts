@@ -20,7 +20,7 @@ import UI from '../General/UI';
 import { MINUTE, SECOND } from '../platform/helpers';
 import type Thread from '../classes/Thread';
 
-var ThreadUpdater = {
+const ThreadUpdater = {
   init(this: typeof ThreadUpdater) {
     let sc;
 
@@ -30,7 +30,7 @@ var ThreadUpdater = {
     this.audio = $.el('audio');
     if ($.engine !== 'gecko') { this.audio.src = this.beep; }
     $.on(this.audio, 'error', () => {
-      new Notice('error', this.audio.error.message || 'Error when trying to play thread updater beep.', 15);
+      return new Notice('error', this.audio.error.message || 'Error when trying to play thread updater beep.', 15);
     });
 
     // Return after the audio player is initiated, so it works in the settings preview.
@@ -61,17 +61,17 @@ var ThreadUpdater = {
       {className: 'brackets-wrap updatelink'});
     $.extend(updateLink, {innerHTML: '<a href="javascript:;">Update</a>'});
     $.on(d, '4chanXInitFinished', function() {
-      let navLinksBot;
-      if (navLinksBot = $('.navLinksBot')) { return $.add(navLinksBot, [$.tn(' '), updateLink]); }
+      const navLinksBot = $('.navLinksBot');
+      if (navLinksBot) { return $.add(navLinksBot, [$.tn(' '), updateLink]); }
     });
     $.on(updateLink.firstElementChild, 'click', this.update);
 
     const subEntries = [];
     for (const name in Config.updater.checkbox) {
-      var conf = Config.updater.checkbox[name];
+      const conf = Config.updater.checkbox[name];
       const el = UI.checkbox(name, name);
       el.title = conf[1];
-      var input = el.firstElementChild;
+      const input = el.firstElementChild;
       $.on(input, 'change', $.cb.checked);
       if (input.name === 'Scroll BG') {
         $.on(input, 'change', this.cb.scrollBG);
@@ -89,13 +89,13 @@ var ThreadUpdater = {
 
     subEntries.push({el: this.settings});
 
-    UIState.headerMenu.addEntry(this.entry = {
+    this.entry = {
       el: $.el('span',
         {textContent: 'Updater'}),
       order: 110,
       subEntries
-    }
-    );
+    };
+    UIState.headerMenu.addEntry(this.entry);
 
     return Callbacks.Thread.push({
       name: 'Thread Updater',
@@ -163,14 +163,15 @@ var ThreadUpdater = {
     },
 
     scrollBG() {
-      return ThreadUpdater.scrollBG = Conf['Scroll BG'] ?
+      ThreadUpdater.scrollBG = Conf['Scroll BG'] ?
         () => true
       :
         () => !d.hidden;
+      return ThreadUpdater.scrollBG;
     },
 
     interval(e) {
-      let val = parseInt(this.value, 10);
+      let val = Number.parseInt(this.value, 10);
       if (val < 1) { val = 1; }
       ThreadUpdater.interval = (this.value = val);
       if (e) { return $.cb.value.call(this); }
@@ -192,8 +193,8 @@ var ThreadUpdater = {
             let confirmed;
             if (this.status === 200) {
               confirmed = true;
-              for (var page of this.response) {
-                for (var thread of page.threads) {
+              for (const page of this.response) {
+                for (const thread of page.threads) {
                   if (thread.no === ThreadUpdater.thread.ID) {
                     confirmed = false;
                     break;
@@ -282,16 +283,17 @@ var ThreadUpdater = {
   },
 
   set(name, text, klass) {
-    let node;
     const el = ThreadUpdater[name];
-    if ((node = el.firstChild)) {
+    const node = el.firstChild;
+    if (node) {
       // Prevent the creation of a new DOM Node
       // by setting the text node's data.
       node.data = text;
     } else {
       el.textContent = text;
     }
-    return el.className = klass ?? (text === '' ? 'empty' : '');
+    el.className = klass ?? (text === '' ? 'empty' : '');
+    return el.className;
   },
 
   timeout() {
@@ -306,41 +308,36 @@ var ThreadUpdater = {
   },
 
   update() {
-    let oldReq;
     clearTimeout(ThreadUpdater.timeoutID);
     ThreadUpdater.set('timer', '...', 'loading');
-    if (oldReq = ThreadUpdater.req) {
+    const oldReq = ThreadUpdater.req;
+    if (oldReq) {
       delete ThreadUpdater.req;
       oldReq.abort();
     }
-    return ThreadUpdater.req = $.whenModified(
+    ThreadUpdater.req = $.whenModified(
       g.SITE.urls.threadJSON({boardID: ThreadUpdater.thread.board.ID, threadID: ThreadUpdater.thread.ID}),
       'ThreadUpdater',
       ThreadUpdater.cb.load,
       { timeout: MINUTE }
     );
+    return ThreadUpdater.req;
   },
 
   updateThreadStatus(type, status) {
-    let hasChanged;
-    if (!(hasChanged = ThreadUpdater.thread[`is${type}`] !== status)) { return; }
+    if (ThreadUpdater.thread[`is${type}`] === status) { return; }
     ThreadUpdater.thread.setStatus(type, status);
     if ((type === 'Closed') && ThreadUpdater.thread.isArchived) { return; }
-    const change = type === 'Sticky' ?
-      status ?
-        'now a sticky'
-      :
-        'not a sticky anymore'
-    :
-      status ?
-        'now closed'
-      :
-        'not closed anymore';
+    let change = '';
+    if (type === 'Sticky') {
+      change = status ? 'now a sticky' : 'not a sticky anymore';
+    } else {
+      change = status ? 'now closed' : 'not closed anymore';
+    }
     return new Notice('info', `The thread is ${change}.`, 30);
   },
 
   parse(req: XMLHttpRequest) {
-    let ID, ipCountEl, post;
     const postObjects = req.response.posts;
     const OP = postObjects[0];
     const thread: Thread = ThreadUpdater.thread;
@@ -348,111 +345,24 @@ var ThreadUpdater = {
     const lastPost = ThreadUpdater.postIDs[ThreadUpdater.postIDs.length - 1];
 
     // XXX Reject updates that falsely delete the last post.
-    if ((postObjects[postObjects.length-1].no < lastPost) &&
+    if ((postObjects[postObjects.length - 1].no < lastPost) &&
       ((new Date(req.getResponseHeader('Last-Modified')) - thread.posts.get(lastPost).info.date) < (30 * SECOND))) { return; }
 
-    g.SITE.Build.spoilerRange[board] = OP.custom_spoiler;
-    thread.setStatus('Archived', !!OP.archived);
-    ThreadUpdater.updateThreadStatus('Sticky', !!OP.sticky);
-    ThreadUpdater.updateThreadStatus('Closed', !!OP.closed);
-    thread.postLimit = !!OP.bumplimit;
-    thread.fileLimit = !!OP.imagelimit;
-    if (OP.unique_ips) thread.ipCount = OP.unique_ips;
+    ThreadUpdater.updateMetadata(OP, board, thread);
 
-    const posts    = []; // new post objects
-    const index    = []; // existing posts
-    const files    = []; // existing files
-    const newPosts = []; // new post fullID list for API
+    const { posts, index, files, newPosts } = ThreadUpdater.processPostObjects(postObjects, lastPost, board, thread);
 
-    // Build the index, create posts.
-    for (var postObject of postObjects) {
-      ID = postObject.no;
-      index.push(ID);
-      if (postObject.fsize) { files.push(ID); }
-
-      // Insert new posts, not older ones.
-      if (ID <= lastPost) { continue; }
-
-      // XXX Resurrect wrongly deleted posts.
-      if ((post = thread.posts.get(ID)) && !post.isFetchedQuote) {
-        post.resurrect();
-        continue;
-      }
-
-      newPosts.push(`${board}.${ID}`);
-      var node = g.SITE.Build.postFromObject(postObject, board.ID);
-      posts.push(new Post(node, thread, board));
-      // Fetching your own posts after posting
-      if (ThreadUpdater.postID === ID) { delete ThreadUpdater.postID; }
-    }
-
-    // Check for deleted posts.
     const deletedPosts = [];
-    for (ID of ThreadUpdater.postIDs) {
-      if (!index.includes(ID)) {
-        thread.posts.get(ID).kill();
-        deletedPosts.push(`${board}.${ID}`);
-      }
-    }
-    ThreadUpdater.postIDs = index;
-
-    // Check for deleted files.
     const deletedFiles = [];
-    for (ID of ThreadUpdater.fileIDs) {
-      if (!(files.includes(ID) || deletedPosts.includes(`${board}.${ID}`))) {
-        thread.posts.get(ID).kill(true);
-        deletedFiles.push(`${board}.${ID}`);
-      }
-    }
-    ThreadUpdater.fileIDs = files;
+    ThreadUpdater.findDeletedPostsAndFiles(board, thread, index, files, deletedPosts, deletedFiles);
 
     if (!posts.length) {
       ThreadUpdater.set('status', '');
     } else {
-      ThreadUpdater.set('status', `+${posts.length}`, 'new');
-      ThreadUpdater.outdateCount = 0;
-
-      const unreadCount   = Unread.posts?.size;
-      const unreadQYCount = Unread.postsQuotingYou?.size;
-
-      for (const post of posts) { Callbacks.Post.execute(post); }
-
-      if (d.hidden || !d.hasFocus()) {
-        if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
-          ThreadUpdater.playBeep();
-          if (Conf['Beep']) { ThreadUpdater.playBeep(); }
-        } else if (Conf['Beep'] && (Unread.posts?.size > 0) && (unreadCount === 0)) {
-          ThreadUpdater.playBeep();
-        }
-      }
-
-      const scroll = Conf['Auto Scroll'] && ThreadUpdater.scrollBG() &&
-        ((ThreadUpdater.root.getBoundingClientRect().bottom - doc.clientHeight) < 25);
-
-      let firstPost = null;
-      for (post of posts) {
-        if (!QuoteThreading.insert(post)) {
-          if (!firstPost) { firstPost = post.nodes.root; }
-          $.add(ThreadUpdater.root, post.nodes.root);
-        }
-      }
-      $.event('PostsInserted', null, ThreadUpdater.root);
-
-      if (scroll) {
-        if (Conf['Bottom Scroll']) {
-          window.scrollTo(0, d.body.clientHeight);
-        } else {
-          if (firstPost) { UIState.scrollTo(firstPost); }
-        }
-      }
+      ThreadUpdater.handleNewPosts(posts);
     }
 
-    // Update IP count in original post form.
-    if (OP.unique_ips && (ipCountEl = $.id('unique-ips'))) {
-      ipCountEl.textContent = OP.unique_ips;
-      ipCountEl.previousSibling.textContent = ipCountEl.previousSibling.textContent.replace(/\b(?:is|are)\b/, OP.unique_ips === 1 ? 'is' : 'are');
-      ipCountEl.nextSibling.textContent = ipCountEl.nextSibling.textContent.replace(/\bposters?\b/, OP.unique_ips === 1 ? 'poster' : 'posters');
-    }
+    ThreadUpdater.updateIPCount(OP);
 
     return $.event('ThreadUpdate', {
       404: false,
@@ -463,8 +373,125 @@ var ThreadUpdater = {
       postCount: OP.replies + 1,
       fileCount: OP.images + !!OP.fsize,
       ipCount: OP.unique_ips
+    });
+  },
+
+  updateMetadata(OP, board, thread) {
+    g.SITE.Build.spoilerRange[board] = OP.custom_spoiler;
+    thread.setStatus('Archived', !!OP.archived);
+    ThreadUpdater.updateThreadStatus('Sticky', !!OP.sticky);
+    ThreadUpdater.updateThreadStatus('Closed', !!OP.closed);
+    thread.postLimit = !!OP.bumplimit;
+    thread.fileLimit = !!OP.imagelimit;
+    if (OP.unique_ips) { thread.ipCount = OP.unique_ips; }
+  },
+
+  processPostObjects(postObjects, lastPost, board, thread) {
+    const posts    = []; // new post objects
+    const index    = []; // existing posts
+    const files    = []; // existing files
+    const newPosts = []; // new post fullID list for API
+
+    for (const postObject of postObjects) {
+      const ID = postObject.no;
+      index.push(ID);
+      if (postObject.fsize) { files.push(ID); }
+
+      // Insert new posts, not older ones.
+      if (ID <= lastPost) { continue; }
+
+      // XXX Resurrect wrongly deleted posts.
+      const post = thread.posts.get(ID);
+      if (post && !post.isFetchedQuote) {
+        post.resurrect();
+        continue;
+      }
+
+      newPosts.push(`${board}.${ID}`);
+      const node = g.SITE.Build.postFromObject(postObject, board.ID);
+      posts.push(new Post(node, thread, board));
+      // Fetching your own posts after posting
+      if (ThreadUpdater.postID === ID) { delete ThreadUpdater.postID; }
     }
-    );
+
+    return { posts, index, files, newPosts };
+  },
+
+  findDeletedPostsAndFiles(board, thread, index, files, deletedPosts, deletedFiles) {
+    for (const ID of ThreadUpdater.postIDs) {
+      if (!index.includes(ID)) {
+        thread.posts.get(ID).kill();
+        deletedPosts.push(`${board}.${ID}`);
+      }
+    }
+    ThreadUpdater.postIDs = index;
+
+    for (const ID of ThreadUpdater.fileIDs) {
+      if (!(files.includes(ID) || deletedPosts.includes(`${board}.${ID}`))) {
+        thread.posts.get(ID).kill(true);
+        deletedFiles.push(`${board}.${ID}`);
+      }
+    }
+    ThreadUpdater.fileIDs = files;
+  },
+
+  handleNewPosts(posts) {
+    ThreadUpdater.set('status', `+${posts.length}`, 'new');
+    ThreadUpdater.outdateCount = 0;
+
+    const unreadCount   = Unread.posts?.size;
+    const unreadQYCount = Unread.postsQuotingYou?.size;
+
+    for (const post of posts) { Callbacks.Post.execute(post); }
+
+    ThreadUpdater.beepForUnread(unreadCount, unreadQYCount);
+
+    const scroll = Conf['Auto Scroll'] && ThreadUpdater.scrollBG() &&
+      ((ThreadUpdater.root.getBoundingClientRect().bottom - doc.clientHeight) < 25);
+
+    const firstPost = ThreadUpdater.insertPosts(posts);
+    $.event('PostsInserted', null, ThreadUpdater.root);
+
+    if (scroll) { ThreadUpdater.scrollToNewPosts(firstPost); }
+  },
+
+  beepForUnread(unreadCount, unreadQYCount) {
+    if (!d.hidden && d.hasFocus()) { return; }
+    if (Conf['Beep Quoting You'] && (Unread.postsQuotingYou?.size > unreadQYCount)) {
+      ThreadUpdater.playBeep();
+      if (Conf['Beep']) { ThreadUpdater.playBeep(); }
+    } else if (Conf['Beep'] && (Unread.posts?.size > 0) && (unreadCount === 0)) {
+      ThreadUpdater.playBeep();
+    }
+  },
+
+  insertPosts(posts) {
+    let firstPost = null;
+    for (const post of posts) {
+      if (!QuoteThreading.insert(post)) {
+        if (!firstPost) { firstPost = post.nodes.root; }
+        $.add(ThreadUpdater.root, post.nodes.root);
+      }
+    }
+    return firstPost;
+  },
+
+  scrollToNewPosts(firstPost) {
+    if (Conf['Bottom Scroll']) {
+      window.scrollTo(0, d.body.clientHeight);
+    } else if (firstPost) {
+      UIState.scrollTo(firstPost);
+    }
+  },
+
+  updateIPCount(OP) {
+    if (!OP.unique_ips) return;
+    const ipCountEl = $.id('unique-ips');
+    if (ipCountEl) {
+      ipCountEl.textContent = OP.unique_ips;
+      ipCountEl.previousSibling.textContent = ipCountEl.previousSibling.textContent.replace(/\b(?:is|are)\b/, OP.unique_ips === 1 ? 'is' : 'are');
+      ipCountEl.nextSibling.textContent = ipCountEl.nextSibling.textContent.replace(/\bposters?\b/, OP.unique_ips === 1 ? 'poster' : 'posters');
+    }
   }
 };
 export default ThreadUpdater;
