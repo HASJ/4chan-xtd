@@ -1181,7 +1181,7 @@ Callbacks.handleErrors({
   // Parses posting-delay error messages ("you must wait n minutes") and sets cooldowns accordingly.
   handleDelayError(err, post) {
     const delayText = err.textContent || '';
-    const delayPattern = /\d+\s+(?:minute|second)/gi;
+    const delayPattern = /\d+\s+(?:minute|second)/gi; // NOSONAR \d and \s are disjoint char classes, no backtracking ambiguity; already linear
     const m = [];
     let delayMatch = delayPattern.exec(delayText);
     while (delayMatch) {
