@@ -239,30 +239,43 @@ export class VideoStripper {
     return { stripped, offset };
   }
 
+  // Returns the offset past the EBML header if uint8 at offset starts with one, else null.
+  private static tryReadEbmlHeader(uint8: Uint8Array, offset: number): number | null {
+    if (!(uint8[offset] === 0x1a && uint8[offset + 1] === 0x45 && uint8[offset + 2] === 0xdf && uint8[offset + 3] === 0xa3)) {
+      return null;
+    }
+    const sizeInfo = this.readVint(uint8, offset + 4);
+    return offset + 4 + sizeInfo.length + sizeInfo.val;
+  }
+
+  // Returns the processed Segment result if uint8 at offset starts with one, else null.
+  private static tryProcessSegment(uint8: Uint8Array, offset: number): { stripped: boolean; offset: number } | null {
+    if (!(uint8[offset] === 0x18 && uint8[offset + 1] === 0x53 && uint8[offset + 2] === 0x80 && uint8[offset + 3] === 0x67)) {
+      return null;
+    }
+    const sizeInfo = this.readVint(uint8, offset + 4);
+    const segStart = offset + 4 + sizeInfo.length;
+    const segEnd = sizeInfo.val === -1 ? uint8.length : segStart + sizeInfo.val;
+    return this.processSegment(uint8, segStart, segEnd);
+  }
+
   private static stripWebm(uint8: Uint8Array): boolean {
     let offset = 0;
     let stripped = false;
 
     while (offset < uint8.length) {
       if (offset + 3 >= uint8.length) break;
-      // EBML header
-      if (uint8[offset] === 0x1a && uint8[offset + 1] === 0x45 && uint8[offset + 2] === 0xdf && uint8[offset + 3] === 0xa3) {
-        const sizeInfo = this.readVint(uint8, offset + 4);
-        offset += 4 + sizeInfo.length + sizeInfo.val;
+
+      const ebmlEnd = this.tryReadEbmlHeader(uint8, offset);
+      if (ebmlEnd !== null) {
+        offset = ebmlEnd;
         continue;
       }
-      // Segment
-      if (uint8[offset] === 0x18 && uint8[offset + 1] === 0x53 && uint8[offset + 2] === 0x80 && uint8[offset + 3] === 0x67) {
-        const sizeInfo = this.readVint(uint8, offset + 4);
-        const segStart = offset + 4 + sizeInfo.length;
-        const segEnd = sizeInfo.val === -1 ? uint8.length : segStart + sizeInfo.val;
 
-        const result = this.processSegment(uint8, segStart, segEnd);
-        if (result.stripped) stripped = true;
-        offset = result.offset;
-      } else {
-        break;
-      }
+      const result = this.tryProcessSegment(uint8, offset);
+      if (!result) break;
+      if (result.stripped) stripped = true;
+      offset = result.offset;
     }
     return stripped;
   }
