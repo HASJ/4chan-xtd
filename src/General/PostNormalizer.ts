@@ -2,6 +2,14 @@ import ImageHost from "../Images/ImageHost";
 import $$ from "../platform/$$";
 import $ from "../platform/$";
 
+// Linear-time equivalent of `s.replace(/\n+$/g, '')`: scans back from the end
+// instead of retrying the `\n+` quantifier at every start position.
+function rtrimNewlines(s: string): string {
+  let i = s.length;
+  while (i > 0 && s.charCodeAt(i - 1) === 10) { i--; }
+  return s.slice(0, i);
+}
+
 export default function normalizePost(root) {
   let el, i;
   let node;
@@ -46,7 +54,7 @@ export default function normalizePost(root) {
     node.data = node.data.replace(/ +/g, ' ');
     // XXX https://a.4cdn.org/sci/thread/5942502.json, https://a.4cdn.org/news/thread/6.json, https://a.4cdn.org/wsg/thread/957536.json
     if (node.previousSibling?.nodeName === 'BR') { node.data = node.data.replace(/^\n+/g, ''); }
-    if (node.nextSibling?.nodeName === 'BR') { node.data = node.data.replace(/\n+$/g, ''); }
+    if (node.nextSibling?.nodeName === 'BR') { node.data = rtrimNewlines(node.data); }
     if (node.data === '') { $.rm(node); }
   }
   return root2;

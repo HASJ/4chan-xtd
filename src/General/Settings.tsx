@@ -517,9 +517,12 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     }
     if (compareString < '00001.00014.00022.00003') { // NOSONAR Migration version, not an IP address.
       if (data['sauces']) {
-        set('sauces', data['sauces'].replace(/^#?\s*https:\/\/www\.google\.com\/searchbyimage\?image_url=%(IMG|T?URL)&safe=off(?=$|;)/mg, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
+        // `(?=(\s*))\1` is an atomic-group emulation: it consumes the same
+        // whitespace run as `\s*` would, but never backtracks into it, which
+        // is what made the previous unbounded-quantifier version super-linear.
+        set('sauces', data['sauces'].replace(/^#?(?=(\s*))\1https:\/\/www\.google\.com\/searchbyimage\?image_url=%(IMG|T?URL)&safe=off(?=$|;)/mg, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$2&safe=off'));
         if (compareString === '00001.00014.00022.00002' && !/\bsbisrc=/.test(data['sauces'])) { // NOSONAR Migration version, not an IP address.
-          set('sauces', data['sauces'].replace(/^#?\s*https:\/\/lens\.google\.com\/uploadbyurl\?url=%(IMG|T?URL)(?=$|;)/m, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$1&safe=off'));
+          set('sauces', data['sauces'].replace(/^#?(?=(\s*))\1https:\/\/lens\.google\.com\/uploadbyurl\?url=%(IMG|T?URL)(?=$|;)/m, 'https://www.google.com/searchbyimage?sbisrc=4chanx&image_url=%$2&safe=off'));
         }
       }
     }

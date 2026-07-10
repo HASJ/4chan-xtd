@@ -12,24 +12,32 @@ import { setBoardLinkURL, updateBoardListLinks } from "./HeaderBoardLists";
 import { openSettings } from "./SettingsBridge";
 import UIState from "../globals/UIState";
 
+const BOARDNAV_FLAG = /^-([a-z]+)(?::"[^"]+"(?:,"[^"]+")?)?/;
+const BOARDNAV_FLAG_NAMES = new Set(['all', 'title', 'replace', 'full', 'index', 'catalog', 'archive', 'expired', 'nt', 'mode', 'sort', 'text']);
+const BOARDNAV_WORD = /[\w@]/;
+
+// Finds the end index of the token starting at `i`: a word (board ID plus any
+// trailing `-flag` suffixes) or a run of non-word separator characters.
+function boardNavTokenEnd(segment: string, i: number): number {
+  let j = i + 1;
+  if (!BOARDNAV_WORD.test(segment[i])) {
+    while (j < segment.length && !BOARDNAV_WORD.test(segment[j])) j++;
+    return j;
+  }
+  while (j < segment.length && BOARDNAV_WORD.test(segment[j])) j++;
+  let match = BOARDNAV_FLAG.exec(segment.slice(j));
+  while (match && BOARDNAV_FLAG_NAMES.has(match[1])) {
+    j += match[0].length;
+    match = BOARDNAV_FLAG.exec(segment.slice(j));
+  }
+  return j;
+}
+
 function tokenizeBoardNav(segment: string): string[] {
-  const FLAG = /^-([a-z]+)(?::"[^"]+"(?:,"[^"]+")?)?/;
-  const flagNames = new Set(['all', 'title', 'replace', 'full', 'index', 'catalog', 'archive', 'expired', 'nt', 'mode', 'sort', 'text']);
-  const WORD = /[\w@]/;
   const tokens: string[] = [];
   let i = 0;
   while (i < segment.length) {
-    let j = i + 1;
-    if (WORD.test(segment[i])) {
-      while (j < segment.length && WORD.test(segment[j])) j++;
-      let match = FLAG.exec(segment.slice(j));
-      while (match && flagNames.has(match[1])) {
-        j += match[0].length;
-        match = FLAG.exec(segment.slice(j));
-      }
-    } else {
-      while (j < segment.length && !WORD.test(segment[j])) j++;
-    }
+    const j = boardNavTokenEnd(segment, i);
     tokens.push(segment.slice(i, j));
     i = j;
   }

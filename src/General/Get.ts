@@ -1,6 +1,14 @@
 import { Conf, g } from "../globals/globals";
 import $ from "../platform/$";
 
+// Linear-time equivalent of `id.match(/\d*$/)[0]`: scans backwards from the
+// end instead of retrying `\d*` at every start position (avoids O(n^2) backtracking).
+function trailingDigits(id: string): string {
+  let i = id.length;
+  while (i > 0 && id.charCodeAt(i - 1) >= 48 && id.charCodeAt(i - 1) <= 57) { i--; }
+  return id.slice(i);
+}
+
 const Get: any = {
   url(type, IDs, ...args) {
     const site = g.sites[IDs.siteID];
@@ -24,7 +32,7 @@ const Get: any = {
   threadFromRoot(root) {
     if (root == null) { return null; }
     const {board} = root.dataset;
-    return g.threads!.get(`${board ? encodeURIComponent(board) : g.BOARD!.ID}.${root.id.match(/\d*$/)[0]}`);
+    return g.threads!.get(`${board ? encodeURIComponent(board) : g.BOARD!.ID}.${trailingDigits(root.id)}`);
   },
   threadFromNode(node) {
     return Get.threadFromRoot($.x(`ancestor-or-self::${g.SITE.xpath.thread}`, node));
@@ -45,6 +53,7 @@ const Get: any = {
       if (!threadID) { threadID = 0; }
     } else {
       const match = link.href.match(g.SITE.regexp.quotelink);
+      if (!match) { return undefined; }
       [boardID, threadID, postID] = match.slice(1);
       if (!postID) { postID = threadID; }
     }
@@ -88,10 +97,9 @@ const Get: any = {
     // Third:
     //   Filter out irrelevant quotelinks.
     return quotelinks.filter(function(quotelink) {
-      const {boardID, postID} = Get.postDataFromLink(quotelink);
-      return (boardID === post.board.ID) && (postID === post.ID);
+      const data = Get.postDataFromLink(quotelink);
+      return data && (data.boardID === post.board.ID) && (data.postID === post.ID);
     });
   }
 };
 export default Get;
-
