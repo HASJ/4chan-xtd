@@ -11,7 +11,7 @@ import Get from "../General/Get";
 import RestoreDeletedFromArchive from "../Archive/RestoreDeletedFromArchive";
 
 export default class Fetcher {
-  static flagCSS: HTMLLinkElement | null;
+  static flagCSS: HTMLLinkElement | null; // NOSONAR lazily-assigned cache, reassigned in insert() — `readonly` would be a TS2540 compile error
 
   declare boardID: string;
   declare threadID: number;

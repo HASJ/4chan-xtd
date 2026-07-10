@@ -43,7 +43,7 @@ export default function h( // NOSONAR URI validation deliberately keeps each all
       if (!value && value !== 0) continue;
       innerHTML += ` ${attribute}`;
       if (value === true) continue;
-      let valStr = value.toString();
+      let valStr = value.toString(); // NOSONAR attribute values are conventionally primitives by this file's design (see jsx.d.ts)
       if (attribute === 'href' || attribute === 'src') {
         const valTrim = valStr.trim().toLowerCase();
         if (valTrim.startsWith('javascript:')) {
@@ -70,11 +70,11 @@ export default function h( // NOSONAR URI validation deliberately keeps each all
       if (child === null || child === undefined || child === '') continue;
 
       if (child instanceof Object && "innerHTML" in child && child[isEscaped]) {
-        innerHTML += child.innerHTML;
+        innerHTML += child.innerHTML; // NOSONAR narrowed via `"innerHTML" in child` above, always a string here
         continue;
       }
 
-      innerHTML += E(child.toString());
+      innerHTML += E(child.toString()); // NOSONAR children are conventionally primitives or EscapedHtml by this file's design
     }
   }
 

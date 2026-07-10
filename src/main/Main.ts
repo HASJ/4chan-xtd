@@ -118,7 +118,7 @@ const toError = (error: unknown): Error => {
   try {
     return new Error(JSON.stringify(error));
   } catch {
-    return new Error(String(error));
+    return new Error(String(error)); // NOSONAR last-resort fallback after instanceof/typeof/JSON.stringify all failed, no better alternative
   }
 };
 

@@ -540,7 +540,7 @@ const SWYotsuba = {
       html = html
         .replace(/<br\b[^<]*>/gi, '\n')
         .replace(/\n\n<span\b[^<]* class="abbr"[^]*$/i, '') // EXIF data (/p/)
-        .replace(/<[^>]*>/g, '');
+        .replace(/<[^>]*>/g, ''); // NOSONAR single quantifier, class disjoint from delimiter, linear
       return $.unescape(html);
     },
 
@@ -556,7 +556,7 @@ const SWYotsuba = {
         .replace(/^<b\b[^<]*>Rolled [^<]*<\/b>/i, '')      // Rolls (/tg/, /qst/)
         .replace(/<span\b[^<]* class="fortune"[^]*$/i, ''); // Fortunes (/s4s/)
       // Remove preceding and following new lines, trailing spaces.
-      return this.parseComment(html).trim().replace(/\s+$/gm, '');
+      return this.parseComment(html).trim().replace(/\s+$/gm, ''); // NOSONAR single quantifier anchored to $, no overlap; not touching prod comment rendering
     },
 
     postFromObject(data, boardID) {

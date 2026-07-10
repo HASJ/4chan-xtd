@@ -228,7 +228,7 @@ const SWTinyboard = {
     parseComment(html: string): string {
       html = html
         .replace(/<br\b[^<]*>/gi, '\n')
-        .replace(/<[^>]*>/g, '');
+        .replace(/<[^>]*>/g, ''); // NOSONAR single quantifier, class disjoint from delimiter, linear
       return $.unescape(html);
     }
   },
@@ -293,9 +293,9 @@ const SWTinyboard = {
 
     const nameNode = $('.postfilename', text);
     $.extend(file, {
-      name:       nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0],
+      name:       nameNode ? (nameNode.title || nameNode.textContent) : link.pathname.match(/[^/]*$/)[0], // NOSONAR single quantifier anchored to end, linear
       size:       info[2],
-      dimensions: info[0].match(/\d+x\d+/)?.[0]
+      dimensions: info[0].match(/\d+x\d+/)?.[0] // NOSONAR digit/'x' classes disjoint, no backtracking ambiguity
     });
     if (thumb) {
       $.extend(file, {

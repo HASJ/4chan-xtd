@@ -584,8 +584,7 @@ const Embedding = {
     }
     , {
       key: 'Twitter',
-      regExp: // NOSONAR complex intentionally, matches every known Twitter/X mirror domain
-        /^\w+:\/\/(?:www\.|mobile\.)?(?:(?:(?:fx|vx)?twitter|(?:fixup|fixv)?x|twittpr|xcancel)\.com|nitter\.\w+.\w+)\/(\w+\/status\/\d+)/,
+      regExp: /^\w+:\/\/(?:www\.|mobile\.)?(?:(?:(?:fx|vx)?twitter|(?:fixup|fixv)?x|twittpr|xcancel)\.com|nitter\.\w+.\w+)\/(\w+\/status\/\d+)/, // NOSONAR complex intentionally, matches every known Twitter/X mirror domain
       style: 'border: none; width: 550px; height: 250px; overflow: hidden; resize: both;',
       el(a) {
         if (Conf.XEmbedder === 'tf') {
@@ -670,7 +669,7 @@ const Embedding = {
         if (start) { start = start[1]; }
         if (start && !/^\d+$/.test(start)) {
           start += ' 0h0m0s';
-          start = (3600 * start.match(/(\d+)h/)[1]) + (60 * start.match(/(\d+)m/)[1]) + (1 * start.match(/(\d+)s/)[1]);
+          start = (3600 * start.match(/(\d+)h/)[1]) + (60 * start.match(/(\d+)m/)[1]) + (1 * start.match(/(\d+)s/)[1]); // NOSONAR digit class is disjoint from the following letter, no backtracking ambiguity
         }
         const el = $.el('iframe',
           {src: `//www.youtube.com/embed/${a.dataset.uid}?rel=0&wmode=opaque${start ? '&start=' + start : ''}`});

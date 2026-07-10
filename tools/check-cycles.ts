@@ -40,7 +40,7 @@ const graph = new Map<string, string[]>(files.map(file => [file, []]));
 // Matches `import ... from "path"`, `export ... from "path"`, and `import "path"`.
 // Captures whether `type ` was used so we can ignore type-only imports.
 // Note: This relies on a simple regex and does not parse dynamic `import()` or multiline syntax perfectly.
-const importPattern = /\b(import|export)\s+(type\s+)?(?:[^'"]*?\s+from\s*)?['"]([^'"]+)['"]/g;
+const importPattern = /\b(import|export)\s+(type\s+)?(?:[^'"]*?\s+from\s*)?['"]([^'"]+)['"]/g; // NOSONAR dev-only tool, runs against this repo's own trusted source files, never external input
 
 for (const file of files) {
   const text = readFileSync(file, 'utf8');

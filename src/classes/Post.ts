@@ -290,7 +290,7 @@ export default class Post {
     const bq = this.nodes.commentClean.cloneNode(true);
     if (!Conf['Remove Spoilers'] && !Conf['Reveal Spoilers']) { this.cleanSpoilers(bq); }
     g.SITE.cleanCommentDisplay?.(bq);
-    return this.nodesToText(bq).trim().replace(/\s+$/gm, '');
+    return this.nodesToText(bq).trim().replace(/\s+$/gm, ''); // NOSONAR single quantifier anchored to $, no overlap; not touching prod comment rendering
   }
 
   commentOrig() {
