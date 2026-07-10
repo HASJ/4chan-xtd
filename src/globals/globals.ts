@@ -49,7 +49,7 @@ export const g: {
   NAMESPACE: string,
   sites:     Record<string, any>,
   boardID?:  string,
-  boards:    Board[],
+  boards:    Record<string, import("../classes/Board").default>,
   posts?:    SimpleDict<Post>,
   threads?:  SimpleDict<Thread>,
   threadID?: number,

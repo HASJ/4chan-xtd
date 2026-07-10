@@ -225,7 +225,7 @@ const QR = {
         QR.dialog();
       } catch (err) {
         delete QR.nodes;
-        Callbacks.errorHandler?.({
+Callbacks.handleErrors({
           message: 'Quick Reply dialog creation crashed.',
           error: err
         });
@@ -438,7 +438,7 @@ const QR = {
         const quoted = QR.quoteRange(sel.getRangeAt(i), postRange, root);
         if (quoted) { text += quoted; }
       } catch (error) {
-        Callbacks.errorHandler?.({
+Callbacks.handleErrors({
           message: 'Quick Reply quote extraction failed.',
           error
         });

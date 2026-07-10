@@ -1052,7 +1052,7 @@ User agent: ${navigator.userAgent}\
     ['Check for Updates',         GithubUpdater],
   ]
 };
-Callbacks.errorHandler = Main.handleErrors;
+Callbacks.setErrorHandler(Main.handleErrors);
 
 
 // Avoid Rollup tree-shaking of Main and its features
