@@ -1,5 +1,11 @@
 # 4chan XTd
 
+[![Verify](https://github.com/HASJ/4chan-xtd/actions/workflows/verify.yml/badge.svg)](https://github.com/HASJ/4chan-xtd/actions/workflows/verify.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=HASJ_4chan-xtd&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=HASJ_4chan-xtd)
+[![GitHub release](https://img.shields.io/github/v/release/HASJ/4chan-xtd)](https://github.com/HASJ/4chan-xtd/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Greasy Fork](https://img.shields.io/greasyfork/v/489508)](https://greasyfork.org/scripts/489508-4chan-xtd)
+
 4chan XTd is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has no affiliation with it.
 
 4chan XTd was originally forked from [4chan X](https://github.com/ccd0/4chan-x). It is named XT both as a continuation of eXTended, and a T for TypeScript, the language it's written in.

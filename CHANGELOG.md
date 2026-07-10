@@ -3,6 +3,20 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.6 (2026-07-10)
+
+- Reliability
+  - Continued the SonarQube ReDoS cleanup pass: linearized/removed backtracking-prone regexes in `Embedding.tsx` (LiveLeak, Loopvid), `Fetcher.ts` (flag CSS version), `SW.tinyboard.ts` (file-size parsing), and `tools/rollup.ts` (userscript metadata). The Loopvid host/names split and the Fetcher CSS-version extraction were rewritten without regex entirely (plain `indexOf`/`slice` and a linear digit scan), since even a simple anchored `\d+$` is technically O(n²) without a leading `^`.
+  - Swapped `String#charCodeAt()` for `String#codePointAt()` across the linear-time ASCII scanners in `Get.ts`, `PostNormalizer.ts`, `Test.ts`, `Gallery.ts`, `Sauce.ts`, `Linkify.ts`, `Quotify.ts`, `CatalogThreadNative.ts`, `Post.ts`, `SW.tinyboard.ts`, and `SW.yotsuba.tsx`.
+  - Fixed a real bug found while verifying: `tools/rollup.ts` called `.replaceAll()` with a non-global regex on the userscript banner text, which throws unconditionally.
+
+- Accessibility
+  - Settings dialog's Export/Import/Reset/Close controls were `<a href="javascript:;">`, not keyboard/screen-reader navigable; converted to `<button type="button">` with matching CSS.
+  - Added missing accessible names (`aria-label`/`<label>`) to the QuickReply file-tag select and the posting test fixture's comment/file fields, and `lang` to the browser test fixtures' `<html>`.
+
+- Documentation
+  - Added `refactor-sonarlint.md` documenting every SonarLint finding resolved with a `// NOSONAR` suppression instead of a code change (a compile-breaking suggestion, and several static-analyzer false positives on disjoint character classes), with reasoning for each.
+
 ### 2.30.5 (2026-07-10)
 
 - Testing
