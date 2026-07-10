@@ -436,7 +436,7 @@ const Embedding = {
     }
     , {
       key: 'LiveLeak',
-      regExp: /^\w+:\/\/(?:\w+\.)?liveleak\.com\/.*\?.*[tif]=(\w+)/,
+      regExp: /^\w+:\/\/(?:\w+\.)?liveleak\.com\/[^?]*\?[^?]*[tif]=(\w+)/,
       el(a) {
         const el = $.el('iframe',
           {src: `https://www.liveleak.com/e/${a.dataset.uid}`,});
@@ -459,7 +459,7 @@ const Embedding = {
           $.add(el, $.el('source', {src: a.dataset.uid}));
           return el;
         }
-        const [_, host, names] = a.dataset.uid.match(/(\w+)\/(.*)/);
+        const [_, host, names] = a.dataset.uid.match(/([^/]+)\/(.*)/);
         const types = (() => { switch (host) {
           case 'gd': case 'wu': case 'fc': return [''];
           case 'gc': return ['giant', 'fat', 'zippy'];

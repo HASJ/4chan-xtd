@@ -49,7 +49,7 @@ const eventPageTsPlugin = (typescript as any)({
   const metaFileName = `${packageJson.meta.path}${minify ? '.min' : ''}.meta.js`;
 
   const metadata = await generateMetadata(packageJson, fileName, metaFileName);
-  const metaNoDownload = metadata.replace(/downloadURL( +)[^\n]+\n/, 'downloadURL$1none\n');
+  const metaNoDownload = metadata.replace(/downloadURL( +)(\S[^\n]*)\n/, 'downloadURL$1none\n');
 
   const license = await readFile(resolve(repoRoot, 'LICENSE'), 'utf8');
 

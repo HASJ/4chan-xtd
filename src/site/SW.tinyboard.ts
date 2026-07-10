@@ -288,7 +288,7 @@ const SWTinyboard = {
     const infoNode = hasParen ? nextSibling : link.nextElementSibling;
     if (!infoNode) { return false; }
 
-    const info = infoNode.textContent!.match(/\((.*,\s*)?([\d.]+ ?[KMG]?B).*\)/);
+    const info = infoNode.textContent!.match(/\(([^,()]*,\s*)?([\d.]+ ?[KMG]?B)[^)]*\)/);
     if (!info) { return false; }
 
     const nameNode = $('.postfilename', text);
