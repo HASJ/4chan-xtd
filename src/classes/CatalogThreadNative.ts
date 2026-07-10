@@ -3,6 +3,14 @@ import $ from "../platform/$";
 import Board from "./Board";
 import Thread from "./Thread";
 
+// Linear-time equivalent of `/\d*$/.exec(s)?.[0] ?? ''`: scans backwards from
+// the end instead of retrying `\d*` at every start position.
+function trailingDigits(id: string): string {
+  let i = id.length;
+  while (i > 0 && id.charCodeAt(i - 1) >= 48 && id.charCodeAt(i - 1) <= 57) { i--; }
+  return id.slice(i);
+}
+
 export default class CatalogThreadNative {
   nodes: {
     root: HTMLElement;
@@ -29,7 +37,7 @@ export default class CatalogThreadNative {
     const parentNode = this.nodes.thumb.parentNode as HTMLAnchorElement;
     this.boardID = parentNode.pathname.split(/\/+/)[1];
     this.board = g.boards[this.boardID] || new Board(this.boardID);
-    const id = /\d*$/.exec(root.dataset.id || root.id)?.[0] ?? '';
+    const id = trailingDigits(root.dataset.id || root.id);
     this.ID = this.threadID = +id;
     this.thread = this.board.threads.get(String(this.ID)) || new Thread(String(this.ID), this.board);
   }

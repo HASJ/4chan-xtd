@@ -69,7 +69,7 @@ const icons = {
    arrowDownLong:   toSvg(arrowDownLongSvg, arrowDownLongW, arrowDownLongH)
 } as const;
 
-var Icon = {
+const Icon = {
   /** Sets an icon in an HTML element */
   set (node: HTMLElement, name: keyof typeof icons, altText?: string) {
     const html = icons[name];

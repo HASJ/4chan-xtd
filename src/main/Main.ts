@@ -112,7 +112,15 @@ interface Feature {
   init(): void;
 }
 
-const toError = (error: unknown): Error => error instanceof Error ? error : new Error(String(error));
+const toError = (error: unknown): Error => {
+  if (error instanceof Error) { return error; }
+  if (typeof error === 'string') { return new Error(error); }
+  try {
+    return new Error(JSON.stringify(error));
+  } catch {
+    return new Error(String(error));
+  }
+};
 
 const Main = {
   isFirstRun: false,

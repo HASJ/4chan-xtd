@@ -13,6 +13,23 @@ import type Thread from "./Thread";
 
 let cloneSuffix = 0;
 
+// Linear-time equivalent of `id.match(/\d*$/)[0]`: scans backwards from the
+// end instead of retrying `\d*` at every start position (avoids O(n^2) backtracking).
+function trailingDigits(s: string): string {
+  let i = s.length;
+  while (i > 0 && s.charCodeAt(i - 1) >= 48 && s.charCodeAt(i - 1) <= 57) { i--; }
+  return s.slice(i);
+}
+
+// Linear-time equivalent of `/\w+$/.exec(s)?.[0]` (empty string when none):
+// scans backwards from the end instead of retrying `\w+` at every start position.
+function trailingWordChars(s: string): string {
+  const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
+  let i = s.length;
+  while (i > 0 && isWord(s.charCodeAt(i - 1))) { i--; }
+  return s.slice(i);
+}
+
 export interface File {
   text:        string,
   link:        HTMLAnchorElement,
@@ -113,7 +130,7 @@ export default class Post {
     this.thread = thread;
     this.board = board;
     $.extend(this, flags);
-    this.ID       = +(/\d*$/.exec(root.id)?.[0] ?? '');
+    this.ID       = +trailingDigits(root.id);
     this.postID   = this.ID;
     this.threadID = this.thread.ID;
     this.boardID  = this.board.ID;
@@ -138,7 +155,7 @@ export default class Post {
       tripcode,
       uniqueID:  this.nodes.uniqueID?.textContent,
       capcode:   this.nodes.capcode?.textContent.replace('## ', ''),
-      pass:      /\d*$/.exec(this.nodes.pass?.title ?? '')?.[0],
+      pass:      trailingDigits(this.nodes.pass?.title ?? ''),
       flagCode:  /flag-(\w+)/.exec(this.nodes.flag?.className ?? '')?.[1].toUpperCase(),
       flagCodeTroll: /bfl-(\w+)/.exec(this.nodes.flag?.className ?? '')?.[1].toUpperCase(),
       flag:      this.nodes.flag?.title,
@@ -378,10 +395,10 @@ export default class Post {
     }
     );
     const sizeMatch = /[\d.]+/.exec(file.size);
-    const unitMatch = /\w+$/.exec(file.size);
-    if (!(sizeMatch && unitMatch)) { return; }
+    const unitStr = trailingWordChars(file.size);
+    if (!(sizeMatch && unitStr)) { return; }
     let size  = +sizeMatch[0];
-    let unit  = ['B', 'KB', 'MB', 'GB'].indexOf(unitMatch[0]);
+    let unit  = ['B', 'KB', 'MB', 'GB'].indexOf(unitStr);
     while (unit-- > 0) { size *= 1024; }
     file.sizeInBytes = size;
 

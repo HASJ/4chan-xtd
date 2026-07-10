@@ -3,7 +3,7 @@ import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import { dict } from "../platform/helpers";
 
-var IDColor: any = {
+const IDColor: any = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW) || !Conf['Color User IDs']) { return; }
     this.ids = dict();
@@ -17,7 +17,9 @@ var IDColor: any = {
 
   node() {
     let span, uid;
-    if (this.isClone || !((uid = this.info.uniqueID) && (span = this.nodes.uniqueID))) { return; }
+    if (this.isClone) { return; }
+    uid = this.info.uniqueID;
+    if (!(uid && (span = this.nodes.uniqueID))) { return; }
 
     const rgb = IDColor.ids[uid] || IDColor.compute(uid);
 
@@ -31,7 +33,7 @@ var IDColor: any = {
   compute(uid) {
     // Convert chars to integers, bitshift and math to create a larger integer
     // Create a nice string of binary
-    const hash = g.SITE.uidColor ? g.SITE.uidColor(uid) : parseInt(uid, 16);
+    const hash = g.SITE.uidColor ? g.SITE.uidColor(uid) : Number.parseInt(uid, 16);
 
     // Convert binary string to numerical values with bitshift and '&' truncation.
     const rgb: any[] = [
@@ -48,7 +50,8 @@ var IDColor: any = {
     );
 
     // Cache.
-    return this.ids[uid] = rgb;
+    this.ids[uid] = rgb;
+    return rgb;
   }
 };
 export default IDColor;

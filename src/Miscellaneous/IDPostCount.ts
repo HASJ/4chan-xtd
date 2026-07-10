@@ -3,12 +3,12 @@ import Get from "../General/Get";
 import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 
-var IDPostCount: any = {
+const IDPostCount: any = {
   init() {
     if ((g.VIEW !== 'thread') || !Conf['Count Posts by ID']) { return; }
     Callbacks.Thread.push({
       name: 'Count Posts by ID',
-      cb() { return IDPostCount.thread = this; }
+      cb() { IDPostCount.thread = this; return this; }
     });
     return Callbacks.Post.push({
       name: 'Count Posts by ID',
@@ -28,7 +28,8 @@ var IDPostCount: any = {
     IDPostCount.thread.posts.forEach(function(post) {
       if (post.info.uniqueID === uniqueID) { return n++; }
     });
-    return this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
+    this.title = `${n} post${n === 1 ? '' : 's'} by this ID`;
+    return this.title;
   }
 };
 export default IDPostCount;

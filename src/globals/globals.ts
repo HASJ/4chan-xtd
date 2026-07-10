@@ -3,7 +3,6 @@ import meta from "../../package.json";
 import type SimpleDict from "../classes/SimpleDict";
 import type Post from "../classes/Post";
 import type Thread from "../classes/Thread";
-import type SWTinyboard from "../site/SW.tinyboard";
 
 // interfaces might be incomplete
 export interface BoardConfig {
@@ -82,8 +81,8 @@ export const E = (function () {
   };
   output.cat = function (templates) {
     let html = '';
-    for (let i = 0; i < templates.length; i++) {
-      html += templates[i].innerHTML;
+    for (const template of templates) {
+      html += template.innerHTML;
     }
     return html;
   };

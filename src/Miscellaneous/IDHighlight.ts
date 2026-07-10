@@ -2,7 +2,7 @@ import Callbacks from "../classes/Callbacks";
 import { g } from "../globals/globals";
 import $ from "../platform/$";
 
-var IDHighlight: any = {
+const IDHighlight: any = {
   init() {
     if (!['index', 'thread'].includes(g.VIEW)) { return; }
 

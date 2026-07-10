@@ -13,7 +13,7 @@ if (!token) {
 // search PATH, so a writable/untrusted PATH entry can't hijack the exec.
 const npx = join(dirname(process.execPath), process.platform === "win32" ? "npx.cmd" : "npx");
 
-const result = spawnSync(npx, [
+const result = spawnSync(npx, [ // NOSONAR npx is resolved to an absolute path from process.execPath above, not looked up via PATH; no shell, no PATH-dependent execution here.
   "@sonar/scan",
   `-Dsonar.host.url=${host}`,
   `-Dsonar.token=${token}`,

@@ -18,6 +18,36 @@ interface SauceType {
   formatters: Record<string, (post: any, file: any, ext: string) => string | undefined>;
 }
 
+// Linear-time equivalent of `s.match(/(\w+)\.\w+\//)?.[1]`: scans word blocks
+// left to right instead of retrying the pattern at every start position
+// (avoids O(n^2) backtracking on long non-matching input).
+function firstDottedSegment(s: string): string | undefined {
+  const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
+  let i = 0;
+  while (i < s.length) {
+    if (!isWord(s.charCodeAt(i))) { i++; continue; }
+    const blockStart = i;
+    while (i < s.length && isWord(s.charCodeAt(i))) { i++; }
+    if (s.charCodeAt(i) === 46 /* '.' */) {
+      const extStart = i + 1;
+      let j = extStart;
+      while (j < s.length && isWord(s.charCodeAt(j))) { j++; }
+      if ((j > extStart) && (s.charCodeAt(j) === 47 /* '/' */)) {
+        return s.slice(blockStart, i);
+      }
+    }
+  }
+  return undefined;
+}
+
+// Linear-time equivalent of `/[^.]*$/.exec(s)?.[0] || ''`: scans backwards
+// from the end instead of retrying the quantifier at every start position.
+function trailingNonDot(s: string): string {
+  let i = s.length;
+  while (i > 0 && s.charCodeAt(i - 1) !== 46 /* '.' */) { i--; }
+  return s.slice(i);
+}
+
 const Sauce: SauceType = {
   links: [],
   link: null as any,
@@ -53,7 +83,7 @@ const Sauce: SauceType = {
     if (!link) { return null; }
     const parts = Sauce.splitLinkParts(link);
     if (!parts['text']) {
-      parts['text'] = parts['url'].match(/(\w+)\.\w+\//)?.[1] || '?';
+      parts['text'] = firstDottedSegment(parts['url']) || '?';
     }
     if ('boards' in parts) {
       parts['boards'] = Filter.parseBoards(parts['boards']);
@@ -70,7 +100,7 @@ const Sauce: SauceType = {
       if (i === 0) {
         parts['url'] = part;
       } else {
-        const m = /^(\w*):?(.*)$/.exec(part);
+        const m = /^(?=(\w*))\1:?(.*)$/.exec(part);
         if (m) {
           parts[m[1]] = m[2];
         }
@@ -98,7 +128,7 @@ const Sauce: SauceType = {
 
   createSauceLink(link: Record<string, any>, post: any, file: any): HTMLAnchorElement | null {
     let a: HTMLAnchorElement, matches: RegExpMatchArray | null = null, needle: string;
-    const ext = /[^.]*$/.exec(file.url)?.[0] || '';
+    const ext = trailingNonDot(file.url);
     const parts = dict() as Record<string, any>;
     $.extend(parts, link);
 

@@ -11,6 +11,14 @@ import UIState from "../globals/UIState";
 import { g, Conf, c, d } from "../globals/globals";
 import Menu from "../Menu/Menu";
 
+// Linear-time equivalent of `id.match(/\d*$/)[0]`: scans backwards from the
+// end instead of retrying `\d*` at every start position (avoids O(n^2) backtracking).
+function trailingDigits(id: string): string {
+  let i = id.length;
+  while (i > 0 && id.charCodeAt(i - 1) >= 48 && id.charCodeAt(i - 1) <= 57) { i--; }
+  return id.slice(i);
+}
+
 const Test: any = {
   init() {
     if ((g.SITE.software !== 'yotsuba') || !(g.VIEW && ['index', 'thread'].includes(g.VIEW))) { return; }
@@ -169,7 +177,7 @@ const Test: any = {
       })());
       const list2 = ((() => {
         const result1: number[] = [];
-        for (x of ($$((g.SITE.isOPContainerThread ? `${g.SITE.selectors.thread}, ` : '') + g.SITE.selectors.postContainer))) {           result1.push(+x.id.match(/\d*$/)[0]);
+        for (x of ($$((g.SITE.isOPContainerThread ? `${g.SITE.selectors.thread}, ` : '') + g.SITE.selectors.postContainer))) {           result1.push(+trailingDigits(x.id));
         }
         return result1;
       })());

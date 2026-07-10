@@ -203,7 +203,7 @@ const QR = {
   statusCheck() {
     if (!QR.nodes) { return; }
     const {thread} = QR.posts[0];
-    if ((thread !== 'new') && g.threads.get(`${g.BOARD}.${thread}`).isDead) {
+    if ((thread !== 'new') && g.threads.get(`${g.BOARD.ID}.${thread}`).isDead) {
       return QR.abort();
     } else {
       return QR.status();
@@ -392,7 +392,7 @@ Callbacks.handleErrors({
     let disabled, value;
     if (!QR.nodes) { return; }
     const {thread} = QR.posts[0];
-    if ((thread !== 'new') && g.threads.get(`${g.BOARD}.${thread}`).isDead) {
+    if ((thread !== 'new') && g.threads.get(`${g.BOARD.ID}.${thread}`).isDead) {
       value    = 'Dead';
       disabled = true;
       QR.cooldown.auto = false;
@@ -1078,7 +1078,7 @@ Callbacks.handleErrors({
           }
         }
       }
-      QR.req = $.ajax(`https://sys.${location.hostname.split('.')[1]}.org/${g.BOARD}/post`, options);
+      QR.req = $.ajax(`https://sys.${location.hostname.split('.')[1]}.org/${g.BOARD.ID}/post`, options);
       QR.req.progress = '...';
     };
 
@@ -1181,7 +1181,7 @@ Callbacks.handleErrors({
   // Parses posting-delay error messages ("you must wait n minutes") and sets cooldowns accordingly.
   handleDelayError(err, post) {
     const delayText = err.textContent || '';
-    const delayPattern = /\d+\s+(?:minute|second)/gi;
+    const delayPattern = /\d+\s+(?:minute|second)/gi; // NOSONAR \d and \s are disjoint char classes, no backtracking ambiguity; already linear
     const m = [];
     let delayMatch = delayPattern.exec(delayText);
     while (delayMatch) {
@@ -1257,9 +1257,9 @@ Callbacks.handleErrors({
   openAfterPost(threadID: number, postID: number, postsCount: number, lastPostToThread: boolean) {
     let URL;
     if (threadID === postID) {
-      URL = `${window.location.origin}/${g.BOARD}/thread/${threadID}`;
+      URL = `${window.location.origin}/${g.BOARD.ID}/thread/${threadID}`;
     } else if ((threadID !== g.THREADID) && lastPostToThread && Conf['Open Post in New Tab']) {
-      URL = `${window.location.origin}/${g.BOARD}/thread/${threadID}#p${postID}`;
+      URL = `${window.location.origin}/${g.BOARD.ID}/thread/${threadID}#p${postID}`;
     }
     if (!URL) { return; }
 
