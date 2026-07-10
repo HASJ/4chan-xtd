@@ -10,6 +10,17 @@ import CrossOrigin from "../platform/CrossOrigin";
 import Get from "../General/Get";
 import RestoreDeletedFromArchive from "../Archive/RestoreDeletedFromArchive";
 
+// Extracts the trailing digits from `href` up to a ".css" suffix, e.g.
+// "flags.1234.css" -> "1234". Falls back to `Date.now()` when there's no
+// ".css" suffix or no trailing digits, so callers always get a value.
+function cssVersionFromHref(href: string | undefined): string | number {
+  if (!href?.endsWith('.css')) { return Date.now(); }
+  const base = href.slice(0, -4);
+  let i = base.length;
+  while (i > 0 && base.codePointAt(i - 1)! >= 48 && base.codePointAt(i - 1)! <= 57) { i--; }
+  return i < base.length ? base.slice(i) : Date.now();
+}
+
 export default class Fetcher {
   static flagCSS: HTMLLinkElement | null; // NOSONAR lazily-assigned cache, reassigned in insert() — `readonly` would be a TS2540 compile error
 
@@ -76,8 +87,7 @@ export default class Fetcher {
 
     // Set up flag CSS for cross-board links to boards with flags
     if (clone.nodes.flag && !(Fetcher.flagCSS || (Fetcher.flagCSS = $('link[href^="//s.4cdn.org/css/flags."]')))) {
-      const cssHref = $('link[href^="//s.4cdn.org/css/"]')?.href;
-      const cssVersion = (cssHref?.endsWith('.css') ? cssHref.slice(0, -4).match(/\d+$/)?.[0] : undefined) || Date.now();
+      const cssVersion = cssVersionFromHref($('link[href^="//s.4cdn.org/css/"]')?.href);
       Fetcher.flagCSS = $.el('link', {
         rel: 'stylesheet',
         href: `//s.4cdn.org/css/flags.${cssVersion}.css`
