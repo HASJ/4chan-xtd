@@ -3,6 +3,19 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.3 (2026-07-10)
+
+- Architecture
+  - Continued the module-by-module SonarQube cleanup pass across `src/Archive`, `src/classes`, `src/General`, `src/Posting`, `src/globals`, and `src/main`.
+  - `Redirect.update()`'s callback parameter is now typed as optional to match how it's actually called (`init()` invokes it with zero arguments); the callback itself was already called via `cb?.()`, so this was a type-signature fix rather than a runtime bug.
+  - Reduced cognitive complexity in several functions that were flagged well over the project's limit of 15, by extracting one helper per responsibility and flattening nesting with early `return`/`continue` rather than just relocating the same nested structure into a new function name: `Redirect.selectArchives` (43), `Redirect.update` (18), `DataBoard.get` (21), `DataBoard.ajaxCleanParse` (17), `Fetcher.fetchedPost` (18), `Post`'s constructor (25), and `PostClone`'s constructor (19).
+  - Replaced `this`-captured-as-`that` closures with bound method references (`const fn = this.method.bind(this)`) across `Redirect.ts`, `DataBoard.ts`, and `Fetcher.ts`, and gave bare XHR/`$.cache` callbacks an explicit `this: XMLHttpRequest` type instead of relying on implicit `any`.
+  - Replaced `RegExp#test()`/`.match()` with `RegExp#exec()`, `instanceof Array` with `Array.isArray()`, and manual prefix/suffix regexes with `String#startsWith`/`String#endsWith` throughout the touched modules.
+  - Converted remaining `var` declarations to `let`/`const`, extracted inline assignment expressions out of conditionals, and de-nested single-statement `else { if (...) }` blocks across all touched files.
+  - Guarded optional global state (`g.posts`, `g.threads`, `g.BOARD`, `Redirect.data`) at each access site instead of loosening their declared types.
+  - Left one SonarQube suggestion unapplied as a documented false positive: `Fetcher.flagCSS` can't be marked `readonly` because it's an intentionally lazily-mutated cache; doing so is a real compile error (`TS2540`), which was verified before deciding to keep the field mutable.
+  - Updated `docs/ARCHITECTURE.md` and `README.md` to correct an overstated "strict type checks" claim (`strict`/`strictNullChecks` are not enabled project-wide yet) and to document the patterns used across this cleanup pass.
+
 ### 2.30.2 (2026-07-09)
 
 - Bugfixes
