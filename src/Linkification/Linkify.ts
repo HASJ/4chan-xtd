@@ -48,33 +48,9 @@ const Linkify: any = {
     let i = 0;
     const links: Range[] = [];
     while ((node = snapshot.snapshotItem(i++))) {
-      let result: RegExpExecArray | null;
       const {data} = node;
       if (!data || (node.parentElement.nodeName === "A")) { continue; }
-
-      while ((result = test.exec(data))) {
-        const {index} = result;
-        let endNode = node;
-        let word    = result[0];
-        let length  = index + word.length;
-
-        // End of node, not necessarily end of space-delimited string
-        if (length === data.length) {
-          ({i, endNode, word, length} = Linkify.extendAcrossNodes(snapshot, i, node, word, test));
-        }
-
-        if (Linkify.regString.test(word)) {
-          links.push(Linkify.makeRange(node, endNode, index, length));
-
-          // #region tests_enabled
-          if (links.length) {
-            Test.assert(() => word === links[links.length - 1]?.toString());
-          }
-          // #endregion
-        }
-
-        if (!test.lastIndex || (node !== endNode)) { break; }
-      }
+      i = Linkify.scanTextNode(node, data, snapshot, i, test, links);
     }
 
     i = links.length;
@@ -82,6 +58,34 @@ const Linkify: any = {
       links[i] = Linkify.makeLink(links[i]);
     }
     return links;
+  },
+
+  // Walk the whitespace-delimited words of a single text node, recording any
+  // that match a link. Returns the (possibly advanced) snapshot index.
+  scanTextNode(node, data, snapshot, i, test, links) {
+    let result: RegExpExecArray | null;
+    while ((result = test.exec(data))) {
+      const {index} = result;
+      let endNode = node;
+      let word    = result[0];
+      let length  = index + word.length;
+
+      // End of node, not necessarily end of space-delimited string
+      if (length === data.length) {
+        ({i, endNode, word, length} = Linkify.extendAcrossNodes(snapshot, i, node, word, test));
+      }
+
+      if (Linkify.regString.test(word)) {
+        links.push(Linkify.makeRange(node, endNode, index, length));
+
+        // #region tests_enabled
+        Test.assert(() => word === links[links.length - 1]?.toString());
+        // #endregion
+      }
+
+      if (!test.lastIndex || (node !== endNode)) { break; }
+    }
+    return i;
   },
 
   // Continue a word past the end of its text node, across <br> tags and
@@ -177,7 +181,7 @@ const Linkify: any = {
     }
 
     // Make our link 'valid' if it is formatted incorrectly.
-    if (!/((mailto|magnet):|.+:\/\/)/.test(text)) {
+    if (!/((mailto|magnet):|.:\/\/)/.test(text)) {
       text = (
         /@/.test(text) ?
           'mailto:'

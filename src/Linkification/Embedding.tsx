@@ -163,7 +163,8 @@ const Embedding = {
     if (!service) { return; }
     $.addClass(link, key.toLowerCase());
     if (service.batchSize) {
-      (service.queue ??= []).push(data);
+      service.queue ??= [];
+      service.queue.push(data);
       if (service.queue.length >= service.batchSize) {
         return Embedding.flushTitles(service);
       }
