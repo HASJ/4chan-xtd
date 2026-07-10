@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.4 (2026-07-10)
+
+- Bugfixes
+  - Fixed the post/header/gallery/thread-watcher dropdown menus reopening themselves instantly after being closed by clicking the same button that opened them, instead of just closing.
+  - Fixed the build-time platform-specific code stripper (`rollup-plugin-platform-specific.ts`) mishandling `if (platform === '...') {...} else if (...) {...} else {...}` chains: it only knew how to strip a single trailing `else { ... }` block, leaving dangling braces (and broken output) for chained `else if`s.
+
 ### 2.30.3 (2026-07-10)
 
 - Architecture
