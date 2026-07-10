@@ -18,11 +18,11 @@ import EmbeddingPage from './Embedding/Embed.html';
 import EmbedFxTwitter from './Embedding/FxTwitter';
 import Icon from '../Icons/icon';
 
-var Embedding = {
+const Embedding = {
   init() {
     if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Linkify'] || (!Conf['Embedding'] && !Conf['Link Title'] && !Conf['Cover Preview'])) { return; }
     this.types = dict();
-    for (var type of this.ordered_types) { this.types[type.key] = type; }
+    for (const type of this.ordered_types) { this.types[type.key] = type; }
 
     if (Conf['Embedding'] && (g.VIEW !== 'archive')) {
       this.dialog = UI.dialog('embedding',
@@ -31,7 +31,7 @@ var Embedding = {
       $.one(d, '4chanXInitFinished', this.ready);
       $.on(d, 'IndexRefreshInternal', () => g.posts.forEach(function(post) {
         for (post of [post, ...post.clones]) {
-          for (var embed of post.nodes.embedlinks) {
+          for (const embed of post.nodes.embedlinks) {
             Embedding.cb.catalogRemove.call(embed);
           }
         }
@@ -63,20 +63,19 @@ var Embedding = {
       i = 0;
       items = $$('.linkify', post.nodes.comment);
       while ((el = items[i++])) {
-        var data;
-        if (data = Embedding.services(el)) {
+        const data = Embedding.services(el);
+        if (data) {
           Embedding.preview(data);
         }
       }
-      return;
     }
   },
 
   process(link, post) {
-    let data;
     if (!Conf['Embedding'] && !Conf['Link Title'] && !Conf['Cover Preview']) { return; }
     if ($.x('ancestor::pre', link)) { return; }
-    if (data = Embedding.services(link)) {
+    const data = Embedding.services(link);
+    if (data) {
       data.post = post;
       if (Conf['Embedding'] && (g.VIEW !== 'archive')) { Embedding.embed(data); }
       if (Embedding.shouldFetchTitles()) Embedding.title(data);
@@ -86,9 +85,9 @@ var Embedding = {
 
   services(link) {
     const {href} = link;
-    for (var type of Embedding.ordered_types) {
-      var match;
-      if (match = type.regExp.exec(href)) {
+    for (const type of Embedding.ordered_types) {
+      const match = type.regExp.exec(href);
+      if (match) {
         return {key: type.key, uid: match[1], options: match[2], link};
       }
     }
@@ -108,7 +107,7 @@ var Embedding = {
       {innerHTML: '(<span>un</span>embed)'});
 
     const object = {key, uid, options, href};
-    for (var name in object) { var value = object[name]; embed.dataset[name] = value; }
+    for (const name in object) { embed.dataset[name] = object[name]; }
 
     $.on(embed, 'click', Embedding.cb.click);
     $.after(link, [$.tn(' '), embed]);
@@ -155,16 +154,16 @@ var Embedding = {
     }
     $.on(d, 'mouseup', Embedding.dragEmbed);
     Embedding.dragEmbed.mouseup = true;
-    return style.pointerEvents = 'none';
+    style.pointerEvents = 'none';
   },
 
   title(data) {
-    let service;
-    const {key, uid, options, link, post} = data;
-    if (!(service = Embedding.types[key].title)) { return; }
+    const {key, uid, link} = data;
+    const service = Embedding.types[key].title;
+    if (!service) { return; }
     $.addClass(link, key.toLowerCase());
     if (service.batchSize) {
-      (service.queue || (service.queue = [])).push(data);
+      (service.queue ??= []).push(data);
       if (service.queue.length >= service.batchSize) {
         return Embedding.flushTitles(service);
       }
@@ -174,20 +173,19 @@ var Embedding = {
   },
 
   flushTitles(service) {
-    let data;
     const {queue} = service;
     if (!queue?.length) { return; }
     service.queue = [];
     const cb = function() {
-      for (data of queue) { Embedding.cb.title(this, data); }
+      for (const data of queue) { Embedding.cb.title(this, data); }
     };
     return CrossOrigin.cache(service.api(queue.map(data => data.uid)), cb);
   },
 
   preview(data) {
-    let service;
     const {key, uid, link} = data;
-    if (!(service = Embedding.types[key].preview)) { return; }
+    const service = Embedding.types[key].preview;
+    if (!service) { return; }
     return $.on(link, 'mouseover', function(e) {
       const src = service.url(uid);
       const {height} = service;
@@ -212,8 +210,8 @@ var Embedding = {
     click(e) {
       e.preventDefault();
       if (!$.hasClass(this, 'embedded') && (Conf['Floating Embeds'] || $.hasClass(doc, 'catalog-mode'))) {
-        let div;
-        if (!(div = Embedding.media.firstChild)) { return; }
+        const div = Embedding.media.firstChild;
+        if (!div) { return; }
         $.replace(div, Embedding.cb.embed(this));
         Embedding.lastEmbed = Get.postFromNode(this).nodes.root;
         return $.rmClass(Embedding.dialog, 'empty');
@@ -233,15 +231,13 @@ var Embedding = {
 
     embed(a) {
       // We create an element to embed
-      let el, type;
+      const type = Embedding.types[a.dataset.key];
       const container = $.el('div', {className: 'media-embed'});
-      $.add(container, (el = (type = Embedding.types[a.dataset.key]).el(a)));
+      const el = type.el(a);
+      $.add(container, el);
 
       // Set style values.
-      el.style.cssText = (type.style != null) ?
-        type.style
-      :
-        'border: none; width: 640px; height: 360px;';
+      el.style.cssText = type.style ?? 'border: none; width: 640px; height: 360px;';
 
       return container;
     },
@@ -255,8 +251,7 @@ var Embedding = {
     },
 
     title(req, data) {
-      let text;
-      const {key, uid, options, link, post} = data;
+      const {key, uid, link, post} = data;
       const service = Embedding.types[key].title;
 
       let {status} = req;
@@ -266,29 +261,26 @@ var Embedding = {
 
       if (!status) { return; }
 
-      text = `[${key}] ${(() => { switch (status) {
-        case 200: case 304:
-          text = service.text(req.response, uid);
-          if (typeof text === 'string') {
-            return text;
-          } else {
-            return text = link.textContent;
-          }
+      const message = (() => { switch (status) {
+        case 200: case 304: {
+          const fetchedText = service.text(req.response, uid);
+          return typeof fetchedText === 'string' ? fetchedText : link.textContent;
+        }
         case 404:
           return "Not Found";
         case 403: case 401:
           return "Forbidden or Private";
         default:
           return `${status}'d`;
-      } })()
-      }`;
+      } })();
+      const text = `[${key}] ${message}`;
 
       link.dataset.original = link.textContent;
       link.textContent = text;
-      for (var post2 of post.clones) {
-        for (var link2 of $$('a.linkify', post2.nodes.comment)) {
+      for (const post2 of post.clones) {
+        for (const link2 of $$('a.linkify', post2.nodes.comment)) {
           if (link2.href === link.href) {
-            if (link2.dataset.original == null) { link2.dataset.original = link2.textContent; }
+            link2.dataset.original ??= link2.textContent;
             link2.textContent = text;
           }
         }
@@ -334,7 +326,7 @@ var Embedding = {
           if ((el.videoHeight === 0) && el.parentNode) {
             return $.replace(el, Embedding.types.audio.el(a));
           } else {
-            return el.hidden = false;
+            el.hidden = false;
           }
         });
         return el;
@@ -342,10 +334,10 @@ var Embedding = {
     }
     , {
       key: 'PeerTube',
-      regExp: /^(\w+:\/\/[^\/]+\/videos\/watch\/\w{8}-\w{4}-\w{4}-\w{4}-\w{12})(.*)/,
+      regExp: /^(\w+:\/\/[^/]+\/videos\/watch\/\w{8}-\w{4}-\w{4}-\w{4}-\w{12})(.*)/,
       el(a) {
-        let start;
-        const options = (start = a.dataset.options.match(/[?&](start=\w+)/)) ? `?${start[1]}` : '';
+        const start = a.dataset.options.match(/[?&](start=\w+)/);
+        const options = start ? `?${start[1]}` : '';
         const el = $.el('iframe',
           {src: a.dataset.uid.replace('/videos/watch/', '/videos/embed/') + options});
         el.setAttribute("allowfullscreen", "true");
@@ -354,7 +346,7 @@ var Embedding = {
     }
     , {
       key: 'BitChute',
-      regExp:  /^\w+:\/\/(?:www\.)?bitchute\.com\/video\/([\w\-]+)/,
+      regExp:  /^\w+:\/\/(?:www\.)?bitchute\.com\/video\/([\w-]+)/,
       el(a) {
         const el = $.el('iframe',
           {src: `https://www.bitchute.com/embed/${a.dataset.uid}/`});
@@ -379,8 +371,8 @@ var Embedding = {
       key: 'Dailymotion',
       regExp:  /^\w+:\/\/(?:(?:www\.)?dailymotion\.com\/(?:embed\/)?video|dai\.ly)\/([A-Za-z0-9]+)[^?]*(.*)/,
       el(a) {
-        let start;
-        const options = (start = a.dataset.options.match(/[?&](start=\d+)/)) ? `?${start[1]}` : '';
+        const start = a.dataset.options.match(/[?&](start=\d+)/);
+        const options = start ? `?${start[1]}` : '';
         const el = $.el('iframe',
           {src: `//www.dailymotion.com/embed/video/${a.dataset.uid}${options}`});
         el.setAttribute("allowfullscreen", "true");
@@ -407,7 +399,7 @@ var Embedding = {
     }
     , {
       key: 'Gist',
-      regExp: /^\w+:\/\/gist\.github\.com\/[\w\-]+\/(\w+)/,
+      regExp: /^\w+:\/\/gist\.github\.com\/[\w-]+\/(\w+)/,
       style: '',
       el: (function() {
         let counter = 0;
@@ -421,7 +413,7 @@ var Embedding = {
             el.textContent = Object.values(this.response.files)[0].content;
             el.className = 'prettyprint';
             $.global('prettyPrint', {id: el.id});
-            return el.hidden = false;
+            el.hidden = false;
           });
           return el;
         };
@@ -429,7 +421,7 @@ var Embedding = {
       title: {
         api(uid) { return `https://api.github.com/gists/${uid}`; },
         text({files}) {
-          for (var file in files) { if (files.hasOwnProperty(file)) { return file; } }
+          for (const file in files) { if (files.hasOwnProperty(file)) { return file; } }
         }
       }
     }
@@ -453,7 +445,7 @@ var Embedding = {
     }
     , {
       key: 'Loopvid',
-      regExp: /^\w+:\/\/(?:www\.)?loopvid.appspot.com\/#?((?:pf|kd|lv|gd|gh|db|dx|nn|cp|wu|ig|ky|mf|m2|pc|1c|pi|ni|wl|ko|mm|ic|gc)\/[\w\-\/]+(?:,[\w\-\/]+)*|fc\/\w+\/\d+|https?:\/\/.+)/,
+      regExp: /^\w+:\/\/(?:www\.)?loopvid.appspot.com\/#?((?:pf|kd|lv|gd|gh|db|dx|nn|cp|wu|ig|ky|mf|m2|pc|1c|pi|ni|wl|ko|mm|ic|gc)\/[\w-/]+(?:,[\w-/]+)*|fc\/\w+\/\d+|https?:\/\/.+)/, // NOSONAR complex intentionally, one path per host code
       style: 'max-width: 80vw; max-height: 80vh;',
       el(a) {
         const el = $.el('video', {
@@ -462,7 +454,7 @@ var Embedding = {
           loop:     true
         }
         );
-        if (/^http/.test(a.dataset.uid)) {
+        if (a.dataset.uid.startsWith('http')) {
           $.add(el, $.el('source', {src: a.dataset.uid}));
           return el;
         }
@@ -472,10 +464,10 @@ var Embedding = {
           case 'gc': return ['giant', 'fat', 'zippy'];
           default: return ['.webm', '.mp4'];
         } })();
-        for (var name of names.split(',')) {
-          for (var type of types) {
-            var base = `${name}${type}`;
-            var urls = (() => { switch (host) {
+        for (const name of names.split(',')) {
+          for (const type of types) {
+            const base = `${name}${type}`;
+            const urls = (() => { switch (host) {
               // list from src/common.py at http://loopvid.appspot.com/source.html
               case 'pf': return [`https://kastden.org/_loopvid_media/pf/${base}`, `https://web.archive.org/web/2/http://a.pomf.se/${base}`];
               case 'kd': return [`https://kastden.org/loopvid/${base}`];
@@ -503,7 +495,7 @@ var Embedding = {
               case 'gc': return [`https://${type}.gfycat.com/${name}.webm`];
             } })();
 
-            for (var url of urls) {
+            for (const url of urls) {
               $.add(el, $.el('source', {src: url}));
             }
           }
@@ -524,16 +516,15 @@ var Embedding = {
     }
     , {
       key: 'Pastebin',
-      regExp: /^\w+:\/\/(?:\w+\.)?pastebin\.com\/(?!u\/)(?:[\w.]+(?:\/|\?i\=))?(\w+)/,
+      regExp: /^\w+:\/\/(?:\w+\.)?pastebin\.com\/(?!u\/)(?:[\w.]+(?:\/|\?i=))?(\w+)/,
       el(a) {
-        let div;
-        return div = $.el('iframe',
+        return $.el('iframe',
           {src: `//pastebin.com/embed_iframe/${a.dataset.uid}`});
       }
     }
     , {
       key: 'SoundCloud',
-      regExp: /^\w+:\/\/(?:www\.)?(?:soundcloud\.com\/|snd\.sc\/)([\w\-\/]+)/,
+      regExp: /^\w+:\/\/(?:www\.)?(?:soundcloud\.com\/|snd\.sc\/)([\w/-]+)/,
       style: 'border: 0; width: 500px; height: 400px;',
       el(a) {
         return $.el('iframe',
@@ -569,17 +560,18 @@ var Embedding = {
     }
     , {
       key: 'TwitchTV',
-      regExp: /^\w+:\/\/(?:www\.|secure\.|clips\.|m\.)?twitch\.tv\/(\w[^#\&\?]*)/,
+      regExp: /^\w+:\/\/(?:www\.|secure\.|clips\.|m\.)?twitch\.tv\/(\w[^#&?]*)/,
       el(a) {
         let url;
-        let m = a.dataset.href.match(/^\w+:\/\/(?:(clips\.)|\w+\.)?twitch\.tv\/(?:\w+\/)?(clip\/)?(\w[^#\&\?]*)/);
+        let m = a.dataset.href.match(/^\w+:\/\/(?:(clips\.)|\w+\.)?twitch\.tv\/(?:\w+\/)?(clip\/)?(\w[^#&?]*)/);
         if (m[1] || m[2]) {
           url = `//clips.twitch.tv/embed?clip=${m[3]}&parent=${location.hostname}`;
         } else {
-          let time;
           m = a.dataset.uid.match(/(\w+)(?:\/(?:v\/)?(\d+))?/);
-          url = `//player.twitch.tv/?${m[2] ? `video=v${m[2]}` : `channel=${m[1]}`}&autoplay=false&parent=${location.hostname}`;
-          if (time = a.dataset.href.match(/\bt=(\w+)/)) {
+          const videoPart = m[2] ? `video=v${m[2]}` : `channel=${m[1]}`;
+          url = `//player.twitch.tv/?${videoPart}&autoplay=false&parent=${location.hostname}`;
+          const time = a.dataset.href.match(/\bt=(\w+)/);
+          if (time) {
             url += `&time=${time[1]}`;
           }
         }
@@ -591,19 +583,20 @@ var Embedding = {
     }
     , {
       key: 'Twitter',
-      regExp:
+      regExp: // NOSONAR complex intentionally, matches every known Twitter/X mirror domain
         /^\w+:\/\/(?:www\.|mobile\.)?(?:(?:(?:fx|vx)?twitter|(?:fixup|fixv)?x|twittpr|xcancel)\.com|nitter\.\w+.\w+)\/(\w+\/status\/\d+)/,
       style: 'border: none; width: 550px; height: 250px; overflow: hidden; resize: both;',
       el(a) {
         if (Conf.XEmbedder === 'tf') {
           const el = $.el('iframe');
+          let cont;
           $.on(el, 'load', function() {
             return this.contentWindow.postMessage({element: 't', query: 'height'}, 'https://twitframe.com');
           });
-          var onMessage = function(e) {
+          const onMessage = function(e) {
             if ((e.source === el.contentWindow) && (e.origin === 'https://twitframe.com')) {
               $.off(window, 'message', onMessage);
-              return (cont || el).style.height = `${+$.minmax(e.data.height, 250, 0.8 * doc.clientHeight)}px`;
+              (cont || el).style.height = `${+$.minmax(e.data.height, 250, 0.8 * doc.clientHeight)}px`;
             }
           };
           $.on(window, 'message', onMessage);
@@ -611,7 +604,7 @@ var Embedding = {
           if ($.engine === 'gecko') {
             // XXX https://bugzilla.mozilla.org/show_bug.cgi?id=680823
             el.style.cssText = 'border: none; width: 100%; height: 100%;';
-            var cont = $.el('div');
+            cont = $.el('div');
             $.add(cont, el);
             return cont;
           } else {
@@ -670,9 +663,9 @@ var Embedding = {
     }
     , {
       key: 'YouTube',
-      regExp: /^\w+:\/\/(?:youtu.be\/|[\w.]*youtube[\w.]*\/.*(?:v=|\bembed\/|\bv\/|shorts\/|live\/|watch\/))([\w\-]{11})(.*)/,
+      regExp: /^\w+:\/\/(?:youtu.be\/|[\w.]*youtube[\w.]*\/.*(?:v=|\bembed\/|\bv\/|shorts\/|live\/|watch\/))([\w-]{11})(.*)/,
       el(a) {
-        let start = a.dataset.options.match(/\b(?:star)?t\=(\w+)/);
+        let start = a.dataset.options.match(/\b(?:star)?t=(\w+)/);
         if (start) { start = start[1]; }
         if (start && !/^\d+$/.test(start)) {
           start += ' 0h0m0s';

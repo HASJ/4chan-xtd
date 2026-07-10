@@ -1,10 +1,38 @@
 import $ from '../../platform/$';
 import Icon from '../../Icons/icon';
 import { processLinks } from '../LinkifyActions';
-import h, { type EscapedHtml, hFragment, isEscaped } from '../../globals/jsx';
+import h, { type EscapedHtml, hFragment } from '../../globals/jsx';
 import Time from '../../Miscellaneous/Time';
 import CrossOrigin from '../../platform/CrossOrigin';
 import { Conf } from '../../globals/globals';
+
+function renderMedia(tweet): EscapedHtml[] {
+  return tweet.media?.all?.map(media => {
+    switch (media.type) {
+      case 'photo':
+        return <div class="fxt-media">
+          <a href={media.url} target="_blank" referrerpolicy="no-referrer">
+            <img src={media.url} alt={media.altText} width={media.width} height={media.height}
+              referrerpolicy="no-referrer" />
+          </a>
+        </div>;
+      case 'video':
+      case 'gif':
+        return <div class="fxt-media">
+          <video controls width={media.width} height={media.height} poster={media.thumbnail_url} preload="meta">
+            <source src={media.url} type={media.format} />
+            <track kind="captions" />
+          </video>
+        </div>;
+      default:
+        console.warn(`FxTwitter media type ${media.type} not recognized`);
+    }
+  }) || [];
+}
+
+function renderDate(tweet): string {
+  return Time.format(new Date(tweet.created_at));
+}
 
 export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
   const el = $.el('div', { innerHTML: '<blockquote class="twitter-tweet">Loading&hellip;</blockquote>' });
@@ -21,33 +49,6 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
 
     // console.log(tweet);
 
-    function renderMedia(tweet): EscapedHtml[] {
-      return tweet.media?.all?.map(media => {
-        switch (media.type) {
-          case 'photo':
-            return <div class="fxt-media">
-              <a href={media.url} target="_blank" referrerpolicy="no-referrer">
-                <img src={media.url} alt={media.altText} width={media.width} height={media.height}
-                  referrerpolicy="no-referrer" />
-              </a>
-            </div>;
-          case 'video':
-          case 'gif':
-            return <div class="fxt-media">
-              <video controls width={media.width} height={media.height} poster={media.thumbnail_url} preload="meta">
-                <source src={media.url} type={media.format} />
-              </video>
-            </div>;
-          default:
-            console.warn(`FxTwitter media type ${media.type} not recognized`);
-        }
-      }) || [];
-    }
-
-    function renderDate(tweet) {
-      return Time.format(new Date(tweet.created_at));
-    }
-
     function renderPoll(tweet): EscapedHtml {
       let maxPercentage = 0;
       let maxChoiceIndex = -1;
@@ -60,7 +61,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
 
       return <div class="fxt-poll">
         {...tweet.poll.choices.map((choice, index) =>
-          <div class={`fxt-choice ${index === maxChoiceIndex ? 'highlight' : ''}`}>
+          <div key={choice.label} class={`fxt-choice ${index === maxChoiceIndex ? 'highlight' : ''}`}>
             <span class="fxt-choice_label">{choice.label}</span>
             <span class="fxt-choice_percentage">{choice.percentage}%</span>
             <div class="fxt-bar" style={`width: ${choice.percentage}%`} />
@@ -86,7 +87,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
         <a class="fxt-meta_profile" href={tweet.author.url} title={tweet.author.description} target="_blank"
           referrerpolicy="no-referrer">
           <div class="fxt-meta_avatar">
-            <img src={tweet.author.avatar_url} referrerpolicy="no-referrer" />
+            <img src={tweet.author.avatar_url} alt={tweet.author.name} referrerpolicy="no-referrer" />
           </div>
           <div class="fxt-meta_author">
             <span class="fxt-meta_author_username">{tweet.author.name}</span>
@@ -100,10 +101,10 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
     }
 
     function renderText(inputText: string): (EscapedHtml | string)[] {
-      const result = [];
+      const result: (EscapedHtml | string)[] = [];
       let endLast = 0;
 
-      for (const match of inputText.matchAll(/(?:@|\#)\w+/g)) {
+      for (const match of inputText.matchAll(/[@#]\w+/g)) {
         result.push(
           inputText.slice(endLast, match.index),
           <a href={`https://x.com/${match[0].startsWith('#') ? 'hashtag/' : ''}${match[0].slice(1)}`} target="_blank"
@@ -146,7 +147,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
     }
 
     async function renderReplies(tweet) {
-      const replies = [];
+      const replies: EscapedHtml[] = [];
       let depth = 0;
       while (tweet.replying_to && tweet.replying_to_status && depth < maxReplies) {
         const replyUrl = `${Conf.fxtUrl}/${tweet.replying_to}/status/${tweet.replying_to_status}`;
@@ -157,7 +158,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
           replies.unshift(replyHTML);
           depth++;
         } catch (error) {
-          console.error(`Error fetching/rendering reply tweet: ${error.message}`);
+          console.error(`Error fetching/rendering reply tweet: ${(error as Error).message}`);
           console.log(tweet);
           const url = `${Conf.fxtUrl}/${tweet.replying_to}/status/${tweet.replying_to_status}`
           return <div class="fxt-reply_container">
