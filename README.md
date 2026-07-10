@@ -44,7 +44,7 @@ This fork is distributed through [GitHub releases](https://github.com/HASJ/4chan
 
 Want to build from source or contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) for build commands, and [ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive into the codebase's structure.
 
-Run `npm test` for the deterministic Vitest/jsdom suite, or `npm run test:coverage` for an informational V8 report. The contributor verification checklist and fixture guidance are in [docs/TESTING.md](docs/TESTING.md).
+Run `npm test` for the deterministic Vitest/jsdom suite, or `npm run test:coverage` for an informational V8 report. Browser smoke tests use synthetic local pages: run `npm run test:browser:install` once, then `npm run test:browser`. The contributor verification checklist and fixture guidance are in [docs/TESTING.md](docs/TESTING.md).
 
 ## Troubleshooting
 If you encounter a bug, try the steps [here](CONTRIBUTING.md#reporting-bugs), then report it to the [issue tracker](https://github.com/HASJ/4chan-xtd/issues?q=is%3Aopen+sort%3Aupdated-desc). If the bug seems to be caused by a script update, you can install an old version from the [GitHub releases](https://github.com/HASJ/4chan-xtd/releases) or from [Greasy Fork](https://greasyfork.org/scripts/489508-4chan-xtd/versions).

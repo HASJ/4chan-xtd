@@ -46,6 +46,8 @@ The extension uses a custom build pipeline powered by **Rollup** and the **TypeS
 
 Vitest runs TypeScript tests in jsdom using `vitest.config.ts`; its shared setup supplies minimal userscript/browser boundary shims. The small fixture set is deliberately synthetic and must return fresh data for each test. Tests exercise public behavior and adapter output, not line-by-line singleton internals.
 
+Playwright supplies the browser smoke layer. `playwright.config.ts` starts `tests/browser/global-setup.ts`, which hosts synthetic thread, catalog, posting, and board-JSON fixtures locally. Each browser test routes supported board/API hosts to that server and installs mocked userscript APIs before loading the production userscript bundle. This retains real browser startup, DOM parsing, filtering, quote, and Quick Reply behavior without browsing or modifying live boards. Chromium and Firefox use the same suite; CI runs it on Node 22 and preserves reports/traces when it fails.
+
 The Rollup build strips `// #region tests_enabled` blocks by default through `tools/rollup-plugin-remove-test-code.ts`. Passing `-test` retains those blocks for the explicit build-test path. Production builds must not depend on test-only imports or behavior.
 
 ## Type Safety & Lint Cleanup
