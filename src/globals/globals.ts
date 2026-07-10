@@ -47,7 +47,7 @@ export const g: {
   VERSION:   string,
   VERSION_DATE: Date,
   NAMESPACE: string,
-  sites:     any[],
+  sites:     Record<string, any>,
   boardID?:  string,
   boards:    Board[],
   posts?:    SimpleDict<Post>,
