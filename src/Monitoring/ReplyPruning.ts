@@ -139,7 +139,7 @@ const ReplyPruning: ReplyPruningType = {
     if (detail?.[404]) { return; }
     for (const fullID of detail?.newPosts || []) {
       ReplyPruning.total++;
-      if (g.posts.get(fullID)?.file) { ReplyPruning.totalFiles++; }
+      if (g.posts!.get(fullID)?.file) { ReplyPruning.totalFiles++; }
     }
   },
 

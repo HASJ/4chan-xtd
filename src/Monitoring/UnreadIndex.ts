@@ -60,7 +60,7 @@ const UnreadIndex: UnreadIndexType = {
     const detail = (e as CustomEvent).detail;
     if (detail?.isCatalog) { return; }
     for (const threadID of detail?.threadIDs || []) {
-      const thread = g.threads.get(threadID);
+      const thread = g.threads!.get(threadID);
       if (thread) {
         UnreadIndex.update(thread);
       }
@@ -79,7 +79,7 @@ const UnreadIndex: UnreadIndexType = {
   },
 
   sync() {
-    g.threads.forEach((thread: any) => {
+    g.threads!.forEach((thread: any) => {
       const lastReadPost = UnreadIndex.db!.get({
         boardID: thread.board.ID,
         threadID: thread.ID

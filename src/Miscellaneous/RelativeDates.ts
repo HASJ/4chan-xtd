@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import Callbacks from "../classes/Callbacks";
 import Post from "../classes/Post";
-import { indexEnabled } from "../General/IndexState";
+import { indexState } from "../General/IndexState";
 import { g, Conf, d, doc } from "../globals/globals";
 import $ from "../platform/$";
 import { DAY, HOUR, MINUTE, SECOND } from "../platform/helpers";
@@ -15,7 +15,7 @@ const RelativeDates = {
         ['index', 'thread', 'archive'].includes(g.VIEW) &&
         ['Show', 'Both', 'BothRelativeFirst'].includes(Conf.RelativeTime)
       ) ||
-      indexEnabled
+indexState.enabled
     ) {
       this.flush();
       $.on(d, 'visibilitychange PostsInserted', this.flush);

@@ -157,7 +157,7 @@ const ThreadStats: ThreadStatsType = {
         ipCountEl.textContent = String(thread.ipCount);
       } else if (g.BOARD?.config?.user_ids) {
         const IDs = new Set();
-        g.posts.forEach((post: any) => {
+        g.posts!.forEach((post: any) => {
           if (post.info?.uniqueID) {
             IDs.add(post.info.uniqueID);
           }

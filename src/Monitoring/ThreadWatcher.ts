@@ -194,7 +194,7 @@ const ThreadWatcher: ThreadWatcherType = {
     (Icon as any).set(this.shortcut, 'eye', 'Watcher');
 
     this.db     = new DataBoard('watchedThreads', this.refresh, true);
-    this.dbLM   = new DataBoard('watcherLastModified', null, true);
+    this.dbLM   = new DataBoard('watcherLastModified', undefined, true);
     this.dialog = UI.dialog('thread-watcher', { innerHTML: ThreadWatcherPage });
     this.status = $('#watcher-status', this.dialog) as HTMLElement;
     this.list   = this.dialog.lastElementChild as HTMLElement;
@@ -263,7 +263,7 @@ const ThreadWatcher: ThreadWatcherType = {
       });
     }
 
-    if (!['index', 'thread'].includes(g.VIEW)) { return; }
+    if (!['index', 'thread'].includes(g.VIEW!)) { return; }
 
     Callbacks.Post.push({
       name: 'Thread Watcher',
@@ -416,7 +416,7 @@ const ThreadWatcher: ThreadWatcherType = {
         }
       } else if (Conf['Auto Watch Reply']) {
         ThreadWatcher.add(
-          (g.threads.get(boardID + '.' + threadID) || new Thread(threadID, (g.boards[boardID] as any) || new Board(boardID))),
+          (g.threads!.get(boardID + '.' + threadID) || new Thread(threadID, (g.boards[boardID] as any) || new Board(boardID))),
           cb, true);
       }
     },
@@ -424,7 +424,7 @@ const ThreadWatcher: ThreadWatcherType = {
       const detail = (e as CustomEvent).detail;
       const { db }    = ThreadWatcher;
       const siteID  = g.SITE.ID;
-      const boardID = g.BOARD.ID;
+      const boardID = g.BOARD!.ID;
       const boardData = db.data[siteID]?.boards[boardID];
       if (!boardData) { return; }
 
@@ -450,7 +450,7 @@ const ThreadWatcher: ThreadWatcherType = {
     },
     onThreadRefresh(e: Event) {
       const detail = (e as CustomEvent).detail;
-      const thread = g.threads.get(detail.threadID);
+      const thread = g.threads!.get(detail.threadID);
       if (!detail[404] || !ThreadWatcher.isWatched(thread)) { return; }
       // Update dead status.
       ThreadWatcher.add(thread);
@@ -767,7 +767,7 @@ const ThreadWatcher: ThreadWatcherType = {
     for (const siteID in ThreadWatcher.db.data) {
       const boards = ThreadWatcher.db.data[siteID];
       for (const boardID in boards.boards) {
-        if (Conf['Current Board'] && ((siteID !== g.SITE.ID) || (boardID !== g.BOARD.ID))) {
+        if (Conf['Current Board'] && ((siteID !== g.SITE.ID) || (boardID !== g.BOARD!.ID))) {
           continue;
         }
         ThreadWatcher.collectBoardThreads(siteID, boardID, boards.boards[boardID], groupByBoard, all);
@@ -847,7 +847,7 @@ const ThreadWatcher: ThreadWatcherType = {
     const fullID = `${boardID}.${threadID}`;
     div.dataset.fullID = fullID;
     div.dataset.siteID = siteID;
-    if ((g.VIEW === 'thread') && (fullID === `${g.BOARD.ID}.${g.THREADID}`)) { $.addClass(div, 'current'); }
+    if ((g.VIEW === 'thread') && (fullID === `${g.BOARD!.ID}.${g.THREADID}`)) { $.addClass(div, 'current'); }
     if (data.isDead) { $.addClass(div, 'dead-thread'); }
     ThreadWatcher.applyPageClasses(div, data);
     ThreadWatcher.applyUnreadClasses(div, data);
@@ -877,7 +877,7 @@ const ThreadWatcher: ThreadWatcherType = {
       while (conflicts.length > 0) {
         len++;
         prefix = siteID.slice(0, len);
-        const conflicts2 = [];
+        const conflicts2: string[] = [];
         for (const siteID2 of conflicts) {
           if (siteID2.slice(0, len) === prefix) {
             conflicts2.push(siteID2);
@@ -894,13 +894,13 @@ const ThreadWatcher: ThreadWatcherType = {
   },
 
   build() {
-    const nodes = [];
+    const nodes: HTMLElement[] = [];
     const threads = ThreadWatcher.getAll();
     ThreadWatcher.setPrefixes(threads);
     for (const { siteID, boardID, threadID, data } of threads) {
       // Add missing excerpt for threads added by Auto Watch
       let thread: any;
-      if ((data.excerpt == null) && (siteID === g.SITE.ID) && (thread = g.threads.get(`${boardID}.${threadID}`)) && thread.OP) {
+      if ((data.excerpt == null) && (siteID === g.SITE.ID) && (thread = g.threads!.get(`${boardID}.${threadID}`)) && thread.OP) {
         ThreadWatcher.db.extend({ boardID, threadID, val: { excerpt: Get.threadExcerpt(thread) } });
       }
       nodes.push(ThreadWatcher.makeLine(siteID, boardID, threadID, data));
@@ -915,7 +915,7 @@ const ThreadWatcher: ThreadWatcherType = {
   refresh(manual) {
     ThreadWatcher.build();
 
-    g.threads.forEach((thread: any) => {
+    g.threads!.forEach((thread: any) => {
       const isWatched = ThreadWatcher.isWatched(thread);
       if (thread.OP) {
         for (const post of [thread.OP, ...thread.OP.clones]) {
@@ -1057,7 +1057,7 @@ const ThreadWatcher: ThreadWatcherType = {
         el: entryEl,
         order: 60,
         open() {
-          const [addClass, rmClass, text] = ThreadWatcher.db.get({ boardID: g.BOARD.ID, threadID: g.THREADID }) ?
+          const [addClass, rmClass, text] = ThreadWatcher.db.get({ boardID: g.BOARD!.ID, threadID: g.THREADID }) ?
             ['unwatch-thread', 'watch-thread', 'Unwatch thread']
           :
             ['watch-thread', 'unwatch-thread', 'Watch thread'];
@@ -1067,7 +1067,7 @@ const ThreadWatcher: ThreadWatcherType = {
           return true;
         }
       });
-      $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads.get(`${g.BOARD.ID}.${g.THREADID}`), true));
+      $.on(entryEl, 'click', () => ThreadWatcher.toggle(g.threads!.get(`${g.BOARD!.ID}.${g.THREADID}`), true));
     },
 
     addMenuEntries() {
