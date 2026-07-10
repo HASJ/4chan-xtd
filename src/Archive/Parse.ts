@@ -191,7 +191,7 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
       dateText: data.fourchan_date,
       commentHTML: comment,
     },
-    file: null as File,
+    file: null as File | null,
     extra: null as any,
   };
 
@@ -208,7 +208,7 @@ export const parseArchivePost = (data: RawArchivePost, url: string) => {
   o.extra = dict();
 
   const board = g.boards[o.boardID] || new Board(o.boardID);
-  const thread = g.threads.get(`${o.boardID}.${o.threadID}`) || new Thread(o.threadID, board);
+  const thread = g.threads!.get(`${o.boardID}.${o.threadID}`) || new Thread(o.threadID, board);
   const post = new Post(g.SITE.Build.post(o), thread, board);
   post.resurrect();
   if (data.deleted === '1') {

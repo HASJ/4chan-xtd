@@ -12,7 +12,7 @@ const ArchiveTags = {
   '[/moot]':    {innerHTML: "</div>"},
   '[banned]':   {innerHTML: "<strong style=\"color: red;\">"},
   '[/banned]':  {innerHTML: "</strong>"},
-  '[fortune]'(text: string) { return {innerHTML: "<span class=\"fortune\" style=\"color:" + E(text.match(/#\w+|$/)[0]) + "\"><b>"}; },
+  '[fortune]'(text: string) { return {innerHTML: "<span class=\"fortune\" style=\"color:" + E(/#\w+|$/.exec(text)![0]) + "\"><b>"}; },
   '[/fortune]': {innerHTML: "</b></span>"},
   '[i]':        {innerHTML: "<span class=\"mu-i\">"},
   '[/i]':       {innerHTML: "</span>"},
