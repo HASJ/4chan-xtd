@@ -9,15 +9,11 @@
 export const debounce = (wait: number, fn: Function, leading = true) => {
   let lastCall = 0;
   let timeout = null;
-  let that = null;
-  let args = null;
-  const exec = function () {
-    lastCall = Date.now();
-    return fn.apply(that, args);
-  };
-  return function () {
-    args = arguments;
-    that = this;
+  return function (this: any, ...args: any[]) {
+    const exec = () => {
+      lastCall = Date.now();
+      return fn.apply(this, args);
+    };
     if (leading && lastCall < (Date.now() - wait)) {
       exec();
       return;
@@ -34,7 +30,7 @@ export const dict = () => Object.create(null);
 dict.clone = function (obj) {
   if ((typeof obj !== 'object') || (obj === null)) {
     return obj;
-  } else if (obj instanceof Array) {
+  } else if (Array.isArray(obj)) {
     const arr = [];
     for (let i = 0, end = obj.length; i < end; i++) {
       arr.push(dict.clone(obj[i]));
@@ -42,8 +38,8 @@ dict.clone = function (obj) {
     return arr;
   } else {
     const map = Object.create(null);
-    for (var key in obj) {
-      var val = obj[key];
+    for (const key in obj) {
+      const val = obj[key];
       map[key] = dict.clone(val);
     }
     return map;
@@ -63,13 +59,13 @@ export const isPassEnabled = () => {
   // A ticket left in localStorage is not proof that the corresponding cookie
   // still exists. In particular, clearing cookies leaves stale tickets behind
   // and must not suppress CAPTCHA initialization.
-  return document.cookie.indexOf('pass_enabled=1') >= 0;
+  return document.cookie.includes('pass_enabled=1');
 };
 
 export const keyCode = function (e: any) {
   let key = (() => {
-    let kc;
-    switch ((kc = e.keyCode)) {
+    const kc = e.keyCode;
+    switch (kc) {
       case 8: // backspace
         return '';
       case 13:
@@ -96,9 +92,9 @@ export const keyCode = function (e: any) {
         return 'Semicolon';
       default:
         if ((48 <= kc && kc <= 57) || (65 <= kc && kc <= 90)) { // 0-9, A-Z
-          return String.fromCharCode(kc).toLowerCase();
+          return String.fromCodePoint(kc).toLowerCase();
         } else if (96 <= kc && kc <= 105) { // numpad 0-9
-          return String.fromCharCode(kc - 48);
+          return String.fromCodePoint(kc - 48);
         } else {
           return null;
         }

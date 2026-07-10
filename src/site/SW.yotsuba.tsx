@@ -278,7 +278,7 @@ const SWYotsuba = {
     $.extend(file, {
       name:       text.title || link.title || link.textContent,
       size:       info[1],
-      dimensions: info[0].match(/\d+x\d+/)?.[0],
+      dimensions: info[0].match(/(?=(\d+))\1x(?=(\d+))\2/)?.[0],
       tag:        info[0].match(/,[^,]*, ([a-z]+)\)/i)?.[1],
       MD5:        text.dataset.md5
     }
@@ -403,7 +403,7 @@ const SWYotsuba = {
       const spoilerRange = this.spoilerRange[boardID];
       if (spoilerRange) {
         // Randomize the spoiler image (cosmetic only, not security-sensitive).
-        return `${this.staticPath}spoiler-${boardID}${Math.floor(1 + (spoilerRange * Math.random()))}.png`;
+        return `${this.staticPath}spoiler-${boardID}${Math.floor(1 + (spoilerRange * Math.random()))}.png`; // NOSONAR Cosmetic spoiler image variance, not security-sensitive.
       } else {
         return `${this.staticPath}spoiler.png`;
       }
@@ -598,7 +598,7 @@ const SWYotsuba = {
       const postLink = `${url}#p${ID}`;
       // Mirrors 4chan's own inline quote() handler; not user-controlled input.
       const quoteLink = this.sameThread(boardID, threadID) ?
-        `javascript:quote('${+ID}');`
+        `javascript:quote('${+ID}');` //NOSONAR Mirrors 4chan's own inline quote() handler; ID coerced to number, not user-controlled.
         :
         `${url}#q${ID}`;
 
@@ -693,7 +693,7 @@ const SWYotsuba = {
         const spoilerRange = this.spoilerRange[thread.board];
         if (spoilerRange) {
           // Randomize the spoiler image (cosmetic only, not security-sensitive).
-          src += (`-${thread.board}`) + Math.floor(1 + (spoilerRange * Math.random()));
+          src += (`-${thread.board}`) + Math.floor(1 + (spoilerRange * Math.random())); // NOSONAR Cosmetic spoiler image variance, not security-sensitive.
         }
         src += '.png';
         imgClass = 'spoiler-file';
