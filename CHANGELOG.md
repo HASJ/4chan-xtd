@@ -5,6 +5,10 @@ and import them in XTd.
 
 ### 2.30.5 (2026-07-10)
 
+- Testing
+  - Added local Playwright smoke coverage for thread display, catalog filtering, quote inlining, and Quick Reply, using synthetic fixtures and mocked userscript APIs rather than live boards.
+  - Added a Node 22 browser CI job for Chromium and Firefox, with cached browser binaries and failure artifacts.
+
 - Bugfixes
   - `VideoStripper.readVint`: fixed the EBML unknown-size check comparing a bitwise-truncated `val` against a 56-bit numeric literal that could never match; now detected from the raw bytes.
   - `Linkify.extendAcrossNodes`: resolved a SonarQube parameter-reassignment finding (`endNode` read-before-write ambiguity) with no behavior change.

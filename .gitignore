@@ -12,6 +12,7 @@ node_modules/
 builds/*
 
 # Test and local development artifacts
+/.worktrees/
 /tmp/
 /test/
 /test.html
@@ -33,6 +34,8 @@ pnpm-debug.log*
 # TypeScript and coverage
 *.tsbuildinfo
 /coverage/
+/playwright-report/
+/test-results/
 /.nyc_output/
 /.cache/
 
@@ -60,4 +63,4 @@ Desktop.ini
 GEMINI.md
 AGENTS.md
 /conductor/
-.agents/
+/.agents/
