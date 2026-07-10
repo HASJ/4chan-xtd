@@ -164,7 +164,10 @@ export class VideoStripper {
       if (off + i >= uint8.length) break;
       const next = uint8[off + i];
       if (next !== 0xff) allOnes = false;
-      val = (val << 8) | next;
+      // Use arithmetic instead of `<<`/`|`: bitwise ops coerce to 32-bit signed
+      // integers, so vints of length >= 5 (up to 8 for EBML) would silently
+      // wrap/go negative. Multiplication stays exact up to Number.MAX_SAFE_INTEGER.
+      val = (val * 256) + next;
     }
     // Handle unknown size (all data bits across the vint are 1)
     if (allOnes) val = -1;
