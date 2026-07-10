@@ -464,7 +464,15 @@ audio.controls-added {
 #fourchanx-settings > nav a {
   text-decoration: underline;
 }
-#fourchanx-settings > nav a.close {
+#fourchanx-settings > nav button {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+#fourchanx-settings > nav button.close {
   text-decoration: none;
   padding: 0 2px;
   margin: 0;
