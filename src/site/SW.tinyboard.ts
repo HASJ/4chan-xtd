@@ -17,11 +17,11 @@ function matchPosterId(text: string): [string, string] | undefined {
   const idx = text.indexOf('ID:');
   if (idx === -1) { return undefined; }
   let start = idx;
-  while (start > 0 && isSpace(text.charCodeAt(start - 1))) { start--; }
+  while (start > 0 && isSpace(text.codePointAt(start - 1)!)) { start--; }
   let end = idx + 3;
-  while (end < text.length && isSpace(text.charCodeAt(end))) { end++; }
+  while (end < text.length && isSpace(text.codePointAt(end)!)) { end++; }
   let valueEnd = end;
-  while (valueEnd < text.length && !isSpace(text.charCodeAt(valueEnd))) { valueEnd++; }
+  while (valueEnd < text.length && !isSpace(text.codePointAt(valueEnd)!)) { valueEnd++; }
   if (valueEnd === end) { return undefined; }
   return [text.slice(start, end), text.slice(end, valueEnd)];
 }

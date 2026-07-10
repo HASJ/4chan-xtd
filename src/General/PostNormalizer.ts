@@ -6,7 +6,7 @@ import $ from "../platform/$";
 // instead of retrying the `\n+` quantifier at every start position.
 function rtrimNewlines(s: string): string {
   let i = s.length;
-  while (i > 0 && s.charCodeAt(i - 1) === 10) { i--; }
+  while (i > 0 && s.codePointAt(i - 1)! === 10) { i--; }
   return s.slice(0, i);
 }
 

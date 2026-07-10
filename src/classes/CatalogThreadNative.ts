@@ -7,7 +7,7 @@ import Thread from "./Thread";
 // the end instead of retrying `\d*` at every start position.
 function trailingDigits(id: string): string {
   let i = id.length;
-  while (i > 0 && id.charCodeAt(i - 1) >= 48 && id.charCodeAt(i - 1) <= 57) { i--; }
+  while (i > 0 && id.codePointAt(i - 1)! >= 48 && id.codePointAt(i - 1)! <= 57) { i--; }
   return id.slice(i);
 }
 

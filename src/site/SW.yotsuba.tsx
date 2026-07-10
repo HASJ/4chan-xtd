@@ -33,13 +33,13 @@ function digitsBeforeExtension(s: string): string | undefined {
   const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
   const isDigit = (c: number) => c >= 48 && c <= 57;
   let wordStart = s.length;
-  while (wordStart > 0 && isWord(s.charCodeAt(wordStart - 1))) { wordStart--; }
-  if (wordStart === s.length || wordStart === 0 || s.charCodeAt(wordStart - 1) !== 46 /* '.' */) {
+  while (wordStart > 0 && isWord(s.codePointAt(wordStart - 1)!)) { wordStart--; }
+  if (wordStart === s.length || wordStart === 0 || s.codePointAt(wordStart - 1) !== 46 /* '.' */) {
     return undefined;
   }
   const dotPos = wordStart - 1;
   let digitsStart = dotPos;
-  while (digitsStart > 0 && isDigit(s.charCodeAt(digitsStart - 1))) { digitsStart--; }
+  while (digitsStart > 0 && isDigit(s.codePointAt(digitsStart - 1)!)) { digitsStart--; }
   if (digitsStart === dotPos) { return undefined; }
   return s.slice(digitsStart, dotPos);
 }

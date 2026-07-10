@@ -25,14 +25,14 @@ function firstDottedSegment(s: string): string | undefined {
   const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
   let i = 0;
   while (i < s.length) {
-    if (!isWord(s.charCodeAt(i))) { i++; continue; }
+    if (!isWord(s.codePointAt(i)!)) { i++; continue; }
     const blockStart = i;
-    while (i < s.length && isWord(s.charCodeAt(i))) { i++; }
-    if (s.charCodeAt(i) === 46 /* '.' */) {
+    while (i < s.length && isWord(s.codePointAt(i)!)) { i++; }
+    if (s.codePointAt(i) === 46 /* '.' */) {
       const extStart = i + 1;
       let j = extStart;
-      while (j < s.length && isWord(s.charCodeAt(j))) { j++; }
-      if ((j > extStart) && (s.charCodeAt(j) === 47 /* '/' */)) {
+      while (j < s.length && isWord(s.codePointAt(j)!)) { j++; }
+      if ((j > extStart) && (s.codePointAt(j) === 47 /* '/' */)) {
         return s.slice(blockStart, i);
       }
     }
@@ -44,7 +44,7 @@ function firstDottedSegment(s: string): string | undefined {
 // from the end instead of retrying the quantifier at every start position.
 function trailingNonDot(s: string): string {
   let i = s.length;
-  while (i > 0 && s.charCodeAt(i - 1) !== 46 /* '.' */) { i--; }
+  while (i > 0 && s.codePointAt(i - 1)! !== 46 /* '.' */) { i--; }
   return s.slice(i);
 }
 

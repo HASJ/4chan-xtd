@@ -17,7 +17,7 @@ let cloneSuffix = 0;
 // end instead of retrying `\d*` at every start position (avoids O(n^2) backtracking).
 function trailingDigits(s: string): string {
   let i = s.length;
-  while (i > 0 && s.charCodeAt(i - 1) >= 48 && s.charCodeAt(i - 1) <= 57) { i--; }
+  while (i > 0 && s.codePointAt(i - 1)! >= 48 && s.codePointAt(i - 1)! <= 57) { i--; }
   return s.slice(i);
 }
 
@@ -26,7 +26,7 @@ function trailingDigits(s: string): string {
 function trailingWordChars(s: string): string {
   const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
   let i = s.length;
-  while (i > 0 && isWord(s.charCodeAt(i - 1))) { i--; }
+  while (i > 0 && isWord(s.codePointAt(i - 1)!)) { i--; }
   return s.slice(i);
 }
 

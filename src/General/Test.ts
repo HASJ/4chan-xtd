@@ -15,7 +15,7 @@ import Menu from "../Menu/Menu";
 // end instead of retrying `\d*` at every start position (avoids O(n^2) backtracking).
 function trailingDigits(id: string): string {
   let i = id.length;
-  while (i > 0 && id.charCodeAt(i - 1) >= 48 && id.charCodeAt(i - 1) <= 57) { i--; }
+  while (i > 0 && id.codePointAt(i - 1)! >= 48 && id.codePointAt(i - 1)! <= 57) { i--; }
   return id.slice(i);
 }
 

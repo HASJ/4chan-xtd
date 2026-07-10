@@ -21,21 +21,21 @@ function trailingUrlTail(s: string): string | null {
   const isSuffix = (i: number, needle: string) => {
     if (i < needle.length) { return false; }
     for (let k = 0; k < needle.length; k++) {
-      const c = s.charCodeAt(i - needle.length + k);
-      if ((c >= 65 && c <= 90 ? c + 32 : c) !== needle.charCodeAt(k)) { return false; }
+      const c = s.codePointAt(i - needle.length + k)!;
+      if ((c >= 65 && c <= 90 ? c + 32 : c) !== needle.codePointAt(k)) { return false; }
     }
     return true;
   };
 
   let i = s.length;
   const end = i;
-  while (i > 0 && isLabelChar(s.charCodeAt(i - 1))) { i--; }
+  while (i > 0 && isLabelChar(s.codePointAt(i - 1)!)) { i--; }
   if (i === end) { return null; } // no trailing [a-z\d-]+ at all
 
   // Consume any further (label.) groups walking backwards.
-  while (i > 0 && s.charCodeAt(i - 1) === 46 /* '.' */) {
+  while (i > 0 && s.codePointAt(i - 1) === 46 /* '.' */) {
     let j = i - 1;
-    while (j > 0 && isLabelChar(s.charCodeAt(j - 1))) { j--; }
+    while (j > 0 && isLabelChar(s.codePointAt(j - 1)!)) { j--; }
     if (j === i - 1) { break; } // dot not preceded by a label, stop here
     i = j;
   }

@@ -80,7 +80,7 @@ interface GalleryType {
 function trailingWordChars(s: string): string {
   const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
   let i = s.length;
-  while (i > 0 && isWord(s.charCodeAt(i - 1))) { i--; }
+  while (i > 0 && isWord(s.codePointAt(i - 1)!)) { i--; }
   return s.slice(i);
 }
 
