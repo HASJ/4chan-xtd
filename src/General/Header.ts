@@ -13,7 +13,8 @@ import { openSettings } from "./SettingsBridge";
 import UIState from "../globals/UIState";
 
 function tokenizeBoardNav(segment: string): string[] {
-  const FLAG = /^-(?:all|title|replace|full|index|catalog|archive|expired|nt|(?:mode|sort|text):"[^"]+"(?:,"[^"]+")?)/;
+  const FLAG = /^-([a-z]+)(?::"[^"]+"(?:,"[^"]+")?)?/;
+  const flagNames = new Set(['all', 'title', 'replace', 'full', 'index', 'catalog', 'archive', 'expired', 'nt', 'mode', 'sort', 'text']);
   const WORD = /[\w@]/;
   const tokens: string[] = [];
   let i = 0;
@@ -21,7 +22,11 @@ function tokenizeBoardNav(segment: string): string[] {
     let j = i + 1;
     if (WORD.test(segment[i])) {
       while (j < segment.length && WORD.test(segment[j])) j++;
-      for (let m; (m = FLAG.exec(segment.slice(j))); ) { j += m[0].length; }
+      let match = FLAG.exec(segment.slice(j));
+      while (match && flagNames.has(match[1])) {
+        j += match[0].length;
+        match = FLAG.exec(segment.slice(j));
+      }
     } else {
       while (j < segment.length && !WORD.test(segment[j])) j++;
     }
@@ -677,4 +682,3 @@ const Header: any = {
   }
 };
 export default Header;
-

@@ -1033,7 +1033,7 @@ const Index: any = {
       }
     }
 
-    if (errors) { Callbacks.errorHandler?.(errors); }
+    if (errors) { Callbacks.handleErrors(errors); }
 
     if (withReplies) {
       newPosts = newPosts.concat(Index.buildReplies(threads));
@@ -1076,7 +1076,7 @@ const Index: any = {
       $.add(thread.nodes.root, nodes);
     }
 
-    if (errors) { Callbacks.errorHandler?.(errors); }
+    if (errors) { Callbacks.handleErrors(errors); }
     return posts;
   },
 

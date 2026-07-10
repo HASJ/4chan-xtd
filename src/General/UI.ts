@@ -198,7 +198,7 @@ export const Menu = class Menu {
       try {
         show = !entry.open || entry.open(post);
       } catch (err) {
-        Callbacks.errorHandler?.([{
+Callbacks.handleErrors([{
           message: `Error in building the ${this.type} menu.`,
           error: err
         }]);

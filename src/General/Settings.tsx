@@ -896,6 +896,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       $.cb.value.call(input);
       Settings.timeLocale.call(input);
     } catch (error_) {
+      c.error(error_);
       input.setCustomValidity('Locale not recognized');
       input.reportValidity();
     }
