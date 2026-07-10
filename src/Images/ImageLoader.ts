@@ -10,6 +10,9 @@ interface ImageLoaderType {
   node(this: any): void;
   replaceVideo(post: any, file: any): void;
   prefetch(post: any, file: any): void;
+  fileType(file: any): string;
+  prefetchVideoThumb(post: any, file: any): boolean;
+  loadPrefetchElement(post: any, file: any, replace: boolean): void;
   prefetchAll(post: any): void;
   toggle(this: HTMLElement): void;
   playVideos(): void;
@@ -19,7 +22,8 @@ const ImageLoader: ImageLoaderType = {
   prefetchEnabled: undefined,
 
   init() {
-    if (!['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+    const view = g.VIEW;
+    if (!view || !['index', 'thread', 'archive'].includes(view)) { return; }
     const replace = Conf['Replace JPG'] || Conf['Replace PNG'] || Conf['Replace GIF'] || Conf['Replace WEBM'];
     if (!Conf['Image Prefetching'] && !replace) { return; }
 
@@ -30,7 +34,7 @@ const ImageLoader: ImageLoaderType = {
 
     $.on(d, 'PostsInserted', () => {
       if (ImageLoader.prefetchEnabled || replace) {
-        g.posts.forEach(ImageLoader.prefetchAll);
+        g.posts?.forEach(ImageLoader.prefetchAll);
       }
     });
 
@@ -38,7 +42,7 @@ const ImageLoader: ImageLoaderType = {
       $.on(d, 'scroll visibilitychange 4chanXInitFinished PostsInserted', this.playVideos);
     }
 
-    if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(g.VIEW)) { return; }
+    if (!Conf['Image Prefetching'] || !['index', 'thread'].includes(view)) { return; }
 
     const el = $.el('a', {
       href: 'javascript:;',
@@ -82,35 +86,43 @@ const ImageLoader: ImageLoaderType = {
   },
 
   prefetch(post: any, file: any) {
-    let clone: any, type: string;
-    const { isImage, isVideo, thumb, url } = file;
+    const { isImage, isVideo, thumb } = file;
     if (file.isPrefetched || !(isImage || isVideo) || post.isHidden || post.thread.isHidden) { return; }
-    if (isVideo) {
-      type = 'WEBM';
-    } else {
-      type = (url.match(/\.([^.]+)$/) || [])[1]?.toUpperCase() || '';
-      if (type === 'JPEG') { type = 'JPG'; }
-    }
+    const type = ImageLoader.fileType(file);
     const replace = Conf[`Replace ${type}`] && !/spoiler/.test(thumb.src || thumb.dataset.src);
     if (!replace && !ImageLoader.prefetchEnabled) { return; }
     if ($.hasClass(doc, 'catalog-mode')) { return; }
     if (![post, ...post.clones].some((clone: any) => doc.contains(clone.nodes.root))) { return; }
     file.isPrefetched = true;
-    if (file.videoThumb) {
-      for (clone of post.clones) { clone.file.thumb.preload = 'auto'; }
-      thumb.preload = 'auto';
-      // XXX Cloned video elements with poster in Firefox cause momentary display of image loading icon.
-      if ($.engine === 'gecko') {
-        $.on(thumb, 'loadeddata', function(this: HTMLElement) { this.removeAttribute('poster'); });
-      }
-      return;
-    }
+    if (ImageLoader.prefetchVideoThumb(post, file)) { return; }
+    ImageLoader.loadPrefetchElement(post, file, replace);
+  },
 
+  fileType(file: any): string {
+    if (file.isVideo) { return 'WEBM'; }
+    const type = (file.url.match(/\.([^.]+)$/) || [])[1]?.toUpperCase() || '';
+    return type === 'JPEG' ? 'JPG' : type;
+  },
+
+  prefetchVideoThumb(post: any, file: any): boolean {
+    if (!file.videoThumb) { return false; }
+    const { thumb } = file;
+    for (const clone of post.clones) { clone.file.thumb.preload = 'auto'; }
+    thumb.preload = 'auto';
+    // XXX Cloned video elements with poster in Firefox cause momentary display of image loading icon.
+    if ($.engine === 'gecko') {
+      $.on(thumb, 'loadeddata', function(this: HTMLElement) { this.removeAttribute('poster'); });
+    }
+    return true;
+  },
+
+  loadPrefetchElement(post: any, file: any, replace: boolean) {
+    const { isImage, isVideo, thumb, url } = file;
     const el = $.el(isImage ? 'img' : 'video') as HTMLImageElement | HTMLVideoElement;
     if (isVideo) { (el as HTMLVideoElement).preload = 'auto'; }
     if (replace && isImage) {
       $.on(el, 'load', () => {
-        for (clone of post.clones) { clone.file.thumb.src = url; }
+        for (const clone of post.clones) { clone.file.thumb.src = url; }
         thumb.src = url;
       });
     }
@@ -127,14 +139,14 @@ const ImageLoader: ImageLoaderType = {
     ImageLoader.prefetchEnabled = !ImageLoader.prefetchEnabled;
     this.classList.toggle('disabled', !ImageLoader.prefetchEnabled);
     if (ImageLoader.prefetchEnabled) {
-      g.posts.forEach(ImageLoader.prefetchAll);
+      g.posts?.forEach(ImageLoader.prefetchAll);
     }
   },
 
   playVideos() {
     // Special case: Quote previews are off screen when inserted into document, but quickly moved on screen.
     const qpClone = $.id('qp')?.firstElementChild;
-    g.posts.forEach((post: any) => {
+    g.posts?.forEach((post: any) => {
       for (const p of [post, ...post.clones]) {
         for (const file of p.files) {
           if (file.videoThumb) {

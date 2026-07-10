@@ -8,7 +8,8 @@ interface RevealSpoilersType {
 
 const RevealSpoilers: RevealSpoilersType = {
   init() {
-    if (!['index', 'thread', 'archive'].includes(g.VIEW) || !Conf['Reveal Spoiler Thumbnails']) { return; }
+    const view = g.VIEW;
+    if (!view || !['index', 'thread', 'archive'].includes(view) || !Conf['Reveal Spoiler Thumbnails']) { return; }
 
     Callbacks.Post.push({
       name: 'Reveal Spoiler Thumbnails',

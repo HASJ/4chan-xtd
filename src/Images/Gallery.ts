@@ -28,9 +28,17 @@ interface GalleryType {
   init(): void;
   node(this: any): void;
   build(image?: HTMLElement): void;
+  enterFullscreen(cb: GalleryType['cb']): void;
+  createDialog(): HTMLElement;
+  wireDialog(dialog: HTMLElement, nodes: any, cb: GalleryType['cb']): void;
+  collectThumbnails(image?: HTMLElement): HTMLElement | undefined;
   generateThumb(post: any, file: any): void;
   load(thumb: HTMLAnchorElement, errorCB: (this: any) => void): HTMLElement;
   open(thumb: HTMLAnchorElement): void;
+  loadOrCachedFile(newID: number, thumb: HTMLAnchorElement): HTMLElement;
+  setupSauceLinks(post: any, file: any): void;
+  continueOrStopSlideshow(oldID: number, newID: number): void;
+  preloadNext(oldID: number, newID: number): void;
   error(this: any): void;
   cacheError(): void;
   cleanupTimer(): void;
@@ -78,7 +86,10 @@ const Gallery: GalleryType = {
   cache: undefined,
 
   init() {
-    if (!(this.enabled = Conf['Gallery'] && ['index', 'thread'].includes(g.VIEW))) { return; }
+    const view = g.VIEW;
+    const enabled = Conf['Gallery'] && !!view && ['index', 'thread'].includes(view);
+    this.enabled = enabled;
+    if (!enabled) { return; }
 
     this.delay = Conf['Slide Delay'];
 
@@ -114,21 +125,44 @@ const Gallery: GalleryType = {
   },
 
   build(image?: HTMLElement) {
-    let dialog: HTMLElement, thumb: HTMLAnchorElement | null = null;
     const cb = Gallery.cb;
 
-    if (Conf['Fullscreen Gallery']) {
-      $.one(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
-      (doc as any).mozRequestFullScreen?.();
-      (doc as any).webkitRequestFullScreen?.((Element as any).ALLOW_KEYBOARD_INPUT);
-    }
+    if (Conf['Fullscreen Gallery']) { Gallery.enterFullscreen(cb); }
 
+    const dialog = Gallery.createDialog();
+    const nodes = Gallery.nodes;
+
+    Gallery.wireDialog(dialog, nodes, cb);
+
+    image = Gallery.collectThumbnails(image);
+
+    $.addClass(doc, 'gallery-open');
+    $.add(d.body, dialog);
+
+    nodes.thumbs.scrollTop = 0;
+    nodes.current.parentElement.scrollTop = 0;
+
+    let thumb: HTMLAnchorElement | null = image ? $(`[href='${(image as any).href}']`, nodes.thumbs) as HTMLAnchorElement : null;
+    if (!thumb) { thumb = Gallery.images[Gallery.images.length - 1]; }
+    if (thumb) { Gallery.open(thumb); }
+
+    doc.style.overflow = 'hidden';
+    nodes.total.textContent = Gallery.images.length;
+  },
+
+  enterFullscreen(cb: GalleryType['cb']) {
+    $.one(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', () => $.on(d, 'fullscreenchange mozfullscreenchange webkitfullscreenchange', cb.close));
+    (doc as any).mozRequestFullScreen?.();
+    (doc as any).webkitRequestFullScreen?.((Element as any).ALLOW_KEYBOARD_INPUT);
+  },
+
+  createDialog(): HTMLElement {
     Gallery.images  = [];
     const nodes = (Gallery.nodes = {} as any);
     Gallery.fileIDs = dict();
     Gallery.slideshow = false;
 
-    nodes.el = (dialog = $.el('div', { id: 'a-gallery' }));
+    const dialog = (nodes.el = $.el('div', { id: 'a-gallery' }));
     $.extend(dialog, { innerHTML: galleryPage });
 
     const object = {
@@ -147,14 +181,18 @@ const Gallery: GalleryType = {
       nodes[key] = $(value, dialog);
     }
 
-    const menuButton = $('.menu-button', dialog) as HTMLElement;
     nodes.menu = new (UI.Menu as any)('gallery');
 
+    return dialog;
+  },
+
+  wireDialog(dialog: HTMLElement, nodes: any, cb: GalleryType['cb']) {
     $.on(nodes.frame, 'click', cb.blank);
     if (Conf['Mouse Wheel Volume']) { $.on(nodes.frame, 'wheel', Volume.wheel); }
     $.on(nodes.next,  'click', cb.click);
     $.on(nodes.name,  'click', ImageCommon.download);
 
+    const menuButton = $('.menu-button', dialog) as HTMLElement;
     const prev =  $('.gal-prev',  dialog) as HTMLElement;
     const next =  $('.gal-next',  dialog) as HTMLElement;
     const start = $('.gal-start', dialog) as HTMLElement;
@@ -187,41 +225,30 @@ const Gallery: GalleryType = {
     disableKeybindHandler();
 
     $.on(window, 'resize', Gallery.cb.setHeight);
+  },
 
+  collectThumbnails(image?: HTMLElement): HTMLElement | undefined {
     for (const postThumb of $$(g.SITE.selectors.file.thumb) as HTMLElement[]) {
-      let post: any;
-      if (!(post = Get.postFromNode(postThumb))) { continue; }
+      const post = Get.postFromNode(postThumb);
+      if (!post) { continue; }
       for (const file of post.files) {
-        if (file.thumb) {
-          Gallery.generateThumb(post, file);
-          // If no image to open is given, pick image we have scrolled to.
-          if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
-            const candidate = file.thumbLink;
-            if ((UIState.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
-              image = candidate;
-            }
+        if (!file.thumb) { continue; }
+        Gallery.generateThumb(post, file);
+        // If no image to open is given, pick image we have scrolled to.
+        if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
+          const candidate = file.thumbLink;
+          if ((UIState.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
+            image = candidate;
           }
         }
       }
     }
-    $.addClass(doc, 'gallery-open');
-
-    $.add(d.body, dialog);
-
-    nodes.thumbs.scrollTop = 0;
-    nodes.current.parentElement.scrollTop = 0;
-
-    if (image) { thumb = $(`[href='${(image as any).href}']`, nodes.thumbs) as HTMLAnchorElement; }
-    if (!thumb) { thumb = Gallery.images[Gallery.images.length - 1]; }
-    if (thumb) { Gallery.open(thumb); }
-
-    doc.style.overflow = 'hidden';
-    nodes.total.textContent = Gallery.images.length;
+    return image;
   },
 
   generateThumb(post: any, file: any) {
     if (post.isClone || post.isHidden) { return; }
-    if (!file || !file.thumb || (!file.isImage && !file.isVideo && !Conf['PDF in Gallery'])) { return; }
+    if (!file?.thumb || (!file.isImage && !file.isVideo && !Conf['PDF in Gallery'])) { return; }
     if (Gallery.fileIDs[`${post.fullID}.${file.index}`]) { return; }
 
     Gallery.fileIDs[`${post.fullID}.${file.index}`] = true;
@@ -248,7 +275,7 @@ const Gallery: GalleryType = {
   },
 
   load(thumb: HTMLAnchorElement, errorCB: (this: any) => void): HTMLElement {
-    const ext = (thumb.href.match(/\w*$/) || [])[0];
+    const ext = /\w*$/.exec(thumb.href)?.[0] || '';
     const elType = $.getOwn({ 'webm': 'video', 'mp4': 'video', 'ogv': 'video', 'pdf': 'iframe' }, ext) || 'img';
     const file = $.el(elType);
     $.extend(file.dataset, thumb.dataset);
@@ -258,24 +285,17 @@ const Gallery: GalleryType = {
   },
 
   open(thumb: HTMLAnchorElement) {
-    let el: HTMLElement | null, file: any, post: any;
     const { nodes } = Gallery;
     const oldID = +nodes.current.dataset.id;
-    const newID = +thumb.dataset.id;
+    const newID = +(thumb.dataset.id || 0);
 
     // Highlight, center selected thumbnail
-    if ((el = Gallery.images[oldID])) { $.rmClass(el, 'gal-highlight'); }
+    const el = Gallery.images[oldID];
+    if (el) { $.rmClass(el, 'gal-highlight'); }
     $.addClass(thumb, 'gal-highlight');
     nodes.thumbs.scrollTop = (thumb.offsetTop + (thumb.offsetHeight / 2)) - (nodes.thumbs.clientHeight / 2);
 
-    // Load image or use preloaded image
-    if (Gallery.cache?.dataset.id === String(newID)) {
-      file = Gallery.cache;
-      $.off(file, 'error', Gallery.cacheError);
-      $.on(file, 'error', Gallery.error);
-    } else {
-      file = Gallery.load(thumb, Gallery.error);
-    }
+    const file: any = Gallery.loadOrCachedFile(newID, thumb);
 
     // Replace old image with new one
     $.off(nodes.current, 'error', Gallery.error);
@@ -300,42 +320,68 @@ const Gallery: GalleryType = {
 
     // Set sauce links
     $.rmAll(nodes.sauce);
-    if (Conf['Sauce'] && Sauce.links && (post = g.posts.get(file.dataset.post))) {
-      const sauces = [];
-      for (const link of Sauce.links) {
-        let sauceNode: HTMLAnchorElement | null;
-        if ((sauceNode = Sauce.createSauceLink(link, post, post.files[+file.dataset.file]))) {
-          sauces.push($.tn(' '), sauceNode);
-        }
-      }
-      $.add(nodes.sauce, sauces);
+    const postID = file.dataset.post;
+    const post = postID ? g.posts?.get(postID) : undefined;
+    Gallery.setupSauceLinks(post, file);
+
+    Gallery.continueOrStopSlideshow(oldID, newID);
+
+    // Scroll to post
+    if (Conf['Scroll to Post'] && post) {
+      UIState.scrollTo(post.nodes.root);
     }
 
+    Gallery.preloadNext(oldID, newID);
+  },
+
+  loadOrCachedFile(newID: number, thumb: HTMLAnchorElement): HTMLElement {
+    // Load image or use preloaded image
+    if (Gallery.cache?.dataset.id === String(newID)) {
+      const file = Gallery.cache;
+      $.off(file, 'error', Gallery.cacheError);
+      $.on(file, 'error', Gallery.error);
+      return file;
+    }
+    return Gallery.load(thumb, Gallery.error);
+  },
+
+  setupSauceLinks(post: any, file: any) {
+    if (!(Conf['Sauce'] && Sauce.links && post)) { return; }
+    const sauces: Node[] = [];
+    for (const link of Sauce.links) {
+      const postFile = post.files[+(file.dataset.file || 0)];
+      const sauceNode = postFile && Sauce.createSauceLink(link, post, postFile);
+      if (sauceNode) {
+        sauces.push($.tn(' '), sauceNode);
+      }
+    }
+    $.add(Gallery.nodes.sauce, sauces);
+  },
+
+  continueOrStopSlideshow(oldID: number, newID: number) {
     // Continue slideshow if moving forward, stop otherwise
     if (Gallery.slideshow && ((newID > oldID) || ((oldID === (Gallery.images.length - 1)) && (newID === 0)))) {
       Gallery.setupTimer();
     } else {
       Gallery.cb.stop();
     }
+  },
 
-    // Scroll to post
-    if (Conf['Scroll to Post'] && (post = g.posts.get(file.dataset.post))) {
-      UIState.scrollTo(post.nodes.root);
-    }
-
-    // Preload next image
-    if (isNaN(oldID) || (newID === ((oldID + 1) % Gallery.images.length))) {
+  preloadNext(oldID: number, newID: number) {
+    if (Number.isNaN(oldID) || (newID === ((oldID + 1) % Gallery.images.length))) {
       Gallery.cache = Gallery.load(Gallery.images[(newID + 1) % Gallery.images.length], Gallery.cacheError);
     }
   },
 
   error(this: any) {
     if (this.error?.code === MediaError.MEDIA_ERR_DECODE) {
-      new Notice('error', 'Corrupt or unplayable video', 30);
+      const _notice = new Notice('error', 'Corrupt or unplayable video', 30);
       return;
     }
     if (ImageCommon.isFromArchive(this)) { return; }
-    const post = g.posts.get(this.dataset.post);
+    const postID = this.dataset.post;
+    const post = postID ? g.posts?.get(postID) : undefined;
+    if (!post) { return; }
     const file = post.files[+this.dataset.file];
     ImageCommon.error(this, post, file, null, (url) => {
       if (!url) { return; }
@@ -356,7 +402,8 @@ const Gallery: GalleryType = {
   },
 
   startTimer(): number {
-    return Gallery.timeoutID = setTimeout(Gallery.checkTimer, Gallery.delay * SECOND);
+    Gallery.timeoutID = setTimeout(Gallery.checkTimer, Gallery.delay * SECOND);
+    return Gallery.timeoutID;
   },
 
   setupTimer() {
@@ -383,8 +430,8 @@ const Gallery: GalleryType = {
 
   cb: {
     keybinds(e: KeyboardEvent) {
-      let key: string | boolean;
-      if (!(key = keyCode(e))) { return; }
+      const key = keyCode(e);
+      if (!key) { return; }
 
       const cb = (() => {
         switch (key) {
@@ -514,7 +561,7 @@ const Gallery: GalleryType = {
         (d as any).webkitExitFullscreen?.();
       }
       delete Gallery.nodes;
-      delete Gallery.fileIDs;
+      Gallery.fileIDs = {};
       doc.style.overflow = '';
 
       $.off(d, 'keydown', Gallery.cb.keybinds);
@@ -532,11 +579,14 @@ const Gallery: GalleryType = {
       const { current, frame } = Gallery.nodes;
       const { style } = current;
 
-      const post = g.posts.get(current.dataset.post);
-      if (Conf['Stretch to Fit'] && post && (dim = post.files[+current.dataset.file].dimensions)) {
+      const postID = current.dataset.post;
+      const post = postID ? g.posts?.get(postID) : undefined;
+      const postFile = post?.files[+(current.dataset.file || 0)];
+      dim = postFile?.dimensions;
+      if (Conf['Stretch to Fit'] && dim) {
         const dims = dim.split('x').map((x: string) => +x);
-        const width = dims[0];
-        const height = dims[1];
+        const width = dims[0] || 1;
+        const height = dims[1] || 1;
         let containerWidth = frame.clientWidth;
         let containerHeight = doc.clientHeight - 25;
         if (((current.dataRotate || 0) % 180) === 90) {

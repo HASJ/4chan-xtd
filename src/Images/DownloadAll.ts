@@ -4,11 +4,6 @@ import Icon from "../Icons/icon";
 import $ from "../platform/$";
 import CrossOrigin from "../platform/CrossOrigin";
 import Notice from "../classes/Notice";
-import Callbacks from "../classes/Callbacks";
-import Menu from "../Menu/Menu";
-
-declare var GM_download: any;
-declare var GM: any;
 
 const DownloadAll = {
   queue: [] as { file: any, folderName: string, seqName: string, threadID: number }[],
@@ -21,7 +16,9 @@ const DownloadAll = {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) return new Set(parsed);
       }
-    } catch (e) {}
+    } catch (error) {
+      console.warn('Unable to read download history.', error);
+    }
     return new Set();
   },
 
@@ -30,13 +27,16 @@ const DownloadAll = {
     downloadedSet.add(url);
     try {
       localStorage.setItem(`4chan-xtd-downloaded-${threadID}`, JSON.stringify(Array.from(downloadedSet)));
-    } catch (e) {}
+    } catch (error) {
+      console.warn('Unable to save download history.', error);
+    }
   },
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) || !Conf['Download All Media']) return;
+    const view = g.VIEW;
+    if (!view || !['index', 'thread'].includes(view) || !Conf['Download All Media']) return;
 
-    if (g.VIEW === 'thread') {
+    if (view === 'thread') {
       const el = $.el('a', {
         href: 'javascript:;',
         title: 'Download All Media',
@@ -45,7 +45,11 @@ const DownloadAll = {
       Icon.set(el, 'download', 'Download All Media');
       $.on(el, 'click', (e) => {
         e.preventDefault();
-        const thread = g.threads.get(`${g.BOARD.ID}.${g.THREADID}`);
+        const threads = g.threads;
+        const board = g.BOARD;
+        const threadID = g.THREADID;
+        if (!threads || !board || threadID == null) return;
+        const thread = threads.get(`${board.ID}.${threadID}`);
         if (thread) DownloadAll.queueThread(thread);
       });
       UIState.addShortcut('download-all', el, 526);
@@ -84,9 +88,9 @@ const DownloadAll = {
     });
 
     if (addedCount === 0) {
-      new Notice('info', 'No new media to download.', 3);
+      const _notice = new Notice('info', 'No new media to download.', 3);
     } else {
-      new Notice('info', `Added ${addedCount} files to download queue.`, 3);
+      const _notice = new Notice('info', `Added ${addedCount} files to download queue.`, 3);
       DownloadAll.processQueue();
     }
   },
@@ -103,7 +107,8 @@ const DownloadAll = {
       
       DownloadAll.addDownloadedUrl(threadID, file.url);
 
-      const GM_download_fn = typeof GM_download !== 'undefined' ? GM_download : (typeof GM !== 'undefined' && typeof GM.download !== 'undefined' ? GM.download : null);
+      const gmDownload = (globalThis as any).GM_download;
+      const GM_download_fn = gmDownload ?? (globalThis as any).GM?.download;
 
       if (GM_download_fn) {
         GM_download_fn({
@@ -112,7 +117,7 @@ const DownloadAll = {
           saveAs: false,
           onload: () => {},
           onerror: () => {
-            new Notice('warning', `Could not download ${file.url}`, 5);
+            const _notice = new Notice('warning', `Could not download ${file.url}`, 5);
           }
         });
       } else {
@@ -133,7 +138,7 @@ const DownloadAll = {
               DownloadAll.processQueue();
             }, 500); // 500ms stagger
           } else {
-            new Notice('warning', `Could not download ${file.url}`, 5);
+            const _notice = new Notice('warning', `Could not download ${file.url}`, 5);
             DownloadAll.isDownloading = false;
             DownloadAll.processQueue();
           }

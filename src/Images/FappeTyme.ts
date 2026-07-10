@@ -19,7 +19,8 @@ const FappeTyme: FappeTymeType = {
   enabled: {},
 
   init() {
-    if ((!Conf['Fappe Tyme'] && !Conf['Werk Tyme']) || !['index', 'thread', 'archive'].includes(g.VIEW)) { return; }
+    const view = g.VIEW;
+    if ((!Conf['Fappe Tyme'] && !Conf['Werk Tyme']) || !view || !['index', 'thread', 'archive'].includes(view)) { return; }
 
     this.nodes = {};
     this.enabled = {

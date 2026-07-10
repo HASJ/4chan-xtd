@@ -22,7 +22,8 @@ const Volume: VolumeType = {
   inputs: undefined,
 
   init() {
-    if (!['index', 'thread'].includes(g.VIEW) ||
+    const view = g.VIEW;
+    if (!view || !['index', 'thread'].includes(view) ||
       (!Conf['Image Expansion'] && !Conf['Image Hover'] && !Conf['Image Hover in Catalog'] && !Conf['Gallery'])) { return; }
 
     $.sync('Allow Sound', (x: boolean) => {
@@ -116,7 +117,8 @@ const Volume: VolumeType = {
   wheel(this: any, e: WheelEvent) {
     let el: HTMLVideoElement | null;
     if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) { return; }
-    if (!(el = $('video:not([data-md5])', this))) { return; }
+    el = $('video:not([data-md5])', this);
+    if (!el) { return; }
     if (el.muted || !($.hasAudio as any)(el)) { return; }
     let volume = el.volume + 0.1;
     if (e.deltaY < 0) { volume *= 1.1; }

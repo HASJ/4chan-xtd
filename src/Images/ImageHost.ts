@@ -21,7 +21,10 @@ const ImageHost: ImageHostType = {
   regex: /^is\d*\.4chan(?:nel)?\.org$/,
 
   init() {
-    if ((!(this.useFaster = /\S/.test(Conf['fourchanImageHost']))) || (g.SITE.software !== 'yotsuba') || !['index', 'thread'].includes(g.VIEW)) { return; }
+    const view = g.VIEW;
+    const useFaster = /\S/.test(Conf['fourchanImageHost']);
+    this.useFaster = useFaster;
+    if (!useFaster || (g.SITE.software !== 'yotsuba') || !view || !['index', 'thread'].includes(view)) { return; }
     Callbacks.Post.push({
       name: 'Image Host Rewriting',
       cb:   this.node
@@ -47,7 +50,7 @@ const ImageHost: ImageHostType = {
   node(this: any) {
     if (this.isClone) { return; }
     const host = ImageHost.host();
-    if (this.file && ImageHost.test(this.file.url.split('/')[2]) && !/\.swf$/.test(this.file.url)) {
+    if (this.file && ImageHost.test(this.file.url.split('/')[2]) && !this.file.url.endsWith('.swf')) {
       this.file.link.hostname = host;
       if (this.file.thumbLink) { this.file.thumbLink.hostname = host; }
       this.file.url = this.file.link.href;
@@ -57,7 +60,7 @@ const ImageHost: ImageHostType = {
 
   fixLinks(links: HTMLAnchorElement[]) {
     for (const link of links) {
-      if (ImageHost.test(link.hostname) && !/\.swf$/.test(link.pathname)) {
+      if (ImageHost.test(link.hostname) && !link.pathname.endsWith('.swf')) {
         const host = ImageHost.host();
         if (link.hostname !== host) { link.hostname = host; }
       }
