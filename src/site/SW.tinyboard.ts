@@ -4,6 +4,28 @@ import $$ from "../platform/$$";
 import { dict } from "../platform/helpers";
 import SWYotsuba from "./SW.yotsuba";
 
+// Linear-time equivalent of `/(\s*ID:\s*)(\S+)/.exec(text)`: \s and \S are
+// complementary, so the leading `\s*` can only pull the match earlier by
+// absorbing whitespace immediately before the first literal "ID:" (an
+// earlier "ID:" can't exist, and a whitespace run can't contain one) —
+// find that first "ID:", then extend over the surrounding whitespace/non
+// whitespace runs, instead of retrying `\s*` at every start position.
+function matchPosterId(text: string): [string, string] | undefined {
+  const isSpace = (c: number) => c === 9 || c === 10 || c === 11 || c === 12 || c === 13 || c === 32 ||
+    c === 0xa0 || c === 0x1680 || (c >= 0x2000 && c <= 0x200a) || c === 0x2028 || c === 0x2029 ||
+    c === 0x202f || c === 0x205f || c === 0x3000 || c === 0xfeff;
+  const idx = text.indexOf('ID:');
+  if (idx === -1) { return undefined; }
+  let start = idx;
+  while (start > 0 && isSpace(text.charCodeAt(start - 1))) { start--; }
+  let end = idx + 3;
+  while (end < text.length && isSpace(text.charCodeAt(end))) { end++; }
+  let valueEnd = end;
+  while (valueEnd < text.length && !isSpace(text.charCodeAt(valueEnd))) { valueEnd++; }
+  if (valueEnd === end) { return undefined; }
+  return [text.slice(start, end), text.slice(end, valueEnd)];
+}
+
 const SWTinyboard = {
   isOPContainerThread: true,
   mayLackJSON: true,
@@ -235,14 +257,13 @@ const SWTinyboard = {
       text += node.textContent;
       node = node.nextSibling;
     }
-    let m: RegExpExecArray | null;
-    m = /(\s*ID:\s*)(\S+)/.exec(text);
+    const m = matchPosterId(text);
     if (m) {
       let uniqueID: HTMLSpanElement;
       nodes.info.normalize();
       let nextSibling = nodes.nameBlock.nextSibling as Text;
-      nextSibling = nextSibling.splitText(m[1].length);
-      nextSibling.splitText(m[2].length);
+      nextSibling = nextSibling.splitText(m[0].length);
+      nextSibling.splitText(m[1].length);
       nodes.uniqueID = (uniqueID = $.el('span', {className: 'poster_id'}) as HTMLSpanElement);
       $.replace(nextSibling, uniqueID);
       $.add(uniqueID, nextSibling);

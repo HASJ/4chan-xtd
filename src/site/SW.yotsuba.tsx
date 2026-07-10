@@ -23,6 +23,37 @@ import generateCatalogThreadHtml from "./SW.yotsuba.Build/CatalogThreadHtml";
 import h, { type EscapedHtml, hFragment, isEscaped } from "../globals/jsx";
 import { dict, MINUTE } from "../platform/helpers";
 
+// Linear-time equivalent of `s.match(/\d+(?=\.\w+$)/)?.[0]`: `\w+$` can only
+// hold directly after the LAST '.' in the string (any earlier '.' is itself
+// non-word, which breaks `\w+$`), so there is at most one candidate dot —
+// find it by scanning back the trailing word-char run, then take the digit
+// run immediately before it, instead of retrying `\d+` at every start
+// position with an O(n) lookahead check each time.
+function digitsBeforeExtension(s: string): string | undefined {
+  const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
+  const isDigit = (c: number) => c >= 48 && c <= 57;
+  let wordStart = s.length;
+  while (wordStart > 0 && isWord(s.charCodeAt(wordStart - 1))) { wordStart--; }
+  if (wordStart === s.length || wordStart === 0 || s.charCodeAt(wordStart - 1) !== 46 /* '.' */) {
+    return undefined;
+  }
+  const dotPos = wordStart - 1;
+  let digitsStart = dotPos;
+  while (digitsStart > 0 && isDigit(s.charCodeAt(digitsStart - 1))) { digitsStart--; }
+  if (digitsStart === dotPos) { return undefined; }
+  return s.slice(digitsStart, dotPos);
+}
+
+// Linear-time equivalent of `filename.match(/\.?[^.]*$/)[0]`: for any input
+// this pattern always matches from the last '.' to the end of the string
+// (or the whole string when there is no '.'), since `[^.]*` can never cross
+// a dot, so a single lastIndexOf scan replaces the per-start-position
+// backtracking.
+function trailingExtension(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return dot === -1 ? filename : filename.slice(dot);
+}
+
 const SWYotsuba = {
   isOPContainerThread: false,
   hasIPCount: true,
@@ -291,8 +322,8 @@ const SWYotsuba = {
       }
       );
       if (file.isSpoiler) {
-        const m = link.href.match(/\d+(?=\.\w+$)/);
-        file.thumbURL = m ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${m[0]}s.jpg` : undefined;
+        const digits = digitsBeforeExtension(link.href);
+        file.thumbURL = digits ? `${location.protocol}//${ImageHost.thumbHost()}/${post.board}/${digits}s.jpg` : undefined;
       }
     }
     return true;
@@ -391,7 +422,7 @@ const SWYotsuba = {
     spoilerRange: Object.create(null),
 
     shortFilename(filename) {
-      const ext = filename.match(/\.?[^.]*$/)[0];
+      const ext = trailingExtension(filename);
       if ((filename.length - ext.length) > 30) {
         return `${filename.match(/(?:[\uD800-\uDBFF][\uDC00-\uDFFF]|[^]){0,25}/)[0]}(...)${ext}`;
       } else {
