@@ -75,6 +75,30 @@ interface GalleryType {
   };
 }
 
+// Linear-time equivalent of `/\w*$/.exec(s)?.[0] || ''`: scans backwards from
+// the end instead of retrying `\w*` at every start position.
+function trailingWordChars(s: string): string {
+  const isWord = (c: number) => (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95;
+  let i = s.length;
+  while (i > 0 && isWord(s.charCodeAt(i - 1))) { i--; }
+  return s.slice(i);
+}
+
+// Generates thumbnails for every file of `post` and, if no image to open was
+// given yet, picks the one currently scrolled into view.
+function generateThumbsForPost(post: any, image?: HTMLElement): HTMLElement | undefined {
+  for (const file of post.files) {
+    if (!file.thumb) { continue; }
+    Gallery.generateThumb(post, file);
+    if (image || !Gallery.fileIDs[`${post.fullID}.${file.index}`]) { continue; }
+    const candidate = file.thumbLink;
+    if ((UIState.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
+      image = candidate;
+    }
+  }
+  return image;
+}
+
 const Gallery: GalleryType = {
   enabled: undefined,
   delay: 0,
@@ -231,17 +255,7 @@ const Gallery: GalleryType = {
     for (const postThumb of $$(g.SITE.selectors.file.thumb) as HTMLElement[]) {
       const post = Get.postFromNode(postThumb);
       if (!post) { continue; }
-      for (const file of post.files) {
-        if (!file.thumb) { continue; }
-        Gallery.generateThumb(post, file);
-        // If no image to open is given, pick image we have scrolled to.
-        if (!image && Gallery.fileIDs[`${post.fullID}.${file.index}`]) {
-          const candidate = file.thumbLink;
-          if ((UIState.getTopOf(candidate) + candidate.getBoundingClientRect().height) >= 0) {
-            image = candidate;
-          }
-        }
-      }
+      image = generateThumbsForPost(post, image);
     }
     return image;
   },
@@ -275,12 +289,13 @@ const Gallery: GalleryType = {
   },
 
   load(thumb: HTMLAnchorElement, errorCB: (this: any) => void): HTMLElement {
-    const ext = /\w*$/.exec(thumb.href)?.[0] || '';
+    const ext = trailingWordChars(thumb.href);
     const elType = $.getOwn({ 'webm': 'video', 'mp4': 'video', 'ogv': 'video', 'pdf': 'iframe' }, ext) || 'img';
     const file = $.el(elType);
     $.extend(file.dataset, thumb.dataset);
     $.on(file, 'error', errorCB);
     (file as any).src = thumb.href;
+    if (elType === 'img') { (file as any).alt = thumb.title; }
     return file;
   },
 
