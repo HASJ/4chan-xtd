@@ -130,8 +130,9 @@
   "scripts": {
     "build:tooling": "tsc -p tools/tsconfig.json",
     "typecheck:src": "tsc -p tsconfig.json",
+    "typecheck:extension": "tsc -p src/extension/tsconfig.json",
     "typecheck:tools": "tsc -p tools/tsconfig.json --noEmit",
-    "typecheck": "npm run typecheck:src && npm run typecheck:tools",
+    "typecheck": "npm run typecheck:src && npm run typecheck:extension && npm run typecheck:tools",
     "test": "vitest run --reporter=dot",
     "build": "npm run build:tooling && node ./builds/ts-tools/tools/rollup.js",
     "check:cycles": "npm run build:tooling && node ./builds/ts-tools/tools/check-cycles.js",

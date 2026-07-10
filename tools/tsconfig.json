@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "module": "Node16",
     "moduleResolution": "node16",
@@ -12,11 +12,14 @@
     "types": [
       "node",
       "@types/chrome"
+    ],
+    "lib": [
+      "DOM",
+      "ES2021"
     ]
   },
   "include": [
-    "./**/*.ts",
-    "../src/meta/**/*.ts"
+    "./**/*.ts"
   ],
   "exclude": [
     "../builds/"

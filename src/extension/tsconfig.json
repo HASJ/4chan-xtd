@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "rootDir": "..",
+    "types": [
+      "@types/chrome"
+    ],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2020"
+    ]
+  },
+  "include": [
+    "./**/*.ts",
+    "../PageContext/**/*.ts"
+  ]
+}

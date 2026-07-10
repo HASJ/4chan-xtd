@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "noImplicitAny": false,
+    "removeComments": false,
+    "sourceMap": true,
+    "target": "ES2020",
+    "allowJs": false,
+    "resolveJsonModule": false,
+    "newLine": "lf",
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "hFragment",
+    "importHelpers": true,
+    "skipDefaultLibCheck": true
+  }
+}
