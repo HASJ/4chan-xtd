@@ -12,7 +12,169 @@ import { setBoardLinkURL, updateBoardListLinks } from "./HeaderBoardLists";
 import { openSettings } from "./SettingsBridge";
 import UIState from "../globals/UIState";
 
-var Header: any = {
+function tokenizeBoardNav(segment: string): string[] {
+  const FLAG = /^-(?:all|title|replace|full|index|catalog|archive|expired|nt|(?:mode|sort|text):"[^"]+"(?:,"[^"]+")?)/;
+  const WORD = /[\w@]/;
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < segment.length) {
+    let j = i + 1;
+    if (WORD.test(segment[i])) {
+      while (j < segment.length && WORD.test(segment[j])) j++;
+      for (let m; (m = FLAG.exec(segment.slice(j))); ) { j += m[0].length; }
+    } else {
+      while (j < segment.length && !WORD.test(segment[j])) j++;
+    }
+    tokens.push(segment.slice(i, j));
+    i = j;
+  }
+  return tokens;
+}
+
+function extractTextOverride(t) {
+  let text = null, url = null;
+  t = t.replace(/-text:"([^"]+)"(?:,"([^"]+)")?/g, function(m0, m1, m2) {
+    text = m1;
+    url  = m2;
+    return '';
+  });
+  return {t, text, url};
+}
+
+function extractIndexOptions(t) {
+  const opts: string[] = [];
+  t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function(m0, m1) {
+    opts.push(m1.toLowerCase().replace(/ /g, '-'));
+    return '';
+  });
+  return {t, indexOptions: opts.join('/')};
+}
+
+function buildToggleAllLink(text) {
+  const a = $.el('a', {
+    className: 'show-board-list-button',
+    textContent: text || '+',
+    href: 'javascript:;'
+  });
+  $.on(a, 'click', Header.toggleBoardList);
+  return a;
+}
+
+function buildExternalLink(t, text, url) {
+  const a = $.el('a', {
+    href: url || 'javascript:;',
+    textContent: text || '+',
+    className: 'external'
+  });
+  if (/-nt/.test(t)) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+  return a;
+}
+
+function buildCurrentBoardLink(t, text) {
+  const a = $.el('a', {
+    href: `/${g.BOARD!.ID}/`,
+    textContent: text || decodeURIComponent(g.BOARD!.ID),
+    className: 'current'
+  });
+  if (/-nt/.test(t)) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+  if (/-index/.test(t)) {
+    a.dataset.only = 'index';
+  } else if (/-catalog/.test(t)) {
+    a.dataset.only = 'catalog';
+    a.href += 'catalog.html';
+  } else if (/-(archive|expired)/.test(t)) {
+    return a.firstChild; // Its text node.
+  }
+  return a;
+}
+
+function buildBoardAnchor(boardID) {
+  if (boardID === '@') {
+    return $.el('a', {
+      href: 'https://twitter.com/4chan',
+      title: '4chan Twitter',
+      className: 'navSmall',
+      textContent: '@'
+    });
+  }
+  const a = $.el('a', {
+    href: `//${BoardConfig.domain(boardID)}/${boardID}/`,
+    textContent: boardID,
+    title: BoardConfig.title(boardID)
+  });
+  let urlV;
+  if (g.VIEW && ['catalog', 'archive'].includes(g.VIEW) && (urlV = Get.url(g.VIEW, {siteID: '4chan.org', boardID}))) {
+    a.href = urlV;
+  }
+  if ((a.hostname === location.hostname) && (boardID === g.BOARD!.ID)) { a.className = 'current'; }
+  return a;
+}
+
+function applyLinkText(a, t, boardID, text) {
+  if (/-title/.test(t) || (/-replace/.test(t) && (a.hostname === location.hostname) && (boardID === g.BOARD!.ID))) {
+    a.textContent = a.title || a.textContent;
+  } else if (/-full/.test(t)) {
+    const titleSuffix = a.title ? ` - ${a.title}` : '';
+    a.textContent = `/${boardID}/` + titleSuffix;
+  } else {
+    a.textContent = text || boardID;
+  }
+}
+
+function applyIndexCatalogLink(a, t, boardID) {
+  const m = t.match(/-(index|catalog)/);
+  if (m && !setBoardLinkURL(a, m[1], {siteID: '4chan.org', boardID})) {
+    return a.firstChild; // Its text node.
+  }
+  return null;
+}
+
+function applyIndexOptions(a, indexOptions) {
+  if (Conf['JSON Index'] && indexOptions) {
+    a.dataset.indexOptions = indexOptions;
+    if (['boards.4chan.org', 'boards.4channel.org'].includes(a.hostname) && (a.pathname.split('/')[2] === '')) {
+      a.href += (a.hash ? '/' : '#') + indexOptions;
+    }
+  }
+}
+
+function applyArchiveLink(a, t, boardID) {
+  if (/-archive/.test(t)) {
+    const href = Redirect.to('board', {boardID});
+    if (href) {
+      a.href = href;
+    } else {
+      return a.firstChild; // Its text node.
+    }
+  }
+  return null;
+}
+
+function applyExpiredLink(a, t, boardID) {
+  if (/-expired/.test(t)) {
+    if (BoardConfig.isArchived(boardID)) {
+      a.href = `//${BoardConfig.domain(boardID)}/${boardID}/archive`;
+    } else {
+      return a.firstChild; // Its text node.
+    }
+  }
+  return null;
+}
+
+function applyNewTabFlag(a, t) {
+  if (/-nt/.test(t)) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+}
+
+const Header: any = {
   init() {
     $.onExists(doc, 'body', () => {
       if (!(g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !!$.id('postForm'))) { return; }
@@ -115,10 +277,10 @@ var Header: any = {
     $.ready(function() {
       const isPageLegit = g.SITE.isThisPageLegit ? g.SITE.isThisPageLegit() : !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
       if (!isPageLegit) { return; }
-      let footer;
-      if ((g.SITE.software === 'yotsuba') && !(footer = $.id('boardNavDesktopFoot'))) {
-        let absbot;
-        if (!(absbot = $.id('absbot'))) { return; }
+      let footer = $.id('boardNavDesktopFoot');
+      if ((g.SITE.software === 'yotsuba') && !footer) {
+        const absbot = $.id('absbot');
+        if (!absbot) { return; }
         footer = $.id('boardNavDesktop').cloneNode(true);
         footer.id = 'boardNavDesktopFoot';
         $('#navtopright',        footer).id = 'navbotright';
@@ -126,9 +288,10 @@ var Header: any = {
         $.before(absbot, footer);
         $.global('stubCloneTopNav');
       }
-      if (Header.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement) {
-        for (var a of $$('a', Header.bottomBoardList)) {
-          if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
+      Header.bottomBoardList = $(g.SITE.selectors.boardListBottom) as HTMLElement;
+      if (Header.bottomBoardList) {
+        for (const a of $$('a', Header.bottomBoardList)) {
+          if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD!.ID)) { a.className = 'current'; }
         }
         return updateBoardListLinks(Header.bottomBoardList);
       }
@@ -189,8 +352,8 @@ var Header: any = {
     }
     const fullBoardList = $('.boardList', Header.boardList);
     $.add(fullBoardList, nodes);
-    for (var a of $$('a', fullBoardList)) {
-      if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD.ID)) { a.className = 'current'; }
+    for (const a of $$('a', fullBoardList)) {
+      if (((a as any).hostname === location.hostname) && ((a as any).pathname.split('/')[1] === g.BOARD!.ID)) { a.className = 'current'; }
     }
     return updateBoardListLinks(fullBoardList);
   },
@@ -201,7 +364,7 @@ var Header: any = {
     if (!boardnav) return;
     boardnav = boardnav.replace(/(\r\n|\n|\r)/g, ' ');
     const segments = boardnav.split(/(\{\{(?:"[^"]+")?|\}\})/);
-    const spanStack = [];
+    const spanStack: any[] = [];
     let currentContainer = list;
     segments.forEach(segment => {
       if (segment.startsWith('{{')) {
@@ -214,8 +377,7 @@ var Header: any = {
         spanStack.pop();
         currentContainer = spanStack.length > 0 ? spanStack[spanStack.length - 1] : list;
       } else {
-        const re = /[\w@]+(-(all|title|replace|full|index|catalog|archive|expired|nt|(mode|sort|text):"[^"]+"(,"[^"]+")?))*|[^\w@]+/g;
-        const segmentNodes = (segment.match(re) || []).map((t) => Header.mapCustomNavigation(t));
+        const segmentNodes = tokenizeBoardNav(segment).map((t) => Header.mapCustomNavigation(t));
         segmentNodes.forEach(node => currentContainer.appendChild(node));
       }
     });
@@ -223,142 +385,47 @@ var Header: any = {
   },
 
   mapCustomNavigation(t) {
-    let a, href, m, url;
     if (/^[^\w@]/.test(t)) {
       return $.tn(t);
     }
 
-    let text = (url = null);
-    t = t.replace(/-text:"([^"]+)"(?:,"([^"]+)")?/g, function(m0, m1, m2) {
-      text = m1;
-      url  = m2;
-      return '';
-    });
+    let text, url;
+    ({t, text, url} = extractTextOverride(t));
+    let indexOptions;
+    ({t, indexOptions} = extractIndexOptions(t));
 
-    let indexOptions: any = [];
-    t = t.replace(/-(?:mode|sort):"([^"]+)"/g, function(m0, m1) {
-      indexOptions.push(m1.toLowerCase().replace(/\ /g, '-'));
-      return '';
-    });
-    indexOptions = indexOptions.join('/');
-
-    if (/^toggle-all/.test(t)) {
-      a = $.el('a', {
-        className: 'show-board-list-button',
-        textContent: text || '+',
-        href: 'javascript:;'
-      }
-      );
-      $.on(a, 'click', Header.toggleBoardList);
-      return a;
+    if (t.startsWith('toggle-all')) {
+      return buildToggleAllLink(text);
     }
 
-    if (/^external/.test(t)) {
-      a = $.el('a', {
-        href: url || 'javascript:;',
-        textContent: text || '+',
-        className: 'external'
-      }
-      );
-      if (/-nt/.test(t)) {
-        a.target = '_blank';
-        a.rel = 'noopener';
-      }
-      return a;
+    if (t.startsWith('external')) {
+      return buildExternalLink(t, text, url);
     }
 
     let boardID = t.split('-')[0];
     if (boardID === 'current') {
       if (['boards.4chan.org', 'boards.4channel.org'].includes(location.hostname)) {
-        boardID = g.BOARD.ID;
+        boardID = g.BOARD!.ID;
       } else {
-        a = $.el('a', {
-          href: `/${g.BOARD.ID}/`,
-          textContent: text || decodeURIComponent(g.BOARD.ID),
-          className: 'current'
-        }
-        );
-        if (/-nt/.test(t)) {
-          a.target = '_blank';
-          a.rel = 'noopener';
-        }
-        if (/-index/.test(t)) {
-          a.dataset.only = 'index';
-        } else if (/-catalog/.test(t)) {
-          a.dataset.only = 'catalog';
-          a.href += 'catalog.html';
-        } else if (/-(archive|expired)/.test(t)) {
-          a = a.firstChild; // Its text node.
-        }
-        return a;
+        return buildCurrentBoardLink(t, text);
       }
     }
 
-    a = (function() {
-      let urlV;
-      if (boardID === '@') {
-        return $.el('a', {
-          href: 'https://twitter.com/4chan',
-          title: '4chan Twitter',
-          className: 'navSmall',
-          textContent: '@'
-        }
-        );
-      }
+    const a = buildBoardAnchor(boardID);
+    applyLinkText(a, t, boardID, text);
 
-      a = $.el('a', {
-        href: `//${BoardConfig.domain(boardID)}/${boardID}/`,
-        textContent: boardID,
-        title: BoardConfig.title(boardID)
-      }
-      );
-      if (['catalog', 'archive'].includes(g.VIEW) && (urlV = Get.url(g.VIEW, {siteID: '4chan.org', boardID}))) {
-        a.href = urlV;
-      }
-      if ((a.hostname === location.hostname) && (boardID === g.BOARD.ID)) { a.className = 'current'; }
-      return a;
-    })();
+    const indexCatalogReplacement = applyIndexCatalogLink(a, t, boardID);
+    if (indexCatalogReplacement) { return indexCatalogReplacement; }
 
-    a.textContent = /-title/.test(t) || (/-replace/.test(t) && (a.hostname === location.hostname) && (boardID === g.BOARD.ID)) ?
-      a.title || a.textContent
-    : /-full/.test(t) ?
-      (`/${boardID}/`) + (a.title ? ` - ${a.title}` : '')
-    :
-      text || boardID;
+    applyIndexOptions(a, indexOptions);
 
-    if (m = t.match(/-(index|catalog)/)) {
-      if (!setBoardLinkURL(a, m[1], {siteID: '4chan.org', boardID})) {
-        return a.firstChild; // Its text node.
-      }
-    }
+    const archiveReplacement = applyArchiveLink(a, t, boardID);
+    if (archiveReplacement) { return archiveReplacement; }
 
-    if (Conf['JSON Index'] && indexOptions) {
-      a.dataset.indexOptions = indexOptions;
-      if (['boards.4chan.org', 'boards.4channel.org'].includes(a.hostname) && (a.pathname.split('/')[2] === '')) {
-        a.href += (a.hash ? '/' : '#') + indexOptions;
-      }
-    }
+    const expiredReplacement = applyExpiredLink(a, t, boardID);
+    if (expiredReplacement) { return expiredReplacement; }
 
-    if (/-archive/.test(t)) {
-      if (href = Redirect.to('board', {boardID})) {
-        a.href = href;
-      } else {
-        return a.firstChild; // Its text node.
-      }
-    }
-
-    if (/-expired/.test(t)) {
-      if (BoardConfig.isArchived(boardID)) {
-        a.href = `//${BoardConfig.domain(boardID)}/${boardID}/archive`;
-      } else {
-        return a.firstChild; // Its text node.
-      }
-    }
-
-    if (/-nt/.test(t)) {
-      a.target = '_blank';
-      a.rel = 'noopener';
-    }
+    applyNewTabFlag(a, t);
 
     return a;
   },
@@ -369,7 +436,8 @@ var Header: any = {
     const full   = $('#full-board-list',   bar);
     const showBoardList = !full.hidden;
     custom.hidden = !showBoardList;
-    return full.hidden   =  showBoardList;
+    full.hidden = showBoardList;
+    return full.hidden;
   },
 
   setLinkJustify(centered) {
@@ -474,7 +542,8 @@ var Header: any = {
     } else {
       $.rmClass(Header.bar,  'autohide', 'scroll');
     }
-    return Header.previousOffset = offsetY;
+    Header.previousOffset = offsetY;
+    return Header.previousOffset;
   },
 
   setBarPosition(bottom) {
@@ -525,7 +594,9 @@ var Header: any = {
     const cust = $('#custom-board-list', Header.bar);
     const full = $('#full-board-list',   Header.bar);
     const btn = $('.hide-board-list-container', full);
-    return [cust.hidden, full.hidden, btn.hidden] = show ? [false, true, false] : [true, false, true];
+    const values = show ? [false, true, false] : [true, false, true];
+    [cust.hidden, full.hidden, btn.hidden] = values;
+    return values;
   },
 
   toggleCustomNav() {
@@ -568,9 +639,8 @@ var Header: any = {
   },
 
   createNotification(e) {
-    let notice;
     const {type, content, lifetime} = e.detail;
-    return notice = new Notice(type, content, lifetime);
+    return new Notice(type, content, lifetime);
   },
 
   enableDesktopNotifications() {
@@ -580,18 +650,16 @@ var Header: any = {
       case 'granted':
         UIState.areNotificationsEnabled = true;
         return;
-        break;
       case 'denied':
         // requestPermission doesn't work if status is 'denied',
         // but it'll still work if status is 'default'.
         return;
-        break;
     }
 
     const el = $.el('span',
       {innerHTML:
         `${meta.name} needs your permission to show desktop notifications. ` +
-        `[<a href=\"${E(meta.upstreamFaq)}#why-is-4chan-x-asking-for-permission-to-show-desktop-notifications\" target=\"_blank\">FAQ</a>]` +
+        `[<a href="${E(meta.upstreamFaq)}#why-is-4chan-x-asking-for-permission-to-show-desktop-notifications" target="_blank">FAQ</a>]` +
         `<br><button>Authorize</button> or <button>Disable</button>`
     });
     const [authorize, disable] = $$('button', el);
@@ -604,7 +672,8 @@ var Header: any = {
       $.set('Desktop Notifications', false);
       return notice.close();
     });
-    return notice = new Notice('info', el);
+    notice = new Notice('info', el);
+    return notice;
   }
 };
 export default Header;

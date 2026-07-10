@@ -10,10 +10,10 @@ export default function normalizePost(root) {
     $.rm(el);
   }
   for (el of $$('a[href]', root2)) {
-    var {
+    let {
       href
     } = el;
-    href = href.replace(/(^\w+:\/\/boards\.4chan(?:nel)?\.org\/[^\/]+\/thread\/\d+)\/.*/, '$1');
+    href = href.replace(/(^\w+:\/\/boards\.4chan(?:nel)?\.org\/[^/]+\/thread\/\d+)\/.*/, '$1');
     el.setAttribute('href', href);
   }
   ImageHost.fixLinks($$('.fileText > a, a.fileThumb', root2));
@@ -21,10 +21,10 @@ export default function normalizePost(root) {
     el.src = el.src.replace(/(spoiler-\w+)\d(\.png)$/, '$11$2');
   }
   for (el of $$('pre.prettyprinted', root2)) {
-    var nodes = $.X('.//br|.//wbr|.//text()', el);
+    let nodes = $.X('.//br|.//wbr|.//text()', el);
     i = 0;
     nodes = ((() => {
-      const result = [];
+      const result: any[] = [];
       while (node = nodes.snapshotItem(i++)) {
         result.push(node);
       }
@@ -43,7 +43,7 @@ export default function normalizePost(root) {
   const textNodes = $.X('.//text()', root2);
   i = 0;
   while (node = textNodes.snapshotItem(i++)) {
-    node.data = node.data.replace(/\ +/g, ' ');
+    node.data = node.data.replace(/ +/g, ' ');
     // XXX https://a.4cdn.org/sci/thread/5942502.json, https://a.4cdn.org/news/thread/6.json, https://a.4cdn.org/wsg/thread/957536.json
     if (node.previousSibling?.nodeName === 'BR') { node.data = node.data.replace(/^\n+/g, ''); }
     if (node.nextSibling?.nodeName === 'BR') { node.data = node.data.replace(/\n+$/g, ''); }

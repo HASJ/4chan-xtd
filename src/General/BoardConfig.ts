@@ -3,7 +3,7 @@ import { g, Conf } from "../globals/globals";
 import $ from "../platform/$";
 import { dict, HOUR } from "../platform/helpers";
 
-var BoardConfig: any = {
+const BoardConfig: any = {
   cbs: [],
 
   init() {
@@ -21,9 +21,9 @@ var BoardConfig: any = {
 
   load() {
     let boards;
-    if ((this.status === 200) && this.response && this.response.boards) {
+    if ((this.status === 200) && this.response?.boards) {
       boards = dict();
-      for (var board of this.response.boards) {
+      for (const board of this.response.boards) {
         boards[board.board] = board;
       }
       $.set('boardConfig', {boards, lastChecked: Date.now()});
@@ -34,18 +34,18 @@ var BoardConfig: any = {
         case 200: return 'Invalid Data';
         default:          return `Error ${this.statusText} (${this.status})`;
       } })();
-      new Notice('warning', `Failed to load board configuration. ${err}`, 20);
+      const _notice = new Notice('warning', `Failed to load board configuration. ${err}`, 20);
     }
     return BoardConfig.set(boards);
   },
 
   set(boards) {
     this.boards = boards;
-    for (var ID in g.boards) {
-      var board = g.boards[ID];
+    for (const ID in g.boards) {
+      const board = g.boards[ID];
       board.config = this.boards[ID] || {};
     }
-    for (var cb of this.cbs) {
+    for (const cb of this.cbs) {
       $.queueTask(cb);
     }
   },
@@ -60,10 +60,10 @@ var BoardConfig: any = {
 
   sfwBoards(sfw) {
     return (() => {
-      const result = [];
+      const result: string[] = [];
       const object = this.boards || Conf['boardConfig'].boards;
-      for (var board in object) {
-        var data = object[board];
+      for (const board in object) {
+        const data = object[board];
         if (!!data.ws_board === sfw) {
           result.push(board);
         }
@@ -90,7 +90,7 @@ var BoardConfig: any = {
   noAudio(boardID) {
     if (g.SITE.software !== 'yotsuba') { return false; }
     const boards = this.boards || Conf['boardConfig'].boards;
-    return boards && boards[boardID] && !boards[boardID].webm_audio;
+    return boards?.[boardID] && !boards[boardID].webm_audio;
   },
 
   title(boardID) {
