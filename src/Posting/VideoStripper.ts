@@ -159,12 +159,15 @@ export class VideoStripper {
       length++;
     }
     let val = byte & ~mask;
+    let allOnes = val === mask - 1; // all data bits in the marker byte are 1
     for (let i = 1; i < length; i++) {
       if (off + i >= uint8.length) break;
-      val = (val << 8) | uint8[off + i];
+      const next = uint8[off + i];
+      if (next !== 0xff) allOnes = false;
+      val = (val << 8) | next;
     }
-    // Handle unknown size
-    if (length === 8 && val === 0xffffffffffffff) val = -1;
+    // Handle unknown size (all data bits across the vint are 1)
+    if (allOnes) val = -1;
     return { val, length };
   }
 

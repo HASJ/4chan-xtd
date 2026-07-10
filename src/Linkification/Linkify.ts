@@ -86,8 +86,9 @@ const Linkify: any = {
 
   // Continue a word past the end of its text node, across <br> tags and
   // adjacent text nodes, until whitespace or an incompatible node is found.
-  extendAcrossNodes(snapshot, i, endNode, word, test) {
+  extendAcrossNodes(snapshot, i, node, word, test) {
     const space = /[\s"]/;
+    let endNode = node;
     let length;
     let saved;
     test.lastIndex = 0;
