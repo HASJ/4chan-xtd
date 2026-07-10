@@ -15,7 +15,9 @@ const Time = {
   node(this: any) {
     if (!this.info.date || this.isClone) { return; }
     const {textContent} = this.nodes.date;
-    this.nodes.date.textContent = textContent.match(/^\s*/)[0] + Time.format(this.info.date) + textContent.match(/\s*$/)[0];
+    const leadingLength = textContent.length - textContent.trimStart().length;
+    const trailingLength = textContent.length - textContent.trimEnd().length;
+    this.nodes.date.textContent = textContent.slice(0, leadingLength) + Time.format(this.info.date) + textContent.slice(textContent.length - trailingLength);
   },
 
   format(date: Date, formatString = Conf['time'] || '') {

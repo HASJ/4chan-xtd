@@ -64,7 +64,7 @@ const ScrollMarkers = {
       if (!el) {
         el = $.el('button', { type: 'button' });
         if (previousEl) {
-          previousEl.insertAdjacentElement('afterend', el);
+          previousEl.after(el);
         } else {
           $.add(ScrollMarkers.container, el);
         }
