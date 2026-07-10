@@ -23,10 +23,10 @@ interface PostInfo {
 /**
  * This class handles data related to specific threads or posts. This data is automatically cleaned up when the thread
  * ages out.
- * TODO At this moment, .get and .set aren't fully typed yet.
+ * Note: .get and .set aren't fully typed yet.
  */
 export default class DataBoard {
-  static keys = [
+  static readonly keys = [
     'hiddenThreads',
     'hiddenPosts',
     'hiddenPosterIds',
@@ -52,7 +52,7 @@ export default class DataBoard {
     if (!sync) return;
     // Chrome also fires the onChanged callback on the current tab,
     // so we only start syncing when we're ready.
-    var init = () => {
+    const init = () => {
       $.off(d, '4chanXInitFinished', init);
       this.sync = sync;
     };
@@ -95,7 +95,7 @@ export default class DataBoard {
     return $.get(this.key, { boards: dict() }, (items: DataBoardData) => {
       if ((items[this.key].version || 0) > (this.data.version || 0)) {
         this.initData(items[this.key]);
-        for (var change of this.changes) { change(); }
+        for (const change of this.changes) { change(); }
         this.sync?.();
       }
       return cb?.();
@@ -141,11 +141,11 @@ export default class DataBoard {
 
   setUnsafe({ siteID, boardID, threadID, postID, val }: PostInfo & { val?: any }) {
     if (!siteID) { siteID = g.SITE.ID; }
-    if (!this.data[siteID]) this.data[siteID] = { boards: dict() };
-    const boards = this.data[siteID].boards;
+    if (!this.data[siteID!]) this.data[siteID!] = { boards: dict() };
+    const boards = this.data[siteID!].boards;
     if (postID !== undefined) {
-      let base;
-      (((base = boards[boardID] || (boards[boardID] = dict())))[threadID] || (base[threadID] = dict()))[postID] = val;
+      const base = boards[boardID] || (boards[boardID] = dict());
+      (base[threadID!] || (base[threadID!] = dict()))[postID] = val;
     } else if (threadID !== undefined) {
       (boards[boardID] || (boards[boardID] = dict()))[threadID] = val;
     } else {
@@ -159,9 +159,9 @@ export default class DataBoard {
   ) {
     this.save(() => {
       const oldVal = this.get({ siteID, boardID, threadID, postID, defaultValue: dict() });
-      for (var key in val) {
-        var subVal = val[key];
-        if (typeof subVal === 'undefined') {
+      for (const key in val) {
+        const subVal = val[key];
+        if (subVal === undefined) {
           delete oldVal[key];
         } else {
           oldVal[key] = subVal;
@@ -178,26 +178,23 @@ export default class DataBoard {
   }
 
   get({ siteID, boardID, threadID, postID, defaultValue }: PostInfo & { defaultValue?: any }) {
-    let board, val;
     if (!siteID) { siteID = g.SITE.ID; }
-    if (board = this.data[siteID]?.boards[boardID]) {
-      let thread;
-      if (threadID == null) {
-        if (postID != null) {
-          for (thread = 0; thread < board.length; thread++) {
-            if (postID in thread) {
-              val = thread[postID];
-              break;
-            }
-          }
-        } else {
-          val = board;
-        }
-      } else if (thread = board[threadID]) {
-        val = (postID != null) ? thread[postID] : thread;
-      }
-    }
+    const board = this.data[siteID!]?.boards[boardID];
+    const val = board ? this.getFromBoard(board, threadID, postID) : undefined;
     return val || defaultValue;
+  }
+
+  getFromBoard(board: any, threadID: PostInfo['threadID'], postID: PostInfo['postID']) {
+    if (threadID == null) {
+      if (postID == null) { return board; }
+      for (let thread: any = 0; thread < board.length; thread++) {
+        if (postID in thread) { return thread[postID]; }
+      }
+      return undefined;
+    }
+    const thread = board[threadID];
+    if (!thread) { return undefined; }
+    return postID != null ? thread[postID] : thread;
   }
 
   clean() {
@@ -216,43 +213,52 @@ export default class DataBoard {
   }
 
   ajaxClean(boardID) {
-    const that = this;
     const siteID = g.SITE.ID;
     const threadsList = g.SITE.urls.threadsListJSON?.({siteID, boardID});
     if (!threadsList) { return; }
-    ($ as any).cache(threadsList, function() {
+    const ajaxCleanParse = this.ajaxCleanParse.bind(this);
+    ($ as any).cache(threadsList, function(this: XMLHttpRequest) {
       if (this.status !== 200) { return; }
       const archiveList = g.SITE.urls.archiveListJSON?.({siteID, boardID});
-      if (!archiveList) return that.ajaxCleanParse(boardID, this.response);
+      if (!archiveList) return ajaxCleanParse(boardID, this.response);
       const response1 = this.response;
-      ($ as any).cache(archiveList, function() {
+      ($ as any).cache(archiveList, function(this: XMLHttpRequest) {
         if ((this.status !== 200) && (!!g.SITE.archivedBoardsKnown || (this.status !== 404))) { return; }
-        that.ajaxCleanParse(boardID, response1, this.response);
+        ajaxCleanParse(boardID, response1, this.response);
       });
     });
   }
 
   ajaxCleanParse(boardID: string, response1: any, response2?: any) {
-    let board, ID;
     const siteID = g.SITE.ID;
-    if (!(board = this.data[siteID].boards[boardID])) return;
-    const threads = dict();
-    if (response1) {
-      for (var page of response1) {
-        for (var thread of page.threads) {
-          ID = thread.no;
-          if (ID in board) { threads[ID] = board[ID]; }
-        }
-      }
-    }
-    if (response2) {
-      for (ID of response2) {
-        if (ID in board) threads[ID] = board[ID];
-      }
-    }
+    const board = this.data[siteID].boards[boardID];
+    if (!board) { return; }
+    const threads = this.filterLiveThreads(board, response1, response2);
     this.data[siteID].boards[boardID] = threads;
     this.deleteIfEmpty({siteID, boardID});
     $.set(this.key, this.data);
+  }
+
+  filterLiveThreads(board: any, response1: any, response2?: any) {
+    const threads = dict();
+    if (response1) { this.collectLiveThreadsFromPages(threads, board, response1); }
+    if (response2) { this.collectLiveThreadsFromIDs(threads, board, response2); }
+    return threads;
+  }
+
+  collectLiveThreadsFromPages(threads: any, board: any, response1: any) {
+    for (const page of response1) {
+      for (const thread of page.threads) {
+        const id = thread.no;
+        if (id in board) { threads[id] = board[id]; }
+      }
+    }
+  }
+
+  collectLiveThreadsFromIDs(threads: any, board: any, response2: any) {
+    for (const id of response2) {
+      if (id in board) { threads[id] = board[id]; }
+    }
   }
 
   onSync(data) {
