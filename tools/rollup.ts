@@ -123,9 +123,9 @@ const eventPageTsPlugin = (typescript as any)({
             // Remove newlines and trailing whitespace.
             .replace(/\r?\n[ \t+]*/g, '')
             // Remove last semicolon before the }.
-            .replace(/;\}/g, '}')
+            .replaceAll(/;\}/g, '}')
             // Remove space between rule set and {.
-            .replace(/ \{/g, '{')
+            .replaceAll(/ \{/g, '{')
             // Remove comments.
             .replace(/\/\*[^\*]*\*\//g, '')
             // Remove space before and after these characters in selectors.
@@ -175,7 +175,7 @@ const eventPageTsPlugin = (typescript as any)({
   if (platform !== 'crx') {
     await bundle.write({
       ...sharedBundleOpts,
-      banner: (metaNoDownload + license).replace(/\r\n/g, '\n'),
+      banner: (metaNoDownload + license).replaceAll(/\r\n/g, '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
       plugins: minify ? [(terser as any)({
@@ -195,7 +195,7 @@ const eventPageTsPlugin = (typescript as any)({
     const crxDir = resolve(buildDir, 'crx');
     await bundle.write({
       ...sharedBundleOpts,
-      banner: license.replace(/\r\n/g, '\n'),
+      banner: license.replaceAll(/\r\n/g, '\n'),
       file: resolve(crxDir, 'script.js'),
     });
 
