@@ -76,7 +76,8 @@ export default class Fetcher {
 
     // Set up flag CSS for cross-board links to boards with flags
     if (clone.nodes.flag && !(Fetcher.flagCSS || (Fetcher.flagCSS = $('link[href^="//s.4cdn.org/css/flags."]')))) {
-      const cssVersion = $('link[href^="//s.4cdn.org/css/"]')?.href.match(/(\d+)(?=\.css$)/)?.[1] || Date.now();
+      const cssHref = $('link[href^="//s.4cdn.org/css/"]')?.href;
+      const cssVersion = (cssHref?.endsWith('.css') ? cssHref.slice(0, -4).match(/\d+$/)?.[0] : undefined) || Date.now();
       Fetcher.flagCSS = $.el('link', {
         rel: 'stylesheet',
         href: `//s.4cdn.org/css/flags.${cssVersion}.css`

@@ -459,7 +459,9 @@ const Embedding = {
           $.add(el, $.el('source', {src: a.dataset.uid}));
           return el;
         }
-        const [_, host, names] = a.dataset.uid.match(/([^/]+)\/(.*)/);
+        const slashIndex = a.dataset.uid.indexOf('/');
+        const host = a.dataset.uid.slice(0, slashIndex);
+        const names = a.dataset.uid.slice(slashIndex + 1);
         const types = (() => { switch (host) {
           case 'gd': case 'wu': case 'fc': return [''];
           case 'gc': return ['giant', 'fat', 'zippy'];

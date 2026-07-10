@@ -44,7 +44,7 @@ function firstDottedSegment(s: string): string | undefined {
 // from the end instead of retrying the quantifier at every start position.
 function trailingNonDot(s: string): string {
   let i = s.length;
-  while (i > 0 && s.codePointAt(i - 1)! !== 46 /* '.' */) { i--; }
+  while (i > 0 && s.codePointAt(i - 1) !== 46 /* '.' */) { i--; }
   return s.slice(i);
 }
 
