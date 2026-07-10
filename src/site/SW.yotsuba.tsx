@@ -587,7 +587,7 @@ const SWYotsuba = {
 
     post(o) {
       const { ID, threadID, boardID, file } = o;
-      const { subject, email, name, tripcode, capcode, pass, uniqueID, flagCode, flagCodeTroll, flag, dateUTC, dateText, commentHTML } = o.info;
+      const { capcode, commentHTML } = o.info;
       const { staticPath, gifIcon } = this;
 
       /* Post Info */
@@ -602,16 +602,19 @@ const SWYotsuba = {
         :
         `${url}#q${ID}`;
 
-      const postInfo = generatePostInfoHtml(
-        ID, o, subject, capcode, email, name, tripcode, pass, capcodeLC, capcodePlural, staticPath, gifIcon,
-        capcodeDescription, uniqueID, flag, flagCode, flagCodeTroll, dateUTC, dateText, postLink, quoteLink, boardID,
-        threadID,
-      );
+      const assets = { staticPath, gifIcon };
+
+      const postInfo = generatePostInfoHtml({
+        o,
+        capcodeInfo: { capcodeLC, capcodePlural, capcodeDescription },
+        assets,
+        links: { postLink, quoteLink }
+      });
 
       /* File Info */
-      const { fileURL, shortFilename, fileThumb } = this.fileInfo(file, boardID);
+      const fileInfo = this.fileInfo(file, boardID);
 
-      const fileBlock = generateFileHtml(file, ID, boardID, fileURL, shortFilename, fileThumb, o, staticPath, gifIcon);
+      const fileBlock = generateFileHtml({o, fileInfo, assets});
 
       /* Whole Post */
 
@@ -712,7 +715,7 @@ const SWYotsuba = {
 
       const container = $.el(
         'div',
-        generateCatalogThreadHtml(thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon)
+        generateCatalogThreadHtml({thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon})
       );
       $.before(thread.OP.nodes.info, [...container.childNodes]);
 

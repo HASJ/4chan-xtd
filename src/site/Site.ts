@@ -21,36 +21,41 @@ const Site = {
 
   init(cb: () => void): void {
     $.extend(Conf['siteProperties'], Site.defaultProperties);
-    let hostname = Site.resolve();
+    const hostname = Site.resolve();
     if (hostname && $.hasOwn(SW, Conf['siteProperties'][hostname].software)) {
       this.set(hostname);
       cb();
     }
-    $.onExists(doc, 'body', () => {
-      for (const software in SW) {
-        let changes: any;
-        if (changes = SW[software].detect?.()) {
-          changes.software = software;
-          hostname = location.hostname.replace(/^www\./, '');
-          const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
-          let changed = 0;
-          for (const key in changes) {
-            if (properties[key] !== changes[key]) {
-              properties[key] = changes[key];
-              changed++;
-            }
-          }
-          if (changed) {
-            $.set('siteProperties', Conf['siteProperties']);
-          }
-          if (!g.SITE) {
-            this.set(hostname);
-            cb();
-          }
-          return;
-        }
+    $.onExists(doc, 'body', () => Site.detectAndApply(cb));
+  },
+
+  detectAndApply(cb: () => void): void {
+    for (const software in SW) {
+      const changes = SW[software].detect?.();
+      if (!changes) { continue; }
+      changes.software = software;
+      const hostname = location.hostname.replace(/^www\./, '');
+      const properties = (Conf['siteProperties'][hostname] || (Conf['siteProperties'][hostname] = dict()));
+      Site.applyChanges(properties, changes);
+      if (!g.SITE) {
+        this.set(hostname);
+        cb();
       }
-    });
+      return;
+    }
+  },
+
+  applyChanges(properties: any, changes: any): void {
+    let changed = 0;
+    for (const key in changes) {
+      if (properties[key] !== changes[key]) {
+        properties[key] = changes[key];
+        changed++;
+      }
+    }
+    if (changed) {
+      $.set('siteProperties', Conf['siteProperties']);
+    }
   },
 
   resolve(url: { hostname: string } | Location = location): string {
@@ -59,8 +64,8 @@ const Site = {
       hostname = hostname.replace(/^[^.]*\.?/, '');
     }
     if (hostname) {
-      let canonical: string | undefined;
-      if (canonical = Conf['siteProperties'][hostname]?.canonical) {
+      const canonical: string | undefined = Conf['siteProperties'][hostname]?.canonical;
+      if (canonical) {
         hostname = canonical;
       }
     }
@@ -99,16 +104,18 @@ const Site = {
   },
 
   set(hostname: string): any {
-    for (const ID in Conf['siteProperties']) {
-      let site: any;
+    for (const ID of Object.keys(Conf['siteProperties'])) {
       const properties = Conf['siteProperties'][ID];
       if (properties.canonical) { continue; }
       const { software } = properties;
       if (!software || !$.hasOwn(SW, software)) { continue; }
-      g.sites[ID] = (site = Object.create(SW[software]));
+      const site: any = Object.create(SW[software]);
+      (g.sites as Record<string, any>)[ID] = site;
       $.extend(site, { ID, siteID: ID, properties, software });
     }
-    return g.SITE = g.sites[hostname];
+    const site = g.sites[hostname];
+    g.SITE = site;
+    return site;
   }
 };
 

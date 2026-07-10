@@ -1,13 +1,11 @@
 import h, { hFragment, EscapedHtml } from "../../globals/jsx";
 
-export default function generateCatalogThreadHtml(
-  thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon,
-): EscapedHtml {
+export default function generateCatalogThreadHtml({thread, src, imgClass, data, postCount, fileCount, pageCount, staticPath, gifIcon}): EscapedHtml {
   return <>
     <a class="catalog-link" href={`/${thread.board}/thread/${thread.ID}`}>
       {imgClass ?
-        <img src={src} class={`catalog-thumb ${imgClass}`} /> :
-        <img src={src} class="catalog-thumb" data-width={data.tn_w} data-height={data.tn_h} />
+        <img src={src} alt="" class={`catalog-thumb ${imgClass}`} /> :
+        <img src={src} alt="" class="catalog-thumb" data-width={data.tn_w} data-height={data.tn_h} />
       }
     </a>
     <div class="catalog-stats">
@@ -17,8 +15,8 @@ export default function generateCatalogThreadHtml(
         <span class="page-count">{pageCount}</span>
       </span>
       <span class="catalog-icons">
-        {thread.isSticky ? <img src={`${staticPath}sticky${gifIcon}`} class="stickyIcon" title="Sticky" /> : ''}
-        {thread.isClosed ? <img src={`${staticPath}closed${gifIcon}`} class="closedIcon" title="Closed" /> : ''}
+        {thread.isSticky ? <img src={`${staticPath}sticky${gifIcon}`} alt="Sticky" class="stickyIcon" title="Sticky" /> : ''}
+        {thread.isClosed ? <img src={`${staticPath}closed${gifIcon}`} alt="Closed" class="closedIcon" title="Closed" /> : ''}
       </span>
     </div>
   </>;

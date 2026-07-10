@@ -112,6 +112,8 @@ interface Feature {
   init(): void;
 }
 
+const toError = (error: unknown): Error => error instanceof Error ? error : new Error(String(error));
+
 const Main = {
   isFirstRun: false,
   jsEnabled: false,
@@ -172,7 +174,7 @@ const Main = {
     }
     $.on(d, '4chanXInitFinished', function() {
       if (Main.expectInitFinished) {
-        return delete Main.expectInitFinished;
+        Main.expectInitFinished = false;
       } else {
         const _notice = new Notice('error', `Error: Multiple copies of ${meta.name} or 4chan X are enabled.`);
         return $.addClass(doc, 'tainted');
@@ -343,9 +345,11 @@ const Main = {
     if (g.VIEW === 'file') {
       $.asap((() => d.readyState !== 'loading'), function() {
         if ((g.SITE.software === 'yotsuba') && Conf['404 Redirect'] && g.SITE.is404?.()) {
+          const board = g.BOARD;
+          if (!board) { return; }
           const pathname = location.pathname.split(/\/+/);
           return Redirect.navigate('file', {
-            boardID:  g.BOARD.ID,
+            boardID:  board.ID,
             filename: pathname[pathname.length - 1]
           }, '' as any);
         }
@@ -379,7 +383,7 @@ const Main = {
       } catch (err) {
         Main.handleErrors({
           message: `"${name}" initialization crashed.`,
-          error: err
+          error: toError(err)
         });
       }
     }
@@ -531,14 +535,17 @@ const Main = {
   initReady(): void {
     if (g.SITE.is404?.()) {
       if (g.VIEW === 'thread') {
-        ThreadWatcher.set404(g.BOARD.ID, g.THREADID, function() {
+        const board = g.BOARD;
+        const threadID = g.THREADID;
+        if (!board || threadID == null) { return; }
+        ThreadWatcher.set404(board.ID, threadID, function() {
           if (Conf['404 Redirect']) {
             return Redirect.navigate('thread', {
-              boardID:  g.BOARD.ID,
-              threadID: g.THREADID,
+              boardID:  board.ID,
+              threadID,
               postID:   +(/\d+/.exec(location.hash)?.[0] || 0)
             } // post number or 0
-            , `/${g.BOARD.ID}/`);
+            , `/${board.ID}/`);
           }
         });
       }
@@ -570,11 +577,11 @@ const Main = {
 
   initThread(): void {
     const s = g.SITE.selectors;
-    const board = $((s.boardFor?.[g.VIEW] || s.board));
+    const board = $((s.boardFor?.[g.VIEW ?? ''] || s.board));
     if (board) {
-      const threads = [];
-      const posts   = [];
-      const errors  = [];
+      const threads: Thread[] = [];
+      const posts: Post[] = [];
+      const errors: ErrorData[] = [];
 
       try {
         g.SITE.preParsingFixes?.(board);
@@ -590,11 +597,12 @@ const Main = {
       if (errors.length) { Main.handleErrors(errors); }
 
       if (g.VIEW === 'thread') {
-        if ((g as any).threadArchived) {
-          threads[0].isArchived = true;
-          threads[0].kill();
+        const thread = threads[0];
+        if (thread && (g as any).threadArchived) {
+          thread.isArchived = true;
+          thread.kill();
         }
-        g.SITE.parseThreadMetadata?.(threads[0]);
+        if (thread) { g.SITE.parseThreadMetadata?.(thread); }
       }
 
       setTimeout(() => {
@@ -631,20 +639,20 @@ const Main = {
       const postRoots = $$(g.SITE.selectors.postContainer, threadRoot);
       if (g.SITE.isOPContainerThread) { postRoots.unshift(threadRoot); }
       Main.parsePosts(postRoots, thread, posts, errors);
-      Main.addPostsObserver.observe(threadRoot, {childList: true});
+      Main.addPostsObserver?.observe(threadRoot, {childList: true});
     }
   },
 
   parsePosts(postRoots: HTMLElement[], thread: any, posts: any[], errors: ErrorData[]): void {
     for (const postRoot of postRoots) {
-      if (!(postRoot.dataset.fullID && g.posts.get(postRoot.dataset.fullID)) && $(g.SITE.selectors.comment, postRoot)) {
+      if (!(postRoot.dataset.fullID && g.posts?.get(postRoot.dataset.fullID)) && $(g.SITE.selectors.comment, postRoot)) {
         try {
           posts.push(new Post(postRoot, thread, thread.board));
         } catch (err) {
           // Skip posts that we failed to parse.
           errors.push({
             message: `Parsing of Post No.${/\d+/.exec(postRoot.id)?.[0] || ''} failed. Post will be skipped.`,
-            error: err,
+            error: toError(err),
             html: postRoot.outerHTML
           });
         }
@@ -761,7 +769,7 @@ const Main = {
         // Skip threads that we failed to parse.
         errors.push({
           message: `Parsing of Catalog Thread No.${/\d+/.exec(threadRoot.dataset.id || threadRoot.id)?.[0] || ''} failed. Thread will be skipped.`,
-          error: err,
+          error: toError(err),
           html: threadRoot.outerHTML
         });
       }
@@ -856,7 +864,7 @@ const Main = {
       innerHTML:
         `${(errors as ErrorData[]).length} errors occurred.${Main.reportLink(errors as ErrorData[]).innerHTML} [<a href="javascript:;">show</a>]`
     });
-    $.on(div.lastElementChild, 'click', function () {
+    $.on(div.lastElementChild, 'click', function (this: Element) {
       const show = this.textContent === 'show';
       this.textContent = show ? 'hide' : 'show';
       logs.hidden = !show;
@@ -937,7 +945,7 @@ User agent: ${navigator.userAgent}\
       g.SITE.isThisPageLegit()
     :
       !/^[45]\d\d\b/.test(document.title) && !/\.(?:json|rss)$/.test(location.pathname);
-    return Main.thisPageIsLegit;
+    return Main.thisPageIsLegit ?? false;
   },
 
   ready(cb: () => void): void {
