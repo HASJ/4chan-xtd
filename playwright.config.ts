@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   globalSetup: './tests/browser/global-setup.ts',
   use: {
-    baseURL: 'http://boards.4chan.org:4173',
+    baseURL: 'https://boards.4chan.org:4173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

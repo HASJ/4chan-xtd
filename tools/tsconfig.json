@@ -19,7 +19,8 @@
     ]
   },
   "include": [
-    "./**/*.ts"
+    "./**/*.ts",
+    "../playwright.config.ts"
   ],
   "exclude": [
     "../builds/"

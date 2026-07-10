@@ -2,9 +2,9 @@ import { rollup } from 'rollup';
 import typescript from '@rollup/plugin-typescript';
 import setupFileInliner from './rollup-plugin-inline-file.js';
 import faFix from './rollup-plugin-fa.js';
-import { resolve } from 'path';
+import { resolve } from 'node:path';
 import generateMetadata from './meta/metadata.js';
-import { copyFile, readFile, writeFile } from 'fs/promises';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import importBase64 from './rollup-plugin-base64.js';
 import generateManifestJson from './meta/manifestJson.js';
 import terser from '@rollup/plugin-terser';
@@ -119,15 +119,15 @@ const eventPageTsPlugin = (typescript as any)({
 
           return css
             // Remove whitespace after colon in css rules.
-            .replace(/^ {2,}([a-z\-]+:) +/gm, '$1')
+            .replace(/^ {2,}([a-z-]+:) +/gm, '$1')
             // Remove newlines and trailing whitespace.
             .replace(/\r?\n[ \t+]*/g, '')
             // Remove last semicolon before the }.
-            .replaceAll(/;\}/g, '}')
+            .replaceAll(/;\}/, '}')
             // Remove space between rule set and {.
-            .replaceAll(/ \{/g, '{')
+            .replaceAll(/ \{/, '{')
             // Remove comments.
-            .replace(/\/\*[^\*]*\*\//g, '')
+            .replace(/\/\*[^*]*\*\//g, '')
             // Remove space before and after these characters in selectors.
             .replace(/ ([>+~]) /g, '$1');
         }
@@ -175,13 +175,13 @@ const eventPageTsPlugin = (typescript as any)({
   if (platform !== 'crx') {
     await bundle.write({
       ...sharedBundleOpts,
-      banner: (metaNoDownload + license).replaceAll(/\r\n/g, '\n'),
+      banner: (metaNoDownload + license).replaceAll(/\r\n/, '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
       plugins: minify ? [(terser as any)({
         format: {
           max_line_len: 1000,
-          comments: /^(?: ==\/?UserScript==| @|!)|license|\bcc\b|copyright/i,
+          comments: /(?:^(?: ==\/?UserScript==| @|!))|license|\bcc\b|copyright/i,
         },
       })] : [],
       sourcemap: minify,
@@ -195,7 +195,7 @@ const eventPageTsPlugin = (typescript as any)({
     const crxDir = resolve(buildDir, 'crx');
     await bundle.write({
       ...sharedBundleOpts,
-      banner: license.replaceAll(/\r\n/g, '\n'),
+      banner: license.replaceAll(/\r\n/, '\n'),
       file: resolve(crxDir, 'script.js'),
     });
 
