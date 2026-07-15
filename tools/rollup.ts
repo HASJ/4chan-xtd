@@ -123,9 +123,9 @@ const eventPageTsPlugin = (typescript as any)({
             // Remove newlines and trailing whitespace.
             .replace(/\r?\n[ \t+]*/g, '')
             // Remove last semicolon before the }.
-            .replaceAll(/;\}/, '}')
+            .replaceAll(';}', '}')
             // Remove space between rule set and {.
-            .replaceAll(/ \{/, '{')
+            .replaceAll(' {', '{')
             // Remove comments.
             .replace(/\/\*[^*]*\*\//g, '')
             // Remove space before and after these characters in selectors.

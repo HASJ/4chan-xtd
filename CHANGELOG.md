@@ -3,6 +3,13 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.7 (2026-07-15)
+
+- Bugfixes
+  - Restored comment menu submenu initialization so Report, Copy Text, Delete, Filter, Archive, Hide, and nested actions work correctly.
+  - Restored the themed background and border styling for expanded comment menu submenus.
+  - Fixed the userscript release build failing on non-global regular expressions passed to `String#replaceAll()`.
+
 ### 2.30.6 (2026-07-10)
 
 - Reliability

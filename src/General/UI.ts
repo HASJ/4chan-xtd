@@ -49,9 +49,7 @@ export const Menu = class Menu {
       id:        `${this.type}-menu`,
       tabIndex:  0
     });
-    $.on(this.el, 'click', function(e: MouseEvent) {
-      if ((e.target as HTMLElement).nodeName !== 'A') { return e.stopPropagation(); }
-    });
+    $.on(this.el, 'click', (e: MouseEvent) => e.stopPropagation());
     $.on(this.el, 'keydown', (e: KeyboardEvent) => this.onKeydown(e));
     $.on(d, 'click CloseMenu 4chanXInitFinished', () => this.close());
     $.on(d, 'visibilitychange', () => this.close());
@@ -158,6 +156,35 @@ export const Menu = class Menu {
     return this.entries.push(entry);
   }
 
+  insertEntry(entry: any, parent: HTMLElement, data: any) {
+    if (typeof entry.open === 'function') {
+      try {
+        if (!entry.open(data)) { return; }
+      } catch (err) {
+        Callbacks.handleErrors([{
+          message: `Error in building the ${this.type} menu.`,
+          error: err
+        }]);
+        return;
+      }
+    }
+
+    $.add(parent, entry.el);
+
+    if (!entry.subEntries) { return; }
+
+    const existingSubmenu = $('.submenu', entry.el);
+    if (existingSubmenu) {
+      $.rm(existingSubmenu);
+    }
+
+    const submenu = $.el('div', {className: 'dialog submenu'});
+    for (const subEntry of entry.subEntries) {
+      this.insertEntry(subEntry, submenu, data);
+    }
+    $.add(entry.el, submenu);
+  }
+
   parseEntry(entry: any) {
     const {el, subEntries} = entry;
     $.addClass(el, 'entry');
@@ -165,17 +192,27 @@ export const Menu = class Menu {
     el.style.order = entry.order || 100;
     if (!subEntries) { return; }
     $.addClass(el, 'has-submenu');
-    const submenu = $.el('div', {className: 'submenu'});
     for (const subEntry of subEntries) {
       this.parseEntry(subEntry);
-      $.add(submenu, subEntry.el);
     }
-    $.add(el, submenu);
+    if ($('.menu-indicator', el)) { return; }
     const span = $.el('span',
       {className: 'menu-indicator'}
     );
     Icon.set(span, 'caretRight');
     $.add(el, span);
+  }
+
+  open(post: any) {
+    $.rmAll(this.el);
+    for (const entry of this.entries) {
+      this.insertEntry(entry, this.el, post);
+    }
+
+    if (!this.el.children.length) { return false; }
+
+    $.add(d.body, this.el);
+    return true;
   }
 
   makeButton(post: any) {
@@ -193,32 +230,14 @@ export const Menu = class Menu {
 
   toggle(e: MouseEvent, a: HTMLElement, post: any) {
     e.preventDefault();
+    e.stopPropagation();
     const reclicked = !!this.el.parentNode && this.lastButton === a;
     $.event('CloseMenu', undefined);
     if (reclicked) {
-      return e.stopPropagation();
+      return;
     }
     this.lastButton = a;
-    for (const entry of this.entries) {
-      let show;
-      try {
-        show = !entry.open || entry.open(post);
-      } catch (err) {
-Callbacks.handleErrors([{
-          message: `Error in building the ${this.type} menu.`,
-          error: err
-        }]);
-        show = false;
-      }
-      if (show) {
-        $.add(this.el, entry.el);
-      } else {
-        $.rm(entry.el);
-      }
-    }
-    if (!this.el.children.length) { return; }
-
-    $.add(d.body, this.el);
+    if (!this.open(post)) { return; }
     const bRect   = a.getBoundingClientRect();
     const mRect   = this.el.getBoundingClientRect();
     const cHeight = doc.clientHeight;
@@ -239,7 +258,6 @@ Callbacks.handleErrors([{
     this.el.classList.toggle('left', !!right);
 
     this.el.focus({preventScroll: true});
-    return e.stopPropagation();
   }
 
   close() {
