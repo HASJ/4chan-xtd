@@ -4,7 +4,6 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=HASJ_4chan-xtd&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=HASJ_4chan-xtd)
 [![GitHub release](https://img.shields.io/github/v/release/HASJ/4chan-xtd)](https://github.com/HASJ/4chan-xtd/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Greasy Fork](https://img.shields.io/greasyfork/v/489508)](https://greasyfork.org/scripts/489508-4chan-xtd)
 
 4chan XTd is a script that adds various features to anonymous imageboards. It was originally developed for 4chan but has no affiliation with it.
 
