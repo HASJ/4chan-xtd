@@ -289,15 +289,10 @@ const CaptchaT: any = {
     return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
   },
 
-  // 4chan's #t-load button refuses a new challenge while it counts down
-  // ("Get Captcha (28)"). Click it whenever the counter is not running, so a
-  // challenge is ready without the user reaching for the button. Deliberately
-  // stateless: any latch on having seen a counter strands the feature in every
-  // state where the counter already expired, such as after a failed post.
   // 'cd' is the number of seconds until the service will hand out another
-  // challenge, stated by the service that enforces it. Everything else here is
-  // inference -- scraping the button's label, or an invented retry schedule --
-  // so this takes precedence over both.
+  // challenge, stated by the service that enforces it. Everything else in this
+  // area is inference -- scraping the button's label, or an invented retry
+  // schedule -- so this takes precedence over both.
   noteServerCooldown(twister) {
     const cd = twister?.cd;
     if ((typeof cd !== 'number') || !Number.isFinite(cd) || (cd < 0)) { return; }
@@ -310,6 +305,11 @@ const CaptchaT: any = {
     return !!this.serverCooldownUntil && (Date.now() < this.serverCooldownUntil);
   },
 
+  // 4chan's #t-load button refuses a new challenge while it counts down
+  // ("Get Captcha (28)"). Click it whenever the counter is not running, so a
+  // challenge is ready without the user reaching for the button. Deliberately
+  // stateless: any latch on having seen a counter strands the feature in every
+  // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
     if (!Conf['Auto-load captcha after cooldown']) { return; }
     // The service already said it will refuse. Asking anyway earns an error and
@@ -347,8 +347,10 @@ const CaptchaT: any = {
     return !this.hasMoreChallengeSteps($('#t-next', this.nodes.container));
   },
 
-  // If a click yields neither a challenge nor a fresh countdown, the request
-  // failed and the reload backs off instead of clicking the button again.
+  // Score the click 5s on. A challenge, another step, a fresh countdown or a
+  // "no verification needed" reply all count as the service having answered;
+  // anything else is treated as a failure and backs the reload off rather than
+  // clicking again.
   watchCooldownReload() {
     clearTimeout(this.cooldownReloadTimer);
     this.cooldownReloadTimer = setTimeout(() => {
@@ -374,6 +376,11 @@ const CaptchaT: any = {
   // Back off, never latch off. A permanent stop only recovers on a successful
   // post or a page reload, so a failed challenge -- which is neither -- used to
   // strand the reload for the rest of the session.
+  //
+  // The invented schedule below is only reached when the service said nothing
+  // at all: no challenge, no countdown, no stated cooldown. That is an outage,
+  // not a hiccup, so it stays slow on purpose -- a faster curve would just send
+  // more requests at an endpoint that is not answering.
   failCooldownReload() {
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
