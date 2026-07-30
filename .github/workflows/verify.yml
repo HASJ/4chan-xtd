@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm test
       - run: npm run check:cycles
@@ -34,8 +34,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox
+      - run: npm ci --ignore-scripts
+      - run: npx --no-install playwright install --with-deps chromium firefox
       - run: npm run test:browser
       - if: failure()
         uses: actions/upload-artifact@v4
