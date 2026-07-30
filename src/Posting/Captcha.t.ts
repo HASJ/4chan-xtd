@@ -300,7 +300,10 @@ const CaptchaT: any = {
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
     if (!state.tLoad || state.tLoad.disabled) { return; }
-    if ($('#t-resp', this.nodes.container)?.value) {
+    // Never clobber an answer already in hand: a click here would wipe it and
+    // silently strand 'Post on Captcha Completion'. Check the same sources
+    // checkCompletion() reads, not just the visible input.
+    if (this.isCompleted || this.getOne()?.['t-response'] || $('#t-resp', this.nodes.container)?.value) {
       this.clearCooldownReload();
       return;
     }
@@ -331,6 +334,8 @@ const CaptchaT: any = {
     this.cooldownReloadFailed = true;
     this.clearCooldownReload();
     this.clearCooldownReloadTimer();
+    // The request produced nothing, so don't leave load() blocked on it.
+    delete this.hasRequested;
   },
 
   clearCooldownReload() {
@@ -683,6 +688,9 @@ const CaptchaT: any = {
     if (this.hasMoreChallengeSteps(tNext)) return;
     if (this.isCompleted) return;
     this.isCompleted = true;
+    // A solved captcha proves the service is answering again, so lift the
+    // failure latch instead of waiting for the next post or QR teardown.
+    this.resetCooldownReload();
     if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
       QRState.submit();
     }
