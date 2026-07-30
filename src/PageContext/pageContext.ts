@@ -148,9 +148,15 @@ const PageContextFunctions = {
   setupTCaptcha: ({ boardID, threadID, autoLoad }) => {
     const { TCaptcha } = (window as any);
     TCaptcha.init(document.querySelector('#qr .captcha-container'), boardID, +threadID);
-    TCaptcha.setErrorCb(err => window.dispatchEvent(new CustomEvent('CreateNotification', {
-      detail: { type: 'warning', content: '' + err }
-    })));
+    TCaptcha.setErrorCb(err => {
+      window.dispatchEvent(new CustomEvent('CreateNotification', {
+        detail: { type: 'warning', content: '' + err }
+      }));
+      document.dispatchEvent(new CustomEvent('TCaptchaError', {
+        bubbles: true,
+        detail: { error: '' + err }
+      }));
+    });
     if (autoLoad === '1') TCaptcha.load(boardID, threadID);
   },
   loadTCaptcha: ({ boardID, threadID }) => {

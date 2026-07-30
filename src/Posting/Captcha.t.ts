@@ -2,7 +2,7 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
-import { isPassEnabled } from "../platform/helpers";
+import { isPassEnabled, SECOND } from "../platform/helpers";
 
 const CaptchaT: any = {
   init() {
@@ -20,6 +20,11 @@ const CaptchaT: any = {
     $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
     $.on(QRState.nodes.com, 'keydown', e => {
       if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+    });
+    // Give up on the automatic reload when it is our own click that failed;
+    // errors from a manual or unrelated request are not ours to react to.
+    $.on(d, 'TCaptchaError', () => {
+      if (this.cooldownReloadTimer) { this.failCooldownReload(); }
     });
     d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
     d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
@@ -270,7 +275,94 @@ const CaptchaT: any = {
 
     const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-    return { slider, taskEl, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+    return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+  },
+
+  // 4chan's #t-load button refuses a new challenge while it counts down
+  // ("Get Captcha (28)"). Click it whenever the counter is not running, so a
+  // challenge is ready without the user reaching for the button. Deliberately
+  // stateless: any latch on having seen a counter strands the feature in every
+  // state where the counter already expired, such as after a failed post.
+  updateCooldownReload(state) {
+    if (!Conf['Auto-load captcha after cooldown']) { return; }
+    // 4chan is not asking for a captcha at all (the ext=1 widget parks on a
+    // 'noop' challenge). Clicking fetches nothing, and the watchdog would score
+    // the empty result as a failure -- which is what used to ratchet the backoff
+    // to its ceiling and keep it there for the rest of the session.
+    if (state.verificationNotRequired) { return; }
+    if (this.cooldownReloadRetryAt && (Date.now() < this.cooldownReloadRetryAt)) { return; }
+    // A missing #t-load is not proof the counter cleared: the control is not
+    // consistently rendered, so only act on a real, enabled button.
+    if (!state.tLoad || state.tLoad.disabled || state.isOnCooldown) { return; }
+    // Leave a live challenge, and any answer already in hand, alone: a click
+    // wipes them and strands 'Post on Captcha Completion' with nothing to send.
+    if (state.isChallenge || state.hasActiveChallengeStep || this.hasAnswerInHand()) { return; }
+    // A previous click is still in flight while its watchdog is pending.
+    if (this.cooldownReloadTimer) { return; }
+
+    this.hasRequested = true;
+    this.shouldLoad = false;
+    if (d.activeElement === QRState.nodes?.com) { this.startCommentFocusRestore(false); }
+    state.tLoad.click();
+    this.watchCooldownReload();
+    this.restoreCommentFocus();
+  },
+
+  // checkCompletion()'s condition, recomputed rather than read off isCompleted:
+  // createStrips() runs before checkCompletion() in a poll tick, so the flag
+  // trails the DOM by one tick.
+  hasAnswerInHand() {
+    if (this.isCompleted) { return true; }
+    if (!this.getOne()?.['t-response']) { return false; }
+    return !this.hasMoreChallengeSteps($('#t-next', this.nodes.container));
+  },
+
+  // If a click yields neither a challenge nor a fresh countdown, the request
+  // failed and the reload backs off instead of clicking the button again.
+  watchCooldownReload() {
+    clearTimeout(this.cooldownReloadTimer);
+    this.cooldownReloadTimer = setTimeout(() => {
+      delete this.cooldownReloadTimer;
+      if (!this.nodes.container) { return; }
+      const state = this.detectChallengeState(this.nodes.container);
+      if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) {
+        delete this.cooldownReloadFailures;
+        return;
+      }
+      // The state flipped to 'no captcha needed' while our click was in flight.
+      // The service answered, so that is not a failure -- but nothing loaded,
+      // so leave load() unblocked.
+      if (state.verificationNotRequired) {
+        delete this.cooldownReloadFailures;
+        delete this.hasRequested;
+        return;
+      }
+      this.failCooldownReload();
+    }, 5 * SECOND);
+  },
+
+  // Back off, never latch off. A permanent stop only recovers on a successful
+  // post or a page reload, so a failed challenge -- which is neither -- used to
+  // strand the reload for the rest of the session.
+  failCooldownReload() {
+    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
+    this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
+    this.clearCooldownReloadTimer();
+    // The request produced nothing, so don't leave load() blocked on it.
+    delete this.hasRequested;
+  },
+
+  clearCooldownReloadTimer() {
+    if (this.cooldownReloadTimer) {
+      clearTimeout(this.cooldownReloadTimer);
+      delete this.cooldownReloadTimer;
+    }
+  },
+
+  resetCooldownReload() {
+    this.clearCooldownReloadTimer();
+    delete this.cooldownReloadRetryAt;
+    delete this.cooldownReloadFailures;
   },
 
   // Check if we have a NEW challenge in a sequence (e.g. Next 2/3); reconciles
@@ -489,6 +581,8 @@ const CaptchaT: any = {
     const state = this.detectChallengeState(mainDiv);
     const { slider, taskEl } = state;
 
+    this.updateCooldownReload(state);
+
     if (state.verificationNotRequired) {
       this.setStatusMessage(mainDiv);
       return;
@@ -539,6 +633,8 @@ const CaptchaT: any = {
     delete this.isInitialized;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    delete this.autoSubmittedFor;
+    this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
       delete this.observer;
@@ -594,24 +690,50 @@ const CaptchaT: any = {
 
   checkCompletion() {
     if (!this.isEnabled || !this.nodes.container) return;
+    // getOne() is the authority on what counts as a usable payload: an answered
+    // challenge, or one where 4chan wants no verification. Reading 't-response'
+    // directly disagreed with it, so the no-verification case never completed
+    // and never triggered the auto-post.
+    //
+    // Take the 'noop' sentinel as proof of that second case, not the status
+    // text: the message can still be on screen while a real challenge loads, and
+    // completing there would auto-post an empty t-response and burn an error.
     const response = this.getOne();
-    if (!response?.['t-response']) {
+    const noCaptchaNeeded = !response?.['t-response'] && (response?.['t-challenge'] === 'noop');
+    if (!response?.['t-response'] && !noCaptchaNeeded) {
       this.isCompleted = false;
       return;
     }
-    const tNext = $('#t-next', this.nodes.container);
-    if (this.hasMoreChallengeSteps(tNext)) return;
+    // Nothing to solve and no steps to advance when no captcha was asked for.
+    if (!noCaptchaNeeded && this.hasMoreChallengeSteps($('#t-next', this.nodes.container))) return;
     if (this.isCompleted) return;
     this.isCompleted = true;
+    // A solved captcha proves the service is answering again, so cut any
+    // backoff short rather than waiting it out.
+    this.resetCooldownReload();
     if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
-      QRState.submit();
+      this.autoSubmit(response);
     }
+  },
+
+  // setup() runs on every failed post and clears isCompleted, so the false->true
+  // edge alone does not bound the auto-post: the next poll tick would complete
+  // and submit again. That is harmless for a solved challenge, whose answer is
+  // single-use, but a 'noop' payload never changes and would resubmit forever.
+  // Key the submit to the payload so each distinct captcha posts at most once.
+  autoSubmit(response) {
+    const payload = `${response['t-challenge'] || ''}:${response['t-response'] || ''}`;
+    if (this.autoSubmittedFor === payload) { return; }
+    this.autoSubmittedFor = payload;
+    QRState.submit();
   },
 
   setUsed() {
     this.isCompleted = false;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    delete this.autoSubmittedFor;
+    this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
       $.global('TCaptchaClearChallenge');

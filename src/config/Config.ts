@@ -555,6 +555,12 @@ const Config = {
         'Automatically load the captcha in the QR even if your post is empty.',
         1
       ],
+      'Auto-load captcha after cooldown': [
+        false,
+        'Click the captcha\'s <em>Get Captcha</em> button whenever its counter is not running, ' +
+          'so a challenge is ready without asking for one by hand.',
+        1
+      ],
       'Post on Captcha Completion': [
         false,
         'Submit the post immediately when the captcha is completed.',

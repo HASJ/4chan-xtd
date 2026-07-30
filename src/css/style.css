@@ -1594,7 +1594,6 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root.captcha-status > div {
   display: block !important;
   height: auto !important;
-  min-height: 170px !important;
   overflow: visible !important;
 }
 
@@ -1602,6 +1601,13 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root.captcha-status #t-task,
 #qr .captcha-root.captcha-status #t-box {
   display: block !important;
+}
+
+/* This state only ever showed elements, so #t-slider kept 4chan's inline
+   `display: block` and painted an inert track under the message -- it is always
+   disabled here, and a noop challenge still leaves min/max on it. */
+#qr .captcha-root.captcha-status #t-slider {
+  display: none !important;
 }
 
 #qr .captcha-root.is-challenge > div,
@@ -1629,6 +1635,18 @@ input.field.tripped:not(:hover):not(:focus) {
 #qr .captcha-root.is-challenge #t-next,
 .captcha-iframe.is-challenge #t-next {
   margin-left: 0 !important;
+}
+
+/* 4chan's ext=1 widget embeds sys.4chan.org/captcha in #t-frame. Nothing here
+   drives that iframe yet -- the challenge we render comes from the parent's own
+   #t-task -- so it is an unstyled 80px white block, cross-origin and beyond the
+   reach of themed-captcha. Collapse it in every state the parent owns:
+   is-challenge means the parent had the puzzle, and idle/status mean there is no
+   puzzle at all. */
+#qr .captcha-root.is-challenge #t-frame,
+#qr .captcha-root.captcha-idle #t-frame,
+#qr .captcha-root.captcha-status #t-frame {
+  display: none !important;
 }
 
 #qr .captcha-clue-image,

@@ -3,6 +3,18 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.8 (2026-07-30)
+
+- Features
+  - Added `Auto-load captcha after cooldown`: clicks the captcha's *Get Captcha* button whenever its counter is not running, so a challenge is ready without asking for one by hand.
+
+- Bugfixes
+  - Fixed the captcha auto-load going quiet for minutes at a time. When 4chan answers with a `noop` challenge ("Verification not required"), no captcha is on offer, but the auto-load clicked anyway and its watchdog scored the empty result as a failure — ratcheting the retry backoff to its 120-second ceiling and re-arming it there indefinitely. It now recognises that state and stays idle.
+  - Fixed `Post on Captcha Completion` never firing when 4chan requires no verification. `checkCompletion()` read `t-response` directly and disagreed with `getOne()`, which already accepts such a payload as valid; it now defers to `getOne()`, keyed on the `noop` sentinel rather than the on-screen message so a lingering status text cannot auto-post an empty response.
+  - Bounded the auto-post to one submission per distinct captcha payload. A failed post clears the completion flag, so the 500ms poll would otherwise resubmit an unchanging `noop` payload on every tick.
+  - Hid `#t-frame`, the `ext=1` captcha iframe, in the idle, status, and challenge states. Nothing drives it yet, so it rendered as an unstyled white block inside the Quick Reply, cross-origin and beyond the reach of `Theme Captcha`.
+  - Hid the inert `#t-slider` while a captcha status message is shown, and dropped the surplus `min-height` that had been reserving room for the iframe.
+
 ### 2.30.7 (2026-07-15)
 
 - Bugfixes
