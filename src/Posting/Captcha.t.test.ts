@@ -66,6 +66,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
     delete CaptchaT.serverCooldownUntil;
+    delete CaptchaT.answerExpiresAt;
     CaptchaT.shouldLoad = false;
   });
 
@@ -317,6 +318,100 @@ describe('CaptchaT auto-load after cooldown', () => {
       CaptchaT.noteServerCooldown(twister);
 
       expect(CaptchaT.serverCooldownUntil).toBeUndefined();
+    });
+  });
+
+  // A solved answer sits in #t-resp and nothing clears it on its own, so once
+  // it is past the ttl the frame stated it protects a payload 4chan will reject.
+  describe('expired answer', () => {
+    const CHALLENGE = { challenge: 'abc.def', ttl: 120, cd: 30 };
+
+    it('still protects an answer inside its ttl', () => {
+      const { root, click } = buildCaptcha();
+      root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
+
+      CaptchaT.noteChallengeExpiry(CHALLENGE);
+      vi.advanceTimersByTime(119 * 1000);
+      CaptchaT.createStrips();
+
+      expect(click).not.toHaveBeenCalled();
+    });
+
+    it('reloads over an answer once its ttl has passed', () => {
+      const { root, click } = buildCaptcha();
+      root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
+
+      CaptchaT.noteChallengeExpiry(CHALLENGE);
+      vi.advanceTimersByTime(120 * 1000);
+      CaptchaT.createStrips();
+
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    // isCompleted short-circuits hasAnswerInHand(), so it needs the same escape.
+    it('reloads over a completed captcha once its ttl has passed', () => {
+      const { click } = buildCaptcha();
+      CaptchaT.isCompleted = true;
+
+      CaptchaT.noteChallengeExpiry(CHALLENGE);
+      vi.advanceTimersByTime(121 * 1000);
+      CaptchaT.createStrips();
+
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    // No message seen means unknown expiry, which must not read as expired.
+    it('keeps protecting an answer when no ttl was ever stated', () => {
+      const { root, click } = buildCaptcha();
+      root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+      CaptchaT.createStrips();
+
+      expect(click).not.toHaveBeenCalled();
+    });
+
+    it('does not expire a live challenge mid-solve', () => {
+      const { root, click } = buildCaptcha();
+      $('#t-task', root)!.style.backgroundImage = 'url("data:image/png;base64,x")';
+      $('#t-next', root)!.textContent = 'Next (1/2)';
+
+      CaptchaT.noteChallengeExpiry(CHALLENGE);
+      vi.advanceTimersByTime(200 * 1000);
+      CaptchaT.createStrips();
+
+      expect(click).not.toHaveBeenCalled();
+    });
+
+    it('caps an implausible ttl', () => {
+      buildCaptcha();
+
+      CaptchaT.noteChallengeExpiry({ challenge: 'abc', ttl: 120000 });
+
+      expect((CaptchaT.answerExpiresAt - Date.now()) / 1000).toBe(600);
+    });
+
+    it.each([
+      ['a refusal carrying no challenge', { error: 'nope', cd: 15 }],
+      ['a challenge with no ttl', { challenge: 'abc' }],
+      ['a non-numeric ttl', { challenge: 'abc', ttl: '120' }],
+      ['a zero ttl', { challenge: 'abc', ttl: 0 }],
+      ['a negative ttl', { challenge: 'abc', ttl: -1 }],
+    ])('ignores %s', (_label, twister) => {
+      buildCaptcha();
+
+      CaptchaT.noteChallengeExpiry(twister);
+
+      expect(CaptchaT.answerExpiresAt).toBeUndefined();
+    });
+
+    it('is cleared once the captcha is consumed', () => {
+      buildCaptcha();
+
+      CaptchaT.noteChallengeExpiry(CHALLENGE);
+      CaptchaT.setUsed();
+
+      expect(CaptchaT.answerExpiresAt).toBeUndefined();
     });
   });
 

@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.11 (2026-07-30)
+
+- Bugfixes
+  - The captcha auto-load can now replace an answer that has expired. A solved captcha sits in the response field and nothing clears it on its own, so once it was past the lifetime 4chan stated for it, the auto-load kept protecting a payload the server would reject — and refused to fetch a fresh challenge until the Quick Reply was closed and reopened. It now stands aside once that deadline passes.
+  - A challenge you are part-way through solving is still left alone; only a finished answer is treated as expendable. If no lifetime was ever received, nothing is assumed to have expired.
+
 ### 2.30.10 (2026-07-30)
 
 - Bugfixes

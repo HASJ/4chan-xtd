@@ -110,8 +110,19 @@ Two consequences:
    schedule. The button-label scrape (`/\(\d+\)/`) stays as the render-time
    signal; the two agree, and it still works if no message was seen.
 
-   `ttl` is still unused — see the tracking issue. It would let the auto-load
-   replace a stale answer instead of protecting one indefinitely.
+   `ttl` is now consumed too. `updateCooldownReload()` protects an answer in
+   hand because clicking would strand *Post on Captcha Completion* with nothing
+   to send — but a solved answer sits in `#t-resp` and nothing clears it on its
+   own, so past its `ttl` it protected a payload 4chan would reject and blocked
+   the reload behind it. `noteChallengeExpiry()` records the deadline and the
+   guard now stands down once it passes.
+
+   Deliberately narrow: only the *answer* guard yields to expiry, not the live
+   challenge guard. An expired unsolved puzzle resolves itself — 4chan drops the
+   task background, `isChallenge` goes false, and the normal idle path takes
+   over — whereas wiping a challenge the user is mid-solve on would be a visible
+   regression. Unknown expiry never reads as expired, so with no message seen
+   the previous behaviour stands.
 
 The frame→parent direction of this channel is live and is what 4chan itself
 uses. The `{type:'select-strip'}` listener in `setupIframe()` is the *other*
