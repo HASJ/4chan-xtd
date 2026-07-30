@@ -12,7 +12,7 @@ const buildCaptcha = () => {
   root.className = 'captcha-root';
   root.innerHTML = `
     <div class="captcha-container">
-      <input type="button" id="t-load" value="${COUNTING_DOWN}">
+      <input type="button" id="t-load" value="${IDLE}">
       <div id="t-ctrl"><button id="t-next"></button></div>
       <div id="t-task"></div>
       <input id="t-resp" name="t-response">
@@ -31,6 +31,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     vi.useFakeTimers();
     vi.spyOn($, 'global').mockResolvedValue({});
     Conf['Auto-load captcha'] = false;
+    Conf['Auto-load captcha after cooldown'] = true;
     Conf['Post on Captcha Completion'] = false;
     QRState.posts = [];
     QRState.nodes = null;
@@ -46,12 +47,20 @@ describe('CaptchaT auto-load after cooldown', () => {
     vi.useRealTimers();
   });
 
-  it('clicks #t-load once the counter clears', () => {
+  it('clicks an idle #t-load without ever having seen a counter', () => {
+    const { click } = buildCaptcha();
+
+    CaptchaT.createStrips();
+
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicks once the counter clears', () => {
     const { tLoad, click } = buildCaptcha();
+    tLoad.value = COUNTING_DOWN;
 
     CaptchaT.createStrips();
     expect(click).not.toHaveBeenCalled();
-    expect(CaptchaT.cooldownReloadPending).toBe(true);
 
     tLoad.value = IDLE;
     CaptchaT.createStrips();
@@ -62,52 +71,62 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  // The counter is only ever visible because a captcha was recently in play,
-  // so an empty QR still gets a fresh one when the counter clears.
-  it('clicks for an empty QR that would not lazy-load a captcha', () => {
-    const { tLoad, click } = buildCaptcha();
-    QRState.posts = [{ isOnlyQuotes: () => true, file: null }];
+  // The failed-post path: setUsed() drops the challenge and the button can be
+  // idle straight away, with no countdown for anything to latch onto.
+  it('clicks after setUsed leaves the button idle', () => {
+    const { click } = buildCaptcha();
 
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
+    CaptchaT.setUsed();
     CaptchaT.createStrips();
 
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('does not click without having seen a counter', () => {
-    const { tLoad, click } = buildCaptcha();
-    tLoad.value = IDLE;
+  it('does not click when the option is off', () => {
+    const { click } = buildCaptcha();
+    Conf['Auto-load captcha after cooldown'] = false;
 
-    CaptchaT.createStrips();
     CaptchaT.createStrips();
 
     expect(click).not.toHaveBeenCalled();
   });
 
-  it('waits for a real #t-load instead of treating a missing one as idle', () => {
+  it('does not treat a missing #t-load as an idle button', () => {
     const { tLoad, click } = buildCaptcha();
-
-    CaptchaT.createStrips();
     tLoad.remove();
+
     CaptchaT.createStrips();
 
     expect(click).not.toHaveBeenCalled();
-    expect(CaptchaT.cooldownReloadPending).toBe(true);
   });
 
-  it('stops reloading when a click yields no challenge and no new countdown', () => {
-    const { tLoad, click } = buildCaptcha();
+  it('does not click over an answered challenge', () => {
+    const { root, click } = buildCaptcha();
+    root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
 
     CaptchaT.createStrips();
-    tLoad.value = IDLE;
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('does not click over a solved captcha that has not been used yet', () => {
+    const { click } = buildCaptcha();
+    CaptchaT.isCompleted = true;
+
+    CaptchaT.createStrips();
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('stops clicking when a click yields no challenge and no new countdown', () => {
+    const { tLoad, click } = buildCaptcha();
+
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(5000);
     expect(CaptchaT.cooldownReloadFailed).toBe(true);
 
-    // A fresh countdown must not re-arm the reload after a failure.
     tLoad.value = COUNTING_DOWN;
     CaptchaT.createStrips();
     tLoad.value = IDLE;
@@ -115,73 +134,38 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps reloading when the click did produce a new countdown', () => {
-    const { tLoad, click } = buildCaptcha();
+  it('stops clicking when the captcha reports an error for our own click', () => {
+    const { click } = buildCaptcha();
 
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
-    CaptchaT.createStrips();
-
-    tLoad.value = COUNTING_DOWN;
-    vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
-
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
-    CaptchaT.createStrips();
-    expect(click).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not click over an answered challenge', () => {
-    const { root, tLoad, click } = buildCaptcha();
-
-    CaptchaT.createStrips();
-    root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
-    tLoad.value = IDLE;
-    CaptchaT.createStrips();
-
-    expect(click).not.toHaveBeenCalled();
-    expect(CaptchaT.cooldownReloadPending).toBeUndefined();
-  });
-
-  it('stops reloading when the captcha reports an error for our own click', () => {
-    const { tLoad, click } = buildCaptcha();
-
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
-
-    // Arrives while our click is still in flight.
     expect(CaptchaT.cooldownReloadTimer).toBeDefined();
+
     CaptchaT.failCooldownReload();
 
     expect(CaptchaT.cooldownReloadFailed).toBe(true);
     expect(CaptchaT.cooldownReloadTimer).toBeUndefined();
 
-    tLoad.value = COUNTING_DOWN;
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('does not click over a solved captcha that has not been used yet', () => {
+  it('keeps clicking when the click did produce a new countdown', () => {
     const { tLoad, click } = buildCaptcha();
 
     CaptchaT.createStrips();
-    CaptchaT.isCompleted = true;
+    tLoad.value = COUNTING_DOWN;
+    vi.advanceTimersByTime(5000);
+    expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
+
     tLoad.value = IDLE;
     CaptchaT.createStrips();
-
-    expect(click).not.toHaveBeenCalled();
+    expect(click).toHaveBeenCalledTimes(2);
   });
 
-  it('leaves load() unblocked after a failed reload', () => {
-    const { tLoad } = buildCaptcha();
+  it('leaves load() unblocked after a failed click', () => {
+    buildCaptcha();
 
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
     expect(CaptchaT.hasRequested).toBe(true);
 
@@ -191,12 +175,10 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(CaptchaT.hasRequested).toBeUndefined();
   });
 
-  it('resumes reloading once a captcha is solved after a failure', () => {
-    const { root, tLoad, click } = buildCaptcha();
+  it('resumes clicking once a captcha is solved after a failure', () => {
+    const { root, click } = buildCaptcha();
     const resp = root.querySelector<HTMLInputElement>('#t-resp')!;
 
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
     vi.advanceTimersByTime(5000);
     expect(CaptchaT.cooldownReloadFailed).toBe(true);
@@ -207,21 +189,17 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(CaptchaT.isCompleted).toBe(true);
     expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
 
-    // That captcha gets consumed, then the next countdown runs out.
+    // That captcha gets consumed, then the button goes idle again.
     resp.value = '';
     CaptchaT.checkCompletion();
-    tLoad.value = COUNTING_DOWN;
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
 
     expect(click).toHaveBeenCalledTimes(2);
   });
 
-  it('setUsed clears a pending reload and the failure latch', () => {
-    const { tLoad } = buildCaptcha();
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
+  it('setUsed clears the failure latch', () => {
+    buildCaptcha();
+
     CaptchaT.createStrips();
     vi.advanceTimersByTime(5000);
     expect(CaptchaT.cooldownReloadFailed).toBe(true);
@@ -229,6 +207,5 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.setUsed();
 
     expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
-    expect(CaptchaT.cooldownReloadPending).toBeUndefined();
   });
 });

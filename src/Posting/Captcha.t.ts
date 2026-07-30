@@ -278,43 +278,37 @@ const CaptchaT: any = {
     return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
   },
 
-  // Auto-load after cooldown: while #t-load counts down ("Get Captcha (28)") a
-  // new challenge cannot be requested, so remember that one is due and click
-  // the button as soon as the counter clears.
+  // 4chan's #t-load button refuses a new challenge while it counts down
+  // ("Get Captcha (28)"). Click it whenever the counter is not running, so a
+  // challenge is ready without the user reaching for the button. Deliberately
+  // stateless: any latch on having seen a counter strands the feature in every
+  // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
-    if (this.cooldownReloadFailed) { return; }
-
-    if (state.isChallenge || state.hasActiveChallengeStep) {
-      this.clearCooldownReload();
-      return;
-    }
-
-    if (state.isOnCooldown) {
-      // A counter is only ever visible because a captcha was recently in play,
-      // so this is no longer a lazy-load decision: isWanted() does not apply.
-      this.cooldownReloadPending = true;
-      return;
-    }
-
-    if (!this.cooldownReloadPending) { return; }
+    if (!Conf['Auto-load captcha after cooldown'] || this.cooldownReloadFailed) { return; }
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
-    if (!state.tLoad || state.tLoad.disabled) { return; }
-    // Never clobber an answer already in hand: a click here would wipe it and
-    // silently strand 'Post on Captcha Completion'. Check the same sources
-    // checkCompletion() reads, not just the visible input.
-    if (this.isCompleted || this.getOne()?.['t-response'] || $('#t-resp', this.nodes.container)?.value) {
-      this.clearCooldownReload();
-      return;
-    }
+    if (!state.tLoad || state.tLoad.disabled || state.isOnCooldown) { return; }
+    // Leave a live challenge, and any answer already in hand, alone: a click
+    // wipes them and strands 'Post on Captcha Completion' with nothing to send.
+    if (state.isChallenge || state.hasActiveChallengeStep || this.hasAnswerInHand()) { return; }
+    // A previous click is still in flight while its watchdog is pending.
+    if (this.cooldownReloadTimer) { return; }
 
-    this.clearCooldownReload();
     this.hasRequested = true;
     this.shouldLoad = false;
     if (d.activeElement === QRState.nodes?.com) { this.startCommentFocusRestore(false); }
     state.tLoad.click();
     this.watchCooldownReload();
     this.restoreCommentFocus();
+  },
+
+  // checkCompletion()'s condition, recomputed rather than read off isCompleted:
+  // createStrips() runs before checkCompletion() in a poll tick, so the flag
+  // trails the DOM by one tick.
+  hasAnswerInHand() {
+    if (this.isCompleted) { return true; }
+    if (!this.getOne()?.['t-response']) { return false; }
+    return !this.hasMoreChallengeSteps($('#t-next', this.nodes.container));
   },
 
   // If a click yields neither a challenge nor a fresh countdown, the request
@@ -332,14 +326,9 @@ const CaptchaT: any = {
 
   failCooldownReload() {
     this.cooldownReloadFailed = true;
-    this.clearCooldownReload();
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
     delete this.hasRequested;
-  },
-
-  clearCooldownReload() {
-    delete this.cooldownReloadPending;
   },
 
   clearCooldownReloadTimer() {
@@ -350,7 +339,6 @@ const CaptchaT: any = {
   },
 
   resetCooldownReload() {
-    this.clearCooldownReload();
     this.clearCooldownReloadTimer();
     delete this.cooldownReloadFailed;
   },
