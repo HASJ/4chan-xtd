@@ -3,6 +3,18 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.10 (2026-07-30)
+
+- Bugfixes
+  - Captcha errors from 4chan now actually reach you. The captcha frame reports failures by posting a message up to the page, but it sends them from `sys.4chan.org` while the board page is `boards.4chan.org` — and the listener only accepted messages from its own origin. Every one of them was discarded, so a refusal like "You have to wait a while before doing this again" arrived as silence.
+
+- Reliability
+  - The captcha auto-load now takes its retry timing from 4chan instead of guessing. Each captcha response carries the exact number of seconds until the service will hand out another one; that value is now read and obeyed, both for waiting out a cooldown and for retrying after a refusal. The old invented schedule remains only as a fallback for when no response arrives at all.
+  - A cooldown value is capped at 300 seconds, so a malformed one cannot leave the auto-load stuck for the rest of the session.
+
+- Notes
+  - The `ext=1` captcha iframe was found to be a courier rather than a display: it fetches the challenge, hands it to the page, and unloads. Hiding it, which 2.30.8 started doing, is correct and does not affect the captcha. See `docs/captcha-cooldown-reload-diagnosis.md`.
+
 ### 2.30.8 (2026-07-30)
 
 - Features
