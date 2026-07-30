@@ -47,23 +47,18 @@ const CaptchaT: any = {
     }, true);
   },
 
-  // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge for
-  // an empty QR, but fetch one as soon as the queued post needs it.
-  isWanted() {
+  moreNeeded() {
     const post = QRState.posts[0];
-    if (!post) { return false; }
-    return !!(
+    if (!this.isEnabled || !post) { return; }
+
+    // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge
+    // for an empty QR, but fetch one as soon as the queued post needs it.
+    if (
       (QRState.posts.length > 1) ||
       Conf['Auto-load captcha'] ||
       !post.isOnlyQuotes() ||
       post.file
-    );
-  },
-
-  moreNeeded() {
-    if (!this.isEnabled || !QRState.posts[0]) { return; }
-
-    if (this.isWanted()) {
+    ) {
       this.shouldLoad = true;
       this.load();
     }
@@ -295,10 +290,9 @@ const CaptchaT: any = {
     }
 
     if (state.isOnCooldown) {
+      // A counter is only ever visible because a captcha was recently in play,
+      // so this is no longer a lazy-load decision: isWanted() does not apply.
       this.cooldownReloadPending = true;
-      // hasRequested/shouldLoad are cleared by setUsed() before the counter
-      // runs out, so latch here whether a captcha was already wanted.
-      if (this.hasRequested || this.shouldLoad) { this.cooldownReloadWanted = true; }
       return;
     }
 
@@ -306,7 +300,6 @@ const CaptchaT: any = {
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
     if (!state.tLoad || state.tLoad.disabled) { return; }
-    if (!this.cooldownReloadWanted && !this.isWanted()) { return; }
     if ($('#t-resp', this.nodes.container)?.value) {
       this.clearCooldownReload();
       return;
@@ -342,7 +335,6 @@ const CaptchaT: any = {
 
   clearCooldownReload() {
     delete this.cooldownReloadPending;
-    delete this.cooldownReloadWanted;
   },
 
   clearCooldownReloadTimer() {

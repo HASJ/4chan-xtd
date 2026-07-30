@@ -43,9 +43,8 @@ describe('CaptchaT auto-load after cooldown', () => {
     vi.useRealTimers();
   });
 
-  it('clicks #t-load once the counter clears for a captcha that was already wanted', () => {
+  it('clicks #t-load once the counter clears', () => {
     const { tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     expect(click).not.toHaveBeenCalled();
@@ -60,19 +59,11 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('does not click when no captcha is wanted', () => {
+  // The counter is only ever visible because a captcha was recently in play,
+  // so an empty QR still gets a fresh one when the counter clears.
+  it('clicks for an empty QR that would not lazy-load a captcha', () => {
     const { tLoad, click } = buildCaptcha();
-
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
-    CaptchaT.createStrips();
-
-    expect(click).not.toHaveBeenCalled();
-  });
-
-  it('clicks when the queued post wants a captcha on its own', () => {
-    const { tLoad, click } = buildCaptcha();
-    QRState.posts = [{ isOnlyQuotes: () => false, file: null }];
+    QRState.posts = [{ isOnlyQuotes: () => true, file: null }];
 
     CaptchaT.createStrips();
     tLoad.value = IDLE;
@@ -81,9 +72,18 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  it('does not click without having seen a counter', () => {
+    const { tLoad, click } = buildCaptcha();
+    tLoad.value = IDLE;
+
+    CaptchaT.createStrips();
+    CaptchaT.createStrips();
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
   it('waits for a real #t-load instead of treating a missing one as idle', () => {
     const { tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     tLoad.remove();
@@ -95,7 +95,6 @@ describe('CaptchaT auto-load after cooldown', () => {
 
   it('stops reloading when a click yields no challenge and no new countdown', () => {
     const { tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     tLoad.value = IDLE;
@@ -115,7 +114,6 @@ describe('CaptchaT auto-load after cooldown', () => {
 
   it('keeps reloading when the click did produce a new countdown', () => {
     const { tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     tLoad.value = IDLE;
@@ -133,7 +131,6 @@ describe('CaptchaT auto-load after cooldown', () => {
 
   it('does not click over an answered challenge', () => {
     const { root, tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     root.querySelector<HTMLInputElement>('#t-resp')!.value = 'answer';
@@ -146,7 +143,6 @@ describe('CaptchaT auto-load after cooldown', () => {
 
   it('stops reloading when the captcha reports an error for our own click', () => {
     const { tLoad, click } = buildCaptcha();
-    CaptchaT.hasRequested = true;
 
     CaptchaT.createStrips();
     tLoad.value = IDLE;
@@ -169,7 +165,6 @@ describe('CaptchaT auto-load after cooldown', () => {
 
   it('setUsed clears a pending reload and the failure latch', () => {
     const { tLoad } = buildCaptcha();
-    CaptchaT.hasRequested = true;
     CaptchaT.createStrips();
     tLoad.value = IDLE;
     CaptchaT.createStrips();
