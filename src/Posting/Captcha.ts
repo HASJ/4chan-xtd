@@ -438,7 +438,11 @@ const Captcha: any = {
         this.saveNotNeeded(pasted, focus);
       }
 
-      if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) { return QRState.submit(); }
+      if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
+        const post = QRState.posts[0];
+        if (post && !((QRState.posts.length > 1) || !post.isOnlyQuotes() || post.file)) { return; }
+        return QRState.submit();
+      }
     },
 
     count() {

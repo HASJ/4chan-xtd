@@ -792,6 +792,8 @@ const CaptchaT: any = {
   // single-use, but a 'noop' payload never changes and would resubmit forever.
   // Key the submit to the payload so each distinct captcha posts at most once.
   autoSubmit(response) {
+    const post = QRState.posts[0];
+    if (post && !((QRState.posts.length > 1) || !post.isOnlyQuotes() || post.file)) { return; }
     const payload = `${response['t-challenge'] || ''}:${response['t-response'] || ''}`;
     if (this.autoSubmittedFor === payload) { return; }
     this.autoSubmittedFor = payload;

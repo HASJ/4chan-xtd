@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.12 (2026-07-30)
+
+- Bugfixes
+  - Fixed an oversight where `Auto-load captcha` combined with `Post on Captcha Completion` could automatically post immediately upon quoting a post if 4chan returned `Verification not required`. `Post on Captcha Completion` now checks that the post contains actual comment text or an attached file (rather than only containing the inserted quote tag) before auto-submitting.
+
 ### 2.30.11 (2026-07-30)
 
 - Bugfixes

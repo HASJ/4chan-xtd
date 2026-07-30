@@ -552,4 +552,34 @@ describe('CaptchaT when 4chan requires no verification', () => {
 
     expect(QRState.submit).toHaveBeenCalledTimes(2);
   });
+
+  it('does not auto-submit when post contains only quotes and no file', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+    const post = {
+      isOnlyQuotes: () => true,
+      file: null,
+    };
+    QRState.posts = [post];
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('auto-submits when post contains text in addition to quotes', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+    const post = {
+      isOnlyQuotes: () => false,
+      file: null,
+    };
+    QRState.posts = [post];
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
 });
