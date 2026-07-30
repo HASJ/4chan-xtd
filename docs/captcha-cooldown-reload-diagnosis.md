@@ -101,10 +101,17 @@ Two consequences:
 1. **The `#t-frame` risk noted below is retired.** `frameH: 0` is our CSS hiding
    it, and the challenge loaded, rendered, was solved and posted regardless.
    Hiding it is correct; no gating is needed.
-2. **`cd` and `ttl` are authoritative and unused.** `cd` is the exact cooldown
-   before *Get Captcha* works again — currently scraped out of the button label
-   with `/\((\d+)\)/`. `ttl` is the answer's lifetime, which would let the
-   auto-load replace a stale answer instead of protecting it indefinitely.
+2. **`cd` and `ttl` are authoritative.** `cd` is the exact cooldown before *Get
+   Captcha* works again; `ttl` is the answer's lifetime.
+
+   `cd` is now consumed — `noteServerCooldown()` records it and both
+   `updateCooldownReload()` and `failCooldownReload()` defer to it, so the retry
+   time comes from the service that enforces it rather than from an invented
+   schedule. The button-label scrape (`/\(\d+\)/`) stays as the render-time
+   signal; the two agree, and it still works if no message was seen.
+
+   `ttl` is still unused — see the tracking issue. It would let the auto-load
+   replace a stale answer instead of protecting one indefinitely.
 
 The frame→parent direction of this channel is live and is what 4chan itself
 uses. The `{type:'select-strip'}` listener in `setupIframe()` is the *other*

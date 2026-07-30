@@ -20,7 +20,7 @@ import Menu from '../Menu/Menu';
 import UI from '../General/UI';
 import BoardConfig from '../General/BoardConfig';
 import Get from '../General/Get';
-import { DAY, dict, SECOND } from '../platform/helpers';
+import { DAY, dict, isTrustedSiteOrigin, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import * as MimeTypes from '../globals/MimeTypes';
@@ -122,27 +122,16 @@ const QR = {
 
     UIState.addShortcut('qr', sc, 540);
 
+    // The captcha frame reports failures as {twister: {error, cd}} from
+    // sys.<domain>.org. A same-origin-only check dropped every one of them, so
+    // a captcha error reached the user as silence.
     window.addEventListener('message', event => {
-      if (!QR.isTrustedMessageOrigin(event.origin)) { return; }
+      if (!isTrustedSiteOrigin(event.origin)) { return; }
       const error = event.data?.twister?.error;
       if (typeof error === 'string') {
         QR.error(error);
       }
     });
-  },
-
-  // 4chan's captcha frame reports failures by posting {twister: {error, cd}} up
-  // to the parent, and it posts from sys.<domain>.org -- never the board's own
-  // origin. A same-origin-only check therefore dropped every one of them, so a
-  // captcha error from the frame reached the user as silence.
-  //
-  // Deliberately an exact match against that one extra origin. QR.error()
-  // renders a string through $.tn() so there is no markup injection here, but
-  // anything looser would still hand an embedded frame a channel for putting
-  // arbitrary text in front of the user as if the site had said it.
-  isTrustedMessageOrigin(origin: string) {
-    return (origin === location.origin) ||
-      (origin === `https://sys.${location.hostname.split('.')[1]}.org`);
   },
 
   initReady() {

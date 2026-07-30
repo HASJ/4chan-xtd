@@ -65,6 +65,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.resetCooldownReload();
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
+    delete CaptchaT.serverCooldownUntil;
     CaptchaT.shouldLoad = false;
   });
 
@@ -255,6 +256,68 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.createStrips();
 
     expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  // The frame states its own cooldown; that beats both the button-label scrape
+  // and the invented retry schedule.
+  describe('server-stated cooldown', () => {
+    it('does not click while the stated cooldown runs', () => {
+      const { click } = buildCaptcha();
+
+      CaptchaT.noteServerCooldown({ cd: 30 });
+      CaptchaT.createStrips();
+      expect(click).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(30 * 1000);
+      CaptchaT.createStrips();
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries on the stated time instead of the invented schedule', () => {
+      buildCaptcha();
+
+      CaptchaT.createStrips();
+      CaptchaT.noteServerCooldown({ error: 'wait a while', cd: 15 });
+      vi.advanceTimersByTime(5000);
+
+      // 15s from the message, not the 30s first rung.
+      expect((CaptchaT.cooldownReloadRetryAt - Date.now()) / 1000).toBe(10);
+      // A stated cooldown is an answer, not a fault to escalate on.
+      expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+    });
+
+    it('falls back to the invented schedule when nothing was stated', () => {
+      buildCaptcha();
+
+      CaptchaT.createStrips();
+      vi.advanceTimersByTime(5000);
+
+      expect(CaptchaT.cooldownReloadFailures).toBe(1);
+      expect(CaptchaT.cooldownReloadRetryAt).toBeGreaterThan(Date.now());
+    });
+
+    it('caps an implausible value so it cannot strand the auto-load', () => {
+      buildCaptcha();
+
+      // e.g. a unit change to milliseconds.
+      CaptchaT.noteServerCooldown({ cd: 30000 });
+
+      expect((CaptchaT.serverCooldownUntil - Date.now()) / 1000).toBe(300);
+    });
+
+    it.each([
+      ['a missing payload', undefined],
+      ['no cd field', { error: 'nope' }],
+      ['a string', { cd: '30' }],
+      ['NaN', { cd: Number.NaN }],
+      ['a negative', { cd: -5 }],
+    ])('ignores %s', (_label, twister) => {
+      buildCaptcha();
+
+      CaptchaT.noteServerCooldown(twister);
+
+      expect(CaptchaT.serverCooldownUntil).toBeUndefined();
+    });
   });
 
   it('setUsed clears the backoff', () => {

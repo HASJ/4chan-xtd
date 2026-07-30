@@ -62,6 +62,19 @@ export const isPassEnabled = () => {
   return document.cookie.includes('pass_enabled=1');
 };
 
+// 4chan's captcha frame posts {twister: {...}} up to the parent, and it posts
+// from sys.<domain>.org -- never the board's own origin. Both the Quick Reply
+// (error relay) and the captcha (cooldown) read those messages, so the trust
+// boundary lives here rather than in either of them.
+//
+// Deliberately an exact match. Callers render these values as text rather than
+// markup, but anything looser would still let an embedded frame put arbitrary
+// content in front of the user as if the site had sent it.
+export const isTrustedSiteOrigin = (origin: string) => {
+  return (origin === location.origin) ||
+    (origin === `https://sys.${location.hostname.split('.')[1]}.org`);
+};
+
 export const keyCode = function (e: any) {
   let key = (() => {
     const kc = e.keyCode;
