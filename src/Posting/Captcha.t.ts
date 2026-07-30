@@ -4,9 +4,10 @@ import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
 import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers";
 
-// Ceiling on a server-stated cooldown, in seconds. Only a malformed value can
-// exceed this; a real one is tens of seconds.
+// Ceilings on server-stated durations, in seconds. Only a malformed value can
+// exceed these; real ones are tens of seconds to a couple of minutes.
 const MAX_SERVER_COOLDOWN = 300;
+const MAX_CHALLENGE_TTL = 600;
 
 const CaptchaT: any = {
   init() {
@@ -36,6 +37,7 @@ const CaptchaT: any = {
     window.addEventListener('message', e => {
       if (!isTrustedSiteOrigin(e.origin)) { return; }
       this.noteServerCooldown(e.data?.twister);
+      this.noteChallengeExpiry(e.data?.twister);
     });
     d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
     d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
@@ -305,6 +307,22 @@ const CaptchaT: any = {
     return !!this.serverCooldownUntil && (Date.now() < this.serverCooldownUntil);
   },
 
+  // 'ttl' is how long the challenge in this message stays valid -- 120s in
+  // practice. Only trust it on a message that actually carries a challenge; a
+  // refusal has no challenge to put a lifetime on.
+  noteChallengeExpiry(twister) {
+    const ttl = twister?.ttl;
+    if (!twister?.challenge) { return; }
+    if ((typeof ttl !== 'number') || !Number.isFinite(ttl) || (ttl <= 0)) { return; }
+    this.answerExpiresAt = Date.now() + (Math.min(ttl, MAX_CHALLENGE_TTL) * SECOND);
+  },
+
+  // Unknown expiry is not expiry: with no message seen, this stays false and
+  // the answer keeps its protection.
+  answerHasExpired() {
+    return !!this.answerExpiresAt && (Date.now() >= this.answerExpiresAt);
+  },
+
   // 4chan's #t-load button refuses a new challenge while it counts down
   // ("Get Captcha (28)"). Click it whenever the counter is not running, so a
   // challenge is ready without the user reaching for the button. Deliberately
@@ -324,9 +342,13 @@ const CaptchaT: any = {
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
     if (!state.tLoad || state.tLoad.disabled || state.isOnCooldown) { return; }
-    // Leave a live challenge, and any answer already in hand, alone: a click
-    // wipes them and strands 'Post on Captcha Completion' with nothing to send.
-    if (state.isChallenge || state.hasActiveChallengeStep || this.hasAnswerInHand()) { return; }
+    // Leave a live challenge alone: a click wipes it mid-solve.
+    if (state.isChallenge || state.hasActiveChallengeStep) { return; }
+    // Same for an answer already in hand -- clicking would strand 'Post on
+    // Captcha Completion' with nothing to send. But a solved answer sits in
+    // #t-resp and nothing clears it on its own, so once it is past its ttl it
+    // protects a payload 4chan will reject and blocks the reload behind it.
+    if (this.hasAnswerInHand() && !this.answerHasExpired()) { return; }
     // A previous click is still in flight while its watchdog is pending.
     if (this.cooldownReloadTimer) { return; }
 
@@ -681,6 +703,7 @@ const CaptchaT: any = {
     delete this.hasRequested;
     delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
+    delete this.answerExpiresAt;
     this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
@@ -780,6 +803,7 @@ const CaptchaT: any = {
     delete this.hasRequested;
     delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
+    delete this.answerExpiresAt;
     this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
