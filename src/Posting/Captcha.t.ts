@@ -284,7 +284,8 @@ const CaptchaT: any = {
   // stateless: any latch on having seen a counter strands the feature in every
   // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
-    if (!Conf['Auto-load captcha after cooldown'] || this.cooldownReloadFailed) { return; }
+    if (!Conf['Auto-load captcha after cooldown']) { return; }
+    if (this.cooldownReloadRetryAt && (Date.now() < this.cooldownReloadRetryAt)) { return; }
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
     if (!state.tLoad || state.tLoad.disabled || state.isOnCooldown) { return; }
@@ -312,20 +313,27 @@ const CaptchaT: any = {
   },
 
   // If a click yields neither a challenge nor a fresh countdown, the request
-  // failed; stop reloading instead of clicking the button again.
+  // failed and the reload backs off instead of clicking the button again.
   watchCooldownReload() {
     clearTimeout(this.cooldownReloadTimer);
     this.cooldownReloadTimer = setTimeout(() => {
       delete this.cooldownReloadTimer;
       if (!this.nodes.container) { return; }
       const state = this.detectChallengeState(this.nodes.container);
-      if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) { return; }
+      if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) {
+        delete this.cooldownReloadFailures;
+        return;
+      }
       this.failCooldownReload();
     }, 5 * SECOND);
   },
 
+  // Back off, never latch off. A permanent stop only recovers on a successful
+  // post or a page reload, so a failed challenge -- which is neither -- used to
+  // strand the reload for the rest of the session.
   failCooldownReload() {
-    this.cooldownReloadFailed = true;
+    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
+    this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
     delete this.hasRequested;
@@ -340,7 +348,8 @@ const CaptchaT: any = {
 
   resetCooldownReload() {
     this.clearCooldownReloadTimer();
-    delete this.cooldownReloadFailed;
+    delete this.cooldownReloadRetryAt;
+    delete this.cooldownReloadFailures;
   },
 
   // Check if we have a NEW challenge in a sequence (e.g. Next 2/3); reconciles
@@ -676,8 +685,8 @@ const CaptchaT: any = {
     if (this.hasMoreChallengeSteps(tNext)) return;
     if (this.isCompleted) return;
     this.isCompleted = true;
-    // A solved captcha proves the service is answering again, so lift the
-    // failure latch instead of waiting for the next post or QR teardown.
+    // A solved captcha proves the service is answering again, so cut any
+    // backoff short rather than waiting it out.
     this.resetCooldownReload();
     if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
       QRState.submit();

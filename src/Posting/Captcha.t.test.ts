@@ -118,23 +118,55 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).not.toHaveBeenCalled();
   });
 
-  it('stops clicking when a click yields no challenge and no new countdown', () => {
-    const { tLoad, click } = buildCaptcha();
+  it('backs off when a click yields no challenge and no new countdown', () => {
+    const { click } = buildCaptcha();
 
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
 
     vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailed).toBe(true);
+    expect(CaptchaT.cooldownReloadFailures).toBe(1);
 
-    tLoad.value = COUNTING_DOWN;
-    CaptchaT.createStrips();
-    tLoad.value = IDLE;
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('stops clicking when the captcha reports an error for our own click', () => {
+  // The failed-challenge path: nothing calls setUsed() and nothing gets solved,
+  // so a permanent stop here would only recover on a page reload.
+  it('recovers on its own once the backoff elapses', () => {
+    const { click } = buildCaptcha();
+
+    CaptchaT.createStrips();
+    vi.advanceTimersByTime(5000);
+    expect(click).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(30000);
+    CaptchaT.createStrips();
+
+    expect(click).toHaveBeenCalledTimes(2);
+  });
+
+  it('lengthens the backoff on repeated failures', () => {
+    const { click } = buildCaptcha();
+
+    CaptchaT.createStrips();
+    vi.advanceTimersByTime(5000);
+    vi.advanceTimersByTime(30000);
+    CaptchaT.createStrips();
+    vi.advanceTimersByTime(5000);
+    expect(CaptchaT.cooldownReloadFailures).toBe(2);
+
+    // 30s was enough the first time, not the second.
+    vi.advanceTimersByTime(30000);
+    CaptchaT.createStrips();
+    expect(click).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(30000);
+    CaptchaT.createStrips();
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('backs off when the captcha reports an error for our own click', () => {
     const { click } = buildCaptcha();
 
     CaptchaT.createStrips();
@@ -143,24 +175,28 @@ describe('CaptchaT auto-load after cooldown', () => {
 
     CaptchaT.failCooldownReload();
 
-    expect(CaptchaT.cooldownReloadFailed).toBe(true);
+    expect(CaptchaT.cooldownReloadRetryAt).toBeGreaterThan(Date.now());
     expect(CaptchaT.cooldownReloadTimer).toBeUndefined();
 
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps clicking when the click did produce a new countdown', () => {
+  it('forgets earlier failures when a click does produce a countdown', () => {
     const { tLoad, click } = buildCaptcha();
 
     CaptchaT.createStrips();
-    tLoad.value = COUNTING_DOWN;
     vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
+    expect(CaptchaT.cooldownReloadFailures).toBe(1);
 
-    tLoad.value = IDLE;
+    vi.advanceTimersByTime(30000);
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(2);
+
+    tLoad.value = COUNTING_DOWN;
+    vi.advanceTimersByTime(5000);
+
+    expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
   });
 
   it('leaves load() unblocked after a failed click', () => {
@@ -171,23 +207,22 @@ describe('CaptchaT auto-load after cooldown', () => {
 
     vi.advanceTimersByTime(5000);
 
-    expect(CaptchaT.cooldownReloadFailed).toBe(true);
     expect(CaptchaT.hasRequested).toBeUndefined();
   });
 
-  it('resumes clicking once a captcha is solved after a failure', () => {
+  it('cuts the backoff short once a captcha is solved', () => {
     const { root, click } = buildCaptcha();
     const resp = root.querySelector<HTMLInputElement>('#t-resp')!;
 
     CaptchaT.createStrips();
     vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailed).toBe(true);
+    expect(CaptchaT.cooldownReloadRetryAt).toBeGreaterThan(Date.now());
 
     // User loads and solves one by hand.
     resp.value = 'solved';
     CaptchaT.checkCompletion();
     expect(CaptchaT.isCompleted).toBe(true);
-    expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
+    expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
 
     // That captcha gets consumed, then the button goes idle again.
     resp.value = '';
@@ -197,15 +232,16 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(2);
   });
 
-  it('setUsed clears the failure latch', () => {
+  it('setUsed clears the backoff', () => {
     buildCaptcha();
 
     CaptchaT.createStrips();
     vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailed).toBe(true);
+    expect(CaptchaT.cooldownReloadRetryAt).toBeGreaterThan(Date.now());
 
     CaptchaT.setUsed();
 
-    expect(CaptchaT.cooldownReloadFailed).toBeUndefined();
+    expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
+    expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
   });
 });
