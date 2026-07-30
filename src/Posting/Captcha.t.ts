@@ -2,7 +2,11 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
-import { isPassEnabled, SECOND } from "../platform/helpers";
+import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers";
+
+// Ceiling on a server-stated cooldown, in seconds. Only a malformed value can
+// exceed this; a real one is tens of seconds.
+const MAX_SERVER_COOLDOWN = 300;
 
 const CaptchaT: any = {
   init() {
@@ -25,6 +29,13 @@ const CaptchaT: any = {
     // errors from a manual or unrelated request are not ours to react to.
     $.on(d, 'TCaptchaError', () => {
       if (this.cooldownReloadTimer) { this.failCooldownReload(); }
+    });
+    // The captcha frame posts its own cooldown up to the parent, on both a
+    // challenge ({twister:{cd,ttl,...}}) and a refusal ({twister:{error,cd}}).
+    // That number is authoritative; everything else here is inference.
+    window.addEventListener('message', e => {
+      if (!isTrustedSiteOrigin(e.origin)) { return; }
+      this.noteServerCooldown(e.data?.twister);
     });
     d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
     d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
@@ -283,8 +294,27 @@ const CaptchaT: any = {
   // challenge is ready without the user reaching for the button. Deliberately
   // stateless: any latch on having seen a counter strands the feature in every
   // state where the counter already expired, such as after a failed post.
+  // 'cd' is the number of seconds until the service will hand out another
+  // challenge, stated by the service that enforces it. Everything else here is
+  // inference -- scraping the button's label, or an invented retry schedule --
+  // so this takes precedence over both.
+  noteServerCooldown(twister) {
+    const cd = twister?.cd;
+    if ((typeof cd !== 'number') || !Number.isFinite(cd) || (cd < 0)) { return; }
+    // A malformed or changed unit (milliseconds, say) must not be able to
+    // strand the auto-load for the rest of the session.
+    this.serverCooldownUntil = Date.now() + (Math.min(cd, MAX_SERVER_COOLDOWN) * SECOND);
+  },
+
+  serverCooldownRemains() {
+    return !!this.serverCooldownUntil && (Date.now() < this.serverCooldownUntil);
+  },
+
   updateCooldownReload(state) {
     if (!Conf['Auto-load captcha after cooldown']) { return; }
+    // The service already said it will refuse. Asking anyway earns an error and
+    // a longer cooldown.
+    if (this.serverCooldownRemains()) { return; }
     // 4chan is not asking for a captcha at all (the ext=1 widget parks on a
     // 'noop' challenge). Clicking fetches nothing, and the watchdog would score
     // the empty result as a failure -- which is what used to ratchet the backoff
@@ -345,11 +375,21 @@ const CaptchaT: any = {
   // post or a page reload, so a failed challenge -- which is neither -- used to
   // strand the reload for the rest of the session.
   failCooldownReload() {
-    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
-    this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
     delete this.hasRequested;
+
+    // The refusal came with the service's own retry time. Use it rather than
+    // guessing, and keep the guess unescalated -- a stated cooldown is a normal
+    // answer, not a fault to hold against the next attempt.
+    if (this.serverCooldownRemains()) {
+      delete this.cooldownReloadFailures;
+      this.cooldownReloadRetryAt = this.serverCooldownUntil;
+      return;
+    }
+
+    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
+    this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
   },
 
   clearCooldownReloadTimer() {
