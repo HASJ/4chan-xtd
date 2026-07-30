@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.9 (2026-07-30)
+
+- Reliability
+  - Made the captcha auto-load retry sooner after a failure. The backoff now doubles from 2 seconds to a 120-second ceiling (2, 4, 8, 16, 32, 64, 120) instead of climbing linearly from 30. A one-off hiccup previously cost half a minute of dead time; the ceiling still keeps a persistent outage from hammering the endpoint.
+  - Loading a captcha now clears the pending retry gate along with the failure count, so the next failure always restarts at 2 seconds.
+
 ### 2.30.8 (2026-07-30)
 
 - Features
