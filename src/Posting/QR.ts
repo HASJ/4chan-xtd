@@ -123,11 +123,26 @@ const QR = {
     UIState.addShortcut('qr', sc, 540);
 
     window.addEventListener('message', event => {
+      if (!QR.isTrustedMessageOrigin(event.origin)) { return; }
       const error = event.data?.twister?.error;
-      if (event.origin === location.origin && typeof error === 'string') {
+      if (typeof error === 'string') {
         QR.error(error);
       }
     });
+  },
+
+  // 4chan's captcha frame reports failures by posting {twister: {error, cd}} up
+  // to the parent, and it posts from sys.<domain>.org -- never the board's own
+  // origin. A same-origin-only check therefore dropped every one of them, so a
+  // captcha error from the frame reached the user as silence.
+  //
+  // Deliberately an exact match against that one extra origin. QR.error()
+  // renders a string through $.tn() so there is no markup injection here, but
+  // anything looser would still hand an embedded frame a channel for putting
+  // arbitrary text in front of the user as if the site had said it.
+  isTrustedMessageOrigin(origin: string) {
+    return (origin === location.origin) ||
+      (origin === `https://sys.${location.hostname.split('.')[1]}.org`);
   },
 
   initReady() {

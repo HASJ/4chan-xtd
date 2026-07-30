@@ -35,19 +35,25 @@ Measured: root 300x213, first child forced to `min-height:170px` by the
 
 ## Root cause
 
-**4chan serves the challenge inside `#t-frame` (`?ext=1`). The parent-side module
-still reads the pre-iframe DOM.** In `ext` mode the parent's `#t-task`,
-`#t-slider` and `#t-resp` are inert leftovers — status text, a disabled slider,
-an empty hidden input — and `t-challenge` is the sentinel `noop`.
+**4chan parks on a `noop` challenge — "Verification not required." — and nothing
+accounted for that state.** Its parent-side nodes are inert leftovers: status
+text, a disabled slider that keeps its `max`, an empty hidden response, and
+`t-challenge` set to the sentinel `noop`.
 
 Everything downstream is computed from those inert nodes:
 
-| Site | Reads | Value in `ext` mode | Consequence |
+| Site | Reads | Value in `noop` state | Consequence |
 |---|---|---|---|
-| `detectChallengeState` [Captcha.t.ts:245](../src/Posting/Captcha.t.ts) | `#t-task` background, `#t-next` text | no bg, `"Next"` | `isChallenge` permanently false |
+| `detectChallengeState` [Captcha.t.ts:245](../src/Posting/Captcha.t.ts) | `#t-task` background, `#t-next` text | no bg, `"Next"` | `isChallenge` false |
 | `watchCooldownReload` [Captcha.t.ts:317](../src/Posting/Captcha.t.ts) | same state, 5s after a click | none of challenge/step/cooldown | **every click scored a failure** |
 | `checkCompletion` [Captcha.t.ts:677](../src/Posting/Captcha.t.ts) | `#t-resp` value | always `""` | never completes, never auto-posts |
 | `load` [Captcha.t.ts:73](../src/Posting/Captcha.t.ts) | `slider.hasAttribute('max')` | always `max="3"` | permanently returns early |
+
+> **Correction.** This section originally claimed 4chan had moved the challenge
+> inside `#t-frame` and that the parent nodes were inert *in general*. That was
+> wrong — see "How `ext=1` actually works" below. The nodes are inert only in the
+> `noop` state, which is what the capture happened to catch. The fixes are
+> unaffected: they target the `noop` state, which is real.
 
 ### Why it looks like "stops after a post isn't sent"
 
@@ -63,6 +69,46 @@ in `noop` mode, so `checkCompletion` returns at its first guard and the
 false→true edge that triggers `QRState.submit()` never happens.
 
 One gate, two symptoms — as reported.
+
+## How `ext=1` actually works
+
+Captured from the parent tab across a full load → solve → post cycle.
+
+`#t-frame` is a **courier, not a UI surface**. It loads, posts the challenge up
+to the parent, and unloads. The whole challenge is in the message, sent from
+`sys.<domain>.org`:
+
+```json
+{"twister":{"challenge":"KBaac22…","ttl":120,"cd":30,
+            "tasks":[{"str":"…not like the others…",
+                      "items":["<base64 png>","<base64 png>","<base64 png>"]}]}}
+```
+
+4chan's own TCaptcha in the parent consumes that and renders it into the
+parent's `#t-task` / `#t-slider` / `#t-resp` — the same nodes this codebase
+already reads. Observed transitions, with the frame hidden by our own CSS the
+whole time:
+
+```
++0.4s   is-challenge  taskBg=yes  strips=3  resp=empty   frameH=0
++21.9s  <twister challenge payload arrives from sys.4chan.org>
++31.4s  is-challenge  task="Done."          resp=len=1   frameH=0
++32.2s  captcha-root  taskBg=no   strips=0  resp=empty   frameH=absent
+```
+
+Two consequences:
+
+1. **The `#t-frame` risk noted below is retired.** `frameH: 0` is our CSS hiding
+   it, and the challenge loaded, rendered, was solved and posted regardless.
+   Hiding it is correct; no gating is needed.
+2. **`cd` and `ttl` are authoritative and unused.** `cd` is the exact cooldown
+   before *Get Captcha* works again — currently scraped out of the button label
+   with `/\((\d+)\)/`. `ttl` is the answer's lifetime, which would let the
+   auto-load replace a stale answer instead of protecting it indefinitely.
+
+The frame→parent direction of this channel is live and is what 4chan itself
+uses. The `{type:'select-strip'}` listener in `setupIframe()` is the *other*
+direction and has no sender.
 
 ## White rectangle
 
@@ -121,11 +167,10 @@ a real challenge in `ext` mode.
    only ever *showed* elements, so the slider kept 4chan's inline
    `display: block` and painted an inert disabled track under the message.
 
-**Risk on (5):** if 4chan ever serves a challenge *only* through the iframe, that
-rule hides it. `is-challenge` is safe by construction — it is only set when the
-parent's own `#t-task` carries the puzzle — but a pure-`ext` challenge would land
-in `captcha-idle`. If the captcha ever renders blank, that rule is the first
-suspect, and the deferred `ext` work is the real answer.
+**~~Risk on (5)~~ — retired.** This originally warned that hiding `#t-frame`
+could hide a challenge served only through the iframe. The capture above shows
+the frame never renders a challenge at all; it couriers the payload to the parent
+and unloads. A full solve-and-post cycle ran with `frameH: 0`. No gating needed.
 
 Tests: `src/Posting/Captcha.t.test.ts`, suite *"CaptchaT when 4chan requires no
 verification"* (8 cases). Full suite 52/52, typecheck clean.
