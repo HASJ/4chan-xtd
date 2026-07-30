@@ -2,7 +2,7 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
-import { isPassEnabled } from "../platform/helpers";
+import { isPassEnabled, SECOND } from "../platform/helpers";
 
 const CaptchaT: any = {
   init() {
@@ -20,6 +20,11 @@ const CaptchaT: any = {
     $.on(root, 'pointerdown mousedown touchstart click', () => this.cancelCommentFocusRestore());
     $.on(QRState.nodes.com, 'keydown', e => {
       if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
+    });
+    // Give up on the automatic reload when it is our own click that failed;
+    // errors from a manual or unrelated request are not ours to react to.
+    $.on(d, 'TCaptchaError', () => {
+      if (this.cooldownReloadTimer) { this.failCooldownReload(); }
     });
     d.addEventListener('focus', e => this.redirectCommentFocus(e), true);
     d.addEventListener('focusin', e => this.redirectCommentFocus(e), true);
@@ -42,18 +47,23 @@ const CaptchaT: any = {
     }, true);
   },
 
-  moreNeeded() {
+  // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge for
+  // an empty QR, but fetch one as soon as the queued post needs it.
+  isWanted() {
     const post = QRState.posts[0];
-    if (!this.isEnabled || !post) { return; }
-
-    // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge
-    // for an empty QR, but fetch one as soon as the queued post needs it.
-    if (
+    if (!post) { return false; }
+    return !!(
       (QRState.posts.length > 1) ||
       Conf['Auto-load captcha'] ||
       !post.isOnlyQuotes() ||
       post.file
-    ) {
+    );
+  },
+
+  moreNeeded() {
+    if (!this.isEnabled || !QRState.posts[0]) { return; }
+
+    if (this.isWanted()) {
       this.shouldLoad = true;
       this.load();
     }
@@ -270,7 +280,82 @@ const CaptchaT: any = {
 
     const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-    return { slider, taskEl, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+    return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+  },
+
+  // Auto-load after cooldown: while #t-load counts down ("Get Captcha (28)") a
+  // new challenge cannot be requested, so remember that one is due and click
+  // the button as soon as the counter clears.
+  updateCooldownReload(state) {
+    if (this.cooldownReloadFailed) { return; }
+
+    if (state.isChallenge || state.hasActiveChallengeStep) {
+      this.clearCooldownReload();
+      return;
+    }
+
+    if (state.isOnCooldown) {
+      this.cooldownReloadPending = true;
+      // hasRequested/shouldLoad are cleared by setUsed() before the counter
+      // runs out, so latch here whether a captcha was already wanted.
+      if (this.hasRequested || this.shouldLoad) { this.cooldownReloadWanted = true; }
+      return;
+    }
+
+    if (!this.cooldownReloadPending) { return; }
+    // A missing #t-load is not proof the counter cleared: the control is not
+    // consistently rendered, so only act on a real, enabled button.
+    if (!state.tLoad || state.tLoad.disabled) { return; }
+    if (!this.cooldownReloadWanted && !this.isWanted()) { return; }
+    if ($('#t-resp', this.nodes.container)?.value) {
+      this.clearCooldownReload();
+      return;
+    }
+
+    this.clearCooldownReload();
+    this.hasRequested = true;
+    this.shouldLoad = false;
+    if (d.activeElement === QRState.nodes?.com) { this.startCommentFocusRestore(false); }
+    state.tLoad.click();
+    this.watchCooldownReload();
+    this.restoreCommentFocus();
+  },
+
+  // If a click yields neither a challenge nor a fresh countdown, the request
+  // failed; stop reloading instead of clicking the button again.
+  watchCooldownReload() {
+    clearTimeout(this.cooldownReloadTimer);
+    this.cooldownReloadTimer = setTimeout(() => {
+      delete this.cooldownReloadTimer;
+      if (!this.nodes.container) { return; }
+      const state = this.detectChallengeState(this.nodes.container);
+      if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) { return; }
+      this.failCooldownReload();
+    }, 5 * SECOND);
+  },
+
+  failCooldownReload() {
+    this.cooldownReloadFailed = true;
+    this.clearCooldownReload();
+    this.clearCooldownReloadTimer();
+  },
+
+  clearCooldownReload() {
+    delete this.cooldownReloadPending;
+    delete this.cooldownReloadWanted;
+  },
+
+  clearCooldownReloadTimer() {
+    if (this.cooldownReloadTimer) {
+      clearTimeout(this.cooldownReloadTimer);
+      delete this.cooldownReloadTimer;
+    }
+  },
+
+  resetCooldownReload() {
+    this.clearCooldownReload();
+    this.clearCooldownReloadTimer();
+    delete this.cooldownReloadFailed;
   },
 
   // Check if we have a NEW challenge in a sequence (e.g. Next 2/3); reconciles
@@ -489,6 +574,8 @@ const CaptchaT: any = {
     const state = this.detectChallengeState(mainDiv);
     const { slider, taskEl } = state;
 
+    this.updateCooldownReload(state);
+
     if (state.verificationNotRequired) {
       this.setStatusMessage(mainDiv);
       return;
@@ -539,6 +626,7 @@ const CaptchaT: any = {
     delete this.isInitialized;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
       delete this.observer;
@@ -612,6 +700,7 @@ const CaptchaT: any = {
     this.isCompleted = false;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
       $.global('TCaptchaClearChallenge');
