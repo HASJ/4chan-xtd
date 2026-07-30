@@ -165,30 +165,68 @@ describe('CaptchaT auto-load after cooldown', () => {
     vi.advanceTimersByTime(5000);
     expect(click).toHaveBeenCalledTimes(1);
 
-    vi.advanceTimersByTime(30000);
+    vi.advanceTimersByTime(2000);
     CaptchaT.createStrips();
 
     expect(click).toHaveBeenCalledTimes(2);
   });
 
-  it('lengthens the backoff on repeated failures', () => {
+  // Fail once per round and read the gap back off cooldownReloadRetryAt.
+  it('doubles the backoff from 2s up to a 120s ceiling', () => {
+    buildCaptcha();
+    const seen: number[] = [];
+
+    for (let i = 0; i < 8; i++) {
+      CaptchaT.failCooldownReload();
+      seen.push((CaptchaT.cooldownReloadRetryAt - Date.now()) / 1000);
+    }
+
+    expect(seen).toEqual([2, 4, 8, 16, 32, 64, 120, 120]);
+  });
+
+  it('holds the gate for the whole backoff, then reopens', () => {
     const { click } = buildCaptcha();
 
+    // First failure: 2s.
     CaptchaT.createStrips();
     vi.advanceTimersByTime(5000);
-    vi.advanceTimersByTime(30000);
-    CaptchaT.createStrips();
-    vi.advanceTimersByTime(5000);
-    expect(CaptchaT.cooldownReloadFailures).toBe(2);
+    expect(CaptchaT.cooldownReloadFailures).toBe(1);
 
-    // 30s was enough the first time, not the second.
-    vi.advanceTimersByTime(30000);
+    vi.advanceTimersByTime(2000);
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(2);
 
-    vi.advanceTimersByTime(30000);
+    // Second failure: 4s, so 2s is no longer enough.
+    vi.advanceTimersByTime(5000);
+    expect(CaptchaT.cooldownReloadFailures).toBe(2);
+
+    vi.advanceTimersByTime(2000);
+    CaptchaT.createStrips();
+    expect(click).toHaveBeenCalledTimes(2);
+
+    vi.advanceTimersByTime(2000);
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('restarts the climb at 2s after a captcha loads', () => {
+    const { tLoad } = buildCaptcha();
+
+    // Climb to the third rung: 8s.
+    for (let i = 0; i < 3; i++) { CaptchaT.failCooldownReload(); }
+    expect((CaptchaT.cooldownReloadRetryAt - Date.now()) / 1000).toBe(8);
+
+    // A click that does land a countdown clears the climb...
+    CaptchaT.resetCooldownReload();
+    CaptchaT.createStrips();
+    tLoad.value = COUNTING_DOWN;
+    vi.advanceTimersByTime(5000);
+    expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+    expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
+
+    // ...so the next failure is back to the first rung.
+    CaptchaT.failCooldownReload();
+    expect((CaptchaT.cooldownReloadRetryAt - Date.now()) / 1000).toBe(2);
   });
 
   it('backs off when the captcha reports an error for our own click', () => {
@@ -214,7 +252,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     vi.advanceTimersByTime(5000);
     expect(CaptchaT.cooldownReloadFailures).toBe(1);
 
-    vi.advanceTimersByTime(30000);
+    vi.advanceTimersByTime(2000);
     CaptchaT.createStrips();
     expect(click).toHaveBeenCalledTimes(2);
 

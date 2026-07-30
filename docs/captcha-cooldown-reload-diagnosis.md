@@ -130,12 +130,23 @@ suspect, and the deferred `ext` work is the real answer.
 Tests: `src/Posting/Captcha.t.test.ts`, suite *"CaptchaT when 4chan requires no
 verification"* (8 cases). Full suite 52/52, typecheck clean.
 
+## Backoff schedule
+
+`failCooldownReload` doubles from 2s to a 120s ceiling — 2, 4, 8, 16, 32, 64,
+120 — and the counter stops climbing at the seventh failure. Any outcome that
+loads a captcha calls `resetCooldownReload()`, dropping both the counter and any
+pending retry gate, so the next failure starts back at 2s.
+
+It was previously linear from 30s (30, 60, 90, 120). A one-off hiccup cost half
+a minute of dead time for nothing; 2s is unnoticeable, and the ceiling still
+keeps a persistent outage from hammering the endpoint.
+
 ## Open: is the ratchet actually the reported symptom 1?
 
-`failCooldownReload` caps failures at 4, so the backoff ceiling is 120s and it
-re-arms on every retry. **That self-heals every two minutes** — which does not
-match "the only way to get it working again is by refreshing the page." The
-ratchet is real and worth fixing, but it may not be the whole of symptom 1.
+The backoff self-heals on its own — under the old linear schedule within two
+minutes, now within two seconds on the first failure. Neither matches "the only
+way to get it working again is by refreshing the page." The ratchet is real and
+worth fixing, but it may not be the whole of symptom 1.
 
 The reading that keeps the diagnosis intact: in `noop` mode no captcha is needed,
 so "it isn't loading a captcha" is correct behaviour rather than a defect, and

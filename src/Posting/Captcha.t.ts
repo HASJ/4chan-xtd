@@ -325,15 +325,17 @@ const CaptchaT: any = {
       delete this.cooldownReloadTimer;
       if (!this.nodes.container) { return; }
       const state = this.detectChallengeState(this.nodes.container);
+      // A captcha loaded. Drop the climb entirely so the next failure starts
+      // back at 2s, and drop any pending retry gate with it.
       if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) {
-        delete this.cooldownReloadFailures;
+        this.resetCooldownReload();
         return;
       }
       // The state flipped to 'no captcha needed' while our click was in flight.
       // The service answered, so that is not a failure -- but nothing loaded,
       // so leave load() unblocked.
       if (state.verificationNotRequired) {
-        delete this.cooldownReloadFailures;
+        this.resetCooldownReload();
         delete this.hasRequested;
         return;
       }
@@ -345,8 +347,12 @@ const CaptchaT: any = {
   // post or a page reload, so a failed challenge -- which is neither -- used to
   // strand the reload for the rest of the session.
   failCooldownReload() {
-    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
-    this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
+    // Double from 2s to a 120s ceiling: 2, 4, 8, 16, 32, 64, 120. The seventh
+    // failure reaches the ceiling, so the counter stops climbing there. Starting
+    // small keeps a one-off hiccup cheap; the ceiling keeps a persistent outage
+    // from hammering the endpoint.
+    this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 7);
+    this.cooldownReloadRetryAt = Date.now() + (Math.min(2 ** this.cooldownReloadFailures, 120) * SECOND);
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
     delete this.hasRequested;
