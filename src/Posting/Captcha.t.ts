@@ -285,6 +285,11 @@ const CaptchaT: any = {
   // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
     if (!Conf['Auto-load captcha after cooldown']) { return; }
+    // 4chan is not asking for a captcha at all (the ext=1 widget parks on a
+    // 'noop' challenge). Clicking fetches nothing, and the watchdog would score
+    // the empty result as a failure -- which is what used to ratchet the backoff
+    // to its ceiling and keep it there for the rest of the session.
+    if (state.verificationNotRequired) { return; }
     if (this.cooldownReloadRetryAt && (Date.now() < this.cooldownReloadRetryAt)) { return; }
     // A missing #t-load is not proof the counter cleared: the control is not
     // consistently rendered, so only act on a real, enabled button.
@@ -322,6 +327,14 @@ const CaptchaT: any = {
       const state = this.detectChallengeState(this.nodes.container);
       if (state.isChallenge || state.hasActiveChallengeStep || state.isOnCooldown) {
         delete this.cooldownReloadFailures;
+        return;
+      }
+      // The state flipped to 'no captcha needed' while our click was in flight.
+      // The service answered, so that is not a failure -- but nothing loaded,
+      // so leave load() unblocked.
+      if (state.verificationNotRequired) {
+        delete this.cooldownReloadFailures;
+        delete this.hasRequested;
         return;
       }
       this.failCooldownReload();
@@ -620,6 +633,7 @@ const CaptchaT: any = {
     delete this.isInitialized;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    delete this.autoSubmittedFor;
     this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
@@ -676,27 +690,49 @@ const CaptchaT: any = {
 
   checkCompletion() {
     if (!this.isEnabled || !this.nodes.container) return;
+    // getOne() is the authority on what counts as a usable payload: an answered
+    // challenge, or one where 4chan wants no verification. Reading 't-response'
+    // directly disagreed with it, so the no-verification case never completed
+    // and never triggered the auto-post.
+    //
+    // Take the 'noop' sentinel as proof of that second case, not the status
+    // text: the message can still be on screen while a real challenge loads, and
+    // completing there would auto-post an empty t-response and burn an error.
     const response = this.getOne();
-    if (!response?.['t-response']) {
+    const noCaptchaNeeded = !response?.['t-response'] && (response?.['t-challenge'] === 'noop');
+    if (!response?.['t-response'] && !noCaptchaNeeded) {
       this.isCompleted = false;
       return;
     }
-    const tNext = $('#t-next', this.nodes.container);
-    if (this.hasMoreChallengeSteps(tNext)) return;
+    // Nothing to solve and no steps to advance when no captcha was asked for.
+    if (!noCaptchaNeeded && this.hasMoreChallengeSteps($('#t-next', this.nodes.container))) return;
     if (this.isCompleted) return;
     this.isCompleted = true;
     // A solved captcha proves the service is answering again, so cut any
     // backoff short rather than waiting it out.
     this.resetCooldownReload();
     if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
-      QRState.submit();
+      this.autoSubmit(response);
     }
+  },
+
+  // setup() runs on every failed post and clears isCompleted, so the false->true
+  // edge alone does not bound the auto-post: the next poll tick would complete
+  // and submit again. That is harmless for a solved challenge, whose answer is
+  // single-use, but a 'noop' payload never changes and would resubmit forever.
+  // Key the submit to the payload so each distinct captcha posts at most once.
+  autoSubmit(response) {
+    const payload = `${response['t-challenge'] || ''}:${response['t-response'] || ''}`;
+    if (this.autoSubmittedFor === payload) { return; }
+    this.autoSubmittedFor = payload;
+    QRState.submit();
   },
 
   setUsed() {
     this.isCompleted = false;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
+    delete this.autoSubmittedFor;
     this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {

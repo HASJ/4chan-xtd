@@ -26,6 +26,31 @@ const buildCaptcha = () => {
   return { root, container, tLoad, click: vi.spyOn(tLoad, 'click') };
 };
 
+// 4chan's ext=1 captcha: the challenge lives in #t-frame and the parent's own
+// nodes are inert -- a status message, a disabled slider that keeps its max, an
+// empty hidden response, and a 'noop' challenge.
+const buildExtCaptcha = () => {
+  const root = document.createElement('div');
+  root.className = 'captcha-root';
+  root.innerHTML = `
+    <div class="captcha-container">
+      <div id="t-ctrl">
+        <button id="t-load" type="button">${IDLE}</button>
+        <button id="t-next" type="button" disabled>Next</button>
+      </div>
+      <iframe id="t-frame" src="https://sys.4chan.org/captcha?ext=1"></iframe>
+      <div id="t-task"><div>Verification not required.</div></div>
+      <input id="t-slider" type="range" min="0" max="3" disabled>
+      <input name="t-challenge" type="hidden" value="noop">
+      <input id="t-resp" name="t-response" type="hidden" value="">
+    </div>`;
+  document.body.append(root);
+  const container = root.querySelector<HTMLElement>('.captcha-container')!;
+  const tLoad = root.querySelector<HTMLButtonElement>('#t-load')!;
+  CaptchaT.nodes = { root, container };
+  return { root, container, tLoad, click: vi.spyOn(tLoad, 'click') };
+};
+
 describe('CaptchaT auto-load after cooldown', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -243,5 +268,130 @@ describe('CaptchaT auto-load after cooldown', () => {
 
     expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
     expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+  });
+});
+
+describe('CaptchaT when 4chan requires no verification', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha'] = false;
+    Conf['Auto-load captcha after cooldown'] = true;
+    Conf['Post on Captcha Completion'] = false;
+    QRState.posts = [];
+    QRState.nodes = null;
+    QRState.cooldown = { auto: false };
+    QRState.submit = vi.fn();
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.resetCooldownReload();
+    CaptchaT.isCompleted = false;
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.autoSubmittedFor;
+    CaptchaT.shouldLoad = false;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // There is no captcha to fetch, so the click asks for nothing.
+  it('does not click Get Captcha', () => {
+    const { click } = buildExtCaptcha();
+
+    CaptchaT.createStrips();
+
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  // The ratchet is the actual reported bug: every pointless click was scored a
+  // failure, so the backoff climbed to its 120s ceiling and stayed there.
+  it('does not ratchet the backoff', () => {
+    buildExtCaptcha();
+
+    for (let i = 0; i < 5; i++) {
+      CaptchaT.createStrips();
+      vi.advanceTimersByTime(5000);
+    }
+
+    expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+    expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
+  });
+
+  // A click already in flight when the state flips to noop: the service did
+  // answer, so that is not a failure, but nothing loaded so load() must reopen.
+  it('scores an in-flight click as answered, not failed', () => {
+    const { root } = buildCaptcha();
+
+    CaptchaT.createStrips();
+    expect(CaptchaT.hasRequested).toBe(true);
+
+    $('#t-task', root)!.textContent = 'Verification not required.';
+    vi.advanceTimersByTime(5000);
+
+    expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+    expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
+    expect(CaptchaT.hasRequested).toBeUndefined();
+  });
+
+  // getOne() already treats this as a valid payload; checkCompletion did not.
+  it('counts as a completed captcha', () => {
+    buildExtCaptcha();
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+  });
+
+  it('submits once when Post on Captcha Completion is on', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+
+    CaptchaT.checkCompletion();
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  // setup() runs on every failed post and clears isCompleted. Without a guard
+  // keyed to the payload, the poll would resubmit on the next tick and keep
+  // resubmitting -- a post loop against 4chan.
+  it('does not resubmit the same noop payload after a failed post', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+
+    CaptchaT.setup(false);
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  // The status text can linger while a real challenge loads. Completing on the
+  // text alone would auto-post an empty t-response and burn a posting error.
+  it('waits for the noop sentinel, not just the status text', () => {
+    const { root } = buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+    root.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'real-challenge-id';
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(false);
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('submits again once the captcha is actually consumed', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = true;
+
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+
+    CaptchaT.setUsed();
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(2);
   });
 });
