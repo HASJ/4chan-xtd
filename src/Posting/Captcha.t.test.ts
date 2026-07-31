@@ -3,6 +3,7 @@ import { Conf } from '../globals/globals';
 import QRState from '../globals/QRState';
 import $ from '../platform/$';
 import CaptchaT from './Captcha.t';
+import PageContextFunctions from '../PageContext/pageContext';
 
 const COUNTING_DOWN = 'Get Captcha (28)';
 const IDLE = 'Get Captcha';
@@ -65,6 +66,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.resetCooldownReload();
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
     delete CaptchaT.serverCooldownUntil;
     delete CaptchaT.answerExpiresAt;
     CaptchaT.shouldLoad = false;
@@ -415,6 +417,65 @@ describe('CaptchaT auto-load after cooldown', () => {
     });
   });
 
+  // 4chan stops answering after too many challenges pulled in a row, and an
+  // open QR with nothing being posted would keep pulling them until it hit that.
+  describe('auto-load budget between posts', () => {
+    const clickThrough = (times: number) => {
+      for (let i = 0; i < times; i++) {
+        CaptchaT.createStrips();
+        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(4 * 30 * 1000);
+      }
+    };
+
+    it('stops auto-clicking after three loads with no post', () => {
+      const { click } = buildCaptcha();
+
+      clickThrough(5);
+
+      expect(click).toHaveBeenCalledTimes(3);
+    });
+
+    it('leaves the button alone for a manual click once the budget is spent', () => {
+      const { tLoad, click } = buildCaptcha();
+
+      clickThrough(4);
+      expect(click).toHaveBeenCalledTimes(3);
+      expect(tLoad.disabled).toBe(false);
+    });
+
+    it('earns the budget back once a captcha is consumed by a post', () => {
+      const { click } = buildCaptcha();
+
+      clickThrough(4);
+      expect(click).toHaveBeenCalledTimes(3);
+
+      CaptchaT.setUsed();
+      clickThrough(1);
+
+      expect(click).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not spend the budget on a state that never clicks', () => {
+      buildExtCaptcha();
+
+      clickThrough(5);
+
+      expect(CaptchaT.autoReloadsSincePost).toBeUndefined();
+    });
+  });
+
+  // A click that gets no answer leaves 4chan's own button disabled on
+  // 'Loading' with nothing left to re-enable it -- not even a manual click.
+  it('hands #t-load back to the user when a click gets no answer', () => {
+    buildCaptcha();
+
+    CaptchaT.createStrips();
+    vi.advanceTimersByTime(5000);
+
+    expect($.global).toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+  });
+
   it('setUsed clears the backoff', () => {
     buildCaptcha();
 
@@ -426,6 +487,49 @@ describe('CaptchaT auto-load after cooldown', () => {
 
     expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
     expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+  });
+});
+
+describe('unlockStuckTCaptchaReload', () => {
+  const build = (text: string, disabled: boolean) => {
+    const button = document.createElement('button');
+    button.textContent = text;
+    button.disabled = disabled;
+    const unlockReloadBtn = vi.fn(() => { button.disabled = false; button.textContent = 'Get Captcha'; });
+    (window as any).TCaptcha = { reloadNode: button, unlockReloadBtn };
+    return { button, unlockReloadBtn };
+  };
+
+  afterEach(() => { delete (window as any).TCaptcha; });
+
+  it('re-enables a button stuck on Loading', () => {
+    const { unlockReloadBtn } = build('Loading', true);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a running cooldown alone', () => {
+    const { unlockReloadBtn } = build(COUNTING_DOWN, true);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).not.toHaveBeenCalled();
+  });
+
+  it('leaves an already-enabled button alone', () => {
+    const { unlockReloadBtn } = build(IDLE, false);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when TCaptcha is not on the page', () => {
+    delete (window as any).TCaptcha;
+
+    expect(() => PageContextFunctions.unlockStuckTCaptchaReload()).not.toThrow();
   });
 });
 
@@ -445,6 +549,7 @@ describe('CaptchaT when 4chan requires no verification', () => {
     CaptchaT.resetCooldownReload();
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
     delete CaptchaT.autoSubmittedFor;
     CaptchaT.shouldLoad = false;
   });
