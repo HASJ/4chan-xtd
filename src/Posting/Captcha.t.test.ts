@@ -65,6 +65,7 @@ describe('CaptchaT auto-load after cooldown', () => {
     CaptchaT.resetCooldownReload();
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
     delete CaptchaT.serverCooldownUntil;
     delete CaptchaT.answerExpiresAt;
     CaptchaT.shouldLoad = false;
@@ -415,6 +416,54 @@ describe('CaptchaT auto-load after cooldown', () => {
     });
   });
 
+  // 4chan stops answering after too many challenges pulled in a row, and an
+  // open QR with nothing being posted would keep pulling them until it hit that.
+  describe('auto-load budget between posts', () => {
+    const clickThrough = (times: number) => {
+      for (let i = 0; i < times; i++) {
+        CaptchaT.createStrips();
+        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(4 * 30 * 1000);
+      }
+    };
+
+    it('stops auto-clicking after three loads with no post', () => {
+      const { click } = buildCaptcha();
+
+      clickThrough(5);
+
+      expect(click).toHaveBeenCalledTimes(3);
+    });
+
+    it('leaves the button alone for a manual click once the budget is spent', () => {
+      const { tLoad, click } = buildCaptcha();
+
+      clickThrough(4);
+      expect(click).toHaveBeenCalledTimes(3);
+      expect(tLoad.disabled).toBe(false);
+    });
+
+    it('earns the budget back once a captcha is consumed by a post', () => {
+      const { click } = buildCaptcha();
+
+      clickThrough(4);
+      expect(click).toHaveBeenCalledTimes(3);
+
+      CaptchaT.setUsed();
+      clickThrough(1);
+
+      expect(click).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not spend the budget on a state that never clicks', () => {
+      buildExtCaptcha();
+
+      clickThrough(5);
+
+      expect(CaptchaT.autoReloadsSincePost).toBeUndefined();
+    });
+  });
+
   it('setUsed clears the backoff', () => {
     buildCaptcha();
 
@@ -445,6 +494,7 @@ describe('CaptchaT when 4chan requires no verification', () => {
     CaptchaT.resetCooldownReload();
     CaptchaT.isCompleted = false;
     delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
     delete CaptchaT.autoSubmittedFor;
     CaptchaT.shouldLoad = false;
   });

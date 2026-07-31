@@ -9,6 +9,14 @@ import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers"
 const MAX_SERVER_COOLDOWN = 300;
 const MAX_CHALLENGE_TTL = 600;
 
+// 4chan rate-limits how many challenges one client may pull, and an open QR
+// with the auto-load on will keep pulling them for as long as the tab is open
+// -- none of which get spent, because nothing is being posted. Past the limit
+// the service stops answering the frame at all, which strands #t-load on
+// "Loading" with no way back. Budget the auto-clicks between posts and let the
+// user click the button by hand after that.
+const MAX_AUTO_RELOADS_PER_POST = 3;
+
 const CaptchaT: any = {
   init() {
     if (isPassEnabled()) { return; }
@@ -330,6 +338,9 @@ const CaptchaT: any = {
   // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
     if (!Conf['Auto-load captcha after cooldown']) { return; }
+    // Budget spent since the last post. Not a backoff: there is nothing to
+    // retry, so this stays off until a post consumes a captcha.
+    if (this.autoReloadsSincePost >= MAX_AUTO_RELOADS_PER_POST) { return; }
     // The service already said it will refuse. Asking anyway earns an error and
     // a longer cooldown.
     if (this.serverCooldownRemains()) { return; }
@@ -354,6 +365,7 @@ const CaptchaT: any = {
 
     this.hasRequested = true;
     this.shouldLoad = false;
+    this.autoReloadsSincePost = (this.autoReloadsSincePost || 0) + 1;
     if (d.activeElement === QRState.nodes?.com) { this.startCommentFocusRestore(false); }
     state.tLoad.click();
     this.watchCooldownReload();
@@ -704,6 +716,7 @@ const CaptchaT: any = {
     delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
+    delete this.autoReloadsSincePost;
     this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
@@ -806,6 +819,8 @@ const CaptchaT: any = {
     delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
+    // A captcha reached 4chan, so the auto-load has earned its budget back.
+    delete this.autoReloadsSincePost;
     this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
