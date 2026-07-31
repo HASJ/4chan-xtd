@@ -34,6 +34,11 @@ const CaptchaT: any = {
     $.on(QRState.nodes.com, 'keydown', e => {
       if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
     });
+    // Anywhere in the QR counts as the user working on the post -- comment,
+    // name, options, subject, filename. The captcha widget does not: a click
+    // there is what completes the challenge, so counting it would delay every
+    // auto-post by the full window.
+    $.on(QRState.nodes.el, 'input keydown', e => this.noteTyping(e));
     // Give up on the automatic reload when it is our own click that failed;
     // errors from a manual or unrelated request are not ours to react to.
     $.on(d, 'TCaptchaError', () => {
@@ -100,6 +105,66 @@ const CaptchaT: any = {
     this.hasRequested = true;
     $.global('loadTCaptcha', CaptchaT.currentThread).then(() => this.restoreCommentFocus());
     this.restoreCommentFocus();
+  },
+
+  noteTyping(e) {
+    const target = e?.target instanceof Node ? e.target : null;
+    if (target && this.nodes.root?.contains(target)) { return; }
+    this.lastTypedAt = Date.now();
+  },
+
+  // Milliseconds still to wait before the QR counts as idle. 0 means the post
+  // can go out now -- either nothing was typed or the delay is switched off.
+  typingIdleRemaining() {
+    const seconds = Number.parseFloat(Conf['Auto-post typing delay']);
+    const delay = (Number.isFinite(seconds) && (seconds > 0)) ? (seconds * SECOND) : 0;
+    if (!delay || !this.lastTypedAt) { return 0; }
+    return Math.max(0, (this.lastTypedAt + delay) - Date.now());
+  },
+
+  // 'Post on Captcha Completion' submits the moment an answer lands, which with
+  // the auto-load can be while the user is still writing. Hold the submit until
+  // they have been quiet -- deferred, never cancelled, so the setting still
+  // does what it says once they stop.
+  autoSubmitWhenIdle(response) {
+    this.clearAutoSubmitTimer();
+    const wait = this.typingIdleRemaining();
+    if (!wait) {
+      this.autoSubmit(response);
+      return;
+    }
+    this.autoSubmitTimer = setTimeout(() => {
+      delete this.autoSubmitTimer;
+      if (!this.isEnabled || !this.nodes.container) { return; }
+      if (!Conf['Post on Captcha Completion'] || QRState.cooldown?.auto) { return; }
+      // Re-read instead of reusing the payload captured when the wait started:
+      // the answer may have been consumed, cleared or replaced since.
+      const current = this.getOne();
+      if (!current?.['t-response'] && (current?.['t-challenge'] !== 'noop')) { return; }
+      // Still typing? Wait again rather than posting on a stale deadline.
+      this.autoSubmitWhenIdle(current);
+    }, wait);
+  },
+
+  clearAutoSubmitTimer() {
+    if (this.autoSubmitTimer) {
+      clearTimeout(this.autoSubmitTimer);
+      delete this.autoSubmitTimer;
+    }
+  },
+
+  // The 'Load new captcha' keybind. Asks the same way the auto-load does, so a
+  // running countdown still blocks it. It neither spends nor refunds the
+  // auto-load budget: this is the user asking, not the poll.
+  loadByHand() {
+    if (!this.isEnabled || !this.nodes.container) { return false; }
+    const tLoad = $('#t-load', this.nodes.container);
+    if (!tLoad || tLoad.disabled) { return false; }
+    this.hasRequested = true;
+    this.shouldLoad = false;
+    tLoad.click();
+    this.watchCooldownReload();
+    return true;
   },
 
   getThread() {
@@ -720,6 +785,8 @@ const CaptchaT: any = {
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
     delete this.autoReloadsSincePost;
+    delete this.lastTypedAt;
+    this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
@@ -798,7 +865,7 @@ const CaptchaT: any = {
     // backoff short rather than waiting it out.
     this.resetCooldownReload();
     if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
-      this.autoSubmit(response);
+      this.autoSubmitWhenIdle(response);
     }
   },
 
@@ -824,6 +891,8 @@ const CaptchaT: any = {
     delete this.answerExpiresAt;
     // A captcha reached 4chan, so the auto-load has earned its budget back.
     delete this.autoReloadsSincePost;
+    delete this.lastTypedAt;
+    this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {

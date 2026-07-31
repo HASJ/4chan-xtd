@@ -566,6 +566,13 @@ const Config = {
         'Submit the post immediately when the captcha is completed.',
         1
       ],
+      'Auto-post typing delay': [
+        5,
+        'Seconds to wait after you stop typing before <em>Post on Captcha Completion</em> submits, ' +
+          'so a captcha that completes on its own cannot post a comment you are still writing. ' +
+          'Set to 0 to submit as soon as the captcha is done.',
+        2
+      ],
       'Next challenge on captcha selection': [
         false,
         'Automatically go to the next challenge when a captcha answer is selected.',
@@ -1006,6 +1013,10 @@ current-archive-text:"Archive"]
     'Submit QR': [
       'Ctrl+Enter',
       'Submit post.'
+    ],
+    'Load new captcha': [
+      'Alt+r',
+      'Load a new captcha in the QR.'
     ],
     // Thread related
     'Watch': [

@@ -490,6 +490,187 @@ describe('CaptchaT auto-load after cooldown', () => {
   });
 });
 
+// A captcha can complete on its own while the user is still writing, and
+// 'Post on Captcha Completion' would send the half-written comment.
+describe('CaptchaT auto-post typing delay', () => {
+  let outside: HTMLTextAreaElement;
+
+  const type = () => CaptchaT.noteTyping({ target: outside });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha after cooldown'] = false;
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 5;
+    QRState.posts = [];
+    QRState.nodes = null;
+    QRState.cooldown = { auto: false };
+    QRState.submit = vi.fn();
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.isCompleted = false;
+    delete CaptchaT.autoSubmittedFor;
+    delete CaptchaT.lastTypedAt;
+    CaptchaT.clearAutoSubmitTimer();
+    outside = document.createElement('textarea');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('holds the post while the user is typing', () => {
+    buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('posts once the typing pause elapses', () => {
+    buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+    vi.advanceTimersByTime(5000);
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  // The deadline moves with the last keystroke; it is not fixed when the
+  // captcha completed.
+  it('defers again when the user keeps typing', () => {
+    buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+
+    vi.advanceTimersByTime(4000);
+    type();
+    vi.advanceTimersByTime(4000);
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1000);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('posts immediately when the delay is zero', () => {
+    buildExtCaptcha();
+    Conf['Auto-post typing delay'] = 0;
+
+    type();
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('posts immediately when nothing was typed', () => {
+    buildExtCaptcha();
+
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  // Solving the captcha is what completes it; counting those clicks would
+  // delay every single auto-post by the full window.
+  it('does not count captcha interaction as typing', () => {
+    const { container } = buildExtCaptcha();
+
+    CaptchaT.noteTyping({ target: container });
+
+    expect(CaptchaT.lastTypedAt).toBeUndefined();
+  });
+
+  // A deferral must not become a second post: the payload guard still applies.
+  it('still posts a given payload only once', () => {
+    buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+    vi.advanceTimersByTime(5000);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+
+    CaptchaT.isCompleted = false;
+    CaptchaT.checkCompletion();
+    vi.advanceTimersByTime(5000);
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  // The answer can be consumed or cleared while we wait.
+  it('does not post when the answer is gone by the time the wait ends', () => {
+    const { root } = buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+    root.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = '';
+    vi.advanceTimersByTime(5000);
+
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('drops a pending post when the captcha is consumed', () => {
+    buildExtCaptcha();
+
+    type();
+    CaptchaT.checkCompletion();
+    CaptchaT.setUsed();
+    vi.advanceTimersByTime(5000);
+
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+});
+
+describe('CaptchaT.loadByHand', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.resetCooldownReload();
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('clicks an enabled Get Captcha', () => {
+    const { click } = buildExtCaptcha();
+
+    expect(CaptchaT.loadByHand()).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  // A running countdown disables the button; that is 4chan refusing on purpose.
+  it('leaves a disabled button alone', () => {
+    const { tLoad, click } = buildExtCaptcha();
+    tLoad.disabled = true;
+
+    expect(CaptchaT.loadByHand()).toBe(false);
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('does nothing without a captcha in the QR', () => {
+    CaptchaT.nodes = {};
+
+    expect(CaptchaT.loadByHand()).toBe(false);
+  });
+
+  // Asking by hand is not the poll spending its allowance.
+  it('does not spend the auto-load budget', () => {
+    buildExtCaptcha();
+
+    CaptchaT.loadByHand();
+
+    expect(CaptchaT.autoReloadsSincePost).toBeUndefined();
+  });
+});
+
 describe('unlockStuckTCaptchaReload', () => {
   const build = (text: string, disabled: boolean) => {
     const button = document.createElement('button');

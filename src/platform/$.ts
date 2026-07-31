@@ -174,6 +174,17 @@ $.cb = {
       Conf[this.name] = this.value;
       return Conf[this.name];
     }
+  },
+  // Numeric settings are stored as numbers, not as the input's string. A blank
+  // or unparseable field keeps whatever is already stored rather than writing
+  // NaN, which would read back as a broken setting on the next page load.
+  number(this: HTMLInputElement) {
+    if (!$.hasOwn(Conf, this.name)) { return; }
+    const value = Number.parseFloat(this.value);
+    if (!Number.isFinite(value)) { return Conf[this.name]; }
+    $.set(this.name, value);
+    Conf[this.name] = value;
+    return Conf[this.name];
   }
 };
 

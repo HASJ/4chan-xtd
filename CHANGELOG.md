@@ -3,6 +3,15 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.0 (2026-07-31)
+
+- Features
+  - Added `Auto-post typing delay`, a sub-option of `Post on Captcha Completion`. A captcha that completes on its own — which `Auto-load captcha after cooldown` makes likely — could submit a comment you were still writing. The post is now held until you have been quiet for the configured number of seconds (5 by default; set it to 0 for the old behaviour). Anything you type in the Quick Reply counts: comment, name, options, subject, filename. The captcha itself does not, since solving it is what completes the challenge. The post is delayed, never cancelled — keep typing and the deadline simply moves with you.
+  - Added the `Load new captcha` keybind, `Alt+r` by default and rebindable like any other. It presses the captcha's *Get Captcha* button while the Quick Reply is open. A running cooldown still blocks it, and it neither spends nor refunds the auto-load's request budget.
+
+- Other
+  - Settings sections can now show numeric fields, not only checkboxes. Previously a numeric option had to be hand-placed on the *Advanced* tab, away from the feature it belonged to.
+
 ### 2.30.13 (2026-07-31)
 
 - Bugfixes
