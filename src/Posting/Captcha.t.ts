@@ -419,6 +419,9 @@ const CaptchaT: any = {
     this.clearCooldownReloadTimer();
     // The request produced nothing, so don't leave load() blocked on it.
     delete this.hasRequested;
+    // Our click got no answer, so #t-load is still disabled on 'Loading' and
+    // nothing else will ever re-enable it. Hand the button back to the user.
+    $.global('unlockStuckTCaptchaReload');
 
     // The refusal came with the service's own retry time. Use it rather than
     // guessing, and keep the guess unescalated -- a stated cooldown is a normal

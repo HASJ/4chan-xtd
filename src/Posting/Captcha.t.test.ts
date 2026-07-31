@@ -3,6 +3,7 @@ import { Conf } from '../globals/globals';
 import QRState from '../globals/QRState';
 import $ from '../platform/$';
 import CaptchaT from './Captcha.t';
+import PageContextFunctions from '../PageContext/pageContext';
 
 const COUNTING_DOWN = 'Get Captcha (28)';
 const IDLE = 'Get Captcha';
@@ -464,6 +465,17 @@ describe('CaptchaT auto-load after cooldown', () => {
     });
   });
 
+  // A click that gets no answer leaves 4chan's own button disabled on
+  // 'Loading' with nothing left to re-enable it -- not even a manual click.
+  it('hands #t-load back to the user when a click gets no answer', () => {
+    buildCaptcha();
+
+    CaptchaT.createStrips();
+    vi.advanceTimersByTime(5000);
+
+    expect($.global).toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+  });
+
   it('setUsed clears the backoff', () => {
     buildCaptcha();
 
@@ -475,6 +487,49 @@ describe('CaptchaT auto-load after cooldown', () => {
 
     expect(CaptchaT.cooldownReloadRetryAt).toBeUndefined();
     expect(CaptchaT.cooldownReloadFailures).toBeUndefined();
+  });
+});
+
+describe('unlockStuckTCaptchaReload', () => {
+  const build = (text: string, disabled: boolean) => {
+    const button = document.createElement('button');
+    button.textContent = text;
+    button.disabled = disabled;
+    const unlockReloadBtn = vi.fn(() => { button.disabled = false; button.textContent = 'Get Captcha'; });
+    (window as any).TCaptcha = { reloadNode: button, unlockReloadBtn };
+    return { button, unlockReloadBtn };
+  };
+
+  afterEach(() => { delete (window as any).TCaptcha; });
+
+  it('re-enables a button stuck on Loading', () => {
+    const { unlockReloadBtn } = build('Loading', true);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a running cooldown alone', () => {
+    const { unlockReloadBtn } = build(COUNTING_DOWN, true);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).not.toHaveBeenCalled();
+  });
+
+  it('leaves an already-enabled button alone', () => {
+    const { unlockReloadBtn } = build(IDLE, false);
+
+    PageContextFunctions.unlockStuckTCaptchaReload();
+
+    expect(unlockReloadBtn).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when TCaptcha is not on the page', () => {
+    delete (window as any).TCaptcha;
+
+    expect(() => PageContextFunctions.unlockStuckTCaptchaReload()).not.toThrow();
   });
 });
 

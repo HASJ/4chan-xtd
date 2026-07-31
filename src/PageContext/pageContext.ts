@@ -194,6 +194,22 @@ const PageContextFunctions = {
   destroyTCaptcha: () => { (window as any).TCaptcha.destroy(); },
   TCaptchaClearChallenge: () => { (window as any).TCaptcha.clearChallenge() },
 
+  // Clicking #t-load disables it and labels it 'Loading'; only a message back
+  // from the captcha frame re-enables it. When that message never arrives the
+  // button is stuck for the rest of the page's life -- our auto-load skips a
+  // disabled button and the user's own click does nothing either.
+  //
+  // Recover from that state alone. A running countdown ('Get Captcha (28)') is
+  // the service refusing on purpose, and unlocking it would let us ask again
+  // during a cooldown we were told to wait out.
+  unlockStuckTCaptchaReload: () => {
+    const tCaptcha = (window as any).TCaptcha;
+    const button = tCaptcha?.reloadNode;
+    if (!button?.disabled) { return; }
+    if ((button.textContent || button.value) !== 'Loading') { return; }
+    tCaptcha.unlockReloadBtn();
+  },
+
   setupQR: () => {
     (window as any).FCX.oekakiCB = () => (window as any).Tegaki.flatten().toBlob(function (file) {
       const source = `oekaki-${Date.now()}`;
