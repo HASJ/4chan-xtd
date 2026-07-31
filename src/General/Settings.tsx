@@ -241,12 +241,22 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
         const arr = obj[key];
         if (Array.isArray(arr)) {
           const description = arr[1];
+          // A numeric default asks for a number field. Everything else is a
+          // checkbox, which is what every setting in these sections used to be.
+          const isNumber = typeof arr[0] === 'number';
           const div = $.el('div',
-            { innerHTML: `<label><input type="checkbox" name="${key}">${key}</label><span class="description">: ${description}</span>` });
+            isNumber ?
+              { innerHTML: `<label><input type="number" name="${key}" class="field" min="0">${key}</label><span class="description">: ${description}</span>` }
+            :
+              { innerHTML: `<label><input type="checkbox" name="${key}">${key}</label><span class="description">: ${description}</span>` });
           div.dataset.name = key;
           const input = $('input', div);
-          $.on(input, 'change', $.cb.checked);
-          $.on(input, 'change', function() { this.parentNode.parentNode.dataset.checked = this.checked; });
+          if (isNumber) {
+            $.on(input, 'input', $.cb.number);
+          } else {
+            $.on(input, 'change', $.cb.checked);
+            $.on(input, 'change', function() { this.parentNode.parentNode.dataset.checked = this.checked; });
+          }
           items[key] = Conf[key];
           inputs[key] = input;
           const level = arr[2] || 0;
@@ -280,6 +290,10 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
     $.get(items, function(items) {
       for (key in items) {
         const val = items[key];
+        if (inputs[key].type === 'number') {
+          inputs[key].value = val;
+          continue;
+        }
         inputs[key].checked = val;
         inputs[key].parentNode.parentNode.dataset.checked = val;
       }
