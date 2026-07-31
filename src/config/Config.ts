@@ -1014,6 +1014,10 @@ current-archive-text:"Archive"]
       'Ctrl+Enter',
       'Submit post.'
     ],
+    'Load new captcha': [
+      'Alt+r',
+      'Load a new captcha in the QR.'
+    ],
     // Thread related
     'Watch': [
       'w',

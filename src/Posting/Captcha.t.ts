@@ -153,6 +153,20 @@ const CaptchaT: any = {
     }
   },
 
+  // The 'Load new captcha' keybind. Asks the same way the auto-load does, so a
+  // running countdown still blocks it. It neither spends nor refunds the
+  // auto-load budget: this is the user asking, not the poll.
+  loadByHand() {
+    if (!this.isEnabled || !this.nodes.container) { return false; }
+    const tLoad = $('#t-load', this.nodes.container);
+    if (!tLoad || tLoad.disabled) { return false; }
+    this.hasRequested = true;
+    this.shouldLoad = false;
+    tLoad.click();
+    this.watchCooldownReload();
+    return true;
+  },
+
   getThread() {
     return {
       boardID: g.BOARD!.ID,

@@ -171,7 +171,8 @@ const Keybinds: any = {
       [key === Conf['Toggle Cooldown'] && QR.nodes && !QR.nodes.el.hidden && $.hasClass(QR.nodes.fileSubmit, 'custom-cooldown'), () => QR.toggleCustomCooldown()],
       [key === Conf['Post from URL'] && QR.postingIsEnabled, () => QR.handleUrl('')],
       [key === Conf['Add new post'] && QR.postingIsEnabled, () => QR.addPost()],
-      [key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && !QR.status(), () => (QR as any).submit()]
+      [key === Conf['Submit QR'] && QR.nodes && !QR.nodes.el.hidden && !QR.status(), () => (QR as any).submit()],
+      [key === Conf['Load new captcha'] && QR.nodes && !QR.nodes.el.hidden, () => (QR as any).captcha?.loadByHand?.()]
     ]);
   },
 

@@ -624,6 +624,53 @@ describe('CaptchaT auto-post typing delay', () => {
   });
 });
 
+describe('CaptchaT.loadByHand', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.resetCooldownReload();
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('clicks an enabled Get Captcha', () => {
+    const { click } = buildExtCaptcha();
+
+    expect(CaptchaT.loadByHand()).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  // A running countdown disables the button; that is 4chan refusing on purpose.
+  it('leaves a disabled button alone', () => {
+    const { tLoad, click } = buildExtCaptcha();
+    tLoad.disabled = true;
+
+    expect(CaptchaT.loadByHand()).toBe(false);
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('does nothing without a captcha in the QR', () => {
+    CaptchaT.nodes = {};
+
+    expect(CaptchaT.loadByHand()).toBe(false);
+  });
+
+  // Asking by hand is not the poll spending its allowance.
+  it('does not spend the auto-load budget', () => {
+    buildExtCaptcha();
+
+    CaptchaT.loadByHand();
+
+    expect(CaptchaT.autoReloadsSincePost).toBeUndefined();
+  });
+});
+
 describe('unlockStuckTCaptchaReload', () => {
   const build = (text: string, disabled: boolean) => {
     const button = document.createElement('button');
