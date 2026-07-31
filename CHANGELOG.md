@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.30.13 (2026-07-31)
+
+- Bugfixes
+  - `Auto-load captcha after cooldown` no longer fetches challenges indefinitely. 4chan limits how many captchas one client may pull, and with the Quick Reply left open the auto-load kept pulling a fresh one every time the counter cleared — none of which were ever spent, because nothing was being posted. Once past that limit 4chan stops answering the captcha frame entirely, which is what left the button stuck on `Loading`. The auto-load now takes at most three captchas between posts, and earns that budget back once a captcha actually reaches 4chan.
+  - The `Get Captcha` button can no longer get stuck on `Loading` forever. Clicking it disables it, and only a reply from the captcha frame re-enables it — so when that reply never arrived, neither the auto-load nor your own click could ask again and the only way out was reloading the page. A request that goes unanswered now hands the button back to you. A running cooldown (`Get Captcha (28)`) is left alone, since that is 4chan refusing on purpose.
+
 ### 2.30.12 (2026-07-30)
 
 - Bugfixes
