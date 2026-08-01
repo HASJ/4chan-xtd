@@ -7,7 +7,6 @@ import generateMetadata from './meta/metadata.js';
 import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import importBase64 from './rollup-plugin-base64.js';
 import generateManifestJson from './meta/manifestJson.js';
-import terser from '@rollup/plugin-terser';
 import fixTsOutputFormat from './fix-ts-output-format.js';
 import cleanup from 'rollup-plugin-cleanup';
 import alias from '@rollup/plugin-alias';
@@ -18,7 +17,6 @@ const repoRoot = process.cwd();
 
 const buildDir = resolve(repoRoot, 'builds');
 
-const minify = process.argv.includes('-min'); // -min: Minifies the output.
 const noFormat = process.argv.includes('-no-format'); // -no-format: Skips post-processing formatting steps (faster builds, larger output).
 const platform = /** @type {'crx'|'userscript'} */ (process.argv.find(arg => arg.startsWith('-platform='))?.slice(10)); // -platform=[userscript|crx]: Targets a specific build output. If omitted, builds both.
 if (platform !== undefined && platform !== 'crx' && platform !== 'userscript') {
@@ -31,7 +29,7 @@ const tsPlugin = (typescript as any)({
   compilerOptions: {
     outDir: buildDir,
     noEmit: false,
-    sourceMap: minify,
+    sourceMap: false,
   },
 });
 const eventPageTsPlugin = (typescript as any)({
@@ -45,10 +43,9 @@ const eventPageTsPlugin = (typescript as any)({
 (async () => {
   const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf-8'));
 
-  const fileName = `${packageJson.meta.path}${minify ? '.min' : ''}.user.js`;
-  const metaFileName = `${packageJson.meta.path}${minify ? '.min' : ''}.meta.js`;
+  const fileName = `${packageJson.meta.path}.user.js`;
 
-  const metadata = await generateMetadata(packageJson, fileName, metaFileName);
+  const metadata = await generateMetadata(packageJson, fileName);
   const metaNoDownload = metadata.replace(/downloadURL( +)(\S[^\n]*)\n/, 'downloadURL$1none\n');
 
   const license = await readFile(resolve(repoRoot, 'LICENSE'), 'utf8');
@@ -58,11 +55,11 @@ const eventPageTsPlugin = (typescript as any)({
   const inlineFile = setupFileInliner(packageJson);
 
   const cleanupPlugin = noFormat ? undefined : cleanup({
-    extensions: minify ? ['html', 'css'] : ['js', 'ts', 'tsx', 'json', 'html', 'css'],
+    extensions: ['js', 'ts', 'tsx', 'json', 'html', 'css'],
     comments: 'all',
     lineEndings: 'unix',
     maxEmptyLines: 1,
-    sourcemap: minify,
+    sourcemap: false,
   });
 
   const bundle = await rollup({
@@ -77,7 +74,6 @@ const eventPageTsPlugin = (typescript as any)({
           "**/src/platform/$.ts",
           "**/src/platform/CrossOrigin.ts",
         ],
-        minify
       }) : undefined,
       buildForTest ? undefined : removeTestCode({
         include: [
@@ -86,7 +82,7 @@ const eventPageTsPlugin = (typescript as any)({
           "**/src/classes/Post.ts",
           "**/src/Linkification/Linkify.ts",
         ],
-        sourceMap: minify,
+        sourceMap: false,
       }),
       tsPlugin,
       (alias as any)({
@@ -101,37 +97,11 @@ const eventPageTsPlugin = (typescript as any)({
           },
         ]
       }),
-      minify || noFormat ? undefined : fixTsOutputFormat({
+      noFormat ? undefined : fixTsOutputFormat({
         include: ["**/*.ts", "**/*.tsx"],
       }),
-      inlineFile({
-        include: ["**/*.html"],
-        transformer(html) {
-          if (!minify) return html;
-
-          return html.replace(/\n */g, ' ');
-        },
-      }),
-      inlineFile({
-        include: ["**/*.css"],
-        transformer(css) {
-          if (!minify) return css;
-
-          return css
-            // Remove whitespace after colon in css rules.
-            .replace(/^ {2,}([a-z-]+:) +/gm, '$1')
-            // Remove newlines and trailing whitespace.
-            .replace(/\r?\n[ \t+]*/g, '')
-            // Remove last semicolon before the }.
-            .replaceAll(';}', '}')
-            // Remove space between rule set and {.
-            .replaceAll(' {', '{')
-            // Remove comments.
-            .replace(/\/\*[^*]*\*\//g, '')
-            // Remove space before and after these characters in selectors.
-            .replace(/ ([>+~]) /g, '$1');
-        }
-      }),
+      inlineFile({ include: ["**/*.html"] }),
+      inlineFile({ include: ["**/*.css"] }),
       importBase64({ include: ["**/*.png", "**/*.gif", "**/*.wav", "**/*.woff", "**/*.woff2"] }),
       inlineFile({
         include: "**/package.json",
@@ -178,16 +148,9 @@ const eventPageTsPlugin = (typescript as any)({
       banner: (metaNoDownload + license).replaceAll('\r\n', '\n'),
       // file: '../builds/test/rollupOutput.js',
       file: resolve(buildDir, fileName),
-      plugins: minify ? [(terser as any)({
-        format: {
-          max_line_len: 1000,
-          comments: /(?:^(?: ==\/?UserScript==| @|!))|license|\bcc\b|copyright/i,
-        },
-      })] : [],
-      sourcemap: minify,
+      plugins: [],
+      sourcemap: false,
     });
-
-    await writeFile(resolve(buildDir, metaFileName), metadata);
   }
 
   // chrome extension

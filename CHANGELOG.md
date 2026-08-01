@@ -3,6 +3,14 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.1 (2026-08-01)
+
+- Other
+  - Dropped the minified userscript build. It was never published — releases ship only `4chan-XTd.user.js`, so the download link baked into the minified script's own header pointed at a file that did not exist. Nothing built it automatically either, which is why it had drifted several versions behind. The `build:min`, `build:userscript:min` and `build:crx:min` scripts are gone, and `build:all` no longer produces one.
+  - Stopped emitting the standalone `.meta.js`. That file exists so a userscript manager can check the version without downloading the whole script, but this project sets `@updateURL none` and checks for updates from inside the script against the GitHub releases API instead, so nothing ever fetched it. The `==UserScript==` header shipped inside `4chan-XTd.user.js` is unaffected.
+
+The installed userscript is byte-for-byte identical to 2.31.0; these are build-tooling changes only.
+
 ### 2.31.0 (2026-07-31)
 
 - Features
