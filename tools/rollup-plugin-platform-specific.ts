@@ -68,7 +68,6 @@ const skipElseBody = (code, index) => {
  * @param {import("@rollup/pluginutils").FilterPattern} opts.include
  * @param {import("@rollup/pluginutils").FilterPattern} [opts.exclude]
  * @param {'crx'|'userscript'} opts.platform
- * @param {boolean} opts.minify
  * @returns {import("rollup").Plugin}
  */
 export default function platformSpecific(opts) {
@@ -114,7 +113,7 @@ export default function platformSpecific(opts) {
         }
       }
 
-      return { code: ms.toString(), map: opts.minify ? ms.generateMap() : { mappings: '' } };
+      return { code: ms.toString(), map: { mappings: '' } };
     }
   };
 };
