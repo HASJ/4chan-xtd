@@ -61,7 +61,13 @@ jobs:
       - name: Work out the release title
         id: title
         run: |
-          subject="$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+          # Only an annotated tag carries a message of its own. A lightweight
+          # tag points straight at a commit, and asking it for a subject hands
+          # back the commit message instead.
+          subject=''
+          if [ "$(git tag -l --format='%(objecttype)' "$GITHUB_REF_NAME")" = 'tag' ]; then
+            subject="$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+          fi
           if [ -n "$subject" ]; then
             echo "value=$GITHUB_REF_NAME: $subject" >> "$GITHUB_OUTPUT"
           else
@@ -71,8 +77,12 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Passed as an environment variable rather than interpolated into the
+          # script, so a tag message cannot inject shell.
+          RELEASE_TITLE: ${{ steps.title.outputs.value }}
+          RELEASE_ASSET: builds/4chan-XTd-${{ steps.version.outputs.value }}.user.js
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            --title "${{ steps.title.outputs.value }}" \
+            --title "$RELEASE_TITLE" \
             --notes-file release-notes.md \
-            "builds/4chan-XTd-${{ steps.version.outputs.value }}.user.js"
+            "$RELEASE_ASSET"
