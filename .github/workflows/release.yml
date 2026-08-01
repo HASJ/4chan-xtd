@@ -13,10 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The release title can come from an annotated tag's message, which
-          # needs the tag object itself and not just the commit it points at.
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -60,13 +56,18 @@ jobs:
       # "v2.31.1: Menus actually work now". A lightweight tag just gets its name.
       - name: Work out the release title
         id: title
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Only an annotated tag carries a message of its own. A lightweight
-          # tag points straight at a commit, and asking it for a subject hands
-          # back the commit message instead.
+          # Ask the API, not the checkout. actions/checkout leaves the tag ref
+          # pointing straight at the commit, so locally an annotated tag is
+          # indistinguishable from a lightweight one and `git tag -l` hands back
+          # the commit message as its "subject". v2.31.1 was published with the
+          # wrong title that way. The API has the real object.
           subject=''
-          if [ "$(git tag -l --format='%(objecttype)' "$GITHUB_REF_NAME")" = 'tag' ]; then
-            subject="$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+          read -r object_type object_sha <<< "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object.type + " " + .object.sha')"
+          if [ "$object_type" = 'tag' ]; then
+            subject="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$object_sha" --jq '.message' | head -n 1)"
           fi
           if [ -n "$subject" ]; then
             echo "value=$GITHUB_REF_NAME: $subject" >> "$GITHUB_OUTPUT"
