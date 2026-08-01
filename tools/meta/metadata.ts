@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-export default async function generateMetadata(packageJson: any, fileName: any, metaFileName: any) {
+export default async function generateMetadata(packageJson: any, fileName: any) {
   const meta = packageJson.meta;
 
   const versionFile = await readFile(resolve(process.cwd(), 'version.json'));
@@ -61,7 +61,6 @@ export default async function generateMetadata(packageJson: any, fileName: any, 
     return '// @grant        ' + grant;
   }).join('\n');
 
-  // @updateURL    ${meta.downloads}/latest/download/${metaFileName}
   output += `
 // @run-at       document-start
 // @updateURL    none

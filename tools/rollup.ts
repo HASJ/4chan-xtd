@@ -44,9 +44,8 @@ const eventPageTsPlugin = (typescript as any)({
   const packageJson = JSON.parse(await readFile(resolve(repoRoot, 'package.json'), 'utf-8'));
 
   const fileName = `${packageJson.meta.path}.user.js`;
-  const metaFileName = `${packageJson.meta.path}.meta.js`;
 
-  const metadata = await generateMetadata(packageJson, fileName, metaFileName);
+  const metadata = await generateMetadata(packageJson, fileName);
   const metaNoDownload = metadata.replace(/downloadURL( +)(\S[^\n]*)\n/, 'downloadURL$1none\n');
 
   const license = await readFile(resolve(repoRoot, 'LICENSE'), 'utf8');
@@ -152,8 +151,6 @@ const eventPageTsPlugin = (typescript as any)({
       plugins: [],
       sourcemap: false,
     });
-
-    await writeFile(resolve(buildDir, metaFileName), metadata);
   }
 
   // chrome extension
