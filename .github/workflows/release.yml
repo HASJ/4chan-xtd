@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The release title can come from an annotated tag's message, which
+          # needs the tag object itself and not just the commit it points at.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      # A tag that disagrees with version.json would ship a build announcing a
+      # different version than the release it lives under. Stop before building.
+      - name: Check the tag matches version.json
+        id: version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          file_version="$(node -p "require('./version.json').version")"
+          if [ "$tag_version" != "$file_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version.json ($file_version)." >&2
+            exit 1
+          fi
+          echo "value=$tag_version" >> "$GITHUB_OUTPUT"
+
+      # Verify runs on the tag push too, but it runs alongside this job rather
+      # than before it. Re-check here so a release can never be cut from a tree
+      # that does not build or pass its tests.
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:userscript
+
+      # The asset carries its version so a downloaded copy is identifiable on
+      # disk. Nothing resolves it by name: the script ships with @downloadURL
+      # none and @updateURL none, and updates are checked in-script against the
+      # releases API.
+      - name: Name the asset for this version
+        run: mv builds/4chan-XTd.user.js "builds/4chan-XTd-${{ steps.version.outputs.value }}.user.js"
+
+      # Release notes are the hand-written CHANGELOG section, verbatim. The
+      # extractor exits non-zero when the version has no section, so a release
+      # can never go out with an empty or auto-generated body.
+      - name: Extract the release notes
+        run: node ./builds/ts-tools/tools/release-notes.js "$GITHUB_REF_NAME" > release-notes.md
+
+      # `git tag -a v2.31.1 -m "Menus actually work now"` titles the release
+      # "v2.31.1: Menus actually work now". A lightweight tag just gets its name.
+      - name: Work out the release title
+        id: title
+        run: |
+          subject="$(git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME")"
+          if [ -n "$subject" ]; then
+            echo "value=$GITHUB_REF_NAME: $subject" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "${{ steps.title.outputs.value }}" \
+            --notes-file release-notes.md \
+            "builds/4chan-XTd-${{ steps.version.outputs.value }}.user.js"
