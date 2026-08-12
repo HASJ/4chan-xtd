@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.2 (2026-08-12)
+
+- Bugfixes
+  - The captcha no longer loads itself with `Auto-load captcha` switched off. Closing the Quick Reply and opening it again arrived with a challenge already fetched and its cooldown counting down. Closing the Quick Reply replaces the post you were writing with a blank one, and for a moment both existed — which the captcha read as a queue of posts waiting to go out, the one case where it does fetch a challenge without being asked. The captcha is now torn down before that replacement is made, and a freshly opened Quick Reply no longer inherits a pending request from the one you closed.
+  - The `Get Captcha` button can no longer get stuck on `Loading` from the page's first captcha request or from your own click on it. 2.30.13 fixed this only for requests the auto-load made itself; the same lock from any other source stayed until you reloaded the page, and neither the auto-load nor another click could ask again. Any request that goes unanswered for about five seconds now hands the button back.
+
 ### 2.31.1 (2026-08-01)
 
 - Other
