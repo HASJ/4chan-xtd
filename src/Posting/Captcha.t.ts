@@ -222,6 +222,7 @@ const CaptchaT: any = {
           this.createStrips();
           this.checkCompletion();
           this.load();
+          this.watchStuckLoad();
         }, 500);
       }
     }
@@ -499,6 +500,27 @@ const CaptchaT: any = {
 
     this.cooldownReloadFailures = Math.min((this.cooldownReloadFailures || 0) + 1, 4);
     this.cooldownReloadRetryAt = Date.now() + (this.cooldownReloadFailures * 30 * SECOND);
+  },
+
+  // watchCooldownReload only arms after our own auto-reload click, so it never
+  // sees #t-load lock up from the initial page-open request (load(), which
+  // calls 4chan's API directly, not the button) or from the user's own manual
+  // click. Same lock, same fix, caught from the poll that already runs every
+  // 500ms: ~5s stuck on that exact disabled 'Loading' label hands the button
+  // back.
+  watchStuckLoad() {
+    const tLoad = $('#t-load', this.nodes.container);
+    const label = tLoad ? (tLoad.textContent || tLoad.value) : '';
+    if (!tLoad?.disabled || (label !== 'Loading')) {
+      delete this.stuckLoadTicks;
+      return;
+    }
+    this.stuckLoadTicks = (this.stuckLoadTicks || 0) + 1;
+    if (this.stuckLoadTicks < 10) { return; }
+    delete this.stuckLoadTicks;
+    // The request produced nothing, so don't leave load() blocked on it.
+    delete this.hasRequested;
+    $.global('unlockStuckTCaptchaReload');
   },
 
   clearCooldownReloadTimer() {
@@ -786,6 +808,7 @@ const CaptchaT: any = {
     delete this.answerExpiresAt;
     delete this.autoReloadsSincePost;
     delete this.lastTypedAt;
+    delete this.stuckLoadTicks;
     this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     if (this.observer) {
@@ -892,6 +915,7 @@ const CaptchaT: any = {
     // A captcha reached 4chan, so the auto-load has earned its budget back.
     delete this.autoReloadsSincePost;
     delete this.lastTypedAt;
+    delete this.stuckLoadTicks;
     this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     this.shouldLoad = false;

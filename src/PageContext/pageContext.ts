@@ -207,6 +207,7 @@ const PageContextFunctions = {
     const button = tCaptcha?.reloadNode;
     if (!button?.disabled) { return; }
     if ((button.textContent || button.value) !== 'Loading') { return; }
+    if (typeof tCaptcha.unlockReloadBtn !== 'function') { return; }
     tCaptcha.unlockReloadBtn();
   },
 
