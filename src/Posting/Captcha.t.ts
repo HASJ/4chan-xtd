@@ -183,6 +183,12 @@ const CaptchaT: any = {
 
     if (!this.nodes.container) {
       this.hasRequested = !!Conf['Auto-load captcha'];
+      // A fresh widget owes nobody a challenge. shouldLoad outlives destroy(),
+      // so without this a request raised while the previous QR was open (or
+      // while it was closing) fires the moment setup() finishes -- which reads
+      // as an auto-load with the setting off. Anything really needed is
+      // re-asserted by the next moreNeeded().
+      this.shouldLoad = false;
       // Create a child element for TCaptcha to use. TCaptcha.init() will
       // clear its className and set inline styles on it, but our JS reference
       // (this.nodes.container) remains valid. We observe captcha-root (the

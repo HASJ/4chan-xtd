@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Conf } from '../globals/globals';
+import { Conf, g } from '../globals/globals';
 import QRState from '../globals/QRState';
 import $ from '../platform/$';
 import CaptchaT from './Captcha.t';
@@ -942,5 +942,58 @@ describe('CaptchaT when 4chan requires no verification', () => {
 
     expect(CaptchaT.isCompleted).toBe(true);
     expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Reported as issue #24: with 'Auto-load captcha' off, the first QR open asks
+// for nothing, but closing it and opening it again arrives with a challenge
+// already fetched and its cooldown running.
+describe('CaptchaT across a QR close and reopen', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha'] = false;
+    QRState.posts = [{ thread: 123, isOnlyQuotes: () => true, file: null }];
+    QRState.nodes = null;
+    (g as any).BOARD = { ID: 'g' };
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = { root: document.createElement('div') };
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.isInitialized;
+    CaptchaT.shouldLoad = false;
+  });
+
+  afterEach(() => {
+    CaptchaT.destroy();
+    vi.useRealTimers();
+  });
+
+  const open = async () => {
+    CaptchaT.setup();
+    await vi.advanceTimersByTimeAsync(0);
+  };
+
+  // shouldLoad outlives destroy(), and QR.close() raises it: the replacement
+  // post's constructor calls moreNeeded() while QR.posts still holds the old
+  // post too, so the count reads as a queue that needs a challenge.
+  it('does not inherit a pending load raised while closing', async () => {
+    await open();
+    CaptchaT.shouldLoad = true;
+    CaptchaT.destroy();
+
+    await open();
+
+    expect(CaptchaT.shouldLoad).toBe(false);
+    expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', expect.anything());
+  });
+
+  // The reset is about stale state only -- a real need still loads.
+  it('still loads once the reopened post needs a captcha', async () => {
+    await open();
+
+    QRState.posts = [{ thread: 123, isOnlyQuotes: () => false, file: null }];
+    CaptchaT.moreNeeded();
+
+    expect($.global).toHaveBeenCalledWith('loadTCaptcha', expect.anything());
   });
 });

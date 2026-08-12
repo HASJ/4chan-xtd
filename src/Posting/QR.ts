@@ -249,13 +249,17 @@ Callbacks.handleErrors({
     QR.blur();
     $.rmClass(QR.nodes.el, 'dump');
     $.addClass(QR.shortcut, 'disabled');
+    // Tear the captcha down before the replacement post exists. The post
+    // constructor ends in moreNeeded(), and for that one moment QR.posts holds
+    // both the old and the new post -- a count the captcha reads as a queue
+    // that needs a challenge, so closing the QR fetched one.
+    QR.captcha.destroy();
     new QR.post(true); // NOSONAR: constructor pushes to QR.posts
     for (let post of QR.posts.splice(0, QR.posts.length - 1)) {
       post.delete();
     }
     QR.cooldown.auto = false;
-    QR.status();
-    return QR.captcha.destroy();
+    return QR.status();
   },
 
   focus() {
