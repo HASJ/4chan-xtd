@@ -217,3 +217,70 @@ challenge on this account). The reclassification is what shipped — in `noop`
 state the counter runs and nothing is fetched, which is correct. The
 discriminator capture was never taken, so the theory is confirmed by behaviour
 rather than by DOM evidence; revisit it if symptom 1 returns.
+
+## Recurrence: symptom 1 returned (2026-08-08)
+
+`#t-load` reported stuck on "Loading" again, in the QR, on a fresh thread.
+
+`41067c971` (`fix(captcha): recover #t-load when a click gets no answer`,
+2026-07-31) added `unlockStuckTCaptchaReload`, but only wired it into paths that
+run *after our own click*: `watchCooldownReload` (armed by
+`updateCooldownReload`'s auto-click and by `loadByHand()`, the keybind) and the
+`TCaptchaError` listener (gated on `this.cooldownReloadTimer`, i.e. also only
+live after our own click).
+
+Two other paths lock the same button the same way and had no watchdog at all:
+
+1. **The initial page-open request.** `load()` [Captcha.t.ts:93](../src/Posting/Captcha.t.ts)
+   calls `$.global('loadTCaptcha', ...)`, which calls `TCaptcha.load()`
+   directly — not a button click — but 4chan still disables `#t-load` and
+   relabels it "Loading" while that request is outstanding. If it never
+   answers, `hasRequested` stays `true` forever (nothing clears it outside
+   `destroy()`/`setUsed()`/the click-watchdog's noop branch) and `load()`
+   keeps returning early on line 95.
+2. **A manual mouse click on `#t-load`.** 4chan's own click handler, not
+   `loadByHand()`. `updateCooldownReload` even skips a disabled button
+   (`state.tLoad.disabled` guard, line 420), so once this locks, the
+   auto-reload path can't click either — nothing schedules a watchdog, ever.
+
+Given the `MAX_AUTO_RELOADS_PER_POST` budget exists specifically to hand the
+button back to the user by hand once spent (see the comment at
+[Captcha.t.ts:12-18](../src/Posting/Captcha.t.ts)), a manual click is the more
+likely trigger of this report than the initial load.
+
+### Fix applied
+
+Rather than arming a watchdog at every call site (the prior doc's own
+post-mortem: "four consecutive fixes, each removing one latch, none of which
+could work"), added one dwell check to the 500ms poll that already runs in
+`setup()`: `watchStuckLoad()` [Captcha.t.ts](../src/Posting/Captcha.t.ts)
+counts consecutive ticks where `#t-load` is disabled and reads exactly
+`'Loading'`; at ~5s it clears `hasRequested` and calls
+`unlockStuckTCaptchaReload`, same as the click-watchdog path. Covers all three
+triggers (initial load, manual click, failed auto-click) from one place.
+Deliberately does not touch the auto-reload backoff/retry-at state — this is a
+separate lock-detector, not a rewrite of `watchCooldownReload`.
+
+Also hardened `unlockStuckTCaptchaReload` in
+[pageContext.ts](../src/PageContext/pageContext.ts) with a
+`typeof tCaptcha.unlockReloadBtn !== 'function'` guard: if 4chan renamed or
+removed the method, this now no-ops instead of throwing.
+
+Tests: `Captcha.t.test.ts`, describe *"CaptchaT.watchStuckLoad"* (4 cases) and
+one added case under *"unlockStuckTCaptchaReload"*. Full suite 119/119,
+typecheck clean.
+
+### Open: `unlockStuckTCaptchaReload` itself is still unverified against real DOM
+
+Both the label match (`(button.textContent || button.value) !== 'Loading'`,
+strict equality against a third-party string) and `reloadNode`/`unlockReloadBtn`
+existing at all are assumptions from reading 4chan's minified JS, never
+confirmed against a live capture. If either is wrong, this fix (and the
+2026-07-31 one) silently no-op — the poll counts to 10 and calls a function
+that does nothing. The discriminator this doc asked for after the first fix
+was never taken; it's needed now more than before. One-liner for the browser
+console on a stuck tab:
+
+```js
+const b=document.querySelector('#qr #t-load');console.log(JSON.stringify({tag:b?.tagName,text:b?.textContent,value:b?.value,disabled:b?.disabled,isReloadNode:window.TCaptcha?.reloadNode===b,unlock:typeof window.TCaptcha?.unlockReloadBtn}))
+```

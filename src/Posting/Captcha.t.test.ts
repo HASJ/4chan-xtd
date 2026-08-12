@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Conf } from '../globals/globals';
+import { Conf, g } from '../globals/globals';
 import QRState from '../globals/QRState';
 import $ from '../platform/$';
 import CaptchaT from './Captcha.t';
@@ -671,6 +671,70 @@ describe('CaptchaT.loadByHand', () => {
   });
 });
 
+// load() (the initial page-open request) and a manual mouse click on #t-load
+// both lock the button the same way a failed auto-reload click does, but
+// neither goes through watchCooldownReload -- so they never got unstuck.
+describe('CaptchaT.watchStuckLoad', () => {
+  beforeEach(() => {
+    vi.spyOn($, 'global').mockResolvedValue({});
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.stuckLoadTicks;
+  });
+
+  const stick = (container: HTMLElement) => {
+    const tLoad = container.querySelector<HTMLInputElement>('#t-load')!;
+    tLoad.disabled = true;
+    tLoad.value = 'Loading';
+    return tLoad;
+  };
+
+  it('hands the button back once it dwells on Loading for ~5s of polling', () => {
+    const { container } = buildCaptcha();
+    stick(container);
+
+    for (let i = 0; i < 9; i++) CaptchaT.watchStuckLoad();
+    expect($.global).not.toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+
+    CaptchaT.watchStuckLoad();
+    expect($.global).toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+  });
+
+  it('resets the dwell count once the button leaves Loading', () => {
+    const { container } = buildCaptcha();
+    const tLoad = stick(container);
+
+    for (let i = 0; i < 9; i++) CaptchaT.watchStuckLoad();
+    tLoad.disabled = false;
+    tLoad.value = IDLE;
+    CaptchaT.watchStuckLoad();
+    tLoad.disabled = true;
+    tLoad.value = 'Loading';
+    for (let i = 0; i < 9; i++) CaptchaT.watchStuckLoad();
+
+    expect($.global).not.toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+  });
+
+  it('clears hasRequested so a fresh load is not blocked forever', () => {
+    const { container } = buildCaptcha();
+    stick(container);
+    CaptchaT.hasRequested = true;
+
+    for (let i = 0; i < 10; i++) CaptchaT.watchStuckLoad();
+
+    expect(CaptchaT.hasRequested).toBeUndefined();
+  });
+
+  it('leaves an enabled button alone', () => {
+    buildCaptcha();
+
+    for (let i = 0; i < 10; i++) CaptchaT.watchStuckLoad();
+
+    expect($.global).not.toHaveBeenCalledWith('unlockStuckTCaptchaReload');
+  });
+});
+
 describe('unlockStuckTCaptchaReload', () => {
   const build = (text: string, disabled: boolean) => {
     const button = document.createElement('button');
@@ -709,6 +773,17 @@ describe('unlockStuckTCaptchaReload', () => {
 
   it('does nothing when TCaptcha is not on the page', () => {
     delete (window as any).TCaptcha;
+
+    expect(() => PageContextFunctions.unlockStuckTCaptchaReload()).not.toThrow();
+  });
+
+  // A renamed or missing method on 4chan's side must not throw and re-strand
+  // the button; it just means this recovery can't help this time.
+  it('does not throw when unlockReloadBtn is missing', () => {
+    const button = document.createElement('button');
+    button.textContent = 'Loading';
+    button.disabled = true;
+    (window as any).TCaptcha = { reloadNode: button };
 
     expect(() => PageContextFunctions.unlockStuckTCaptchaReload()).not.toThrow();
   });
@@ -867,5 +942,58 @@ describe('CaptchaT when 4chan requires no verification', () => {
 
     expect(CaptchaT.isCompleted).toBe(true);
     expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Reported as issue #24: with 'Auto-load captcha' off, the first QR open asks
+// for nothing, but closing it and opening it again arrives with a challenge
+// already fetched and its cooldown running.
+describe('CaptchaT across a QR close and reopen', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha'] = false;
+    QRState.posts = [{ thread: 123, isOnlyQuotes: () => true, file: null }];
+    QRState.nodes = null;
+    (g as any).BOARD = { ID: 'g' };
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = { root: document.createElement('div') };
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.isInitialized;
+    CaptchaT.shouldLoad = false;
+  });
+
+  afterEach(() => {
+    CaptchaT.destroy();
+    vi.useRealTimers();
+  });
+
+  const open = async () => {
+    CaptchaT.setup();
+    await vi.advanceTimersByTimeAsync(0);
+  };
+
+  // shouldLoad outlives destroy(), and QR.close() raises it: the replacement
+  // post's constructor calls moreNeeded() while QR.posts still holds the old
+  // post too, so the count reads as a queue that needs a challenge.
+  it('does not inherit a pending load raised while closing', async () => {
+    await open();
+    CaptchaT.shouldLoad = true;
+    CaptchaT.destroy();
+
+    await open();
+
+    expect(CaptchaT.shouldLoad).toBe(false);
+    expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', expect.anything());
+  });
+
+  // The reset is about stale state only -- a real need still loads.
+  it('still loads once the reopened post needs a captcha', async () => {
+    await open();
+
+    QRState.posts = [{ thread: 123, isOnlyQuotes: () => false, file: null }];
+    CaptchaT.moreNeeded();
+
+    expect($.global).toHaveBeenCalledWith('loadTCaptcha', expect.anything());
   });
 });
