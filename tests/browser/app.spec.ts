@@ -74,6 +74,23 @@ test('displays a thread and opens Quick Reply', async ({ page }) => {
   await expect(page.locator('#qr.dialog textarea[data-name="com"]')).toBeVisible();
 });
 
+test('keeps the captcha verification frame visible while loading', async ({ page }) => {
+  await openFixture(page, '/g/thread/100');
+  await page.locator('.qr-link').first().click();
+
+  await page.evaluate(() => {
+    document.querySelector('#qr #t-frame')?.remove();
+    const root = document.createElement('div');
+    root.className = 'captcha-root captcha-idle';
+    const frame = document.createElement('iframe');
+    frame.id = 't-frame';
+    frame.style.display = 'block';
+    root.append(frame);
+    document.querySelector('#qr')!.append(root);
+  });
+
+  await expect(page.locator('#qr .captcha-root.captcha-idle #t-frame')).toHaveCSS('display', 'block');
+});
 test('renders the catalog and applies a deterministic filter', async ({ page }) => {
   await openFixture(page, '/g/catalog', { [storageKey('name')]: '/Filtered/' });
 

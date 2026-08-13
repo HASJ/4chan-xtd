@@ -410,6 +410,8 @@ const CaptchaT: any = {
   // state where the counter already expired, such as after a failed post.
   updateCooldownReload(state) {
     if (!Conf['Auto-load captcha after cooldown']) { return; }
+    // The initial, manual or previous auto-load request is still in flight.
+    if (this.hasRequested) { return; }
     // Budget spent since the last post. Not a backoff: there is nothing to
     // retry, so this stays off until a post consumes a captcha.
     if (this.autoReloadsSincePost >= MAX_AUTO_RELOADS_PER_POST) { return; }

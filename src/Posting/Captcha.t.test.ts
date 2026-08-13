@@ -84,6 +84,15 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  it('does not duplicate a captcha request already in flight', () => {
+    const { click } = buildCaptcha();
+    CaptchaT.hasRequested = true;
+
+    CaptchaT.createStrips();
+
+    expect(click).not.toHaveBeenCalled();
+    expect(CaptchaT.cooldownReloadTimer).toBeUndefined();
+  });
   it('clicks once the counter clears', () => {
     const { tLoad, click } = buildCaptcha();
     tLoad.value = COUNTING_DOWN;
