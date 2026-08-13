@@ -7,27 +7,49 @@ import CrossOrigin from '../../platform/CrossOrigin';
 import { Conf } from '../../globals/globals';
 
 function renderMedia(tweet): EscapedHtml[] {
-  return tweet.media?.all?.map(media => {
+  const mediaList = tweet.media?.all ?? [
+    ...(tweet.media?.photos ?? []),
+    ...(tweet.media?.videos ?? []),
+  ];
+  return mediaList.map(media => {
     switch (media.type) {
       case 'photo':
+      case 'image':
         return <div class="fxt-media">
           <a href={media.url} target="_blank" referrerpolicy="no-referrer">
-            <img src={media.url} alt={media.altText} width={media.width} height={media.height}
-              referrerpolicy="no-referrer" />
+            <img referrerpolicy="no-referrer" src={media.url} alt={media.altText || media.alt_text || ''} width={media.width} height={media.height} />
           </a>
         </div>;
       case 'video':
       case 'gif':
-        return <div class="fxt-media">
-          <video controls width={media.width} height={media.height} poster={media.thumbnail_url} preload="meta">
-            <source src={media.url} type={media.format} />
-            <track kind="captions" />
-          </video>
+      case 'animated_gif': {
+        const isGif = media.type === 'gif' || media.type === 'animated_gif';
+        const videoAttributes = isGif
+          ? 'autoplay loop muted playsinline preload="auto"'
+          : 'controls preload="metadata"';
+        const posterAttr = media.thumbnail_url ? ` poster="${media.thumbnail_url.replace(/"/g, '&quot;')}"` : '';
+        const srcEsc = media.url.replace(/"/g, '&quot;');
+        const typeEsc = (media.format || 'video/mp4').replace(/"/g, '&quot;');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;}video{width:100%;height:100%;object-fit:contain;}</style></head><body><video ${videoAttributes}${posterAttr} src="${srcEsc}"><source src="${srcEsc}" type="${typeEsc}"></video></body></html>`;
+        const blobUrl = (typeof URL !== 'undefined' && URL.createObjectURL)
+          ? URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+          : `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+
+        return <div class="fxt-media fxt-media_video">
+          <iframe
+            class="fxt-video-frame"
+            src={blobUrl}
+            allow="autoplay; fullscreen"
+            allowfullscreen="true"
+            style="border: none; width: 100%; height: 100%;"
+          />
         </div>;
+      }
       default:
         console.warn(`FxTwitter media type ${media.type} not recognized`);
+        return null;
     }
-  }) || [];
+  }).filter(Boolean) as EscapedHtml[] || [];
 }
 
 function renderDate(tweet): string {
@@ -83,15 +105,17 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
     }
 
     function renderMeta(tweet): EscapedHtml {
+      const avatarUrl = tweet.author?.avatar_url || tweet.author?.avatar_url_https || tweet.author?.avatar || tweet.author?.profile_image_url_https;
+      const profileUrl = tweet.author?.url || (tweet.author?.screen_name ? `https://x.com/${tweet.author.screen_name}` : '#');
       return <div class="fxt-meta">
-        <a class="fxt-meta_profile" href={tweet.author.url} title={tweet.author.description} target="_blank"
+        <a class="fxt-meta_profile" href={profileUrl} title={tweet.author?.description} target="_blank"
           referrerpolicy="no-referrer">
           <div class="fxt-meta_avatar">
-            <img src={tweet.author.avatar_url} alt={tweet.author.name} referrerpolicy="no-referrer" />
+            {avatarUrl ? <img referrerpolicy="no-referrer" src={avatarUrl} alt={tweet.author?.name || ''} /> : ''}
           </div>
           <div class="fxt-meta_author">
-            <span class="fxt-meta_author_username">{tweet.author.name}</span>
-            <span class="fxt-meta_author_account">@{tweet.author.screen_name}</span>
+            <span class="fxt-meta_author_username">{tweet.author?.name || ''}</span>
+            <span class="fxt-meta_author_account">@{tweet.author?.screen_name || ''}</span>
           </div>
         </a>
         <a href={tweet.url} title="Open tweet in a new tab" target="_blank" referrerpolicy="no-referrer">
@@ -178,6 +202,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
 
     async function renderTweet(tweet, type: 'quote' | 'reply' | 'original'): Promise<EscapedHtml> {
       const media = renderMedia(tweet);
+      const mediaCountClass = media.length === 3 ? 'fxt-media_contains_3' : (media.length > 1 ? 'fxt-media-multiple' : '');
       const quote = (tweet?.quote) ? await renderQuote(tweet.quote) : ''
 
       const poll = (tweet?.poll) ? renderPoll(tweet) : '';
@@ -194,7 +219,7 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
             {translation}
           </div>
           {(media.length || poll) &&
-            <div class={`fxt-media_container ${tweet.media?.all?.length > 1 ? 'fxt-media-multiple' : ''}`}>
+            <div class={`fxt-media_container ${mediaCountClass}`}>
               {poll}
               {...media}
             </div>
@@ -207,15 +232,15 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
           <div class="fxt-stats_meta">
             <span class="fxt-likes">
               {Icon.raw("comment")}
-              {tweet.replies.toLocaleString()}
+              {(tweet.replies ?? 0).toLocaleString()}
             </span>
             <span class="fxt-reposts">
               {Icon.raw("shuffle")}
-              {tweet.retweets.toLocaleString()}
+              {(tweet.retweets ?? 0).toLocaleString()}
             </span>
             <span class="fxt-replies">
               {Icon.raw("heart")}
-              {tweet.likes.toLocaleString()}
+              {(tweet.likes ?? 0).toLocaleString()}
             </span>
           </div>
         </div>
