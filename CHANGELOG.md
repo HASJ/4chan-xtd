@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.3 (2026-08-12)
+
+- Bugfixes
+  - Quick Reply now keeps 4chan's captcha transport frame visible while a request is loading. A 403 response can contain Cloudflare's interactive verification step; XTd had hidden that frame in the idle/loading state since 2.30.8, leaving the button on *Loading* whenever Cloudflare required the step. The frame is still collapsed after the parent receives a challenge or status.
+  - Captcha polling no longer clicks *Get Captcha* while an initial, manual, or previous automatic request is already in flight. A mutation during initialization could otherwise send a second identical request almost immediately.
+
 ### 2.31.2 (2026-08-12)
 
 - Bugfixes
