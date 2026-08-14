@@ -65,3 +65,4 @@ AGENTS.md
 /conductor/
 /.agents/
 fetch-sonar*
+issues-sonarlint.json

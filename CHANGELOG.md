@@ -6,7 +6,7 @@ and import them in XTd.
 ### 2.31.4 (2026-08-13)
 
 - Bugfixes
-  - Twitter / X embeds: fixed video playback ("No video with supported format and MIME type found"), poster thumbnail, and image/avatar loading by applying `referrerpolicy="no-referrer"` to prevent 4chan referer leakage and resulting 403 blocks by Twitter CDN.
+  - Fixed Twitter / X embeds failing to load videos ("No video with supported format and MIME type found"), poster thumbnails, and user avatars. Media requests previously leaked the 4chan referer header to Twitter's CDN, which rejected them with 403 Forbidden. Embedded videos are now loaded within an isolated container with `referrerpolicy="no-referrer"`, and images/avatars explicitly suppress the referer.
   - Added support for additional FxTwitter media types (`image`, `animated_gif`) and fallback properties for author avatars.
 
 ### 2.31.3 (2026-08-12)

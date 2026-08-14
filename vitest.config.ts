@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    exclude: ['**/node_modules/**', '**/.worktrees/**', 'builds/**', 'tests/browser/**'],
+    exclude: ['**/node_modules/**', '**/.worktrees/**', '**/.claude/**', 'builds/**', '**/tests/browser/**', 'tests/browser/**'],
     environmentOptions: {
       jsdom: { url: 'https://boards.4chan.org/g/thread/1' },
     },
