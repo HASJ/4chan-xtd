@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.4 (2026-08-13)
+
+- Bugfixes
+  - Twitter / X embeds: fixed video playback ("No video with supported format and MIME type found"), poster thumbnail, and image/avatar loading by applying `referrerpolicy="no-referrer"` to prevent 4chan referer leakage and resulting 403 blocks by Twitter CDN.
+  - Added support for additional FxTwitter media types (`image`, `animated_gif`) and fallback properties for author avatars.
+
 ### 2.31.3 (2026-08-12)
 
 - Bugfixes
