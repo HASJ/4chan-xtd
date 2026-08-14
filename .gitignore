@@ -66,3 +66,4 @@ AGENTS.md
 /.agents/
 fetch-sonar*
 issues-sonarlint.json
+graphify-out/
