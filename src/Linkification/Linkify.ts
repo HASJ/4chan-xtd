@@ -130,7 +130,7 @@ const Linkify: any = {
   extendAcrossNodes(snapshot, i, node, word, test) {
     const space = /[\s"]/;
     let endNode = node;
-    let length;
+    let length = node.data.length;
     let saved;
     test.lastIndex = 0;
 
