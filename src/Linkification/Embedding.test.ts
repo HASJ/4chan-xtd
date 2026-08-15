@@ -90,7 +90,7 @@ describe('Embedding & Linkify for YouTube', () => {
       div.textContent = 'youtu.be/QT1BD8bP9-E?t=128';
       document.body.appendChild(div);
       const links = Linkify.process(div);
-      expect(links.length).toBe(1);
+      expect(links).toHaveLength(1);
       const a = links[0];
       expect(a.href).toBe('http://youtu.be/QT1BD8bP9-E?t=128');
       const data = Embedding.services(a);
@@ -105,7 +105,7 @@ describe('Embedding & Linkify for YouTube', () => {
       div.textContent = 'Look at this https://youtu.be/QT1BD8bP9-E?t=128 it is great';
       document.body.appendChild(div);
       const links = Linkify.process(div);
-      expect(links.length).toBe(1);
+      expect(links).toHaveLength(1);
       const a = links[0];
       expect(a.href).toBe('https://youtu.be/QT1BD8bP9-E?t=128');
       expect(a.textContent).toBe('https://youtu.be/QT1BD8bP9-E?t=128');
@@ -121,7 +121,7 @@ describe('Embedding & Linkify for YouTube', () => {
       div.innerHTML = 'Line 1: https://youtu.be/QT1BD8bP9-E?t=128<br>Line 2: https://www.youtube.com/watch?v=QT1BD8bP9-E';
       document.body.appendChild(div);
       const links = Linkify.process(div);
-      expect(links.length).toBe(2);
+      expect(links).toHaveLength(2);
       expect(links[0].href).toBe('https://youtu.be/QT1BD8bP9-E?t=128');
       expect(links[1].href).toBe('https://www.youtube.com/watch?v=QT1BD8bP9-E');
       div.remove();

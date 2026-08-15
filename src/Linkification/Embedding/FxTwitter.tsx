@@ -39,6 +39,7 @@ function renderMedia(tweet): EscapedHtml[] {
           <iframe
             class="fxt-video-frame"
             src={blobUrl}
+            title={media.altText || media.alt_text || (isGif ? 'Twitter GIF' : 'Twitter video')}
             allow="autoplay; fullscreen"
             allowfullscreen="true"
             style="border: none; width: 100%; height: 100%;"
@@ -202,7 +203,12 @@ export default function EmbedFxTwitter(a: HTMLAnchorElement): HTMLElement {
 
     async function renderTweet(tweet, type: 'quote' | 'reply' | 'original'): Promise<EscapedHtml> {
       const media = renderMedia(tweet);
-      const mediaCountClass = media.length === 3 ? 'fxt-media_contains_3' : (media.length > 1 ? 'fxt-media-multiple' : '');
+      let mediaCountClass = '';
+      if (media.length === 3) {
+        mediaCountClass = 'fxt-media_contains_3';
+      } else if (media.length > 1) {
+        mediaCountClass = 'fxt-media-multiple';
+      }
       const quote = (tweet?.quote) ? await renderQuote(tweet.quote) : ''
 
       const poll = (tweet?.poll) ? renderPoll(tweet) : '';

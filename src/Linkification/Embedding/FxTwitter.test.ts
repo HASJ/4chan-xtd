@@ -59,6 +59,7 @@ describe('EmbedFxTwitter', () => {
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute('allow')).toBe('autoplay; fullscreen');
     expect(iframe?.getAttribute('allowfullscreen')).toBe('true');
+    expect(iframe?.getAttribute('title')).toBe('Twitter video');
     expect(iframe?.getAttribute('src')).toBeTruthy();
 
     // Avatar image should have referrerpolicy="no-referrer"
@@ -121,6 +122,7 @@ describe('EmbedFxTwitter', () => {
 
     const gifIframe = el.querySelectorAll('.fxt-media iframe')[0];
     expect(gifIframe).not.toBeNull();
+    expect(gifIframe?.getAttribute('title')).toBe('Twitter GIF');
     expect(gifIframe?.getAttribute('src')).toBeTruthy();
   });
 

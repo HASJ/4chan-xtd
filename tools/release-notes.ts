@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return str.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 export function extractReleaseNotes(changelog: string, version: string): string {
@@ -13,7 +13,7 @@ export function extractReleaseNotes(changelog: string, version: string): string 
   }
 
   const lines = changelog.split(/\r?\n/);
-  const versionPattern = new RegExp('^###\\s+\\[?v?' + escapeRegex(cleanVersion) + '(?:\\s|\\(|$|\\])');
+  const versionPattern = new RegExp(String.raw`^###\s+\[?v?${escapeRegex(cleanVersion)}(?:\s|\(|$|\])`);
 
   const targetIdx = lines.findIndex(line => line.startsWith('### ') && versionPattern.test(line));
 
