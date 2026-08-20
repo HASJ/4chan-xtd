@@ -214,12 +214,12 @@ const Config = {
         1
       ],
       'MD5 Quick Filter in the Catalog': [
-        true,
+        false,
         'Quick filter by MD5 when clicking a thumbnail in the catalog and holding Shift. Disabling falls back on just hiding the thread.',
         1
       ],
       'MD5 Quick Filter in Threads': [
-        true,
+        false,
         'Quick filter by MD5 when clicking a thumbnail in a thread while holding shift.',
         1
       ],
