@@ -3,6 +3,16 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.5 (2026-08-25)
+
+- Features
+  - Added support for embedding and linkifying `youtu.be` URLs, including timestamp parameters (e.g. `?t=128s`, `1m20s`, `1h2m3s`).
+
+- Bugfixes
+  - Fixed WebM audio stripper failing on certain files: overhauled EBML parsing to properly locate and void audio tracks, clusters, block groups, and cue positions.
+  - Disabled default MD5 quick filtering on Shift+Click in catalog and thread views (`MD5 Quick Filter in Threads` and `MD5 Quick Filter in the Catalog` now default to false), falling back to thread/post hiding instead of adding to the filter list.
+  - Fixed FxTwitter multi-media container styling and avatar fallbacks.
+
 ### 2.31.4 (2026-08-13)
 
 - Bugfixes
