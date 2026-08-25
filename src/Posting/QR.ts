@@ -2166,7 +2166,7 @@ class Post {
    * @returns A promise with the old file if it was valid, or a new file if it wasn't.
    */
   async validateFile(file: File): Promise<File> {
-    if (file.type.startsWith('video/') && BoardConfig.noAudio(g.BOARD.ID)) {
+    if ((file.type.startsWith('video/') || /\.(webm|mp4|ogv)$/i.test(file.name)) && BoardConfig.noAudio(g.BOARD.ID)) {
       const strippedFile = await VideoStripper.stripAudio(file);
       if (strippedFile !== file) {
         file = strippedFile;

@@ -3,9 +3,12 @@
  * Modifies the underlying ArrayBuffer in-place.
  */
 
-interface Mp4BoxHeader {
-  size: number;
-  boxOffset: number;
+interface EbmlElement {
+  id: number;
+  idLength: number;
+  dataOffset: number;
+  dataSize: number;
+  totalSize: number;
 }
 
 interface Vint {
@@ -21,9 +24,10 @@ export class VideoStripper {
       const dataView = new DataView(buffer);
 
       let patched = false;
-      if (file.type === 'video/mp4' || file.name.endsWith('.mp4')) {
+      const lowerName = file.name.toLowerCase();
+      if (file.type === 'video/mp4' || lowerName.endsWith('.mp4')) {
         patched = this.stripMp4(uint8, dataView);
-      } else if (file.type === 'video/webm' || file.name.endsWith('.webm')) {
+      } else if (file.type === 'video/webm' || lowerName.endsWith('.webm')) {
         patched = this.stripWebm(uint8);
       }
 
@@ -38,24 +42,48 @@ export class VideoStripper {
 
   // --- MP4 (ISO BMFF) ---
 
-  private static readMp4BoxHeader(uint8: Uint8Array, view: DataView, offset: number): Mp4BoxHeader | null {
+  private static readMp4BoxHeader(
+    uint8: Uint8Array,
+    view: DataView,
+    offset: number
+  ): { size: number; headerSize: number } | null {
     if (offset + 8 > uint8.length) return null;
     let size = view.getUint32(offset, false);
-    let boxOffset = offset;
+    let headerSize = 8;
 
     if (size === 1) {
       if (offset + 16 > uint8.length) return null;
-      // 64-bit size, we only read the lower 32 bits since MP4 files on 4chan aren't that huge
+      // 64-bit size, lower 32 bits since MP4 files on 4chan aren't that huge
       size = view.getUint32(offset + 12, false);
-      boxOffset += 8;
-    }
-
-    if (size === 0) {
+      headerSize = 16;
+    } else if (size === 0) {
       // Box extends to end of file
       size = uint8.length - offset;
     }
 
-    return { size, boxOffset };
+    if (size < headerSize) return null;
+    return { size, headerSize };
+  }
+
+  private static minfHasSoundHeader(
+    uint8: Uint8Array,
+    view: DataView,
+    minfOffset: number,
+    minfEnd: number,
+    decoder: TextDecoder
+  ): boolean {
+    let offset = minfOffset;
+    while (offset < minfEnd) {
+      const header = this.readMp4BoxHeader(uint8, view, offset);
+      if (!header) break;
+      const { size } = header;
+      if (offset + size > minfEnd) break;
+
+      const boxType = decoder.decode(uint8.subarray(offset + 4, offset + 8));
+      if (boxType === 'smhd') return true;
+      offset += size;
+    }
+    return false;
   }
 
   private static mdiaHasAudioHandler(
@@ -65,17 +93,21 @@ export class VideoStripper {
     mdiaEnd: number,
     decoder: TextDecoder
   ): boolean {
-    while (mdiaOffset < mdiaEnd) {
-      if (mdiaOffset + 8 > mdiaEnd) break;
-      let boxSize = view.getUint32(mdiaOffset, false);
-      if (boxSize === 0) boxSize = mdiaEnd - mdiaOffset;
+    let offset = mdiaOffset;
+    while (offset < mdiaEnd) {
+      const header = this.readMp4BoxHeader(uint8, view, offset);
+      if (!header) break;
+      const { size, headerSize } = header;
+      if (offset + size > mdiaEnd) break;
 
-      const boxType = decoder.decode(uint8.subarray(mdiaOffset + 4, mdiaOffset + 8));
-      if (boxType === 'hdlr' && mdiaOffset + 20 <= mdiaEnd) {
-        const handlerType = decoder.decode(uint8.subarray(mdiaOffset + 16, mdiaOffset + 20));
+      const boxType = decoder.decode(uint8.subarray(offset + 4, offset + 8));
+      if (boxType === 'hdlr' && offset + 20 <= mdiaEnd) {
+        const handlerType = decoder.decode(uint8.subarray(offset + 16, offset + 20));
         if (handlerType === 'soun') return true;
+      } else if (boxType === 'minf' && this.minfHasSoundHeader(uint8, view, offset + headerSize, offset + size, decoder)) {
+        return true;
       }
-      mdiaOffset += boxSize;
+      offset += size;
     }
     return false;
   }
@@ -87,16 +119,18 @@ export class VideoStripper {
     trakEnd: number,
     decoder: TextDecoder
   ): boolean {
-    while (trakOffset < trakEnd) {
-      if (trakOffset + 8 > trakEnd) break;
-      let boxSize = view.getUint32(trakOffset, false);
-      if (boxSize === 0) boxSize = trakEnd - trakOffset;
+    let offset = trakOffset;
+    while (offset < trakEnd) {
+      const header = this.readMp4BoxHeader(uint8, view, offset);
+      if (!header) break;
+      const { size, headerSize } = header;
+      if (offset + size > trakEnd) break;
 
-      const boxType = decoder.decode(uint8.subarray(trakOffset + 4, trakOffset + 8));
-      if (boxType === 'mdia' && this.mdiaHasAudioHandler(uint8, view, trakOffset + 8, trakOffset + boxSize, decoder)) {
+      const boxType = decoder.decode(uint8.subarray(offset + 4, offset + 8));
+      if (boxType === 'mdia' && this.mdiaHasAudioHandler(uint8, view, offset + headerSize, offset + size, decoder)) {
         return true;
       }
-      trakOffset += boxSize;
+      offset += size;
     }
     return false;
   }
@@ -109,21 +143,23 @@ export class VideoStripper {
     decoder: TextDecoder
   ): boolean {
     let stripped = false;
-    while (moovOffset < moovEnd) {
-      if (moovOffset + 8 > moovEnd) break;
-      let boxSize = view.getUint32(moovOffset, false);
-      if (boxSize === 0) boxSize = moovEnd - moovOffset;
+    let offset = moovOffset;
+    while (offset < moovEnd) {
+      const header = this.readMp4BoxHeader(uint8, view, offset);
+      if (!header) break;
+      const { size, headerSize } = header;
+      if (offset + size > moovEnd) break;
 
-      const boxType = decoder.decode(uint8.subarray(moovOffset + 4, moovOffset + 8));
-      if (boxType === 'trak' && this.isAudioTrak(uint8, view, moovOffset + 8, moovOffset + boxSize, decoder)) {
+      const boxType = decoder.decode(uint8.subarray(offset + 4, offset + 8));
+      if (boxType === 'trak' && this.isAudioTrak(uint8, view, offset + headerSize, offset + size, decoder)) {
         // Overwrite 'trak' with 'free'
-        uint8[moovOffset + 4] = 0x66; // 'f'
-        uint8[moovOffset + 5] = 0x72; // 'r'
-        uint8[moovOffset + 6] = 0x65; // 'e'
-        uint8[moovOffset + 7] = 0x65; // 'e'
+        uint8[offset + 4] = 0x66; // 'f'
+        uint8[offset + 5] = 0x72; // 'r'
+        uint8[offset + 6] = 0x65; // 'e'
+        uint8[offset + 7] = 0x65; // 'e'
         stripped = true;
       }
-      moovOffset += boxSize;
+      offset += size;
     }
     return stripped;
   }
@@ -136,10 +172,10 @@ export class VideoStripper {
     while (offset < uint8.length) {
       const header = this.readMp4BoxHeader(uint8, view, offset);
       if (!header) break;
-      const { size, boxOffset } = header;
+      const { size, headerSize } = header;
 
-      const type = decoder.decode(uint8.subarray(boxOffset + 4, boxOffset + 8));
-      if (type === 'moov' && this.stripAudioTraks(uint8, view, boxOffset + 8, offset + size, decoder)) {
+      const type = decoder.decode(uint8.subarray(offset + 4, offset + 8));
+      if (type === 'moov' && this.stripAudioTraks(uint8, view, offset + headerSize, offset + size, decoder)) {
         stripped = true;
       }
       offset += size;
@@ -152,6 +188,7 @@ export class VideoStripper {
   private static readVint(uint8: Uint8Array, off: number): Vint {
     if (off >= uint8.length) return { val: 0, length: 1 };
     const byte = uint8[off];
+    if (byte === 0) return { val: 0, length: 1 };
     let mask = 0x80;
     let length = 1;
     while (!(byte & mask) && length < 8) {
@@ -164,9 +201,6 @@ export class VideoStripper {
       if (off + i >= uint8.length) break;
       const next = uint8[off + i];
       if (next !== 0xff) allOnes = false;
-      // Use arithmetic instead of `<<`/`|`: bitwise ops coerce to 32-bit signed
-      // integers, so vints of length >= 5 (up to 8 for EBML) would silently
-      // wrap/go negative. Multiplication stays exact up to Number.MAX_SAFE_INTEGER.
       val = (val * 256) + next;
     }
     // Handle unknown size (all data bits across the vint are 1)
@@ -174,112 +208,255 @@ export class VideoStripper {
     return { val, length };
   }
 
-  private static skipVintElement(uint8: Uint8Array, offset: number): number {
-    let idLength = 1;
-    while (!(uint8[offset] & (0x80 >> (idLength - 1))) && idLength < 8) idLength++;
-    const sizeInfo = this.readVint(uint8, offset + idLength);
-    return offset + idLength + sizeInfo.length + sizeInfo.val;
+  private static readUint(uint8: Uint8Array, offset: number, size: number): number {
+    let val = 0;
+    for (let i = 0; i < size; i++) {
+      if (offset + i >= uint8.length) break;
+      val = (val * 256) + uint8[offset + i];
+    }
+    return val;
   }
 
-  private static isAudioTrackEntry(uint8: Uint8Array, entryDataOffset: number, entryEnd: number): boolean {
-    let curr = entryDataOffset;
+  private static readEbmlElement(uint8: Uint8Array, offset: number, end: number): EbmlElement | null {
+    if (offset >= end || offset >= uint8.length) return null;
+    const firstByte = uint8[offset];
+    if (firstByte === 0) return null;
+
+    let mask = 0x80;
+    let idLength = 1;
+    while (!(firstByte & mask) && idLength < 8) {
+      mask >>= 1;
+      idLength++;
+    }
+
+    if (offset + idLength > end || offset + idLength > uint8.length) return null;
+
+    let id = 0;
+    for (let i = 0; i < idLength; i++) {
+      id = (id * 256) + uint8[offset + i];
+    }
+
+    const sizeInfo = this.readVint(uint8, offset + idLength);
+    const dataOffset = offset + idLength + sizeInfo.length;
+    if (dataOffset > end && sizeInfo.val !== -1) return null;
+
+    const dataSize = sizeInfo.val;
+    const totalSize = dataSize === -1 ? (end - offset) : (idLength + sizeInfo.length + dataSize);
+
+    return { id, idLength, dataOffset, dataSize, totalSize };
+  }
+
+  private static parseTrackEntry(
+    uint8: Uint8Array,
+    entryOffset: number,
+    entryEnd: number
+  ): { trackNumber: number; trackType: number } {
+    let curr = entryOffset;
+    let trackNumber = 1;
+    let trackType = 0;
+
     while (curr < entryEnd) {
-      if (curr >= uint8.length) break;
-      if (uint8[curr] === 0x83) {
-        // TrackType
-        const typeSizeInfo = this.readVint(uint8, curr + 1);
-        const typeValInfo = this.readVint(uint8, curr + 1 + typeSizeInfo.length);
-        if (typeValInfo.val === 2) return true; // Audio
-        curr += 1 + typeSizeInfo.length + typeSizeInfo.val;
-      } else {
-        curr = this.skipVintElement(uint8, curr);
+      const el = this.readEbmlElement(uint8, curr, entryEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xd7) { // TrackNumber
+        trackNumber = this.readUint(uint8, el.dataOffset, el.dataSize);
+      } else if (el.id === 0x83) { // TrackType
+        trackType = this.readUint(uint8, el.dataOffset, el.dataSize);
       }
+      curr += el.totalSize;
+    }
+    return { trackNumber, trackType };
+  }
+
+  private static findAudioTracks(
+    uint8: Uint8Array,
+    tracksOffset: number,
+    tracksEnd: number,
+    audioTrackNumbers: Set<number>
+  ): void {
+    let curr = tracksOffset;
+    while (curr < tracksEnd) {
+      const el = this.readEbmlElement(uint8, curr, tracksEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xae) { // TrackEntry
+        const entryEnd = el.dataSize === -1 ? tracksEnd : el.dataOffset + el.dataSize;
+        const { trackNumber, trackType } = this.parseTrackEntry(uint8, el.dataOffset, entryEnd);
+        if (trackType === 2) { // 2 = Audio
+          audioTrackNumbers.add(trackNumber);
+          // Overwrite 'TrackEntry' (0xAE) with 'Void' (0xEC)
+          uint8[curr] = 0xec;
+        }
+      }
+      curr += el.totalSize;
+    }
+  }
+
+  private static isAudioBlockGroup(
+    uint8: Uint8Array,
+    groupStart: number,
+    groupEnd: number,
+    audioTrackNumbers: Set<number>
+  ): boolean {
+    let curr = groupStart;
+    while (curr < groupEnd) {
+      const el = this.readEbmlElement(uint8, curr, groupEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xa1) { // Block
+        const tn = this.readVint(uint8, el.dataOffset);
+        if (audioTrackNumbers.has(tn.val)) return true;
+      }
+      curr += el.totalSize;
     }
     return false;
   }
 
-  private static processTracks(uint8: Uint8Array, tracksOffset: number, tracksEnd: number): boolean {
-    let stripped = false;
-    while (tracksOffset < tracksEnd) {
-      if (tracksOffset >= uint8.length) break;
-      if (uint8[tracksOffset] === 0xae) {
-        // TrackEntry
-        const entryStart = tracksOffset;
-        const entrySizeInfo = this.readVint(uint8, tracksOffset + 1);
-        const entryDataOffset = tracksOffset + 1 + entrySizeInfo.length;
-        const entryEnd = entryDataOffset + entrySizeInfo.val;
+  private static processCluster(
+    uint8: Uint8Array,
+    clusterStart: number,
+    clusterEnd: number,
+    audioTrackNumbers: Set<number>
+  ): void {
+    let curr = clusterStart;
+    while (curr < clusterEnd) {
+      const el = this.readEbmlElement(uint8, curr, clusterEnd);
+      if (!el || el.totalSize <= 0) break;
 
-        if (this.isAudioTrackEntry(uint8, entryDataOffset, entryEnd)) {
-          // Overwrite 'TrackEntry' (AE) with 'Void' (EC)
-          uint8[entryStart] = 0xec;
-          stripped = true;
+      if (el.id === 0xa3) { // SimpleBlock
+        const tn = this.readVint(uint8, el.dataOffset);
+        if (audioTrackNumbers.has(tn.val)) {
+          uint8[curr] = 0xec; // Overwrite 'SimpleBlock' (0xA3) with 'Void' (0xEC)
         }
-        tracksOffset = entryEnd;
-      } else {
-        tracksOffset = this.skipVintElement(uint8, tracksOffset);
+      } else if (el.id === 0xa0) { // BlockGroup
+        const groupEnd = el.dataSize === -1 ? clusterEnd : el.dataOffset + el.dataSize;
+        if (this.isAudioBlockGroup(uint8, el.dataOffset, groupEnd, audioTrackNumbers)) {
+          uint8[curr] = 0xec; // Overwrite 'BlockGroup' (0xA0) with 'Void' (0xEC)
+        }
       }
+      curr += el.totalSize;
     }
-    return stripped;
   }
 
-  private static processSegment(uint8: Uint8Array, segStart: number, segEnd: number): { stripped: boolean; offset: number } {
-    let stripped = false;
-    let offset = segStart;
-
-    while (offset < segEnd) {
-      if (offset + 3 >= uint8.length) break;
-      // Tracks
-      if (uint8[offset] === 0x16 && uint8[offset + 1] === 0x54 && uint8[offset + 2] === 0xae && uint8[offset + 3] === 0x6b) {
-        const tSizeInfo = this.readVint(uint8, offset + 4);
-        const tracksOffset = offset + 4 + tSizeInfo.length;
-        const tracksEnd = tracksOffset + tSizeInfo.val;
-        if (this.processTracks(uint8, tracksOffset, tracksEnd)) stripped = true;
-        offset = tracksEnd;
-      } else {
-        offset = this.skipVintElement(uint8, offset);
+  private static isAudioCueTrackPositions(
+    uint8: Uint8Array,
+    posStart: number,
+    posEnd: number,
+    audioTrackNumbers: Set<number>
+  ): boolean {
+    let curr = posStart;
+    while (curr < posEnd) {
+      const el = this.readEbmlElement(uint8, curr, posEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xf7) { // CueTrack
+        const trackNum = this.readUint(uint8, el.dataOffset, el.dataSize);
+        if (audioTrackNumbers.has(trackNum)) return true;
       }
+      curr += el.totalSize;
     }
-    return { stripped, offset };
+    return false;
   }
 
-  // Returns the offset past the EBML header if uint8 at offset starts with one, else null.
-  private static tryReadEbmlHeader(uint8: Uint8Array, offset: number): number | null {
-    if (!(uint8[offset] === 0x1a && uint8[offset + 1] === 0x45 && uint8[offset + 2] === 0xdf && uint8[offset + 3] === 0xa3)) {
-      return null;
+  private static processCuePoint(
+    uint8: Uint8Array,
+    pointStart: number,
+    pointEnd: number,
+    audioTrackNumbers: Set<number>
+  ): void {
+    let curr = pointStart;
+    while (curr < pointEnd) {
+      const el = this.readEbmlElement(uint8, curr, pointEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xb7) { // CueTrackPositions
+        const posEnd = el.dataSize === -1 ? pointEnd : el.dataOffset + el.dataSize;
+        if (this.isAudioCueTrackPositions(uint8, el.dataOffset, posEnd, audioTrackNumbers)) {
+          uint8[curr] = 0xec; // Overwrite 'CueTrackPositions' (0xB7) with 'Void' (0xEC)
+        }
+      }
+      curr += el.totalSize;
     }
-    const sizeInfo = this.readVint(uint8, offset + 4);
-    return offset + 4 + sizeInfo.length + sizeInfo.val;
   }
 
-  // Returns the processed Segment result if uint8 at offset starts with one, else null.
-  private static tryProcessSegment(uint8: Uint8Array, offset: number): { stripped: boolean; offset: number } | null {
-    if (!(uint8[offset] === 0x18 && uint8[offset + 1] === 0x53 && uint8[offset + 2] === 0x80 && uint8[offset + 3] === 0x67)) {
-      return null;
+  private static processCues(
+    uint8: Uint8Array,
+    cuesStart: number,
+    cuesEnd: number,
+    audioTrackNumbers: Set<number>
+  ): void {
+    let curr = cuesStart;
+    while (curr < cuesEnd) {
+      const el = this.readEbmlElement(uint8, curr, cuesEnd);
+      if (!el || el.totalSize <= 0) break;
+      if (el.id === 0xbb) { // CuePoint
+        const pointEnd = el.dataSize === -1 ? cuesEnd : el.dataOffset + el.dataSize;
+        this.processCuePoint(uint8, el.dataOffset, pointEnd, audioTrackNumbers);
+      }
+      curr += el.totalSize;
     }
-    const sizeInfo = this.readVint(uint8, offset + 4);
-    const segStart = offset + 4 + sizeInfo.length;
-    const segEnd = sizeInfo.val === -1 ? uint8.length : segStart + sizeInfo.val;
-    return this.processSegment(uint8, segStart, segEnd);
+  }
+
+  private static stripSegment(
+    uint8: Uint8Array,
+    segStart: number,
+    segEnd: number,
+    audioTrackNumbers: Set<number>
+  ): void {
+    let curr = segStart;
+    while (curr < segEnd) {
+      const el = this.readEbmlElement(uint8, curr, segEnd);
+      if (!el || el.totalSize <= 0) break;
+
+      if (el.id === 0x1f43b675) { // Cluster
+        const clusterEnd = el.dataSize === -1 ? segEnd : el.dataOffset + el.dataSize;
+        this.processCluster(uint8, el.dataOffset, clusterEnd, audioTrackNumbers);
+      } else if (el.id === 0x1c53bb6b) { // Cues
+        const cuesEnd = el.dataSize === -1 ? segEnd : el.dataOffset + el.dataSize;
+        this.processCues(uint8, el.dataOffset, cuesEnd, audioTrackNumbers);
+      }
+      curr += el.totalSize;
+    }
   }
 
   private static stripWebm(uint8: Uint8Array): boolean {
+    const audioTrackNumbers = new Set<number>();
     let offset = 0;
-    let stripped = false;
 
+    // Pass 1: Scan for Tracks and collect audio track numbers, converting audio TrackEntry to Void
     while (offset < uint8.length) {
-      if (offset + 3 >= uint8.length) break;
+      const el = this.readEbmlElement(uint8, offset, uint8.length);
+      if (!el || el.totalSize <= 0) break;
 
-      const ebmlEnd = this.tryReadEbmlHeader(uint8, offset);
-      if (ebmlEnd !== null) {
-        offset = ebmlEnd;
-        continue;
+      if (el.id === 0x18538067) { // Segment
+        const segEnd = el.dataSize === -1 ? uint8.length : el.dataOffset + el.dataSize;
+        let segCurr = el.dataOffset;
+        while (segCurr < segEnd) {
+          const childEl = this.readEbmlElement(uint8, segCurr, segEnd);
+          if (!childEl || childEl.totalSize <= 0) break;
+          if (childEl.id === 0x1654ae6b) { // Tracks
+            const tracksEnd = childEl.dataSize === -1 ? segEnd : childEl.dataOffset + childEl.dataSize;
+            this.findAudioTracks(uint8, childEl.dataOffset, tracksEnd, audioTrackNumbers);
+          }
+          segCurr += childEl.totalSize;
+        }
       }
-
-      const result = this.tryProcessSegment(uint8, offset);
-      if (!result) break;
-      if (result.stripped) stripped = true;
-      offset = result.offset;
+      offset += el.totalSize;
     }
-    return stripped;
+
+    if (audioTrackNumbers.size === 0) {
+      return false; // No audio tracks found
+    }
+
+    // Pass 2: Void audio SimpleBlocks/BlockGroups in Clusters and audio CueTrackPositions in Cues
+    offset = 0;
+    while (offset < uint8.length) {
+      const el = this.readEbmlElement(uint8, offset, uint8.length);
+      if (!el || el.totalSize <= 0) break;
+
+      if (el.id === 0x18538067) { // Segment
+        const segEnd = el.dataSize === -1 ? uint8.length : el.dataOffset + el.dataSize;
+        this.stripSegment(uint8, el.dataOffset, segEnd, audioTrackNumbers);
+      }
+      offset += el.totalSize;
+    }
+
+    return true;
   }
 }

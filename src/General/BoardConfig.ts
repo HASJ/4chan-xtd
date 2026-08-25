@@ -89,8 +89,8 @@ const BoardConfig: any = {
 
   noAudio(boardID) {
     if (g.SITE.software !== 'yotsuba') { return false; }
-    const boards = this.boards || Conf['boardConfig'].boards;
-    return boards?.[boardID] && !boards[boardID].webm_audio;
+    const boards = this.boards || Conf['boardConfig']?.boards;
+    return Boolean(boards?.[boardID] && !boards[boardID].webm_audio);
   },
 
   title(boardID) {
