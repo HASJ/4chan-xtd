@@ -28,9 +28,7 @@ const Captcha: any = {
     neededRaw() {
       return !(
         this.haveCookie() || this.captchas.length || QRState.req || this.submitCB
-      ) && (
-          (QRState.posts.length > 1) || Conf['Auto-load captcha'] || !QRState.posts[0].isOnlyQuotes() || QRState.posts[0].file
-        );
+      ) && Conf['Auto-load captcha'];
     },
 
     needed() {

@@ -75,19 +75,10 @@ const CaptchaT: any = {
 
   moreNeeded() {
     const post = QRState.posts[0];
-    if (!this.isEnabled || !post) { return; }
+    if (!this.isEnabled || !post || !Conf['Auto-load captcha']) { return; }
 
-    // Match the v2 captcha's lazy-loading behavior: don't fetch a challenge
-    // for an empty QR, but fetch one as soon as the queued post needs it.
-    if (
-      (QRState.posts.length > 1) ||
-      Conf['Auto-load captcha'] ||
-      !post.isOnlyQuotes() ||
-      post.file
-    ) {
-      this.shouldLoad = true;
-      this.load();
-    }
+    this.shouldLoad = true;
+    this.load();
   },
 
   load() {
