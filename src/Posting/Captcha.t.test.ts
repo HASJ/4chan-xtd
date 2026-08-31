@@ -996,13 +996,13 @@ describe('CaptchaT across a QR close and reopen', () => {
     expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', expect.anything());
   });
 
-  // The reset is about stale state only -- a real need still loads.
-  it('still loads once the reopened post needs a captcha', async () => {
+  // Reported as issue #26: typing should not turn a disabled auto-load back on.
+  it('does not load when typing with auto-load off', async () => {
     await open();
 
     QRState.posts = [{ thread: 123, isOnlyQuotes: () => false, file: null }];
     CaptchaT.moreNeeded();
 
-    expect($.global).toHaveBeenCalledWith('loadTCaptcha', expect.anything());
+    expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', expect.anything());
   });
 });

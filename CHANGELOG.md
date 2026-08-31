@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.6 (2026-08-31)
+
+- Bugfixes
+  - Fixed `Auto-load captcha` loading a captcha as soon as typing began or a file was attached even when the option was switched off. The disabled setting now leaves captcha loading manual in both the current 4chan captcha and the legacy reCAPTCHA path. `Auto-load captcha after cooldown` remains an independent option. [#26](https://github.com/HASJ/4chan-xtd/issues/26)
+
 ### 2.31.5 (2026-08-25)
 
 - Features

@@ -552,7 +552,7 @@ const Config = {
       ],
       'Auto-load captcha': [
         false,
-        'Automatically load the captcha in the QR even if your post is empty.',
+        'Automatically load the captcha in the QR instead of waiting for <em>Get Captcha</em>.',
         1
       ],
       'Auto-load captcha after cooldown': [
