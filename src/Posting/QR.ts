@@ -406,12 +406,16 @@ Callbacks.handleErrors({
       QR.cooldown.auto = false;
     }
 
+    if (!Conf['Post on Captcha Completion']) {
+      QR.cooldown.auto = false;
+    }
+
     value = QR.req ? QR.req.progress : QR.cooldown.seconds || value;
 
     const {status} = QR.nodes;
     if (!value) {
       status.value = 'Submit';
-    } else if (QR.cooldown.auto) {
+    } else if (QR.cooldown.auto && Conf['Post on Captcha Completion']) {
       status.value = `Auto ${value}`;
     } else {
       status.value = value;
@@ -426,7 +430,7 @@ Callbacks.handleErrors({
       const index = QR.posts.indexOf(QR.selected);
       (QR.posts[index+1] || QR.createPost()).select();
       $.addClass(QR.nodes.el, 'dump');
-      QR.cooldown.auto = true;
+      QR.cooldown.auto = !!Conf['Post on Captcha Completion'];
       return true;
     }
   },
@@ -951,8 +955,12 @@ Callbacks.handleErrors({
     if (QR.cooldown.seconds) {
       if (force) {
         QR.cooldown.clear();
-      } else {
+      } else if (Conf['Post on Captcha Completion']) {
         QR.cooldown.auto = !QR.cooldown.auto;
+        QR.status();
+        return;
+      } else {
+        QR.cooldown.auto = false;
         QR.status();
         return;
       }
@@ -981,7 +989,7 @@ Callbacks.handleErrors({
     }
 
     // Enable auto-posting if we have stuff to post, disable it otherwise.
-    QR.cooldown.auto = QR.posts.length > 1;
+    QR.cooldown.auto = !!(Conf['Post on Captcha Completion'] && (QR.posts.length > 1));
 
     post.lock();
 
@@ -1232,7 +1240,7 @@ Callbacks.handleErrors({
 
     // Enable auto-posting if we have stuff left to post, disable it otherwise.
     const postsCount = QR.posts.length - 1;
-    QR.cooldown.auto = postsCount && isReply;
+    QR.cooldown.auto = !!(Conf['Post on Captcha Completion'] && postsCount && isReply);
 
     const lastPostToThread = !QR.posts.slice(1).some(p => p.thread === post.thread);
 
@@ -1655,7 +1663,20 @@ Callbacks.handleErrors({
 
     count() {
       QR.cooldown.update();
-      if ((QR.cooldown.seconds === 0) && QR.cooldown.auto && !QR.req) QR.submit();
+      if (!Conf['Post on Captcha Completion']) {
+        if (QR.cooldown.auto) {
+          QR.cooldown.auto = false;
+          QR.status();
+        }
+        return;
+      }
+      if ((QR.cooldown.seconds === 0) && QR.cooldown.auto && !QR.req) {
+        if (QR.captcha?.isEnabled && QR.captcha.checkCompletion) {
+          QR.captcha.checkCompletion();
+        } else {
+          QR.submit();
+        }
+      }
     }
   },
 

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Conf, g } from '../globals/globals';
 import QRState from '../globals/QRState';
+import UIState from '../globals/UIState';
 import $ from '../platform/$';
 import CaptchaT from './Captcha.t';
+import QR from './QR';
 import PageContextFunctions from '../PageContext/pageContext';
 
 const COUNTING_DOWN = 'Get Captcha (28)';
@@ -1004,5 +1006,437 @@ describe('CaptchaT across a QR close and reopen', () => {
     CaptchaT.moreNeeded();
 
     expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', expect.anything());
+  });
+});
+
+describe('CaptchaT queue auto-posting and completion readiness', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha'] = false;
+    Conf['Auto-load captcha after cooldown'] = false;
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 0;
+    QRState.posts = [{
+      file: new File([], 'image.png'),
+      isOnlyQuotes: () => false,
+    }];
+    QRState.nodes = null;
+    QRState.cooldown = { auto: true, seconds: 0 };
+    QRState.submit = vi.fn();
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.resetCooldownReload();
+    CaptchaT.isCompleted = false;
+    delete CaptchaT.hasRequested;
+    delete CaptchaT.autoReloadsSincePost;
+    delete CaptchaT.autoSubmittedFor;
+    delete CaptchaT.notifiedChallenge;
+    CaptchaT.clearAutoSubmitTimer();
+    CaptchaT.shouldLoad = false;
+  });
+
+  afterEach(() => {
+    CaptchaT.destroy();
+    vi.useRealTimers();
+  });
+
+  it('does not submit when cooldown is zero but captcha is missing', () => {
+    buildCaptcha();
+    QRState.cooldown.seconds = 0;
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(false);
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('does not submit while cooldown remains even if captcha is completed', () => {
+    buildExtCaptcha();
+    QRState.cooldown.seconds = 10;
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('submits at cooldown expiry when captcha was completed while cooldown was active', () => {
+    buildExtCaptcha();
+    QRState.cooldown.seconds = 10;
+
+    CaptchaT.checkCompletion();
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    QRState.cooldown.seconds = 0;
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits when cooldown expires first and captcha completes later', () => {
+    const { container } = buildCaptcha();
+    QRState.cooldown.seconds = 0;
+
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'test-challenge';
+    container.querySelector<HTMLInputElement>('#t-resp')!.value = 'test-response';
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits when image enters queue after captcha was already completed', () => {
+    buildExtCaptcha();
+    QRState.posts = [{
+      file: null,
+      isOnlyQuotes: () => true,
+    }];
+    QRState.cooldown.seconds = 0;
+
+    CaptchaT.checkCompletion();
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    QRState.posts = [{
+      file: new File([], 'photo.jpg'),
+      isOnlyQuotes: () => true,
+    }];
+
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send while a request is in flight', () => {
+    buildExtCaptcha();
+    QRState.req = { progress: 'Uploading...' };
+    QRState.cooldown.seconds = 0;
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    delete QRState.req;
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-submit when Post on Captcha Completion is off', () => {
+    buildExtCaptcha();
+    Conf['Post on Captcha Completion'] = false;
+    QRState.cooldown.seconds = 0;
+
+    CaptchaT.checkCompletion();
+
+    expect(CaptchaT.isCompleted).toBe(true);
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('preserves typing delay in queue auto mode', () => {
+    buildExtCaptcha();
+    Conf['Auto-post typing delay'] = 3;
+    const textarea = document.createElement('textarea');
+    CaptchaT.noteTyping({ target: textarea });
+
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(3000);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CaptchaT unsolved challenge notification', () => {
+  let originalHidden: any;
+  let originalHasFocus: any;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn($, 'global').mockResolvedValue({});
+    Conf['Auto-load captcha'] = false;
+    Conf['Auto-load captcha after cooldown'] = false;
+    Conf['Post on Captcha Completion'] = true;
+    QRState.posts = [{
+      file: new File([], 'image.png'),
+      isOnlyQuotes: () => false,
+    }];
+    QRState.cooldown = { auto: true, seconds: 0 };
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.resetCooldownReload();
+    CaptchaT.isCompleted = false;
+    delete CaptchaT.notifiedChallenge;
+    UIState.areNotificationsEnabled = true;
+
+    originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+    originalHasFocus = document.hasFocus;
+  });
+
+  afterEach(() => {
+    CaptchaT.destroy();
+    if (originalHidden) {
+      Object.defineProperty(document, 'hidden', originalHidden);
+    }
+    document.hasFocus = originalHasFocus;
+    vi.useRealTimers();
+  });
+
+  it('notifies once when queued image is waiting on displayed unsolved challenge after cooldown and document is hidden', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    const { container } = buildCaptcha();
+    const slider = container.querySelector<HTMLInputElement>('#t-slider')!;
+    slider.setAttribute('max', '3');
+    const task = container.querySelector<HTMLElement>('#t-task')!;
+    task.style.backgroundImage = 'url("https://example.com/puzzle1.png")';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'puzzle-1';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).toHaveBeenCalledTimes(1);
+
+    CaptchaT.createStrips();
+    expect(notifSpy).toHaveBeenCalledTimes(1);
+
+    const notice = CaptchaT.challengeNotice;
+    CaptchaT.setIdle(container);
+    expect(notice.closed).toBe(true);
+  });
+
+  it('notifies when challenge has an active challenge step', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    const { container } = buildCaptcha();
+    const slider = container.querySelector<HTMLInputElement>('#t-slider')!;
+    slider.setAttribute('max', '3');
+    container.querySelector<HTMLButtonElement>('#t-next')!.textContent = 'Next (1/3)';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'step-challenge';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify when an idle slider carries max without an active challenge', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'stale-id';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).not.toHaveBeenCalled();
+  });
+
+  it('notifies once per distinct challenge', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    const task = container.querySelector<HTMLElement>('#t-task')!;
+    task.style.backgroundImage = 'url("https://example.com/puzzle1.png")';
+    const challengeInput = container.querySelector<HTMLInputElement>('[name="t-challenge"]')!;
+    challengeInput.value = 'puzzle-1';
+
+    CaptchaT.createStrips();
+    expect(notifSpy).toHaveBeenCalledTimes(1);
+
+    challengeInput.value = 'puzzle-2';
+    task.style.backgroundImage = 'url("https://example.com/puzzle2.png")';
+    CaptchaT.createStrips();
+    expect(notifSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not notify when document is focused', () => {
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+    document.hasFocus = () => true;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    container.querySelector<HTMLElement>('#t-task')!.style.backgroundImage = 'url("https://example.com/puzzle.png")';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'puzzle-1';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not notify if cooldown remains', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    QRState.cooldown.seconds = 10;
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    container.querySelector<HTMLElement>('#t-task')!.style.backgroundImage = 'url("https://example.com/puzzle.png")';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'puzzle-1';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not notify if there is no queued image', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'granted';
+
+    QRState.posts = [{
+      file: null,
+      isOnlyQuotes: () => false,
+    }];
+
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    container.querySelector<HTMLElement>('#t-task')!.style.backgroundImage = 'url("https://example.com/puzzle.png")';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'puzzle-1';
+
+    CaptchaT.createStrips();
+
+    expect(notifSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to in-page notice without throwing when Notification permission is denied', () => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.hasFocus = () => false;
+
+    const notifSpy = vi.fn();
+    (window as any).Notification = notifSpy;
+    (window as any).Notification.permission = 'denied';
+
+    const { container } = buildCaptcha();
+    container.querySelector<HTMLInputElement>('#t-slider')!.setAttribute('max', '3');
+    container.querySelector<HTMLElement>('#t-task')!.style.backgroundImage = 'url("https://example.com/puzzle.png")';
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'puzzle-denied';
+
+    expect(() => CaptchaT.createStrips()).not.toThrow();
+    expect(notifSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('QR queue auto behavior and status display', () => {
+  beforeEach(() => {
+    vi.spyOn($, 'global').mockResolvedValue({});
+    (g as any).BOARD = { ID: 'g' };
+    (g as any).threads = new Map([['g.123', { isDead: false }]]);
+    QRState.posts = [{ thread: 123, isOnlyQuotes: () => false, file: null }];
+    QRState.nodes = {
+      status: document.createElement('input'),
+    };
+    QR.cooldown.seconds = 10;
+    QR.cooldown.auto = true;
+  });
+
+  it('shows Auto in status when Post on Captcha Completion is enabled', () => {
+    Conf['Post on Captcha Completion'] = true;
+    QR.cooldown.seconds = 10;
+    QR.cooldown.auto = true;
+    QR.status();
+    expect(QR.nodes.status.value).toBe('Auto 10');
+  });
+
+  it('does not show Auto and disables auto when Post on Captcha Completion is disabled', () => {
+    Conf['Post on Captcha Completion'] = false;
+    QR.cooldown.seconds = 10;
+    QR.cooldown.auto = true;
+    QR.status();
+    expect(QR.nodes.status.value).toBe('10');
+    expect(QR.cooldown.auto).toBe(false);
+  });
+
+  it('does not submit from cooldown.count when captcha is missing', () => {
+    Conf['Post on Captcha Completion'] = true;
+    QR.cooldown.seconds = 0;
+    QR.cooldown.auto = true;
+    QR.req = null;
+    QR.captcha = CaptchaT;
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.isCompleted = false;
+    const submitSpy = vi.spyOn(QR, 'submit');
+
+    QR.cooldown.count();
+
+    expect(submitSpy).not.toHaveBeenCalled();
+    submitSpy.mockRestore();
+  });
+
+  it('submits a ready noop image once from the cooldown tick', () => {
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 0;
+    QRState.posts[0].file = new File([], 'image.png');
+    QRState.cooldown = QR.cooldown;
+    QRState.submit = vi.fn();
+    QR.cooldown.seconds = 0;
+    QR.cooldown.auto = true;
+    QR.req = null;
+    QR.captcha = CaptchaT;
+    CaptchaT.isEnabled = true;
+    CaptchaT.isCompleted = false;
+    delete CaptchaT.autoSubmittedFor;
+    buildExtCaptcha();
+
+    QR.cooldown.count();
+    QR.cooldown.count();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+    CaptchaT.destroy();
+  });
+
+  it('does not submit from cooldown.count when Post on Captcha Completion is disabled with stale auto=true', () => {
+    Conf['Post on Captcha Completion'] = false;
+    QR.cooldown.seconds = 0;
+    QR.cooldown.auto = true;
+    QR.req = null;
+    QR.captcha = CaptchaT;
+    CaptchaT.isEnabled = true;
+    CaptchaT.nodes = {};
+    CaptchaT.isCompleted = true;
+    const submitSpy = vi.spyOn(QR, 'submit');
+
+    QR.cooldown.count();
+
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(QR.cooldown.auto).toBe(false);
+    submitSpy.mockRestore();
   });
 });
