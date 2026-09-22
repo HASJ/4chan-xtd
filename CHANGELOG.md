@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.7 (2026-09-22)
+
+- Bugfixes
+  - Quick Reply now keeps a queued image pending through the posting cooldown and posts it automatically when verification is complete or not required, when `Post on Captcha Completion` is enabled. It loads captcha after cooldown according to the existing auto-load settings and notifies when an unsolved captcha needs attention while the page is unfocused.
+
 ### 2.31.6 (2026-08-31)
 
 - Bugfixes
