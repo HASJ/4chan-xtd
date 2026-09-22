@@ -3,6 +3,9 @@ import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
 import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers";
+import Notice from "../classes/Notice";
+import UIState from "../globals/UIState";
+import Favicon from "../Monitoring/Favicon";
 
 // Ceilings on server-stated durations, in seconds. Only a malformed value can
 // exceed these; real ones are tens of seconds to a couple of minutes.
@@ -118,16 +121,18 @@ const CaptchaT: any = {
   // they have been quiet -- deferred, never cancelled, so the setting still
   // does what it says once they stop.
   autoSubmitWhenIdle(response) {
-    this.clearAutoSubmitTimer();
     const wait = this.typingIdleRemaining();
     if (!wait) {
+      this.clearAutoSubmitTimer();
       this.autoSubmit(response);
       return;
     }
+    if (this.autoSubmitTimer) { return; }
     this.autoSubmitTimer = setTimeout(() => {
       delete this.autoSubmitTimer;
       if (!this.isEnabled || !this.nodes.container) { return; }
-      if (!Conf['Post on Captcha Completion'] || QRState.cooldown?.auto) { return; }
+      if (!Conf['Post on Captcha Completion']) { return; }
+      if (QRState.cooldown?.seconds || QRState.req) { return; }
       // Re-read instead of reusing the payload captured when the wait started:
       // the answer may have been consumed, cleared or replaced since.
       const current = this.getOne();
@@ -310,6 +315,8 @@ const CaptchaT: any = {
 
   setIdle(mainDiv) {
     this.clearCustomUi(mainDiv);
+    this.clearChallengeNotice();
+    delete this.notifiedChallenge;
     $.rmClass(this.nodes.root, 'is-challenge', 'captcha-status');
     $.addClass(this.nodes.root, 'captcha-idle');
   },
@@ -776,6 +783,7 @@ const CaptchaT: any = {
     }
     $.rmClass(this.nodes.root, 'captcha-idle', 'captcha-status');
     $.addClass(this.nodes.root, 'is-challenge');
+    this.checkUnsolvedNotification(state);
 
     const customUiExists = this.reconcileCustomUi(mainDiv, state);
 
@@ -800,6 +808,7 @@ const CaptchaT: any = {
 
   destroy() {
     this.isCompleted = false;
+    this.clearChallengeNotice();
     delete this.isInitialized;
     delete this.hasRequested;
     delete this.selectedChallengeStep;
@@ -808,6 +817,7 @@ const CaptchaT: any = {
     delete this.autoReloadsSincePost;
     delete this.lastTypedAt;
     delete this.stuckLoadTicks;
+    delete this.notifiedChallenge;
     this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     if (this.observer) {
@@ -863,6 +873,51 @@ const CaptchaT: any = {
     return (stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge);
   },
 
+  clearChallengeNotice() {
+    this.challengeNotice?.close();
+    delete this.challengeNotice;
+  },
+
+  checkUnsolvedNotification(state) {
+    if (!this.isEnabled || !this.nodes.container) return;
+    if (this.isCompleted) return;
+    if (this.hasVerificationNotRequired(this.nodes.container)) return;
+
+    if (!state?.isChallenge && !state?.hasActiveChallengeStep) return;
+
+    if (QRState.cooldown?.seconds) return;
+
+    const hasQueuedImage = QRState.posts.some((p: any) => !!p?.file);
+    if (!hasQueuedImage) return;
+
+    const isHiddenOrUnfocused = d.hidden || (typeof d.hasFocus === 'function' && !d.hasFocus());
+    if (!isHiddenOrUnfocused) return;
+
+    const container = this.nodes.container;
+    const challengeId = $('[name="t-challenge"]', container)?.value ||
+      (state.hasActiveChallengeStep ? $('#t-next', container)?.textContent : '') ||
+      state.clueUrl ||
+      'displayed-challenge';
+    if (this.notifiedChallenge === challengeId) return;
+    this.notifiedChallenge = challengeId;
+
+    const msg = 'CAPTCHA required to submit post.';
+    this.clearChallengeNotice();
+    this.challengeNotice = new Notice('warning', msg);
+    if (UIState.areNotificationsEnabled && (typeof Notification !== 'undefined')) {
+      try {
+        if (!Notification.permission || Notification.permission === 'granted') {
+          const notif = new Notification('4chan X', {
+            body: msg,
+            icon: Favicon.logo
+          });
+          notif.onclick = () => window.focus();
+        }
+      } catch (e) { // NOSONAR
+      }
+    }
+  },
+
   checkCompletion() {
     if (!this.isEnabled || !this.nodes.container) return;
     // getOne() is the authority on what counts as a usable payload: an answered
@@ -881,12 +936,15 @@ const CaptchaT: any = {
     }
     // Nothing to solve and no steps to advance when no captcha was asked for.
     if (!noCaptchaNeeded && this.hasMoreChallengeSteps($('#t-next', this.nodes.container))) return;
-    if (this.isCompleted) return;
-    this.isCompleted = true;
-    // A solved captcha proves the service is answering again, so cut any
-    // backoff short rather than waiting it out.
-    this.resetCooldownReload();
-    if (Conf['Post on Captcha Completion'] && !QRState.cooldown.auto) {
+    this.clearChallengeNotice();
+    if (!this.isCompleted) {
+      this.isCompleted = true;
+      // A solved captcha proves the service is answering again, so cut any
+      // backoff short rather than waiting it out.
+      this.resetCooldownReload();
+    }
+    if (Conf['Post on Captcha Completion']) {
+      if (QRState.cooldown?.seconds || QRState.req) return;
       this.autoSubmitWhenIdle(response);
     }
   },
@@ -907,10 +965,12 @@ const CaptchaT: any = {
 
   setUsed() {
     this.isCompleted = false;
+    this.clearChallengeNotice();
     delete this.hasRequested;
     delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
+    delete this.notifiedChallenge;
     // A captcha reached 4chan, so the auto-load has earned its budget back.
     delete this.autoReloadsSincePost;
     delete this.lastTypedAt;
