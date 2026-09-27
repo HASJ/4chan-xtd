@@ -343,6 +343,7 @@ const CaptchaT: any = {
     const tNextText = tNext?.textContent || '';
     const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
     const verificationNotRequired = this.hasVerificationNotRequired(mainDiv);
+    const hasStatusMessage = !!taskEl?.textContent?.trim();
 
     const imgEl = taskEl ? $('img', taskEl) : null;
     const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
@@ -366,7 +367,7 @@ const CaptchaT: any = {
 
     const isChallenge = hasActiveChallengeStep || (!!hasTaskBg && (!!clueUrl || isNotLikeOthers));
 
-    return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, imgEl, isNotLikeOthers, clueUrl, isChallenge };
+    return { slider, taskEl, tLoad, isOnCooldown, hasActiveChallengeStep, verificationNotRequired, hasStatusMessage, imgEl, isNotLikeOthers, clueUrl, isChallenge };
   },
 
   // 'cd' is the number of seconds until the service will hand out another
@@ -761,6 +762,11 @@ const CaptchaT: any = {
     this.updateCooldownReload(state);
 
     if (state.verificationNotRequired) {
+      this.setStatusMessage(mainDiv);
+      return;
+    }
+
+    if (state.hasStatusMessage && !state.isChallenge) {
       this.setStatusMessage(mainDiv);
       return;
     }

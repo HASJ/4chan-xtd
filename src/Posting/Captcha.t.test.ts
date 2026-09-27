@@ -95,6 +95,21 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).not.toHaveBeenCalled();
     expect(CaptchaT.cooldownReloadTimer).toBeUndefined();
   });
+
+  it.each([
+    ['the verification wait', COUNTING_DOWN, 'Please wait a while.'],
+    ['the completed wait', IDLE, 'You can now request a captcha.'],
+  ])('shows %s message', (_label, loadLabel, message) => {
+    const { root, tLoad } = buildCaptcha();
+    tLoad.value = loadLabel;
+    $('#t-task', root)!.textContent = message;
+
+    CaptchaT.createStrips();
+
+    expect(root.classList.contains('captcha-status')).toBe(true);
+    expect(root.classList.contains('captcha-idle')).toBe(false);
+  });
+
   it('clicks once the counter clears', () => {
     const { tLoad, click } = buildCaptcha();
     tLoad.value = COUNTING_DOWN;

@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.8 (2026-09-26)
+
+- Bugfixes
+  - Quick Reply now displays 4chan's first-visit verification wait and completion messages instead of showing an empty captcha box.
+
 ### 2.31.7 (2026-09-22)
 
 - Bugfixes
