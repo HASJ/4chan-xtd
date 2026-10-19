@@ -3,6 +3,15 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.10 (2026-10-19)
+
+- Features
+  - Added an optional catalog button to copy a thread's URL, with a separate option to hide the thread after a successful copy.
+  - Quick Reply displays the remaining auto-post typing delay between Get Captcha and Next. The countdown resets while typing and disappears when the delay expires.
+
+- Bugfixes
+  - With `Post on Captcha Completion` enabled, selecting the final captcha answer now completes and submits the post even when `Next challenge on captcha selection` is off. This also works inside the captcha iframe; posting cooldown and typing delay still apply.
+
 ### 2.31.8 (2026-09-26)
 
 - Bugfixes
