@@ -19,6 +19,7 @@ const MAX_CHALLENGE_TTL = 600;
 // "Loading" with no way back. Budget the auto-clicks between posts and let the
 // user click the button by hand after that.
 const MAX_AUTO_RELOADS_PER_POST = 3;
+const CAPTCHA_COMPLETE_MESSAGE = '4chanXCaptchaComplete';
 
 const CaptchaT: any = {
   init() {
@@ -52,6 +53,18 @@ const CaptchaT: any = {
     // That number is authoritative; everything else here is inference.
     window.addEventListener('message', e => {
       if (!isTrustedSiteOrigin(e.origin)) { return; }
+      if (e.data?.type === CAPTCHA_COMPLETE_MESSAGE) {
+        const { challenge, response } = e.data;
+        if (!challenge || !response || typeof challenge !== 'string' || typeof response !== 'string') { return; }
+        const container = this.nodes.container;
+        const challengeInput = $(`[name='t-challenge']`, container);
+        const responseInput = $(`[name='t-response']`, container);
+        if (!challengeInput || !responseInput) { return; }
+        challengeInput.value = challenge;
+        responseInput.value = response;
+        this.checkCompletion();
+        return;
+      }
       this.noteServerCooldown(e.data?.twister);
       this.noteChallengeExpiry(e.data?.twister);
     });
@@ -341,7 +354,7 @@ const CaptchaT: any = {
     const isOnCooldown = /\(\d+\)/.test(tLoadText);
     const tNext = $('#t-next', mainDiv);
     const tNextText = tNext?.textContent || '';
-    const hasActiveChallengeStep = /\(\d+\/\d+\)/.test(tNextText);
+    const hasActiveChallengeStep = !slider?.disabled && /\(\d+\/\d+\)/.test(tNextText);
     const verificationNotRequired = this.hasVerificationNotRequired(mainDiv);
     const hasStatusMessage = !!taskEl?.textContent?.trim();
 
@@ -569,7 +582,6 @@ const CaptchaT: any = {
     const existingClueImage = $('.captcha-clue-image', mainDiv);
     if (existingClueImage) $.rm(existingClueImage);
     this.isCapturing = false;
-    delete this.selectedChallengeStep;
     return false;
   },
 
@@ -590,6 +602,12 @@ const CaptchaT: any = {
     }
   },
 
+  shouldAdvanceOnSelection(mainDiv) {
+    if (Conf['Next challenge on captcha selection']) { return true; }
+    const step = $('#t-next', mainDiv)?.textContent?.match(/\((\d+)\/(\d+)\)/);
+    return !!(Conf['Post on Captcha Completion'] && step && step[1] === step[2]);
+  },
+
   onStripClick(mainDiv, slider, stripsContainer, strip, i) {
     if (this.isCapturing) return;
     slider.value = '' + i;
@@ -597,14 +615,11 @@ const CaptchaT: any = {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
     $$('.captcha-strip', stripsContainer).forEach(s => $.rmClass(s, 'selected'));
     $.addClass(strip, 'selected');
-    if (!this.isRestoring) {
-      const tNext = $('#t-next', mainDiv);
-      this.selectedChallengeStep = stripsContainer.dataset.step || tNext?.textContent || '';
-    }
-    if (Conf['Next challenge on captcha selection'] && !this.isRestoring) {
+    if (!this.isRestoring && this.shouldAdvanceOnSelection(mainDiv)) {
       const tNext = $('#t-next', mainDiv);
       if (tNext && !tNext.disabled) {
         tNext.click();
+        this.checkCompletion();
       }
     }
   },
@@ -618,7 +633,6 @@ const CaptchaT: any = {
     if (tNextForStep) {
       stripsContainer.dataset.step = tNextForStep.textContent;
     }
-    delete this.selectedChallengeStep;
     const minVal = Number.parseInt(slider.getAttribute('min') || '0', 10);
     const maxVal = Number.parseInt(slider.getAttribute('max') || '3', 10);
     const count = maxVal + 1;
@@ -817,7 +831,6 @@ const CaptchaT: any = {
     this.clearChallengeNotice();
     delete this.isInitialized;
     delete this.hasRequested;
-    delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
     delete this.autoReloadsSincePost;
@@ -874,9 +887,11 @@ const CaptchaT: any = {
     const tNextText = tNext?.textContent || '';
     const stepMatch = tNextText.match(/\((\d+)\/(\d+)\)/);
     const hasRemainingChallengeSteps = stepMatch && Number.parseInt(stepMatch[1], 10) < Number.parseInt(stepMatch[2], 10);
-    const selectedCurrentStep = stepMatch && this.selectedChallengeStep === tNextText;
+    // Native Next retains its final label. Only the disabled slider proves
+    // that the final answer was committed; custom strip state can be rebuilt.
+    const slider = $('#t-slider', this.nodes.container);
     const canAdvanceChallenge = tNext && !tNext.disabled && (tNext.offsetWidth > 0 || tNext.offsetHeight > 0);
-    return (stepMatch && (!selectedCurrentStep || hasRemainingChallengeSteps || canAdvanceChallenge)) || (!stepMatch && canAdvanceChallenge);
+    return stepMatch ? (hasRemainingChallengeSteps || !slider?.disabled) : canAdvanceChallenge;
   },
 
   clearChallengeNotice() {
@@ -973,7 +988,6 @@ const CaptchaT: any = {
     this.isCompleted = false;
     this.clearChallengeNotice();
     delete this.hasRequested;
-    delete this.selectedChallengeStep;
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
     delete this.notifiedChallenge;
@@ -1042,6 +1056,11 @@ const CaptchaT: any = {
   handleIframeKeydown(mainDiv, e) {
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && document.activeElement?.id !== 't-resp') return;
     const key = e.key;
+    if (key === ' ') {
+      e.preventDefault();
+      this.advanceIframeChallenge(mainDiv);
+      return;
+    }
     const strips = $$('.captcha-strip', mainDiv);
     if (key >= '1' && key <= '9') {
       this.selectStripByNumber(e, strips, key);
@@ -1058,17 +1077,30 @@ const CaptchaT: any = {
     $.on(document, 'keydown', this.keydownListener);
   },
 
+  advanceIframeChallenge(mainDiv) {
+    const slider = $('#t-slider', mainDiv);
+    const tNext = $('#t-next', mainDiv);
+    if (!slider || !tNext || Number.parseInt(slider.value, 10) < 1) { return; }
+    const step = tNext.textContent?.match(/\((\d+)\/(\d+)\)/);
+    const isFinalStep = step && step[1] === step[2];
+    tNext.disabled = false;
+    tNext.click();
+    if (!isFinalStep) { return; }
+    const challenge = $(`[name='t-challenge']`, mainDiv)?.value;
+    const response = $(`[name='t-response']`, mainDiv)?.value;
+    if (!challenge || !response) { return; }
+    const domain = location.hostname.split('.')[1];
+    window.parent.postMessage({ type: CAPTCHA_COMPLETE_MESSAGE, challenge, response }, `https://boards.${domain}.org`);
+  },
+
   onIframeStripClick(mainDiv, slider, strips, strip, i) {
     slider.value = i;
     slider.dispatchEvent(new Event('change', { bubbles: true }));
     slider.dispatchEvent(new Event('input', { bubbles: true }));
     $$('.captcha-strip', strips).forEach(s => $.rmClass(s, 'selected'));
     $.addClass(strip, 'selected');
-    if (Conf['Next challenge on captcha selection']) {
-      const tNext = $('#t-next', mainDiv);
-      if (tNext && !tNext.disabled) {
-        tNext.click();
-      }
+    if (this.shouldAdvanceOnSelection(mainDiv)) {
+      this.advanceIframeChallenge(mainDiv);
     }
   },
 

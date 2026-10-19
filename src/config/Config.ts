@@ -573,7 +573,8 @@ const Config = {
       ],
       'Post on Captcha Completion': [
         false,
-        'Submit the post immediately when the captcha is completed.',
+        'Automatically submit the post when you select the final captcha answer (3/3, 4/4, 5/5, etc.), ' +
+          'even with <em>Next challenge on captcha selection</em> off. Posting cooldown and typing delay still apply.',
         1
       ],
       'Auto-post typing delay': [

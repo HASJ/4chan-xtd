@@ -1056,6 +1056,81 @@ describe('CaptchaT queue auto-posting and completion readiness', () => {
     vi.useRealTimers();
   });
 
+  it.each([3, 4, 5].flatMap(total => ['mouse', 'number key', 'space key', 'native slider'].map(method => [total, method] as const)))('submits final answer %i via %s with automatic Next off', (total, method) => {
+    const { container } = buildCaptcha();
+    const slider = container.querySelector<HTMLInputElement>('#t-slider')!;
+    const next = container.querySelector<HTMLButtonElement>('#t-next')!;
+    const response = container.querySelector<HTMLInputElement>('#t-resp')!;
+    slider.max = '3';
+    slider.value = '0';
+    next.textContent = `Next (${total}/${total})`;
+    next.disabled = true;
+    response.value = '0'.repeat(total - 1);
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'native-final';
+    // Native tcaptcha.min.7.js enables Next on input, appends each answer,
+    // and disables/resets the slider on completion, retaining Next (3/3).
+    slider.addEventListener('input', () => { next.disabled = slider.value === '0'; });
+    next.addEventListener('click', () => {
+      response.value += String(Number(slider.value) - 1);
+      next.disabled = true;
+      slider.disabled = true;
+      slider.value = '0';
+      container.querySelector<HTMLElement>('#t-task')!.textContent = 'Done.';
+    });
+    Conf['Next challenge on captcha selection'] = false;
+    CaptchaT.isCapturing = false;
+    CaptchaT.isRestoring = false;
+    const state = CaptchaT.detectChallengeState(container);
+    const { stripsContainer } = CaptchaT.createStripElements(container, slider, state);
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
+
+    if (method === 'mouse') (stripsContainer.children[1] as HTMLElement).click();
+    else if (method === 'number key') CaptchaT.handleCaptchaKeydown({ key: '2', preventDefault: vi.fn() });
+    else {
+      slider.value = '2';
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      if (method === 'space key') CaptchaT.handleCaptchaKeydown({ key: ' ', preventDefault: vi.fn() });
+      else next.click();
+    }
+    // Completion must survive reconciliation; custom selection is not native state.
+    stripsContainer.remove();
+    CaptchaT.createStrips();
+    CaptchaT.checkCompletion();
+    CaptchaT.checkCompletion();
+
+    expect(response.value).toBe('0'.repeat(total - 1) + '1');
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.captcha-custom-ui')).toBeNull();
+  });
+
+  it.each([
+    ['inline', false, 'Next (3/3)'],
+    ['inline', true, 'Next (2/3)'],
+    ['iframe', false, 'Next (3/3)'],
+    ['iframe', true, 'Next (2/3)'],
+  ])('leaves %s selection uncommitted with auto-post %s at %s', (mode, enabled, label) => {
+    const { container } = buildCaptcha();
+    const slider = container.querySelector<HTMLInputElement>('#t-slider')!;
+    const next = container.querySelector<HTMLButtonElement>('#t-next')!;
+    slider.max = '3';
+    next.textContent = String(label);
+    next.disabled = false;
+    const advance = vi.spyOn(next, 'click');
+    Conf['Next challenge on captcha selection'] = false;
+    Conf['Post on Captcha Completion'] = enabled;
+    CaptchaT.isCapturing = false;
+    CaptchaT.isRestoring = false;
+    const strips = mode === 'iframe'
+      ? CaptchaT.buildIframeStripsContainer(container, slider)
+      : CaptchaT.createStripElements(container, slider, CaptchaT.detectChallengeState(container)).stripsContainer;
+
+    (strips.children[1] as HTMLElement).click();
+
+    expect(advance).not.toHaveBeenCalled();
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
   it('does not submit when cooldown is zero but captcha is missing', () => {
     buildCaptcha();
     QRState.cooldown.seconds = 0;
@@ -1453,5 +1528,77 @@ describe('QR queue auto behavior and status display', () => {
     expect(submitSpy).not.toHaveBeenCalled();
     expect(QR.cooldown.auto).toBe(false);
     submitSpy.mockRestore();
+  });
+});
+
+describe('CaptchaT iframe completion', () => {
+  const buildFinalChallenge = () => {
+    const mainDiv = document.createElement('div');
+    mainDiv.innerHTML = `
+      <button id="t-next" type="button" disabled>Next (3/3)</button>
+      <div id="t-task"></div>
+      <input id="t-slider" type="range" min="0" max="3" value="0">
+      <input name="t-challenge" type="hidden" value="final-challenge">
+      <input id="t-resp" name="t-response" type="hidden" value="">`;
+    document.body.append(mainDiv);
+    const slider = mainDiv.querySelector<HTMLInputElement>('#t-slider')!;
+    const strips = CaptchaT.buildIframeStripsContainer(mainDiv, slider);
+    const tNext = mainDiv.querySelector<HTMLButtonElement>('#t-next')!;
+    tNext.addEventListener('click', () => {
+      mainDiv.querySelector<HTMLInputElement>('#t-resp')!.value = '012';
+      mainDiv.querySelector<HTMLElement>('#t-task')!.textContent = 'Done.';
+    });
+    return { mainDiv, slider, strips };
+  };
+
+  beforeEach(() => {
+    Conf['Next challenge on captcha selection'] = false;
+    Conf['Post on Captcha Completion'] = true;
+  });
+
+  it.each([
+    ['mouse click', ({ strips }) => (strips.children[1] as HTMLElement).click()],
+    ['number key', ({ mainDiv }) => CaptchaT.handleIframeKeydown(mainDiv, { key: '2', preventDefault: vi.fn() })],
+    ['space key', ({ mainDiv, slider }) => {
+      slider.value = '2';
+      CaptchaT.handleIframeKeydown(mainDiv, { key: ' ', preventDefault: vi.fn() });
+    }],
+  ])('reports final completion after %s', (_label, select) => {
+    const challenge = buildFinalChallenge();
+    const postMessage = vi.spyOn(window.parent, 'postMessage');
+
+    select(challenge);
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: '4chanXCaptchaComplete',
+      challenge: 'final-challenge',
+      response: '012',
+    }, 'https://boards.4chan.org');
+  });
+
+  it('submits when the trusted captcha frame reports completion', () => {
+    const qr = document.createElement('form');
+    const comment = document.createElement('textarea');
+    qr.append(comment);
+    document.body.append(qr);
+    QRState.nodes = { el: qr, com: comment };
+    QRState.posts = [{ file: new File([], 'image.png'), isOnlyQuotes: () => false }];
+    QRState.cooldown = { auto: false, seconds: 0 };
+    QRState.submit = vi.fn();
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 0;
+    CaptchaT.init();
+    buildCaptcha();
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://sys.4chan.org',
+      data: {
+        type: '4chanXCaptchaComplete',
+        challenge: 'final-challenge',
+        response: '012',
+      },
+    }));
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
   });
 });
