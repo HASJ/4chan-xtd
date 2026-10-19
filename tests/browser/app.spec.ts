@@ -128,6 +128,36 @@ test('submits a text-only reply after the final native captcha answer', async ({
   expect(sent[0]).toContain('test-challenge');
 });
 
+test('shows the typing countdown between the captcha buttons until idle', async ({ page }) => {
+  await installHarness(page, {
+    [storageKey('previousversion')]: '2.31.9',
+    [storageKey('Thread Watcher')]: false,
+    [storageKey('Post on Captcha Completion')]: true,
+    [storageKey('Auto-load captcha')]: false,
+    [storageKey('Auto-load captcha after cooldown')]: false,
+    [storageKey('Auto-post typing delay')]: 2,
+  });
+  await page.route('https://sys.4chan.org/**', route => route.fulfill({ status: 200, body: '' }));
+  await page.goto('/g/thread/100', { waitUntil: 'domcontentloaded' });
+  await page.addScriptTag({ path: resolve('tests/browser/fixtures/tcaptcha-native.js') });
+  await page.addScriptTag({ path: bundle });
+  await page.locator('.qr-link').first().click();
+  const comment = page.locator('#qr textarea[data-name="com"]');
+  await comment.fill('Countdown test');
+  const countdown = page.locator('#qr .captcha-typing-countdown');
+  await expect(countdown).toHaveText('Auto-post: 2s');
+  await expect(countdown).toBeVisible();
+  const load = await page.locator('#qr #t-load').boundingBox();
+  const timer = await countdown.boundingBox();
+  const next = await page.locator('#qr #t-next').boundingBox();
+  expect(timer!.x).toBeGreaterThanOrEqual(load!.x + load!.width);
+  expect(timer!.x + timer!.width).toBeLessThanOrEqual(next!.x);
+  await expect(countdown).toHaveText('Auto-post: 1s');
+  await comment.fill('Countdown reset');
+  await expect(countdown).toHaveText('Auto-post: 2s');
+  await expect(countdown).toHaveCount(0);
+});
+
 test('renders the catalog and applies a deterministic filter', async ({ page }) => {
   await openFixture(page, '/g/catalog', { [storageKey('name')]: '/Filtered/' });
 

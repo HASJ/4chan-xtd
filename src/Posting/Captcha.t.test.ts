@@ -555,6 +555,51 @@ describe('CaptchaT auto-post typing delay', () => {
     expect(QRState.submit).not.toHaveBeenCalled();
   });
 
+  it('counts down between Get Captcha and Next and resets on typing', () => {
+    const { container, tLoad } = buildExtCaptcha();
+
+    type();
+    const countdown = container.querySelector('.captcha-typing-countdown');
+    expect(countdown?.textContent).toBe('Auto-post: 5s');
+    expect(tLoad.nextElementSibling).toBe(countdown);
+    expect(countdown?.nextElementSibling?.id).toBe('t-next');
+
+    vi.advanceTimersByTime(1250);
+    CaptchaT.createStrips();
+    expect(countdown?.textContent).toBe('Auto-post: 4s');
+    type();
+    expect(countdown?.textContent).toBe('Auto-post: 5s');
+    expect(container.querySelectorAll('.captcha-typing-countdown')).toHaveLength(1);
+
+    vi.advanceTimersByTime(5000);
+    CaptchaT.createStrips();
+    expect(container.querySelector('.captcha-typing-countdown')).toBeNull();
+  });
+
+  it.each([0, -1, Number.NaN])('hides the typing countdown for delay %s', delay => {
+    const { container } = buildExtCaptcha();
+    type();
+    Conf['Auto-post typing delay'] = delay;
+
+    CaptchaT.createStrips();
+
+    expect(container.querySelector('.captcha-typing-countdown')).toBeNull();
+  });
+
+  it('hides the typing countdown when auto-post is disabled or the captcha is used', () => {
+    const { container } = buildExtCaptcha();
+    type();
+    Conf['Post on Captcha Completion'] = false;
+    CaptchaT.createStrips();
+    expect(container.querySelector('.captcha-typing-countdown')).toBeNull();
+
+    Conf['Post on Captcha Completion'] = true;
+    CaptchaT.createStrips();
+    expect(container.querySelector('.captcha-typing-countdown')).not.toBeNull();
+    CaptchaT.setUsed();
+    expect(container.querySelector('.captcha-typing-countdown')).toBeNull();
+  });
+
   it('posts once the typing pause elapses', () => {
     buildExtCaptcha();
 

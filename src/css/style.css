@@ -1629,6 +1629,14 @@ input.field.tripped:not(:hover):not(:focus) {
   pointer-events: none !important;
 }
 
+#qr .captcha-typing-countdown {
+  flex: 1;
+  align-self: center;
+  margin: 0 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 #qr .captcha-root.is-challenge #t-ctrl,
 .captcha-iframe.is-challenge #t-ctrl {
   justify-content: space-between;

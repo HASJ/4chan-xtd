@@ -118,6 +118,7 @@ const CaptchaT: any = {
     const target = e?.target instanceof Node ? e.target : null;
     if (target && this.nodes.root?.contains(target)) { return; }
     this.lastTypedAt = Date.now();
+    this.updateTypingCountdown();
   },
 
   // Milliseconds still to wait before the QR counts as idle. 0 means the post
@@ -127,6 +128,25 @@ const CaptchaT: any = {
     const delay = (Number.isFinite(seconds) && (seconds > 0)) ? (seconds * SECOND) : 0;
     if (!delay || !this.lastTypedAt) { return 0; }
     return Math.max(0, (this.lastTypedAt + delay) - Date.now());
+  },
+
+  updateTypingCountdown() {
+    const container = this.nodes.container;
+    if (!container) { return; }
+    const remaining = Conf['Post on Captcha Completion'] ? this.typingIdleRemaining() : 0;
+    let countdown = $('.captcha-typing-countdown', container);
+    if (!remaining) {
+      if (countdown) { $.rm(countdown); }
+      return;
+    }
+    const next = $('#t-next', container);
+    if (!next) { return; }
+    if (!countdown) {
+      countdown = $.el('span', {className: 'captcha-typing-countdown'});
+      $.before(next, countdown);
+    }
+    const text = `Auto-post: ${Math.ceil(remaining / SECOND)}s`;
+    if (countdown.textContent !== text) { countdown.textContent = text; }
   },
 
   // 'Post on Captcha Completion' submits the moment an answer lands, which with
@@ -160,6 +180,7 @@ const CaptchaT: any = {
       clearTimeout(this.autoSubmitTimer);
       delete this.autoSubmitTimer;
     }
+    this.updateTypingCountdown();
   },
 
   // The 'Load new captcha' keybind. Asks the same way the auto-load does, so a
@@ -770,6 +791,7 @@ const CaptchaT: any = {
     const mainDiv = this.nodes.container;
     if (!mainDiv) return;
 
+    this.updateTypingCountdown();
     const state = this.detectChallengeState(mainDiv);
     const { slider, taskEl } = state;
 
