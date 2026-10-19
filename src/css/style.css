@@ -799,14 +799,16 @@ div[data-checked="false"] > .suboption-list {
   padding: 20px 36px;
 }
 .catalog-icons > img,
-.catalog-stats > .menu-button {
+.catalog-stats > .menu-button,
+.catalog-stats > .copy-thread-url-button {
   width: 1em;
   height: 1em;
   margin: 0;
   vertical-align: text-top;
   padding-left: 2px;
 }
-.catalog-stats > .menu-button > .icon {
+.catalog-stats > .menu-button > .icon,
+.catalog-stats > .copy-thread-url-button > .icon {
   height: 10px;
 }
 .catalog-stats {

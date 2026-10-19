@@ -360,6 +360,16 @@ const Config = {
         true,
         'Add a drop-down menu to posts.'
       ],
+      'Copy Thread URL Button': [
+        false,
+        'Add a button to copy thread URLs in the catalog.',
+        1
+      ],
+      'Hide Thread After Copying': [
+        false,
+        'Hide the thread after its URL is copied.',
+        2
+      ],
       'Report Link': [
         true,
         'Add a report link to the menu.',

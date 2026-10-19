@@ -1,4 +1,5 @@
-import { g, Conf, d } from "../globals/globals";
+import { g, Conf } from "../globals/globals";
+import copyText from "../platform/copyText";
 import $ from "../platform/$";
 import Menu from "./Menu";
 
@@ -25,20 +26,7 @@ const CopyTextLink: any = {
   },
 
   copy() {
-    const el = $.el('textarea', {
-      className: 'copy-text-element',
-      value: CopyTextLink.text
-    }
-    );
-    $.add(d.body, el);
-    el.select();
-    try {
-      (d as any).execCommand('copy');
-    } catch (error) {
-      console.warn('Copy failed', error);
-    }
-    return $.rm(el);
+    return copyText(CopyTextLink.text);
   }
 };
 export default CopyTextLink;
-

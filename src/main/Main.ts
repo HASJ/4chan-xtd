@@ -38,6 +38,7 @@ import Volume from "../Images/Volume";
 import Linkify from "../Linkification/Linkify";
 import ArchiveLink from "../Menu/ArchiveLink";
 import CopyTextLink from "../Menu/CopyTextLink";
+import CopyThreadURL from "../Menu/CopyThreadURL";
 import DeleteLink from "../Menu/DeleteLink";
 import DownloadLink from "../Menu/DownloadLink";
 import ReportLink from "../Menu/ReportLink";
@@ -1006,6 +1007,7 @@ User agent: ${navigator.userAgent}\
     ['Post Jumper',               PostJumper],
     ['Pass Link',                 PassLink],
     ['Menu',                      Menu],
+    ['Copy Thread URL Button',    CopyThreadURL],
     ['Index Generator (Menu)',    Index.menu],
     ['Report Link',               ReportLink],
     ['Copy Text Link',            CopyTextLink],
