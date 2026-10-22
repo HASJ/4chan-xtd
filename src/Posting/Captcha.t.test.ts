@@ -137,6 +137,88 @@ describe('CaptchaT auto-load after cooldown', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  // 4chan's native clearChallenge() blanks the task image by assigning an empty
+  // data URL, and leaves the slider disabled but still carrying its max. Neither
+  // is a challenge, and neither may hold the auto-load back.
+  describe('after the native clearChallenge()', () => {
+    const EMPTY_TASK_IMAGE = 'url("data:image/png;base64,")';
+    const LIVE_TASK_IMAGE = 'url("data:image/png;base64,iVBORw0KGgo=")';
+    const clearChallenge = (container: HTMLElement, image = EMPTY_TASK_IMAGE, disabled = true) => {
+      const slider = $('#t-slider', container) as HTMLInputElement;
+      slider.setAttribute('max', '3');
+      slider.disabled = disabled;
+      ($('#t-task', container) as HTMLElement).style.backgroundImage = image;
+    };
+
+    it('does not read the emptied task image as a challenge', () => {
+      const { container } = buildCaptcha();
+      clearChallenge(container);
+
+      expect(CaptchaT.detectChallengeState(container).isChallenge).toBe(false);
+    });
+
+    it('still reads a task image with content as a challenge', () => {
+      const { container } = buildCaptcha();
+      clearChallenge(container, LIVE_TASK_IMAGE, false);
+
+      expect(CaptchaT.detectChallengeState(container).isChallenge).toBe(true);
+    });
+
+    it('clicks #t-load once the counter clears', () => {
+      const { container, tLoad, click } = buildCaptcha();
+      clearChallenge(container);
+      tLoad.value = COUNTING_DOWN;
+
+      CaptchaT.createStrips();
+      expect(click).not.toHaveBeenCalled();
+
+      tLoad.value = IDLE;
+      CaptchaT.createStrips();
+      expect(click).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not turn the leftover into strips', () => {
+      const { root, container } = buildCaptcha();
+      clearChallenge(container);
+
+      CaptchaT.createStrips();
+
+      expect(root.classList.contains('is-challenge')).toBe(false);
+      expect(root.querySelectorAll('.captcha-strip')).toHaveLength(0);
+    });
+
+    describe('load()', () => {
+      const thread = { boardID: 'g', threadID: '100' };
+      beforeEach(() => {
+        CaptchaT.isInitialized = true;
+        CaptchaT.currentThread = thread;
+        CaptchaT.shouldLoad = true;
+      });
+      afterEach(() => {
+        delete CaptchaT.isInitialized;
+        delete CaptchaT.currentThread;
+      });
+
+      it('requests a new captcha past the leftover max', () => {
+        const { container } = buildCaptcha();
+        clearChallenge(container);
+
+        CaptchaT.load();
+
+        expect($.global).toHaveBeenCalledWith('loadTCaptcha', thread);
+      });
+
+      it('leaves a live challenge alone', () => {
+        const { container } = buildCaptcha();
+        clearChallenge(container, LIVE_TASK_IMAGE, false);
+
+        CaptchaT.load();
+
+        expect($.global).not.toHaveBeenCalledWith('loadTCaptcha', thread);
+      });
+    });
+  });
+
   it('does not click when the option is off', () => {
     const { click } = buildCaptcha();
     Conf['Auto-load captcha after cooldown'] = false;

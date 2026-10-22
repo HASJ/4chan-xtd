@@ -19,6 +19,7 @@ const MAX_CHALLENGE_TTL = 600;
 // "Loading" with no way back. Budget the auto-clicks between posts and let the
 // user click the button by hand after that.
 const MAX_AUTO_RELOADS_PER_POST = 3;
+const EMPTY_DATA_URL = /url\(\s*["']?data:[^,"')]*,\s*["']?\s*\)/;
 const CAPTCHA_COMPLETE_MESSAGE = '4chanXCaptchaComplete';
 
 const CaptchaT: any = {
@@ -103,7 +104,9 @@ const CaptchaT: any = {
     if (this.nodes.container) {
       const slider = $('#t-slider', this.nodes.container);
       const response = $('#t-resp', this.nodes.container);
-      if (slider?.hasAttribute('max') || response?.value) { return; }
+      // clearChallenge() disables the slider but never removes its max, so max
+      // alone outlives the challenge it described.
+      if ((slider?.hasAttribute('max') && !slider.disabled) || response?.value) { return; }
     }
 
     // Request directly from the native API. The #t-load control is not
@@ -381,7 +384,9 @@ const CaptchaT: any = {
 
     const imgEl = taskEl ? $('img', taskEl) : null;
     const taskBg = taskEl ? taskEl.style.backgroundImage || getComputedStyle(taskEl).backgroundImage : '';
-    const hasTaskBg = taskBg?.includes('url(');
+    // clearChallenge() blanks the task by assigning an empty data URL rather than
+    // removing the background, so 'url(' alone does not mean a task is on show.
+    const hasTaskBg = taskBg?.includes('url(') && !EMPTY_DATA_URL.test(taskBg);
 
     // A real puzzle has task image frames. If there is no separate clue image,
     // the challenge is the odd-one-out variant.
