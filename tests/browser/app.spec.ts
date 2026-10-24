@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Frame, type Page, test } from '@playwright/test';
 import { resolve } from 'node:path';
 
 const bundle = resolve('builds/4chan-XTd.user.js');
@@ -128,7 +128,8 @@ test('submits a text-only reply after the final native captcha answer', async ({
   expect(sent[0]).toContain('test-challenge');
 });
 
-test('shows the typing countdown between the captcha buttons until idle', async ({ page }) => {
+test('toggles auto-post with the countdown button between the captcha controls', async ({ page }) => {
+  await page.clock.install();
   await installHarness(page, {
     [storageKey('previousversion')]: '2.31.9',
     [storageKey('Thread Watcher')]: false,
@@ -142,6 +143,7 @@ test('shows the typing countdown between the captcha buttons until idle', async 
   await page.addScriptTag({ path: resolve('tests/browser/fixtures/tcaptcha-native.js') });
   await page.addScriptTag({ path: bundle });
   await page.locator('.qr-link').first().click();
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000));
   const comment = page.locator('#qr textarea[data-name="com"]');
   await comment.fill('Countdown test');
   const countdown = page.locator('#qr .captcha-typing-countdown');
@@ -152,11 +154,105 @@ test('shows the typing countdown between the captcha buttons until idle', async 
   const next = await page.locator('#qr #t-next').boundingBox();
   expect(timer!.x).toBeGreaterThanOrEqual(load!.x + load!.width);
   expect(timer!.x + timer!.width).toBeLessThanOrEqual(next!.x);
+  await countdown.click();
+  await expect(countdown).toHaveText('Auto-post: Off');
+  await expect(countdown).toHaveAttribute('aria-pressed', 'false');
+  await countdown.click();
+  await expect(countdown).toHaveText('Auto-post: 2s');
+  await expect(countdown).toHaveAttribute('aria-pressed', 'true');
+  await page.clock.runFor(1100);
   await expect(countdown).toHaveText('Auto-post: 1s');
   await comment.fill('Countdown reset');
   await expect(countdown).toHaveText('Auto-post: 2s');
-  await expect(countdown).toHaveCount(0);
+  await page.clock.runFor(2500);
+  await expect(countdown).toHaveText('Auto-post: On');
 });
+
+for (const iframe of [false, true]) {
+  test(`corrects earlier captcha answers with Prev and arrow keys (iframe=${iframe})`, async ({ page }) => {
+    await installHarness(page, {
+      [storageKey('previousversion')]: '2.31.10',
+      [storageKey('Thread Watcher')]: false,
+      [storageKey('Post on Captcha Completion')]: false,
+      [storageKey('Auto-post typing delay')]: 30,
+      [storageKey('Next challenge on captcha selection')]: false,
+      [storageKey('Auto-load captcha')]: false,
+      [storageKey('Auto-load captcha after cooldown')]: false,
+    });
+    await page.route('https://sys.4chan.org/**', route => route.fulfill({
+      status: 200, contentType: 'text/html', body: '<html><body><div id="t-root"></div></body></html>',
+    }));
+    await page.goto('https://boards.4chan.org/g/thread/100', { waitUntil: 'domcontentloaded' });
+    const native = resolve('tests/browser/fixtures/tcaptcha-native.js');
+    await page.addScriptTag({ path: native });
+    await page.addScriptTag({ path: bundle });
+    await page.locator('.qr-link').first().click();
+    let captcha: Page | Frame = page;
+    if (iframe) {
+      await page.evaluate(() => {
+        const frame = document.createElement('iframe');
+        frame.id = 't-frame';
+        frame.src = 'https://sys.4chan.org/captcha';
+        frame.style.cssText = 'width: 100%; height: 350px; border: 0';
+        document.querySelector('#qr #t-slider')!.parentNode!.appendChild(frame);
+      });
+      await expect.poll(() => !!page.frame({ url: 'https://sys.4chan.org/captcha' })).toBe(true);
+      captcha = page.frame({ url: 'https://sys.4chan.org/captcha' })!;
+      await captcha.waitForLoadState('domcontentloaded');
+      await captcha.addScriptTag({ path: native });
+      await captcha.evaluate(() => (window as any).TCaptcha.init(document.querySelector('#t-root'), 'g', 100));
+      await captcha.addScriptTag({ path: bundle });
+      await expect(captcha.locator('html')).toHaveClass(/captcha-iframe/);
+    }
+    await captcha.evaluate(iframe => {
+      const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/ZfoAAAAASUVORK5CYII=';
+      (window as any).TCaptcha.setChallenge({ challenge: 'navigation-test', tasks: Array.from({ length: 3 }, () => ({ ...(iframe ? { img: image } : { str: 'Choose an answer' }), items: [image, image, image] })) });
+    }, iframe);
+    const next = captcha.locator('#t-next');
+    const prev = captcha.locator('#t-prev');
+    const strips = captcha.locator('.captcha-strip');
+    const ready = async (step: number) => {
+      await expect(next).toHaveText(`Next (${step}/3)`);
+      await expect(strips.last()).toHaveCSS('background-image', /url\(/);
+    };
+    await ready(1);
+    await expect(prev).toBeDisabled();
+    await strips.first().click();
+    await strips.first().press('ArrowRight');
+    await ready(2);
+    await expect(prev).toBeEnabled();
+    await strips.first().click();
+    await strips.first().press('ArrowRight');
+    await ready(3);
+    await strips.first().press('ArrowLeft');
+    await ready(2);
+    await expect(captcha.locator('[name="t-response"]')).toHaveValue('0');
+    await strips.last().click();
+    await strips.last().press('ArrowRight');
+    await ready(3);
+    await strips.nth(1).click();
+    await strips.nth(1).press('ArrowRight');
+    await expect(captcha.locator('[name="t-response"]')).toHaveValue('021');
+    await expect(page.locator('#qr [name="t-response"]')).toHaveValue('021');
+    await expect(prev).toBeEnabled();
+    await prev.click();
+    await ready(3);
+    await expect(captcha.locator('[name="t-response"]')).toHaveValue('02');
+    if (iframe) await expect(page.locator('#qr [name="t-response"]')).toHaveValue('');
+    await strips.last().click();
+    await next.click();
+    await expect(page.locator('#qr [name="t-response"]')).toHaveValue('022');
+    await prev.click();
+    await ready(3);
+    const toggle = page.locator('#qr .captcha-typing-countdown');
+    await toggle.press('Space');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await strips.first().click();
+    await expect(page.locator('#qr [name="t-response"]')).toHaveValue('020');
+    await toggle.click();
+    await expect(toggle).toHaveText('Auto-post: Off');
+  });
+}
 
 test('renders the catalog and applies a deterministic filter', async ({ page }) => {
   await openFixture(page, '/g/catalog', { [storageKey('name')]: '/Filtered/' });

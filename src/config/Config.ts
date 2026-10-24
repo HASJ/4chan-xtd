@@ -1029,6 +1029,14 @@ current-archive-text:"Archive"]
       'Alt+r',
       'Load a new captcha in the QR.'
     ],
+    'Previous captcha challenge': [
+      'Left',
+      'Return to the previous captcha challenge.'
+    ],
+    'Next captcha challenge': [
+      'Right',
+      'Confirm the answer and go to the next captcha challenge.'
+    ],
     // Thread related
     'Watch': [
       'w',

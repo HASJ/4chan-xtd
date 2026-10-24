@@ -6,6 +6,7 @@ import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers"
 import Notice from "../classes/Notice";
 import UIState from "../globals/UIState";
 import Favicon from "../Monitoring/Favicon";
+import keyCode from "../Miscellaneous/KeyCode";
 
 // Ceilings on server-stated durations, in seconds. Only a malformed value can
 // exceed these; real ones are tens of seconds to a couple of minutes.
@@ -21,6 +22,8 @@ const MAX_CHALLENGE_TTL = 600;
 const MAX_AUTO_RELOADS_PER_POST = 3;
 const EMPTY_DATA_URL = /url\(\s*["']?data:[^,"')]*,\s*["']?\s*\)/;
 const CAPTCHA_COMPLETE_MESSAGE = '4chanXCaptchaComplete';
+const CAPTCHA_INCOMPLETE_MESSAGE = '4chanXCaptchaIncomplete';
+const CAPTCHA_AUTO_POST_MESSAGE = '4chanXCaptchaAutoPost';
 
 const CaptchaT: any = {
   init() {
@@ -54,6 +57,16 @@ const CaptchaT: any = {
     // That number is authoritative; everything else here is inference.
     window.addEventListener('message', e => {
       if (!isTrustedSiteOrigin(e.origin)) { return; }
+      if (e.data?.type === CAPTCHA_INCOMPLETE_MESSAGE) {
+        const container = this.nodes.container;
+        if (!container || QRState.req || !e.data.challenge ||
+            $('[name="t-challenge"]', container)?.value !== e.data.challenge) { return; }
+        const response = $('[name="t-response"]', container);
+        if (response) { response.value = ''; }
+        this.isCompleted = false;
+        this.clearAutoSubmitTimer();
+        return;
+      }
       if (e.data?.type === CAPTCHA_COMPLETE_MESSAGE) {
         const { challenge, response } = e.data;
         if (!challenge || !response || typeof challenge !== 'string' || typeof response !== 'string') { return; }
@@ -134,22 +147,40 @@ const CaptchaT: any = {
   },
 
   updateTypingCountdown() {
-    const container = this.nodes.container;
+    const container = this.nodes?.container;
     if (!container) { return; }
-    const remaining = Conf['Post on Captcha Completion'] ? this.typingIdleRemaining() : 0;
+    const enabled = !!Conf['Post on Captcha Completion'];
+    const remaining = enabled ? this.typingIdleRemaining() : 0;
     let countdown = $('.captcha-typing-countdown', container);
-    if (!remaining) {
-      if (countdown) { $.rm(countdown); }
-      return;
-    }
     const next = $('#t-next', container);
     if (!next) { return; }
     if (!countdown) {
-      countdown = $.el('span', {className: 'captcha-typing-countdown'});
-      $.before(next, countdown);
+      countdown = next.cloneNode(false);
+      countdown.removeAttribute('id');
+      countdown.type = 'button';
+      countdown.disabled = false;
+      countdown.className = 'captcha-typing-countdown';
+      countdown.style.margin = '0';
+      $.on(countdown, 'click', () => this.toggleAutoPost());
+      $.before($('.captcha-navigation', container) || next, countdown);
     }
-    const text = `Auto-post: ${Math.ceil(remaining / SECOND)}s`;
+    countdown.setAttribute('aria-pressed', String(enabled));
+    countdown.title = enabled ? 'Disable automatic posting' : 'Enable automatic posting';
+    const text = `Auto-post: ${remaining ? `${Math.ceil(remaining / SECOND)}s` : (enabled ? 'On' : 'Off')}`;
     if (countdown.textContent !== text) { countdown.textContent = text; }
+  },
+
+  toggleAutoPost() {
+    const enabled = !Conf['Post on Captcha Completion'];
+    Conf['Post on Captcha Completion'] = enabled;
+    $.set('Post on Captcha Completion', enabled);
+    const frame = this.nodes?.container && $('#t-frame', this.nodes.container);
+    const domain = location.hostname.split('.')[1];
+    frame?.contentWindow?.postMessage({ type: CAPTCHA_AUTO_POST_MESSAGE, enabled }, `https://sys.${domain}.org`);
+    if (enabled) { this.lastTypedAt = Date.now(); }
+    else if (QRState.cooldown) { QRState.cooldown.auto = false; }
+    this.clearAutoSubmitTimer();
+    if (enabled) { this.checkCompletion(); }
   },
 
   // 'Post on Captcha Completion' submits the moment an answer lands, which with
@@ -157,6 +188,7 @@ const CaptchaT: any = {
   // they have been quiet -- deferred, never cancelled, so the setting still
   // does what it says once they stop.
   autoSubmitWhenIdle(response) {
+    if (this.isNavigating) { return; }
     const wait = this.typingIdleRemaining();
     if (!wait) {
       this.clearAutoSubmitTimer();
@@ -304,6 +336,10 @@ const CaptchaT: any = {
   redirectCommentFocus(e) {
     if (!this.shouldKeepCommentFocus()) { return false; }
     const target = e?.target instanceof Node ? e.target : null;
+    if (target instanceof Element && target.closest('.captcha-typing-countdown, .captcha-navigation')) {
+      this.cancelCommentFocusRestore();
+      return false;
+    }
     if (target === QRState.nodes?.com) { return false; }
     if (target && QRState.nodes?.el?.contains(target) && !this.nodes.root.contains(target)) {
       this.cancelCommentFocusRestore();
@@ -620,7 +656,7 @@ const CaptchaT: any = {
     } else {
       clueImage.style.backgroundImage = state.clueUrl; // The actual clue icon!
     }
-    const tNextNode = $('#t-next', tCtrl);
+    const tNextNode = $('.captcha-navigation', tCtrl) || $('#t-next', tCtrl);
     if (tNextNode) {
       $.before(tNextNode, clueImage);
     } else {
@@ -747,28 +783,87 @@ const CaptchaT: any = {
     strip.focus();
   },
 
-  navigateStrip(e, strips, delta) {
-    if (!strips.length) return;
-    e.preventDefault();
-    const selectedIndex = strips.findIndex(s => $.hasClass(s, 'selected'));
-    let newIndex;
-    if (delta < 0) {
-      newIndex = selectedIndex - 1;
-      if (selectedIndex === -1 || newIndex < 0) { newIndex = 0; }
-    } else {
-      newIndex = selectedIndex + 1;
-      if (selectedIndex === -1) { newIndex = 0; }
-      else if (newIndex >= strips.length) { newIndex = strips.length - 1; }
+  updateChallengeNavigation(mainDiv, iframe = false) {
+    const next = $('#t-next', mainDiv);
+    if (!next) { return; }
+    let prev = $('#t-prev', mainDiv);
+    if (!prev) {
+      const navigation = $.el('span', {className: 'captcha-navigation'});
+      $.before(next, navigation);
+      prev = next.cloneNode(false);
+      prev.id = 't-prev';
+      prev.type = 'button';
+      prev.textContent = 'Prev';
+      prev.title = 'Previous captcha challenge';
+      prev.style.margin = '0';
+      $.on(prev, 'click', () => this.previousChallenge(mainDiv, iframe));
+      $.add(navigation, [prev, next]);
+      $.on(next, 'click', e => {
+        if (this.isNavigating) { e.preventDefault(); e.stopImmediatePropagation(); }
+      }, true);
+      if (iframe) {
+        $.on(next, 'click', () => {
+          this.updateChallengeNavigation(mainDiv, true);
+          this.reportIframeCompletion(mainDiv);
+        });
+      }
     }
-    const strip = strips[newIndex];
-    if (strip) { strip.click(); strip.focus(); }
+    const step = next.textContent?.match(/\((\d+)\/(\d+)\)/);
+    prev.disabled = !step || (Number(step[1]) === 1 && !$('#t-slider', mainDiv)?.disabled) ||
+      this.isNavigating || this.isCapturing || (!iframe && !!QRState.req);
+  },
+
+  async previousChallenge(mainDiv, iframe = false) {
+    if (this.isCapturing || this.isNavigating || (!iframe && QRState.req)) { return; }
+    const step = $('#t-next', mainDiv)?.textContent?.match(/\((\d+)\/(\d+)\)/);
+    if (!step || (Number(step[1]) === 1 && !$('#t-slider', mainDiv)?.disabled)) { return; }
+    this.isNavigating = true;
+    this.isCompleted = false;
+    this.clearAutoSubmitTimer();
+    try {
+      const result = await $.global('previousTCaptcha', {});
+      if (result?.changed !== '1') { return; }
+      if (iframe) {
+        const challenge = $('[name="t-challenge"]', mainDiv)?.value;
+        const domain = location.hostname.split('.')[1];
+        window.parent.postMessage({ type: CAPTCHA_INCOMPLETE_MESSAGE, challenge }, `https://boards.${domain}.org`);
+        this.createIframeStrips(mainDiv, $('#t-slider', mainDiv));
+      } else {
+        this.createStrips();
+      }
+    } catch (error) {
+      console.warn('Unable to reopen the previous captcha challenge.', error);
+    } finally {
+      this.isNavigating = false;
+      this.updateChallengeNavigation(mainDiv, iframe);
+    }
+  },
+
+  handleChallengeNavigationKeydown(mainDiv, e, iframe = false) {
+    if (Conf.Keybinds === false) { return false; }
+    const key = keyCode(e);
+    if (!key) { return false; }
+    if (key !== Conf['Previous captcha challenge'] && key !== Conf['Next captcha challenge']) { return false; }
+    e.preventDefault();
+    e.stopImmediatePropagation?.();
+    if (key === Conf['Previous captcha challenge']) {
+      this.previousChallenge(mainDiv, iframe);
+    } else if (iframe) {
+      this.advanceIframeChallenge(mainDiv);
+    } else {
+      const next = $('#t-next', mainDiv);
+      if (next && !next.disabled) { next.click(); this.checkCompletion(); }
+    }
+    return true;
   },
 
   handleCaptchaKeydown(e) {
-    if (!this.nodes.container || this.isCapturing) return;
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && document.activeElement?.id !== 't-resp') return;
+    if (e.defaultPrevented || !this.nodes.container || this.isCapturing || this.isNavigating || QRState.nodes?.el?.hidden) return;
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && !['t-resp', 't-slider'].includes(document.activeElement?.id)) return;
+    if (this.handleChallengeNavigationKeydown(this.nodes.container, e)) { return; }
     const key = e.key;
     if (key === ' ') {
+      if (document.activeElement?.tagName === 'BUTTON') { return; }
       const tNext = $('#t-next', this.nodes.container);
       if (tNext && !tNext.disabled) {
         e.preventDefault();
@@ -779,10 +874,6 @@ const CaptchaT: any = {
     const strips = $$('.captcha-strip', this.nodes.root);
     if (key >= '1' && key <= '9') {
       this.selectStripByNumber(e, strips, key);
-    } else if (key === 'ArrowLeft') {
-      this.navigateStrip(e, strips, -1);
-    } else if (key === 'ArrowRight') {
-      this.navigateStrip(e, strips, 1);
     }
   },
 
@@ -797,6 +888,8 @@ const CaptchaT: any = {
     if (!mainDiv) return;
 
     this.updateTypingCountdown();
+    this.updateChallengeNavigation(mainDiv);
+    this.registerKeydownListener();
     const state = this.detectChallengeState(mainDiv);
     const { slider, taskEl } = state;
 
@@ -967,7 +1060,7 @@ const CaptchaT: any = {
   },
 
   checkCompletion() {
-    if (!this.isEnabled || !this.nodes.container) return;
+    if (!this.isEnabled || !this.nodes.container || this.isNavigating) return;
     // getOne() is the authority on what counts as a usable payload: an answered
     // challenge, or one where 4chan wants no verification. Reading 't-response'
     // directly disagreed with it, so the no-verification case never completed
@@ -1037,6 +1130,9 @@ const CaptchaT: any = {
 
   setupIframe() {
     this.isEnabled = true;
+    for (const key of ['Previous captcha challenge', 'Next captcha challenge', 'Post on Captcha Completion']) {
+      $.sync(key, (value, name) => { Conf[name] = value; });
+    }
     const mainDiv = $('#t-slider')?.parentNode;
     if (!mainDiv) {
       this.iframeObserver = new MutationObserver(() => {
@@ -1067,6 +1163,12 @@ const CaptchaT: any = {
     this.createIframeStrips(mainDiv, slider);
 
     $.on(window, 'message', (e) => {
+      const boardOrigin = `https://boards.${location.hostname.split('.')[1]}.org`;
+      if (e.source !== window.parent || e.origin !== boardOrigin) { return; }
+      if (e.data?.type === CAPTCHA_AUTO_POST_MESSAGE && typeof e.data.enabled === 'boolean') {
+        Conf['Post on Captcha Completion'] = e.data.enabled;
+        return;
+      }
       if (e.data?.type === 'select-strip') {
         const index = e.data.index;
         const strips = $$('.captcha-strip', mainDiv);
@@ -1081,9 +1183,12 @@ const CaptchaT: any = {
   },
 
   handleIframeKeydown(mainDiv, e) {
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && document.activeElement?.id !== 't-resp') return;
+    if (e.defaultPrevented || this.isNavigating) { return; }
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && !['t-resp', 't-slider'].includes(document.activeElement?.id)) return;
+    if (this.handleChallengeNavigationKeydown(mainDiv, e, true)) { return; }
     const key = e.key;
     if (key === ' ') {
+      if (document.activeElement?.tagName === 'BUTTON') { return; }
       e.preventDefault();
       this.advanceIframeChallenge(mainDiv);
       return;
@@ -1091,10 +1196,6 @@ const CaptchaT: any = {
     const strips = $$('.captcha-strip', mainDiv);
     if (key >= '1' && key <= '9') {
       this.selectStripByNumber(e, strips, key);
-    } else if (key === 'ArrowLeft') {
-      this.navigateStrip(e, strips, -1);
-    } else if (key === 'ArrowRight') {
-      this.navigateStrip(e, strips, 1);
     }
   },
 
@@ -1107,12 +1208,14 @@ const CaptchaT: any = {
   advanceIframeChallenge(mainDiv) {
     const slider = $('#t-slider', mainDiv);
     const tNext = $('#t-next', mainDiv);
-    if (!slider || !tNext || Number.parseInt(slider.value, 10) < 1) { return; }
-    const step = tNext.textContent?.match(/\((\d+)\/(\d+)\)/);
-    const isFinalStep = step && step[1] === step[2];
+    if (!slider || slider.disabled || !tNext || Number.parseInt(slider.value, 10) < 1) { return; }
+    this.updateChallengeNavigation(mainDiv, true);
     tNext.disabled = false;
     tNext.click();
-    if (!isFinalStep) { return; }
+  },
+
+  reportIframeCompletion(mainDiv) {
+    if (!$('#t-slider', mainDiv)?.disabled) { return; }
     const challenge = $(`[name='t-challenge']`, mainDiv)?.value;
     const response = $(`[name='t-response']`, mainDiv)?.value;
     if (!challenge || !response) { return; }
@@ -1168,7 +1271,11 @@ const CaptchaT: any = {
   },
 
   createIframeStrips(mainDiv, slider) {
+    this.updateChallengeNavigation(mainDiv, true);
     const strips = $('.captcha-strips', mainDiv) || this.buildIframeStripsContainer(mainDiv, slider);
+    for (const strip of $$('.captcha-strip', strips)) {
+      strip.classList.toggle('selected', !slider.disabled && strip.dataset.index === slider.value);
+    }
 
     const taskEl = $('#t-task', mainDiv);
     if (!taskEl) return;

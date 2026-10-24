@@ -163,6 +163,20 @@ const PageContextFunctions = {
     (window as any).TCaptcha.load(boardID, +threadID);
   },
 
+  previousTCaptcha: data => {
+    const t = (window as any).TCaptcha;
+    if (!Array.isArray(t?.tasks) || !Number.isInteger(t.taskId) || t.taskId < 1 || t.taskId > t.tasks.length ||
+        !t.respNode || typeof t.setTaskId !== 'function' || typeof t.setTaskItem !== 'function' || typeof t.toggleSlider !== 'function') { return; }
+    const index = t.taskId - 1;
+    const answer = Number.parseInt(t.respNode.value[index], 10) + 1;
+    // Discard later answers before native Next appends the corrected answer.
+    t.respNode.value = t.respNode.value.slice(0, index);
+    t.toggleSlider(true);
+    t.setTaskId(index);
+    if (Number.isFinite(answer)) { t.setTaskItem(answer); }
+    data.changed = '1';
+  },
+
   captureTCaptchaStrips: () => {
     const slider = document.querySelector('#qr #t-slider') as HTMLInputElement;
     const task = document.querySelector('#qr #t-task') as HTMLElement;

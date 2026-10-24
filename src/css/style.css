@@ -1637,13 +1637,26 @@ input.field.tripped:not(:hover):not(:focus) {
   white-space: nowrap;
 }
 
+#qr #t-ctrl,
+.captcha-iframe #t-ctrl {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.captcha-navigation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
 #qr .captcha-root.is-challenge #t-ctrl,
 .captcha-iframe.is-challenge #t-ctrl {
   justify-content: space-between;
   align-items: flex-start;
 }
-#qr .captcha-root.is-challenge #t-next,
-.captcha-iframe.is-challenge #t-next {
+#qr .captcha-navigation #t-next,
+.captcha-iframe .captcha-navigation #t-next {
   margin-left: 0 !important;
 }
 
@@ -1793,7 +1806,10 @@ input.field.tripped:not(:hover):not(:focus) {
 :root.themed-captcha .captcha-iframe #t-root input[type="button"],
 :root.themed-captcha .captcha-iframe #t-root button,
 :root.themed-captcha #qr #t-next,
+:root.themed-captcha #qr #t-prev,
+:root.themed-captcha #qr .captcha-typing-countdown,
 :root.themed-captcha #qr #t-load,
+:root.themed-captcha .captcha-iframe #t-prev,
 :root.themed-captcha .captcha-iframe #t-next,
 :root.themed-captcha .captcha-iframe #t-load {
   background: var(--xt-background) !important;
@@ -1809,7 +1825,10 @@ input.field.tripped:not(:hover):not(:focus) {
 :root.themed-captcha .captcha-iframe #t-root input[type="button"]:hover,
 :root.themed-captcha .captcha-iframe #t-root button:hover,
 :root.themed-captcha #qr #t-next:hover,
+:root.themed-captcha #qr #t-prev:hover,
+:root.themed-captcha #qr .captcha-typing-countdown:hover,
 :root.themed-captcha #qr #t-load:hover,
+:root.themed-captcha .captcha-iframe #t-prev:hover,
 :root.themed-captcha .captcha-iframe #t-next:hover,
 :root.themed-captcha .captcha-iframe #t-load:hover {
   background: var(--xt-border) !important;
