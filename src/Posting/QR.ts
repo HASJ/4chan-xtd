@@ -1116,7 +1116,7 @@ Callbacks.handleErrors({
         } else if (response) {
           if (cb) { cb(response); }
         } else {
-          delete QR.req;
+          QR.req = null;
           post.unlock();
           QR.cooldown.auto = !!Captcha.cache.getCount();
           QR.status();
@@ -1130,7 +1130,7 @@ Callbacks.handleErrors({
   response() {
     let connErr = false, err;
     if (this !== QR.req) { return; } // aborted
-    delete QR.req;
+    QR.req = null;
 
     const post = QR.posts[0];
     post.unlock();
@@ -1315,7 +1315,7 @@ Callbacks.handleErrors({
   abort() {
     const oldReq = QR.req;
     if (oldReq && !oldReq.isUploadFinished) {
-      delete QR.req;
+      QR.req = null;
       oldReq.abort();
       if ((QR.captcha === Captcha.v2) && QR.currentCaptcha) { Captcha.cache.save(QR.currentCaptcha); }
       delete QR.currentCaptcha;
