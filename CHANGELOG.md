@@ -3,6 +3,12 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.12 (2026-10-24)
+
+- Features
+  - Quick Reply has a Prev button beside Next to go back and correct an earlier captcha challenge, inline and inside the captcha iframe. New `Previous captcha challenge` and `Next captcha challenge` keybinds (Left and Right by default) replace the strip arrow-key navigation.
+  - The auto-post countdown between Get Captcha and Next is now a button that turns `Post on Captcha Completion` on or off, and shows `Auto-post: On` or `Off` when no typing delay is running.
+
 ### 2.31.11 (2026-10-24)
 
 - Features
