@@ -494,6 +494,16 @@ const Config = {
         'The thread watcher will be visible when the page is loaded.',
         1
       ],
+      'Find replies to you in other threads': [
+        true,
+        'Scan boards in the background and add threads that quote your posts to the thread watcher.',
+        1
+      ],
+      'Reply scan boards': [
+        '',
+        'Boards to scan, separated by spaces. Empty = boards you posted on in the last 7 days.',
+        2
+      ],
       'Reply Pruning': [
         true,
         'Add option in header menu to hide old replies in long threads. Activated by default in stickies.'
