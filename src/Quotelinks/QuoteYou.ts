@@ -9,14 +9,30 @@ import ExpandComment from "../Miscellaneous/ExpandComment";
 import ScrollMarkers from "../Miscellaneous/ScrollMarkers";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
+import { dict } from "../platform/helpers";
 import PostRedirect from "../Posting/PostRedirect";
+
+interface YourPostKey {
+  boardID: string;
+  threadID: string | number;
+  postID: string | number;
+}
 
 interface QuoteYouType {
   db: DataBoard;
+  /** Permanent copy of `yourPosts`, never cleaned. Undefined while "Remember Your Posts" is off. */
+  dbForever?: DataBoard;
+  /** Every post in `dbForever` as "siteID/boardID/postID". */
+  foreverIndex: Set<string>;
   mark: HTMLElement;
   lastRead?: HTMLElement;
   init(): void;
   isYou(post: any): boolean;
+  buildIndex(): void;
+  isYouPostID(siteID: string | undefined, boardID: string, postID: string | number): boolean;
+  rememberForever(post: YourPostKey, cb?: () => void): void;
+  forgetForever(post: YourPostKey): void;
+  backfillForever(): void;
   node(this: any): void;
   menu: {
     post?: any;
@@ -32,18 +48,25 @@ interface QuoteYouType {
 const QuoteYou: QuoteYouType = {
   db: null as any,
   mark: null as any,
+  dbForever: undefined,
   lastRead: undefined,
 
   init() {
     if (!Conf['Remember Your Posts']) { return; }
 
     this.db = new DataBoard('yourPosts');
+    // Permanent copy of your posts, never cleaned. Value = time the post was recorded (ms).
+    this.dbForever = new DataBoard('yourPostsForever', QuoteYou.buildIndex, true);
+    QuoteYou.buildIndex();
+    QuoteYou.backfillForever();
     $.sync('Remember Your Posts', (enabled: boolean) => Conf['Remember Your Posts'] = enabled);
     $.on(d, 'QRPostSuccessful', (e: CustomEvent) => {
       const cb = PostRedirect.delay();
+      const cbForever = PostRedirect.delay();
       $.get('Remember Your Posts', Conf['Remember Your Posts'], (items: any) => {
         if (!items['Remember Your Posts']) { return; }
         const { boardID, threadID, postID } = e.detail;
+        QuoteYou.rememberForever({ boardID, threadID, postID }, cbForever);
         QuoteYou.db.set({ boardID, threadID, postID, val: true }, cb);
       });
     });
@@ -81,6 +104,77 @@ const QuoteYou: QuoteYouType = {
       boardID:  post.boardID,
       threadID: post.threadID,
       postID:   post.ID
+    });
+  },
+
+  // Index of `yourPostsForever` as "siteID/boardID/postID". Post numbers are unique per board,
+  // so the thread number is not needed to recognize a post as yours.
+  foreverIndex: new Set<string>(),
+
+  buildIndex() {
+    const index = new Set<string>();
+    const data = QuoteYou.dbForever?.data || {};
+    for (const siteID in data) {
+      const boards = data[siteID]?.boards;
+      if (!boards || typeof boards !== 'object') { continue; }
+      for (const boardID in boards) {
+        for (const threadID in boards[boardID]) {
+          for (const postID in boards[boardID][threadID]) {
+            index.add(`${siteID}/${boardID}/${postID}`);
+          }
+        }
+      }
+    }
+    QuoteYou.foreverIndex = index;
+  },
+
+  isYouPostID(siteID: string | undefined, boardID: string, postID: string | number) {
+    return QuoteYou.foreverIndex.has(`${siteID || g.SITE.ID}/${boardID}/${postID}`);
+  },
+
+  rememberForever({ boardID, threadID, postID }: YourPostKey, cb?: () => void) {
+    if (!QuoteYou.dbForever) { cb?.(); return; }
+    QuoteYou.foreverIndex.add(`${g.SITE.ID}/${boardID}/${postID}`);
+    QuoteYou.dbForever.set({ boardID, threadID, postID, val: Date.now() }, cb);
+  },
+
+  forgetForever({ boardID, threadID, postID }: YourPostKey) {
+    if (!QuoteYou.dbForever) { return; }
+    QuoteYou.foreverIndex.delete(`${g.SITE.ID}/${boardID}/${postID}`);
+    QuoteYou.dbForever.delete({ boardID, threadID, postID });
+  },
+
+  // One time: copy everything already in `yourPosts` into `yourPostsForever`, dated now.
+  backfillForever() {
+    $.get('yourPostsForeverBackfilled', false, ({ yourPostsForeverBackfilled }: any) => {
+      if (yourPostsForeverBackfilled) { return; }
+      const now = Date.now();
+      QuoteYou.dbForever.save(() => {
+        const from = QuoteYou.db.data;
+        const to = QuoteYou.dbForever.data;
+        for (const siteID in from) {
+          const boards = from[siteID]?.boards;
+          if (!boards || typeof boards !== 'object') { continue; }
+          to[siteID] ||= { boards: dict() };
+          const toBoards = to[siteID].boards;
+          for (const boardID in boards) {
+            for (const threadID in boards[boardID]) {
+              const posts = boards[boardID][threadID];
+              if (!posts || typeof posts !== 'object') { continue; }
+              for (const postID in posts) {
+                if (!posts[postID]) { continue; }
+                toBoards[boardID] ||= dict();
+                toBoards[boardID][threadID] ||= dict();
+                toBoards[boardID][threadID][postID] ??= now;
+              }
+            }
+          }
+        }
+      }, () => {
+        QuoteYou.buildIndex();
+        $.set('yourPostsForeverBackfilled', true);
+      });
+      QuoteYou.buildIndex();
     });
   },
 
@@ -127,8 +221,10 @@ const QuoteYou: QuoteYouType = {
       const data = { boardID: post.board.ID, threadID: post.thread.ID, postID: post.ID, val: true };
       if (this.checked) {
         QuoteYou.db.set(data);
+        QuoteYou.rememberForever(data);
       } else {
         QuoteYou.db.delete(data);
+        QuoteYou.forgetForever(data);
       }
       for (const clone of [post].concat(post.clones)) {
         clone.nodes.root.classList.toggle('yourPost', this.checked);
