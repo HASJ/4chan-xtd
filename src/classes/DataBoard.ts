@@ -188,8 +188,10 @@ export default class DataBoard {
   getFromBoard(board: any, threadID: PostInfo['threadID'], postID: PostInfo['postID']) {
     if (threadID == null) {
       if (postID == null) { return board; }
-      for (let thread: any = 0; thread < board.length; thread++) {
-        if (postID in thread) { return thread[postID]; }
+      // No thread given: look for the post in every thread of the board.
+      for (const tid in board) {
+        const thread = board[tid];
+        if (thread && (typeof thread === 'object') && (postID in thread)) { return thread[postID]; }
       }
       return undefined;
     }

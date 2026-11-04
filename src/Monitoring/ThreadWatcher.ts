@@ -21,6 +21,7 @@ import PostRedirect from '../Posting/PostRedirect';
 import QuoteYou from '../Quotelinks/QuoteYou';
 import Unread from './Unread';
 import UnreadIndex from './UnreadIndex';
+import { findQuotedPosts } from './YouScannerLogic';
 import UIState from '../globals/UIState';
 import IndexState from '../globals/IndexState';
 import { Conf, d, doc, g } from '../globals/globals';
@@ -549,7 +550,7 @@ const ThreadWatcher: ThreadWatcherType = {
     ThreadWatcher.status.textContent = '...';
     $.addClass(ThreadWatcher.refreshButton, 'spin');
     ThreadWatcher.syncing = true;
-    const dbs = [ThreadWatcher.db, ThreadWatcher.unreaddb, QuoteYou.db].filter(Boolean);
+    const dbs = [ThreadWatcher.db, ThreadWatcher.unreaddb, QuoteYou.db, QuoteYou.dbForever].filter(Boolean);
     let n = 0;
     return dbs.map((dbi) =>
       dbi.forceSync(() => {
@@ -711,11 +712,13 @@ const ThreadWatcher: ThreadWatcherType = {
     const lastReadPost = ThreadWatcher.unreaddb.get({ siteID, boardID, threadID, defaultValue: 0 });
     let unread = data.unread || 0;
     let quotingYou = data.quotingYou || 0;
-    const youOP = !!QuoteYou.db?.get({ siteID, boardID, threadID, postID: threadID });
+    const youOP = !!QuoteYou.db?.get({ siteID, boardID, threadID, postID: threadID })
+      || QuoteYou.isYouPostID(siteID, boardID, threadID);
 
     for (const postObj of response.posts) {
       if ((postObj.no <= (data.last || 0)) || (postObj.no <= lastReadPost)) { continue; }
       if (QuoteYou.db?.get({ siteID, boardID, threadID, postID: postObj.no })) { continue; }
+      if (QuoteYou.isYouPostID(siteID, boardID, postObj.no)) { continue; }
 
       const quotesYou = ThreadWatcher.postQuotesYou(postObj, thread, site, youOP);
 
@@ -738,16 +741,20 @@ const ThreadWatcher: ThreadWatcherType = {
     regexp.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regexp.exec(postObj.com))) {
+      const quotedBoardID = match[1] ? encodeURIComponent(match[1]) : boardID;
+      const quotedPostID = match[3] || match[2] || threadID;
       if (QuoteYou.db.get({
         siteID,
-        boardID:  match[1] ? encodeURIComponent(match[1]) : boardID,
+        boardID:  quotedBoardID,
         threadID: match[2] || threadID,
-        postID:   match[3] || match[2] || threadID
-      })) {
+        postID:   quotedPostID
+      }) || QuoteYou.isYouPostID(siteID, quotedBoardID, quotedPostID)) {
         return true;
       }
     }
-    return false;
+    // Board + post number match on the visible quote text, which also covers dead quotes (no link).
+    return findQuotedPosts(postObj.com, boardID)
+      .some(quote => QuoteYou.isYouPostID(siteID, quote.boardID, quote.postID));
   },
 
   parseStatus404(thread: any, isArchiveURL: boolean | undefined, site: any) {
