@@ -9,6 +9,7 @@ import { debounce, SECOND } from "../platform/helpers";
 import QuoteYou from "../Quotelinks/QuoteYou";
 import Favicon from "./Favicon";
 import { updateWatchedThread } from "./ThreadWatcherBridge";
+import { findQuotedPosts } from "./YouScannerLogic";
 
 interface LastSet extends Set<number> {
   last?: number;
@@ -35,6 +36,7 @@ interface UnreadType {
   sync(): void;
   addPost(this: any): any;
   addPostQuotingYou(post: any): void;
+  quotesYou(post: any): boolean;
   openNotification(post: any, predicate?: string): any;
   onUpdate(): void;
   readSinglePost(post: any): void;
@@ -238,14 +240,22 @@ const Unread: UnreadType = {
   },
 
   addPostQuotingYou(post: any) {
+    if (!Unread.quotesYou(post)) { return; }
+    Unread.postsQuotingYou.last = post.ID;
+    Unread.postsQuotingYou.add(post.ID);
+    Unread.openNotification(post);
+  },
+
+  // Same test as the thread watcher's check: the yourPosts lookup or the board + post number match on quote links,
+  // then the visible quote text in the comment, which also covers dead quotes.
+  quotesYou(post: any) {
     for (const quotelink of post.nodes.quotelinks) {
-      if (QuoteYou.db?.get(Get.postDataFromLink(quotelink))) {
-        Unread.postsQuotingYou.last = post.ID;
-        Unread.postsQuotingYou.add(post.ID);
-        Unread.openNotification(post);
-        return;
-      }
+      const data = Get.postDataFromLink(quotelink);
+      if (QuoteYou.db?.get(data) || QuoteYou.isYouPostID(post.siteID, data.boardID, data.postID)) { return true; }
     }
+    if (QuoteYou.foreverIndex.size === 0) { return false; }
+    return findQuotedPosts(post.nodes.comment?.innerHTML, post.board.ID)
+      .some(quote => QuoteYou.isYouPostID(post.siteID, quote.boardID, quote.postID));
   },
 
   openNotification(post: any, predicate = ' replied to you') {
