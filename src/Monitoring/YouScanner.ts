@@ -126,7 +126,7 @@ const YouScanner = {
 		});
 		// A post marked as yours by hand (post menu "You"): rescan its board from the start.
 		$.on(d, "YourPostMarked", (e: CustomEvent) => {
-			if (e.detail?.boardID) YouScanner.forgetBoard(e.detail.boardID);
+			if (e.detail?.boardID) void YouScanner.forgetBoard(e.detail.boardID);
 		});
 		// Thread watcher refresh (button or keybind): scan now.
 		$.on(d, "ThreadWatcherRefresh", YouScanner.scanNow);
@@ -652,7 +652,7 @@ const YouScanner = {
 		YouScanner.alive(cycle);
 		if (shown) return;
 		await YouScanner.setStored("youScannerIntroShown", true);
-		new Notice(
+		const _notice = new Notice(
 			"info",
 			`Found a reply to your post >>${quotedNo} in a thread you were not watching, and added it to the thread watcher. This is the "Find replies to you in other threads" option (Settings > Main > Monitoring).`,
 		);
