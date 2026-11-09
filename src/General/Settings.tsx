@@ -179,12 +179,23 @@ const Settings = {
     if (selected) {
       $.rmClass(selected, 'tab-selected');
     }
-    $.addClass($(`.tab-${this.hyphenatedTitle}`, Settings.dialog), 'tab-selected');
+    const currentTab = $(`.tab-${this.hyphenatedTitle}`, Settings.dialog);
+    if (currentTab) {
+      $.addClass(currentTab, 'tab-selected');
+    }
+    const subnav = $('.subsections-list', Settings.dialog);
+    if (subnav) {
+      subnav.hidden = this.title !== 'Main';
+    }
     const section = $('section', Settings.dialog);
     $.rmAll(section);
     section.className = `section-${this.hyphenatedTitle}`;
     this.open(section, g);
     section.scrollTop = 0;
+    const container = $('.section-container', Settings.dialog);
+    if (container) {
+      container.scrollTop = 0;
+    }
     $.event('OpenSettings', null, section);
   },
 
@@ -278,7 +289,16 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return result;
     };
 
-    const navSub = $.el('nav', { className: 'subsections-list' });
+    let subnav = Settings.dialog ? $('.subsections-list', Settings.dialog) : null;
+    if (!subnav) {
+      subnav = $('.subsections-list', section) || $.el('div', { className: 'subsections-list' });
+      if (!subnav.parentNode) {
+        $.prepend(section, subnav);
+      }
+    }
+    $.rmAll(subnav);
+    subnav.hidden = false;
+
     const fieldsets: HTMLElement[] = [];
     const subtabLinks: HTMLElement[] = [];
 
@@ -290,9 +310,11 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       for (const fs of fieldsets) {
         fs.hidden = fs.dataset.category !== category;
       }
+      const container = Settings.dialog ? $('.section-container', Settings.dialog) : null;
+      if (container) {
+        container.scrollTop = 0;
+      }
     };
-
-    $.add(section, navSub);
 
     for (const keyFS in Config.main) {
       const obj = Config.main[keyFS];
@@ -304,7 +326,7 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       link.dataset.category = keyFS;
       $.on(link, 'click', () => selectSubtab(keyFS));
       subtabLinks.push(link);
-      $.add(navSub, link);
+      $.add(subnav, link);
 
       const fs = $.el('fieldset',
         { innerHTML: `<legend>${keyFS}</legend>` });

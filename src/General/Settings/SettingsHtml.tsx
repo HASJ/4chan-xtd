@@ -20,6 +20,7 @@ const settingsHtml = <div id="fourchanx-settings" class="dialog">
       <button type="button" class="close" title="Close">✕</button>
     </div>
   </nav>
+  <div class="subsections-list" hidden></div>
   <div class="section-container"><section></section></div>
 </div>;
 
