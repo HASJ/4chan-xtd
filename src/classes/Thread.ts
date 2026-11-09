@@ -14,6 +14,7 @@ export default class Thread {
   declare posts: SimpleDict<Post>;
   declare isDead: boolean;
   declare isHidden: boolean;
+  declare isHighlighted: boolean;
   declare isSticky: boolean;
   declare isClosed: boolean;
   declare isArchived: boolean;
@@ -40,6 +41,7 @@ export default class Thread {
     this.posts      = new SimpleDict();
     this.isDead     = false;
     this.isHidden   = false;
+    this.isHighlighted = false;
     this.isSticky   = false;
     this.isClosed   = false;
     this.isArchived = false;

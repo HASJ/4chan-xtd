@@ -284,7 +284,7 @@ const ThreadHiding: any = {
 
   hide(thread, makeStub, reason) {
     if (makeStub === undefined) { makeStub = Conf['Stubs']; }
-    if (thread.isHidden) { return; }
+    if (thread.isHidden || (thread.isHighlighted && Conf['Always Show Highlighted Threads'])) { return; }
     const threadRoot = thread.nodes.root;
     thread.isHidden = true;
     $.event('ThreadHidingUpdate', undefined);

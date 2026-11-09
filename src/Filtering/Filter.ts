@@ -180,13 +180,13 @@ interface FilterState {
   poster: boolean;
   replies: boolean;
   reasons: string[] | undefined;
+  hideable: boolean;
 }
 
 interface EvaluationContext {
   mask: number;
   board: string;
   site: string;
-  hideable: boolean;
 }
 
 function isFilterMatched(filter: FilterObj, value: string, isString: boolean, mask: number, board: string, site: string): boolean {
@@ -207,11 +207,11 @@ function evaluateFilter(
   context: EvaluationContext,
   state: FilterState
 ) {
-  const { mask, board, site, hideable } = context;
+  const { mask, board, site } = context;
   if (!isFilterMatched(filter, value, isString, mask, board, site)) return;
 
   if (filter.hide) {
-    if (hideable) {
+    if (state.hideable) {
       state.hide = true;
       if (state.stub) {
         state.stub = filter.stub;
@@ -223,6 +223,10 @@ function evaluateFilter(
     (state.hl || (state.hl = [])).push(filter.hl);
   }
   if (!state.top) { state.top = !!filter.top; }
+  if (filter.hl && Conf['Always Show Highlighted Threads']) {
+    state.hide = false;
+    state.hideable = false;
+  }
   if (filter.noti) state.noti = true;
   if (filter.poster) state.poster = true;
   if (filter.replies) state.replies = true;
@@ -287,6 +291,9 @@ function highlightSamePosterReplies(post: Post, hl: string[], replies: boolean, 
 function applyPostHighlight(post: Post, hl: string[], replies: boolean, poster: boolean) {
   post.highlights = hl;
   $.addClass(post.nodes.root, ...hl);
+  if (post.thread) {
+    post.thread.isHighlighted = true;
+  }
   if (post.isReply) {
     const hlFn = (p: Post, ...h: string[]) => { $.addClass(p.nodes.root, ...h); };
     if (replies) Recursive.applyAndAdd(hlFn, post, ...hl);
@@ -303,14 +310,13 @@ function evaluateTypeFilters(
   mask: number,
   board: string,
   site: string,
-  hideable: boolean,
   state: FilterState
 ) {
   const filtersOrMap = Filter.filters.get(type);
   if (!filtersOrMap) return;
 
   const isString = type === 'uniqueID' || type === 'MD5';
-  const context: EvaluationContext = { mask, board, site, hideable };
+  const context: EvaluationContext = { mask, board, site };
 
   for (const value of Filter.values(type, post)) {
     const filtersForType = Array.isArray(filtersOrMap) ? filtersOrMap : filtersOrMap.get(value);
@@ -442,10 +448,11 @@ const Filter = {
       poster: false,
       replies: false,
       reasons: undefined,
+      hideable,
     };
 
     for (const type of Filter.filters.keys()) {
-      evaluateTypeFilters(type, post, mask, board, site, hideable, state);
+      evaluateTypeFilters(type, post, mask, board, site, state);
     }
     post.filterResults = {
       hide: state.hide,
@@ -538,6 +545,9 @@ const Filter = {
     if (hl) {
       this.highlights = hl;
       $.addClass(this.nodes.root, ...hl);
+      if (this.thread) {
+        this.thread.isHighlighted = true;
+      }
     }
     if (top) {
       $.prepend(this.nodes.root.parentNode, this.nodes.root);

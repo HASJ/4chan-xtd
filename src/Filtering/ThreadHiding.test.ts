@@ -34,4 +34,26 @@ describe('ThreadHiding', () => {
     ThreadHiding.saveHiddenState(thread, false);
     expect(ThreadHiding.isHidden('g', 1)).toBe(false);
   });
+
+  it('prevents hiding when thread is highlighted and Always Show Highlighted Threads is enabled', () => {
+    const thread: any = {
+      ID: 2,
+      board: { ID: 'g' },
+      nodes: { root: document.createElement('section') },
+      isHidden: false,
+      isHighlighted: true,
+    };
+    document.body.append(thread.nodes.root);
+
+    Conf['Always Show Highlighted Threads'] = true;
+    ThreadHiding.hide(thread, false);
+    expect(thread.isHidden).toBe(false);
+    expect(thread.nodes.root.hidden).toBe(false);
+
+    // When the setting is disabled, hiding proceeds
+    Conf['Always Show Highlighted Threads'] = false;
+    ThreadHiding.hide(thread, false);
+    expect(thread.isHidden).toBe(true);
+    expect(thread.nodes.root.hidden).toBe(true);
+  });
 });
