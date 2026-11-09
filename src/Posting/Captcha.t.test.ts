@@ -680,7 +680,7 @@ describe('CaptchaT auto-post typing delay', () => {
     CaptchaT.createStrips();
     expect(container.querySelector('.captcha-typing-countdown')).not.toBeNull();
     CaptchaT.setUsed();
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: On');
+    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 5s');
   });
 
   it('cancels auto-post on click and restarts the delay when enabled again', () => {
@@ -783,6 +783,62 @@ describe('CaptchaT auto-post typing delay', () => {
     type();
     CaptchaT.checkCompletion();
 
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the posting cooldown before submitting a completed captcha', () => {
+    buildExtCaptcha();
+    Conf['Auto-post typing delay'] = 0;
+    QRState.cooldown.update = vi.fn(() => { QRState.cooldown.seconds = 28; });
+
+    CaptchaT.checkCompletion();
+
+    expect(QRState.cooldown.update).toHaveBeenCalled();
+    expect(QRState.submit).not.toHaveBeenCalled();
+  });
+
+  it('waits for posting cooldown after the shorter typing countdown expires', () => {
+    const { container } = buildExtCaptcha();
+    type();
+    CaptchaT.checkCompletion();
+    QRState.cooldown.update = vi.fn(() => { QRState.cooldown.seconds = 23; });
+    vi.advanceTimersByTime(5000);
+    expect(QRState.submit).not.toHaveBeenCalled();
+    CaptchaT.updateTypingCountdown();
+    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 23s');
+
+    QRState.cooldown.update.mockImplementation(() => { QRState.cooldown.seconds = 0; });
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves the typing countdown when a consumed captcha is replaced after an error', () => {
+    const { root } = buildExtCaptcha();
+    type();
+    CaptchaT.setUsed();
+    root.remove();
+    buildExtCaptcha();
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(5000);
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables auto-post with zero typing delay while waiting for posting cooldown', () => {
+    const { container } = buildExtCaptcha();
+    Conf['Auto-post typing delay'] = 0;
+    Conf['Post on Captcha Completion'] = false;
+    QRState.cooldown.seconds = 28;
+    CaptchaT.updateTypingCountdown();
+    container.querySelector<HTMLButtonElement>('.captcha-typing-countdown')!.click();
+
+    expect(Conf['Post on Captcha Completion']).toBe(true);
+    expect(QRState.cooldown.auto).toBe(true);
+    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 28s');
+    expect(QRState.submit).not.toHaveBeenCalled();
+    QRState.cooldown.seconds = 0;
+    CaptchaT.checkCompletion();
     expect(QRState.submit).toHaveBeenCalledTimes(1);
   });
 

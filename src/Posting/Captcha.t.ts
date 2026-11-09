@@ -150,7 +150,7 @@ const CaptchaT: any = {
     const container = this.nodes?.container;
     if (!container) { return; }
     const enabled = !!Conf['Post on Captcha Completion'];
-    const remaining = enabled ? this.typingIdleRemaining() : 0;
+    const remaining = enabled ? Math.max(this.typingIdleRemaining(), (QRState.cooldown?.seconds || 0) * SECOND) : 0;
     let countdown = $('.captcha-typing-countdown', container);
     const next = $('#t-next', container);
     if (!next) { return; }
@@ -178,7 +178,7 @@ const CaptchaT: any = {
     const domain = location.hostname.split('.')[1];
     frame?.contentWindow?.postMessage({ type: CAPTCHA_AUTO_POST_MESSAGE, enabled }, `https://sys.${domain}.org`);
     if (enabled) { this.lastTypedAt = Date.now(); }
-    else if (QRState.cooldown) { QRState.cooldown.auto = false; }
+    if (QRState.cooldown) { QRState.cooldown.auto = enabled; }
     this.clearAutoSubmitTimer();
     if (enabled) { this.checkCompletion(); }
   },
@@ -200,6 +200,7 @@ const CaptchaT: any = {
       delete this.autoSubmitTimer;
       if (!this.isEnabled || !this.nodes.container) { return; }
       if (!Conf['Post on Captcha Completion']) { return; }
+      QRState.cooldown?.update?.();
       if (QRState.cooldown?.seconds || QRState.req) { return; }
       // Re-read instead of reusing the payload captured when the wait started:
       // the answer may have been consumed, cleared or replaced since.
@@ -1085,6 +1086,7 @@ const CaptchaT: any = {
       this.resetCooldownReload();
     }
     if (Conf['Post on Captcha Completion']) {
+      QRState.cooldown?.update?.();
       if (QRState.cooldown?.seconds || QRState.req) return;
       this.autoSubmitWhenIdle(response);
     }
@@ -1113,7 +1115,6 @@ const CaptchaT: any = {
     delete this.notifiedChallenge;
     // A captcha reached 4chan, so the auto-load has earned its budget back.
     delete this.autoReloadsSincePost;
-    delete this.lastTypedAt;
     delete this.stuckLoadTicks;
     this.clearAutoSubmitTimer();
     this.resetCooldownReload();

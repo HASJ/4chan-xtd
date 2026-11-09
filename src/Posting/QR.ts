@@ -952,6 +952,7 @@ Callbacks.handleErrors({
     }
 
     $.forceSync('cooldowns');
+    QR.cooldown.update();
     if (QR.cooldown.seconds) {
       if (force) {
         QR.cooldown.clear();
