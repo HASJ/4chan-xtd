@@ -3,6 +3,19 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.13 (2026-11-09)
+
+- Features
+  - Background Reply Scanner: Finds replies to your posts across boards in the background and adds quoting threads to the thread watcher even if you never opened them.
+  - Added `Always Show Highlighted Threads` option to allow filter highlighting to override thread hiding.
+  - Linkify now parses magnet link display names (`dn`) and prefixes them with a magnet emoji instead of displaying raw magnet URIs.
+  - Added `Image Resolution` gallery option to display image dimensions in gallery mode.
+  - Converted Main settings category dividers (Miscellaneous, Linkification, Filtering, etc.) into accessible subtabs within the Main tab, and modernized settings tab and button styling.
+
+- Bugfixes
+  - Fixed Desuarchive image redirects by properly trimming 16-digit timestamps down to 13 digits.
+  - Fixed Quick Reply captcha auto-post submitting before posting cooldown expires.
+
 ### 2.31.12 (2026-10-24)
 
 - Features
