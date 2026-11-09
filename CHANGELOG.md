@@ -6,15 +6,15 @@ and import them in XTd.
 ### 2.31.13 (2026-11-09)
 
 - Features
-  - Background Reply Scanner: Finds replies to your posts across boards in the background and adds quoting threads to the thread watcher even if you never opened them.
-  - Added `Always Show Highlighted Threads` option to allow filter highlighting to override thread hiding.
-  - Linkify now parses magnet link display names (`dn`) and prefixes them with a magnet emoji instead of displaying raw magnet URIs.
-  - Added `Image Resolution` gallery option to display image dimensions in gallery mode.
-  - Converted Main settings category dividers (Miscellaneous, Linkification, Filtering, etc.) into accessible subtabs within the Main tab, and modernized settings tab and button styling.
+  - Background Reply Scanner: Finds replies to your posts across boards in the background and adds quoting threads to the thread watcher even if you never opened them ([HASJ/4chan-xtd#30](https://github.com/HASJ/4chan-xtd/pull/30)).
+  - Added `Always Show Highlighted Threads` option to allow filter highlighting to override thread hiding ([ccd0/4chan-x#3284](https://github.com/ccd0/4chan-x/pull/3284)).
+  - Linkify now parses magnet link display names (`dn`) and prefixes them with a magnet emoji instead of displaying raw magnet URIs ([ccd0/4chan-x#3303](https://github.com/ccd0/4chan-x/pull/3303)).
+  - Added `Image Resolution` gallery option to display image dimensions in gallery mode ([ccd0/4chan-x#3391](https://github.com/ccd0/4chan-x/pull/3391)).
+  - Converted Main settings category dividers into stationary subtabs with inverted tab styling and spacing across main tabs and subtabs.
 
 - Bugfixes
-  - Fixed Desuarchive image redirects by properly trimming 16-digit timestamps down to 13 digits.
-  - Fixed Quick Reply captcha auto-post submitting before posting cooldown expires.
+  - Fixed Desuarchive image redirects by properly trimming 16-digit timestamps down to 13 digits ([nick-s-b/4chan-xt#6](https://github.com/nick-s-b/4chan-xt/pull/6)).
+  - Fixed Quick Reply captcha auto-post submitting before posting cooldown expires ([HASJ/4chan-xtd#30](https://github.com/HASJ/4chan-xtd/pull/30)).
 
 ### 2.31.12 (2026-10-24)
 
