@@ -126,5 +126,29 @@ describe('Embedding & Linkify for YouTube', () => {
       expect(links[1].href).toBe('https://www.youtube.com/watch?v=QT1BD8bP9-E');
       div.remove();
     });
+
+    it('linkifies magnet link with dn display name and prepends magnet icon', () => {
+      const div = document.createElement('div');
+      div.textContent = 'magnet:?xt=urn:btih:c12fe1c06bba254a9d1b00f&dn=Example+Archive';
+      document.body.appendChild(div);
+      const links = Linkify.process(div);
+      expect(links).toHaveLength(1);
+      const a = links[0];
+      expect(a.href).toBe('magnet:?xt=urn:btih:c12fe1c06bba254a9d1b00f&dn=Example+Archive');
+      expect(a.textContent).toBe('🧲Example Archive');
+      div.remove();
+    });
+
+    it('linkifies magnet link without dn display name with fallback icon', () => {
+      const div = document.createElement('div');
+      div.textContent = 'magnet:?xt=urn:btih:c12fe1c06bba254a9d1b00f';
+      document.body.appendChild(div);
+      const links = Linkify.process(div);
+      expect(links).toHaveLength(1);
+      const a = links[0];
+      expect(a.href).toBe('magnet:?xt=urn:btih:c12fe1c06bba254a9d1b00f');
+      expect(a.textContent).toBe('🧲magnet:?xt=urn:btih:c12fe1c06bba254a9d1b00f');
+      div.remove();
+    });
   });
 });

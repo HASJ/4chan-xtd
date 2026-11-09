@@ -244,7 +244,17 @@ const Linkify: any = {
     );
 
     // Insert the range into the anchor, the anchor into the range's DOM location, and destroy the range.
-    $.add(a, range.extractContents());
+    const contents = range.extractContents();
+    if (/^magnet:/i.test(text)) {
+      try {
+        const dn = new URL(text).searchParams.get('dn');
+        a.textContent = `🧲${dn || text}`;
+      } catch {
+        a.textContent = `🧲${text}`;
+      }
+    } else {
+      $.add(a, contents);
+    }
     range.insertNode(a);
 
     return a;
