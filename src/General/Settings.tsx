@@ -40,6 +40,7 @@ import { registerFilterSettingsOpener, registerSettingsOpener } from './Settings
  * The Settings singleton object managing all aspects of the configuration UI.
  */
 const Settings = {
+  selectedMainSubtab: undefined as string | undefined,
   dialog: undefined as HTMLDivElement | undefined,
 
   /**
@@ -123,10 +124,9 @@ const Settings = {
       }
       );
       $.on(link, 'click', Settings.openSection.bind(section));
-      links.push(link, $.tn(' | '));
+      links.push(link);
       if (section.title === openSection) { sectionToOpen = link; }
     }
-    links.pop();
     $.add($('.sections-list', dialog), links);
     if (openSection !== 'none') { (sectionToOpen || links[0]).click(); }
 
@@ -278,19 +278,54 @@ Enable it on boards.${location.hostname.split('.')[1]}.org in your browser's pri
       return result;
     };
 
+    const navSub = $.el('nav', { className: 'subsections-list' });
+    const fieldsets: HTMLElement[] = [];
+    const subtabLinks: HTMLElement[] = [];
+
+    const selectSubtab = (category: string) => {
+      Settings.selectedMainSubtab = category;
+      for (const link of subtabLinks) {
+        link.classList.toggle('tab-selected', link.dataset.category === category);
+      }
+      for (const fs of fieldsets) {
+        fs.hidden = fs.dataset.category !== category;
+      }
+    };
+
+    $.add(section, navSub);
+
     for (const keyFS in Config.main) {
       const obj = Config.main[keyFS];
+      const link = $.el('a', {
+        className: `subtab-${keyFS.toLowerCase().replace(/\s+/g, '-')}`,
+        textContent: keyFS,
+        href: 'javascript:;'
+      });
+      link.dataset.category = keyFS;
+      $.on(link, 'click', () => selectSubtab(keyFS));
+      subtabLinks.push(link);
+      $.add(navSub, link);
+
       const fs = $.el('fieldset',
         { innerHTML: `<legend>${keyFS}</legend>` });
+      fs.dataset.category = keyFS;
+      fs.className = 'main-category-fieldset';
       addCheckboxes(fs, obj);
       if (keyFS === 'Posting and Captchas') {
         $.add(fs, $.el('p',
           {innerHTML: 'For more info on captcha options and issues, see the <a href="' + meta.captchaFAQ + '" target="_blank">captcha FAQ</a>.'})
         );
       }
+      fieldsets.push(fs);
       $.add(section, fs);
     }
     addCheckboxes($('div[data-name="JSON Index"] > .suboption-list', section), Config.Index);
+
+    let activeSubtab = Settings.selectedMainSubtab;
+    if (!activeSubtab || !Config.main[activeSubtab]) {
+      activeSubtab = Object.keys(Config.main)[0];
+    }
+    selectSubtab(activeSubtab);
 
     $.get(items, function(items) {
       for (key in items) {

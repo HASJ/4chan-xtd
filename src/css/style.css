@@ -486,6 +486,17 @@ audio.controls-added {
 }
 .sections-list {
   flex: 1;
+  border-bottom: 1px solid currentColor;
+}
+div.sections-list a {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  border-bottom: none;
+  padding: 0 4px;
+  margin-right: -1px;
+  text-decoration: none !important;
 }
 .export, .import, .reset {
   cursor: pointer;
@@ -493,6 +504,47 @@ audio.controls-added {
 }
 .tab-selected {
   font-weight: 700;
+  background-color: rgba(128, 128, 128, 0.3);
+}
+#fourchanx-settings .credits button:not(.close) {
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-right: .5em;
+  cursor: pointer;
+}
+.subsections-list {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid currentColor;
+  margin-bottom: 8px;
+  padding: 0 0 2px;
+}
+div.subsections-list a {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  border-bottom: none;
+  padding: 2px 6px;
+  margin-right: 2px;
+  margin-bottom: 2px;
+  text-decoration: none !important;
+  color: inherit;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+div.subsections-list a.tab-selected {
+  font-weight: 700;
+  background-color: rgba(128, 128, 128, 0.3);
+}
+#fourchanx-settings .section-main fieldset.main-category-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+#fourchanx-settings .section-main fieldset.main-category-fieldset > legend {
+  display: none;
 }
 .section-sauce ul,
 .section-advanced ul {
