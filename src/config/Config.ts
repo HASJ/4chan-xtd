@@ -280,6 +280,11 @@ const Config = {
         'Show PDF files in gallery.',
         1
       ],
+      'Image Resolution': [
+        false,
+        'Shows the dimensions of the image you\'re viewing in the gallery.',
+        1
+      ],
       'Sauce': [
         true,
         'Add sauce links to images.'

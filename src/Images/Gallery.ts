@@ -193,6 +193,7 @@ const Gallery: GalleryType = {
       buttons: '.gal-buttons',
       frame:   '.gal-image',
       name:    '.gal-name',
+      dimensions: '.gal-dimensions',
       count:   '.count',
       total:   '.total',
       sauce:   '.gal-sauce',
@@ -332,6 +333,17 @@ const Gallery: GalleryType = {
     nodes.name.href = thumb.href;
     nodes.frame.scrollTop = 0;
     nodes.next.focus();
+
+    if (nodes.dimensions) {
+      nodes.dimensions.textContent = '';
+      const postID = file.dataset.post;
+      const post = postID ? g.posts?.get(postID) : undefined;
+      const postFile = post?.files[+(file.dataset.file || 0)];
+      if (Conf['Image Resolution'] && postFile?.dimensions) {
+        const [w, h] = postFile.dimensions.split('x');
+        nodes.dimensions.textContent = `${w} x ${h} px`;
+      }
+    }
 
     // Set sauce links
     $.rmAll(nodes.sauce);

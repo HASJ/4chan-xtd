@@ -2438,6 +2438,7 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   display: none;
 }
 .gal-name,
+.gal-dimensions,
 .gal-count,
 .gal-sauce {
   background: rgba(0,0,0,0.6) !important;
@@ -2446,6 +2447,9 @@ input[type="checkbox"]:checked ~ .checkbox-letter {
   margin-top: 3px;
   color: #ffffff !important;
   text-decoration: none !important;
+}
+.gal-dimensions:empty {
+  display: none;
 }
 .gal-sauce a {
   color: #ffffff !important;

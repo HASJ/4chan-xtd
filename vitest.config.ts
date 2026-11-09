@@ -2,7 +2,16 @@ import { defineConfig } from 'vitest/config';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
-  assetsInclude: ['**/*.html'],
+  plugins: [
+    {
+      name: 'html-transform',
+      transform(code, id) {
+        if (id.endsWith('.html')) {
+          return `export default ${JSON.stringify(code)};`;
+        }
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@fa': fileURLToPath(new URL('./node_modules/@fortawesome/free-regular-svg-icons/', import.meta.url)),
