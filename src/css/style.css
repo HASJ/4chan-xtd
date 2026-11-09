@@ -486,16 +486,20 @@ audio.controls-added {
 }
 .sections-list {
   flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-end;
   border-bottom: 1px solid currentColor;
 }
-div.sections-list a {
+.sections-list a {
   display: inline-block;
   border: 1px solid currentColor;
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
   border-bottom: none;
-  padding: 0 4px;
-  margin-right: -1px;
+  padding: 0 6px;
+  margin-bottom: -1px;
   text-decoration: none !important;
 }
 .export, .import, .reset {
