@@ -74,6 +74,7 @@ import ThreadUpdater from "../Monitoring/ThreadUpdater";
 import ThreadWatcher from "../Monitoring/ThreadWatcher";
 import Unread from "../Monitoring/Unread";
 import UnreadIndex from "../Monitoring/UnreadIndex";
+import YouScanner from "../Monitoring/YouScanner";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import PassLink from "../Posting/PassLink";
@@ -1050,6 +1051,7 @@ User agent: ${navigator.userAgent}\
     ['Thread Updater',            ThreadUpdater],
     ['Thread Watcher',            ThreadWatcher],
     ['Thread Watcher (Menu)',     ThreadWatcher.menu],
+    ['Find Replies to You',       YouScanner],
     ['Index Navigation',          Nav],
     ['Keybinds',                  Keybinds],
     ['Banner',                    Banner],
