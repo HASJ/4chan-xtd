@@ -171,7 +171,7 @@ const Redirect = {
 
   to(
     dest: 'post' | 'thread' | 'threadJSON' | 'file' | 'board' | 'search',
-    data: { boardID: string, threadID?: string | number, postID?: string | number }
+    data: { boardID: string, threadID?: string | number, postID?: string | number, filename?: string, type?: string, value?: string }
   ): string {
     const archive = (['search', 'board'].includes(dest) ? Redirect.data!.thread : Redirect.data![dest]).get(data.boardID);
     if (!archive) { return ''; }
@@ -227,7 +227,7 @@ const Redirect = {
     } else if (/[sm]\.jpg$/.test(filename)) {
       return '';
     }
-    if (archive.name.endsWith('arch.b4k.co') || archive.name.endsWith('palanq.win')) {
+    if (archive.name.endsWith('arch.b4k.co') || archive.name.endsWith('palanq.win') || archive.name.endsWith('Desuarchive')) {
       const [timeStamp, ext] = filename.split('.');
       if (timeStamp.length > 13) {
         // remove last 3 digits

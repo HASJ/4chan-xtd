@@ -48,4 +48,27 @@ describe('Redirect', () => {
     expect(() => Redirect.selectArchives()).not.toThrow();
     expect(Redirect.to('thread', { boardID: 'g', threadID: 100 })).toBe('https://archive.example/g/thread/100/');
   });
+
+  it('truncates timestamp for Desuarchive file redirects', () => {
+    const desuArchive = {
+      uid: 'desuarchive',
+      name: 'Desuarchive',
+      domain: 'desuarchive.org',
+      software: 'foolfuuka',
+      boards: ['a'],
+      files: ['a'],
+      https: true,
+    };
+    Conf.archives = [desuArchive];
+    Conf.selectedArchives = { a: { file: 'desuarchive' } };
+    Redirect.selectArchives();
+
+    // 16-digit timestamp with 3 trailing digits (ms) truncated to 13 digits
+    expect(Redirect.to('file', { boardID: 'a', filename: '1700000000123456.jpg' }))
+      .toBe('https://desuarchive.org/a/full_image/1700000000123.jpg');
+
+    // 13-digit timestamp remains intact
+    expect(Redirect.to('file', { boardID: 'a', filename: '1700000000123.jpg' }))
+      .toBe('https://desuarchive.org/a/full_image/1700000000123.jpg');
+  });
 });
