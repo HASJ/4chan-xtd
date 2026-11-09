@@ -32,8 +32,18 @@ const GithubUpdater = {
 
         if (this.status !== 200 || !this.response) return;
 
-        const latestVersion = this.response.tag_name;
-        const downloadUrl = this.response.html_url;
+        let response = this.response;
+        if (typeof response === 'string') {
+          try {
+            response = JSON.parse(response);
+          } catch {
+            return;
+          }
+        }
+        if (!response) return;
+
+        const latestVersion = response.tag_name;
+        const downloadUrl = response.html_url;
 
         if (latestVersion && downloadUrl && GithubUpdater.isNewer(g.VERSION, latestVersion)) {
           GithubUpdater.notify(latestVersion.replace(/^v/, ''), downloadUrl);
