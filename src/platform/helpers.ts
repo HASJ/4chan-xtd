@@ -121,3 +121,9 @@ export const keyCode = function (e: any) {
   }
   return key;
 };
+
+/** Parses the Auto-post typing protection window in seconds; returns 0 when disabled or invalid. */
+export const getTypingProtectionSeconds = (value: unknown) => {
+  const seconds = Number.parseFloat(value as string);
+  return Number.isFinite(seconds) && (seconds > 0) ? seconds : 0;
+};

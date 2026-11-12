@@ -128,44 +128,28 @@ test('submits a text-only reply after the final native captcha answer', async ({
   expect(sent[0]).toContain('test-challenge');
 });
 
-test('toggles auto-post with the countdown button between the captcha controls', async ({ page }) => {
-  await page.clock.install();
+test('cancels cooldown auto-post on edit within the protection window without a second countdown', async ({ page }) => {
   await installHarness(page, {
     [storageKey('previousversion')]: '2.31.9',
     [storageKey('Thread Watcher')]: false,
     [storageKey('Post on Captcha Completion')]: true,
     [storageKey('Auto-load captcha')]: false,
     [storageKey('Auto-load captcha after cooldown')]: false,
-    [storageKey('Auto-post typing delay')]: 2,
+    [storageKey('Auto-post typing delay')]: 30,
+    [storageKey('cooldowns')]: { g: { [Date.now()]: { type: 'reply', threadID: 100, delay: 20 } } },
   });
   await page.route('https://sys.4chan.org/**', route => route.fulfill({ status: 200, body: '' }));
   await page.goto('/g/thread/100', { waitUntil: 'domcontentloaded' });
   await page.addScriptTag({ path: resolve('tests/browser/fixtures/tcaptcha-native.js') });
   await page.addScriptTag({ path: bundle });
   await page.locator('.qr-link').first().click();
-  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000));
-  const comment = page.locator('#qr textarea[data-name="com"]');
-  await comment.fill('Countdown test');
-  const countdown = page.locator('#qr .captcha-typing-countdown');
-  await expect(countdown).toHaveText('Auto-post: 2s');
-  await expect(countdown).toBeVisible();
-  const load = await page.locator('#qr #t-load').boundingBox();
-  const timer = await countdown.boundingBox();
-  const next = await page.locator('#qr #t-next').boundingBox();
-  expect(timer!.x).toBeGreaterThanOrEqual(load!.x + load!.width);
-  expect(timer!.x + timer!.width).toBeLessThanOrEqual(next!.x);
-  await countdown.click();
-  await expect(countdown).toHaveText('Auto-post: Off');
-  await expect(countdown).toHaveAttribute('aria-pressed', 'false');
-  await countdown.click();
-  await expect(countdown).toHaveText('Auto-post: 2s');
-  await expect(countdown).toHaveAttribute('aria-pressed', 'true');
-  await page.clock.runFor(1100);
-  await expect(countdown).toHaveText('Auto-post: 1s');
-  await comment.fill('Countdown reset');
-  await expect(countdown).toHaveText('Auto-post: 2s');
-  await page.clock.runFor(2500);
-  await expect(countdown).toHaveText('Auto-post: On');
+  await expect(page.locator('#qr .captcha-typing-countdown')).toHaveCount(0);
+  const submit = page.locator('#qr-submit');
+  await expect(submit).toHaveValue(/^\d+$/);
+  await submit.click();
+  await expect(submit).toHaveValue(/^Auto \d+$/);
+  await page.locator('#qr textarea[data-name="com"]').fill('Edited near submit');
+  await expect(submit).toHaveValue(/^\d+$/);
 });
 
 for (const iframe of [false, true]) {
@@ -244,13 +228,9 @@ for (const iframe of [false, true]) {
     await expect(page.locator('#qr [name="t-response"]')).toHaveValue('022');
     await prev.click();
     await ready(3);
-    const toggle = page.locator('#qr .captcha-typing-countdown');
-    await toggle.press('Space');
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await strips.first().click();
+    await next.click();
     await expect(page.locator('#qr [name="t-response"]')).toHaveValue('020');
-    await toggle.click();
-    await expect(toggle).toHaveText('Auto-post: Off');
   });
 }
 

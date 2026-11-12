@@ -1689,14 +1689,6 @@ input.field.tripped:not(:hover):not(:focus) {
   pointer-events: none !important;
 }
 
-#qr .captcha-typing-countdown {
-  flex: 1;
-  align-self: center;
-  margin: 0 4px;
-  text-align: center;
-  white-space: nowrap;
-}
-
 #qr #t-ctrl,
 .captcha-iframe #t-ctrl {
   flex-wrap: wrap;
@@ -1867,7 +1859,6 @@ input.field.tripped:not(:hover):not(:focus) {
 :root.themed-captcha .captcha-iframe #t-root button,
 :root.themed-captcha #qr #t-next,
 :root.themed-captcha #qr #t-prev,
-:root.themed-captcha #qr .captcha-typing-countdown,
 :root.themed-captcha #qr #t-load,
 :root.themed-captcha .captcha-iframe #t-prev,
 :root.themed-captcha .captcha-iframe #t-next,
@@ -1886,7 +1877,6 @@ input.field.tripped:not(:hover):not(:focus) {
 :root.themed-captcha .captcha-iframe #t-root button:hover,
 :root.themed-captcha #qr #t-next:hover,
 :root.themed-captcha #qr #t-prev:hover,
-:root.themed-captcha #qr .captcha-typing-countdown:hover,
 :root.themed-captcha #qr #t-load:hover,
 :root.themed-captcha .captcha-iframe #t-prev:hover,
 :root.themed-captcha .captcha-iframe #t-next:hover,

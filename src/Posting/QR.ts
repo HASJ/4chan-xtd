@@ -20,7 +20,7 @@ import Menu from '../Menu/Menu';
 import UI from '../General/UI';
 import BoardConfig from '../General/BoardConfig';
 import Get from '../General/Get';
-import { DAY, dict, isTrustedSiteOrigin, SECOND } from '../platform/helpers';
+import { DAY, dict, getTypingProtectionSeconds, isTrustedSiteOrigin, SECOND } from '../platform/helpers';
 import Icon from '../Icons/icon';
 import { VideoStripper } from './VideoStripper';
 import * as MimeTypes from '../globals/MimeTypes';
@@ -1906,6 +1906,7 @@ class Post {
   declare URL?: string;
   declare com?: string;
   declare pasting?: boolean;
+  declare lastEditedAt?: number;
 
   constructor(select) {
     this.select = this.select.bind(this);
@@ -2102,11 +2103,17 @@ class Post {
   }
 
   preventAutoPost() {
+    if (this !== QR.posts[0]) { return; }
+    this.lastEditedAt = Date.now();
     // Disable auto-posting if you're editing the first post
-    // during the last 5 seconds of the cooldown.
-    if (QR.cooldown.auto && (this === QR.posts[0])) {
+    // during the last N seconds of the cooldown.
+    if (QR.cooldown.auto) {
       QR.cooldown.update(); // adding/removing file can change cooldown
-      if (QR.cooldown.seconds <= 5) QR.cooldown.auto = false;
+      const delay = getTypingProtectionSeconds(Conf['Auto-post typing delay']);
+      if (delay > 0 && QR.cooldown.seconds <= delay) {
+        QR.cooldown.auto = false;
+        QR.status();
+      }
     }
   }
 

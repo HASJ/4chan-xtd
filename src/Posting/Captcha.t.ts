@@ -2,7 +2,7 @@ import { Conf, d, g } from "../globals/globals";
 import $ from "../platform/$";
 import $$ from "../platform/$$";
 import QRState from "../globals/QRState";
-import { isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers";
+import { getTypingProtectionSeconds, isPassEnabled, isTrustedSiteOrigin, SECOND } from "../platform/helpers";
 import Notice from "../classes/Notice";
 import UIState from "../globals/UIState";
 import Favicon from "../Monitoring/Favicon";
@@ -23,7 +23,6 @@ const MAX_AUTO_RELOADS_PER_POST = 3;
 const EMPTY_DATA_URL = /url\(\s*["']?data:[^,"')]*,\s*["']?\s*\)/;
 const CAPTCHA_COMPLETE_MESSAGE = '4chanXCaptchaComplete';
 const CAPTCHA_INCOMPLETE_MESSAGE = '4chanXCaptchaIncomplete';
-const CAPTCHA_AUTO_POST_MESSAGE = '4chanXCaptchaAutoPost';
 
 const CaptchaT: any = {
   init() {
@@ -42,11 +41,6 @@ const CaptchaT: any = {
     $.on(QRState.nodes.com, 'keydown', e => {
       if (e.key === 'Tab') { this.cancelCommentFocusRestore(); }
     });
-    // Anywhere in the QR counts as the user working on the post -- comment,
-    // name, options, subject, filename. The captcha widget does not: a click
-    // there is what completes the challenge, so counting it would delay every
-    // auto-post by the full window.
-    $.on(QRState.nodes.el, 'input keydown', e => this.noteTyping(e));
     // Give up on the automatic reload when it is our own click that failed;
     // errors from a manual or unrelated request are not ours to react to.
     $.on(d, 'TCaptchaError', () => {
@@ -64,7 +58,6 @@ const CaptchaT: any = {
         const response = $('[name="t-response"]', container);
         if (response) { response.value = ''; }
         this.isCompleted = false;
-        this.clearAutoSubmitTimer();
         return;
       }
       if (e.data?.type === CAPTCHA_COMPLETE_MESSAGE) {
@@ -130,93 +123,12 @@ const CaptchaT: any = {
     this.restoreCommentFocus();
   },
 
-  noteTyping(e) {
-    const target = e?.target instanceof Node ? e.target : null;
-    if (target && this.nodes.root?.contains(target)) { return; }
-    this.lastTypedAt = Date.now();
-    this.updateTypingCountdown();
-  },
-
-  // Milliseconds still to wait before the QR counts as idle. 0 means the post
-  // can go out now -- either nothing was typed or the delay is switched off.
-  typingIdleRemaining() {
-    const seconds = Number.parseFloat(Conf['Auto-post typing delay']);
-    const delay = (Number.isFinite(seconds) && (seconds > 0)) ? (seconds * SECOND) : 0;
-    if (!delay || !this.lastTypedAt) { return 0; }
-    return Math.max(0, (this.lastTypedAt + delay) - Date.now());
-  },
-
-  updateTypingCountdown() {
-    const container = this.nodes?.container;
-    if (!container) { return; }
-    const enabled = !!Conf['Post on Captcha Completion'];
-    const remaining = enabled ? Math.max(this.typingIdleRemaining(), (QRState.cooldown?.seconds || 0) * SECOND) : 0;
-    let countdown = $('.captcha-typing-countdown', container);
-    const next = $('#t-next', container);
-    if (!next) { return; }
-    if (!countdown) {
-      countdown = next.cloneNode(false);
-      countdown.removeAttribute('id');
-      countdown.type = 'button';
-      countdown.disabled = false;
-      countdown.className = 'captcha-typing-countdown';
-      countdown.style.margin = '0';
-      $.on(countdown, 'click', () => this.toggleAutoPost());
-      $.before($('.captcha-navigation', container) || next, countdown);
-    }
-    countdown.setAttribute('aria-pressed', String(enabled));
-    countdown.title = enabled ? 'Disable automatic posting' : 'Enable automatic posting';
-    const text = `Auto-post: ${remaining ? `${Math.ceil(remaining / SECOND)}s` : (enabled ? 'On' : 'Off')}`;
-    if (countdown.textContent !== text) { countdown.textContent = text; }
-  },
-
-  toggleAutoPost() {
-    const enabled = !Conf['Post on Captcha Completion'];
-    Conf['Post on Captcha Completion'] = enabled;
-    $.set('Post on Captcha Completion', enabled);
-    const frame = this.nodes?.container && $('#t-frame', this.nodes.container);
-    const domain = location.hostname.split('.')[1];
-    frame?.contentWindow?.postMessage({ type: CAPTCHA_AUTO_POST_MESSAGE, enabled }, `https://sys.${domain}.org`);
-    if (enabled) { this.lastTypedAt = Date.now(); }
-    if (QRState.cooldown) { QRState.cooldown.auto = enabled; }
-    this.clearAutoSubmitTimer();
-    if (enabled) { this.checkCompletion(); }
-  },
-
-  // 'Post on Captcha Completion' submits the moment an answer lands, which with
-  // the auto-load can be while the user is still writing. Hold the submit until
-  // they have been quiet -- deferred, never cancelled, so the setting still
-  // does what it says once they stop.
-  autoSubmitWhenIdle(response) {
-    if (this.isNavigating) { return; }
-    const wait = this.typingIdleRemaining();
-    if (!wait) {
-      this.clearAutoSubmitTimer();
-      this.autoSubmit(response);
-      return;
-    }
-    if (this.autoSubmitTimer) { return; }
-    this.autoSubmitTimer = setTimeout(() => {
-      delete this.autoSubmitTimer;
-      if (!this.isEnabled || !this.nodes.container) { return; }
-      if (!Conf['Post on Captcha Completion']) { return; }
-      QRState.cooldown?.update?.();
-      if (QRState.cooldown?.seconds || QRState.req) { return; }
-      // Re-read instead of reusing the payload captured when the wait started:
-      // the answer may have been consumed, cleared or replaced since.
-      const current = this.getOne();
-      if (!current?.['t-response'] && (current?.['t-challenge'] !== 'noop')) { return; }
-      // Still typing? Wait again rather than posting on a stale deadline.
-      this.autoSubmitWhenIdle(current);
-    }, wait);
-  },
-
-  clearAutoSubmitTimer() {
-    if (this.autoSubmitTimer) {
-      clearTimeout(this.autoSubmitTimer);
-      delete this.autoSubmitTimer;
-    }
-    this.updateTypingCountdown();
+  // True when the first post was edited recently enough that an automatic
+  // ('noop') captcha completion should not fire off an unfinished post.
+  isRecentFirstPostEdit() {
+    const delay = getTypingProtectionSeconds(Conf['Auto-post typing delay']);
+    const lastEditedAt = QRState.posts[0]?.lastEditedAt;
+    return !!(delay && lastEditedAt && ((Date.now() - lastEditedAt) < (delay * SECOND)));
   },
 
   // The 'Load new captcha' keybind. Asks the same way the auto-load does, so a
@@ -337,7 +249,7 @@ const CaptchaT: any = {
   redirectCommentFocus(e) {
     if (!this.shouldKeepCommentFocus()) { return false; }
     const target = e?.target instanceof Node ? e.target : null;
-    if (target instanceof Element && target.closest('.captcha-typing-countdown, .captcha-navigation')) {
+    if (target instanceof Element && target.closest('.captcha-navigation')) {
       this.cancelCommentFocusRestore();
       return false;
     }
@@ -820,7 +732,6 @@ const CaptchaT: any = {
     if (!step || (Number(step[1]) === 1 && !$('#t-slider', mainDiv)?.disabled)) { return; }
     this.isNavigating = true;
     this.isCompleted = false;
-    this.clearAutoSubmitTimer();
     try {
       const result = await $.global('previousTCaptcha', {});
       if (result?.changed !== '1') { return; }
@@ -888,7 +799,6 @@ const CaptchaT: any = {
     const mainDiv = this.nodes.container;
     if (!mainDiv) return;
 
-    this.updateTypingCountdown();
     this.updateChallengeNavigation(mainDiv);
     this.registerKeydownListener();
     const state = this.detectChallengeState(mainDiv);
@@ -955,10 +865,8 @@ const CaptchaT: any = {
     delete this.autoSubmittedFor;
     delete this.answerExpiresAt;
     delete this.autoReloadsSincePost;
-    delete this.lastTypedAt;
     delete this.stuckLoadTicks;
     delete this.notifiedChallenge;
-    this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     if (this.observer) {
       this.observer.disconnect();
@@ -1088,8 +996,17 @@ const CaptchaT: any = {
     if (Conf['Post on Captcha Completion']) {
       QRState.cooldown?.update?.();
       if (QRState.cooldown?.seconds || QRState.req) return;
-      this.autoSubmitWhenIdle(response);
+      if (noCaptchaNeeded && this.isRecentFirstPostEdit()) {
+        // Cancel auto-submit for this noop payload so polling does not fire it later.
+        this.autoSubmittedFor = this.getPayloadKey(response);
+        return;
+      }
+      this.autoSubmit(response);
     }
+  },
+
+  getPayloadKey(response) {
+    return `${response['t-challenge'] || ''}:${response['t-response'] || ''}`;
   },
 
   // setup() runs on every failed post and clears isCompleted, so the false->true
@@ -1100,7 +1017,7 @@ const CaptchaT: any = {
   autoSubmit(response) {
     const post = QRState.posts[0];
     if (post && !((QRState.posts.length > 1) || !post.isOnlyQuotes() || post.file)) { return; }
-    const payload = `${response['t-challenge'] || ''}:${response['t-response'] || ''}`;
+    const payload = this.getPayloadKey(response);
     if (this.autoSubmittedFor === payload) { return; }
     this.autoSubmittedFor = payload;
     QRState.submit();
@@ -1116,7 +1033,6 @@ const CaptchaT: any = {
     // A captcha reached 4chan, so the auto-load has earned its budget back.
     delete this.autoReloadsSincePost;
     delete this.stuckLoadTicks;
-    this.clearAutoSubmitTimer();
     this.resetCooldownReload();
     this.shouldLoad = false;
     if (this.isEnabled && this.nodes.container) {
@@ -1166,10 +1082,6 @@ const CaptchaT: any = {
     $.on(window, 'message', (e) => {
       const boardOrigin = `https://boards.${location.hostname.split('.')[1]}.org`;
       if (e.source !== window.parent || e.origin !== boardOrigin) { return; }
-      if (e.data?.type === CAPTCHA_AUTO_POST_MESSAGE && typeof e.data.enabled === 'boolean') {
-        Conf['Post on Captcha Completion'] = e.data.enabled;
-        return;
-      }
       if (e.data?.type === 'select-strip') {
         const index = e.data.index;
         const strips = $$('.captcha-strip', mainDiv);

@@ -598,20 +598,16 @@ describe('CaptchaT auto-load after cooldown', () => {
   });
 });
 
-// A captcha can complete on its own while the user is still writing, and
-// 'Post on Captcha Completion' would send the half-written comment.
-describe('CaptchaT auto-post typing delay', () => {
-  let outside: HTMLTextAreaElement;
-
-  const type = () => CaptchaT.noteTyping({ target: outside });
-
+// A captcha can complete on its own ('noop') while the user is still writing,
+// and 'Post on Captcha Completion' would send the half-written comment.
+describe('CaptchaT auto-post typing protection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn($, 'global').mockResolvedValue({});
     Conf['Auto-load captcha after cooldown'] = false;
     Conf['Post on Captcha Completion'] = true;
     Conf['Auto-post typing delay'] = 5;
-    QRState.posts = [];
+    QRState.posts = [{ isOnlyQuotes: () => false }];
     QRState.nodes = null;
     QRState.cooldown = { auto: false };
     QRState.submit = vi.fn();
@@ -619,168 +615,72 @@ describe('CaptchaT auto-post typing delay', () => {
     CaptchaT.nodes = {};
     CaptchaT.isCompleted = false;
     delete CaptchaT.autoSubmittedFor;
-    delete CaptchaT.lastTypedAt;
-    CaptchaT.clearAutoSubmitTimer();
-    outside = document.createElement('textarea');
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('holds the post while the user is typing', () => {
+  it('does not render a separate captcha typing countdown button', () => {
+    const { container } = buildExtCaptcha();
+    QRState.posts[0].lastEditedAt = Date.now();
+
+    CaptchaT.createStrips();
+
+    expect(container.querySelector('.captcha-typing-countdown')).toBeNull();
+  });
+
+  it('cancels automatic noop submit when the first post was recently edited and stays cancelled', () => {
     buildExtCaptcha();
+    QRState.posts[0].lastEditedAt = Date.now();
 
-    type();
     CaptchaT.checkCompletion();
-
     expect(QRState.submit).not.toHaveBeenCalled();
-  });
 
-  it('counts down between Get Captcha and Next and resets on typing', () => {
-    const { container, tLoad } = buildExtCaptcha();
-
-    type();
-    const countdown = container.querySelector('.captcha-typing-countdown');
-    expect(countdown?.textContent).toBe('Auto-post: 5s');
-    expect(countdown?.tagName).toBe('BUTTON');
-    expect(tLoad.nextElementSibling).toBe(countdown);
-    expect(countdown?.nextElementSibling?.id).toBe('t-next');
-
-    vi.advanceTimersByTime(1250);
-    CaptchaT.createStrips();
-    expect(countdown?.textContent).toBe('Auto-post: 4s');
-    type();
-    expect(countdown?.textContent).toBe('Auto-post: 5s');
-    expect(container.querySelectorAll('.captcha-typing-countdown')).toHaveLength(1);
-
-    vi.advanceTimersByTime(5000);
-    CaptchaT.createStrips();
-    expect(countdown?.textContent).toBe('Auto-post: On');
-  });
-
-  it.each([0, -1, Number.NaN])('shows the auto-post switch without a countdown for delay %s', delay => {
-    const { container } = buildExtCaptcha();
-    type();
-    Conf['Auto-post typing delay'] = delay;
-
-    CaptchaT.createStrips();
-
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: On');
-  });
-
-  it('keeps the switch available when auto-post is disabled or the captcha is used', () => {
-    const { container } = buildExtCaptcha();
-    type();
-    Conf['Post on Captcha Completion'] = false;
-    CaptchaT.createStrips();
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: Off');
-
-    Conf['Post on Captcha Completion'] = true;
-    CaptchaT.createStrips();
-    expect(container.querySelector('.captcha-typing-countdown')).not.toBeNull();
-    CaptchaT.setUsed();
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 5s');
-  });
-
-  it('cancels auto-post on click and restarts the delay when enabled again', () => {
-    const { container } = buildExtCaptcha();
-    const save = vi.spyOn($, 'set');
-    type();
-    CaptchaT.checkCompletion();
-    const toggle = container.querySelector<HTMLButtonElement>('.captcha-typing-countdown')!;
-    toggle.click();
-    expect(toggle.getAttribute('aria-pressed')).toBe('false');
-    expect(Conf['Post on Captcha Completion']).toBe(false);
-    expect(CaptchaT.autoSubmitTimer).toBeUndefined();
+    // Subsequent poll ticks after the window expires must not silently submit.
     vi.advanceTimersByTime(6000);
     CaptchaT.checkCompletion();
     expect(QRState.submit).not.toHaveBeenCalled();
-
-    toggle.click();
-    expect(save).toHaveBeenLastCalledWith('Post on Captcha Completion', true);
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(toggle.textContent).toBe('Auto-post: 5s');
-    vi.advanceTimersByTime(4999);
-    expect(QRState.submit).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps keyboard focus on the auto-post button during captcha initialization', () => {
-    const { container } = buildExtCaptcha();
-    QRState.nodes = { el: document.createElement('div'), com: outside };
-    CaptchaT.keepCommentFocus = true;
-    CaptchaT.keepCommentFocusUntil = Date.now() + 10000;
-    type();
-    const toggle = container.querySelector('.captcha-typing-countdown');
-    const restore = vi.spyOn(CaptchaT, 'restoreCommentFocus').mockImplementation(() => {});
-
-    expect(CaptchaT.redirectCommentFocus({ target: toggle, preventDefault: vi.fn() })).toBe(false);
-    expect(CaptchaT.keepCommentFocus).toBeUndefined();
-    expect(restore).not.toHaveBeenCalled();
-  });
-
-  it('posts once the typing pause elapses', () => {
-    buildExtCaptcha();
-
-    type();
-    CaptchaT.checkCompletion();
-    vi.advanceTimersByTime(5000);
-
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
-  });
-
-  it('cancels a queued auto-post when the iframe reopens the completed challenge', () => {
-    const qr = document.createElement('form');
-    const field = document.createElement('div');
-    field.append(outside);
-    qr.append(field);
-    document.body.append(qr);
-    QRState.nodes = { el: qr, com: outside };
-    CaptchaT.init();
+  it('still submits a manually completed challenge within the typing window', () => {
     const { container } = buildCaptcha();
-    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'completed';
-    const response = container.querySelector<HTMLInputElement>('[name="t-response"]')!;
-    response.value = '012';
-    type();
-    CaptchaT.checkCompletion();
-    expect(CaptchaT.autoSubmitTimer).toBeDefined();
-    const reopen = (origin, challenge) => window.dispatchEvent(new MessageEvent('message', {
-      origin, data: { type: '4chanXCaptchaIncomplete', challenge },
-    }));
-    reopen('https://example.com', 'completed');
-    reopen('https://sys.4chan.org', 'different-challenge');
-    expect(response.value).toBe('012');
-    reopen('https://sys.4chan.org', 'completed');
-    expect(response.value).toBe('');
-    expect(CaptchaT.autoSubmitTimer).toBeUndefined();
-    vi.advanceTimersByTime(5000);
-    expect(QRState.submit).not.toHaveBeenCalled();
-  });
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'manual-challenge';
+    container.querySelector<HTMLInputElement>('#t-resp')!.value = '012';
+    QRState.posts[0].lastEditedAt = Date.now();
 
-  // The deadline moves with the last keystroke; it is not fixed when the
-  // captcha completed.
-  it('defers again when the user keeps typing', () => {
-    buildExtCaptcha();
-
-    type();
     CaptchaT.checkCompletion();
 
-    vi.advanceTimersByTime(4000);
-    type();
-    vi.advanceTimersByTime(4000);
-    expect(QRState.submit).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1000);
     expect(QRState.submit).toHaveBeenCalledTimes(1);
   });
 
-  it('posts immediately when the delay is zero', () => {
-    buildExtCaptcha();
-    Conf['Auto-post typing delay'] = 0;
+  it('submits a later manual challenge even if an earlier noop was cancelled', () => {
+    const { container } = buildExtCaptcha();
+    QRState.posts[0].lastEditedAt = Date.now();
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
 
-    type();
+    container.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = 'manual-challenge';
+    container.querySelector<HTMLInputElement>('#t-resp')!.value = '012';
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0, -1, Number.NaN])('submits noop immediately when typing delay is %s', delay => {
+    buildExtCaptcha();
+    Conf['Auto-post typing delay'] = delay;
+    QRState.posts[0].lastEditedAt = Date.now();
+
+    CaptchaT.checkCompletion();
+
+    expect(QRState.submit).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits noop when nothing was edited or the edit window has elapsed', () => {
+    buildExtCaptcha();
+    QRState.posts[0].lastEditedAt = Date.now() - 5000;
+
     CaptchaT.checkCompletion();
 
     expect(QRState.submit).toHaveBeenCalledTimes(1);
@@ -797,106 +697,31 @@ describe('CaptchaT auto-post typing delay', () => {
     expect(QRState.submit).not.toHaveBeenCalled();
   });
 
-  it('waits for posting cooldown after the shorter typing countdown expires', () => {
-    const { container } = buildExtCaptcha();
-    type();
-    CaptchaT.checkCompletion();
-    QRState.cooldown.update = vi.fn(() => { QRState.cooldown.seconds = 23; });
-    vi.advanceTimersByTime(5000);
-    expect(QRState.submit).not.toHaveBeenCalled();
-    CaptchaT.updateTypingCountdown();
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 23s');
-
-    QRState.cooldown.update.mockImplementation(() => { QRState.cooldown.seconds = 0; });
-    CaptchaT.checkCompletion();
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
-  });
-
-  it('preserves the typing countdown when a consumed captcha is replaced after an error', () => {
+  it('allows noop auto-submit on the next post after setUsed clears suppression', () => {
     const { root } = buildExtCaptcha();
-    type();
+    QRState.posts[0].lastEditedAt = Date.now();
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
+
     CaptchaT.setUsed();
     root.remove();
+    QRState.posts = [{ isOnlyQuotes: () => false }];
     buildExtCaptcha();
-    CaptchaT.checkCompletion();
-
-    expect(QRState.submit).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(5000);
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
-  });
-
-  it('enables auto-post with zero typing delay while waiting for posting cooldown', () => {
-    const { container } = buildExtCaptcha();
-    Conf['Auto-post typing delay'] = 0;
-    Conf['Post on Captcha Completion'] = false;
-    QRState.cooldown.seconds = 28;
-    CaptchaT.updateTypingCountdown();
-    container.querySelector<HTMLButtonElement>('.captcha-typing-countdown')!.click();
-
-    expect(Conf['Post on Captcha Completion']).toBe(true);
-    expect(QRState.cooldown.auto).toBe(true);
-    expect(container.querySelector('.captcha-typing-countdown')?.textContent).toBe('Auto-post: 28s');
-    expect(QRState.submit).not.toHaveBeenCalled();
-    QRState.cooldown.seconds = 0;
-    CaptchaT.checkCompletion();
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
-  });
-
-  it('posts immediately when nothing was typed', () => {
-    buildExtCaptcha();
-
     CaptchaT.checkCompletion();
 
     expect(QRState.submit).toHaveBeenCalledTimes(1);
   });
 
-  // Solving the captcha is what completes it; counting those clicks would
-  // delay every single auto-post by the full window.
-  it('does not count captcha interaction as typing', () => {
-    const { container } = buildExtCaptcha();
-
-    CaptchaT.noteTyping({ target: container });
-
-    expect(CaptchaT.lastTypedAt).toBeUndefined();
-  });
-
-  // A deferral must not become a second post: the payload guard still applies.
-  it('still posts a given payload only once', () => {
+  it('posts a given payload only once', () => {
     buildExtCaptcha();
 
-    type();
     CaptchaT.checkCompletion();
-    vi.advanceTimersByTime(5000);
     expect(QRState.submit).toHaveBeenCalledTimes(1);
 
     CaptchaT.isCompleted = false;
     CaptchaT.checkCompletion();
-    vi.advanceTimersByTime(5000);
 
     expect(QRState.submit).toHaveBeenCalledTimes(1);
-  });
-
-  // The answer can be consumed or cleared while we wait.
-  it('does not post when the answer is gone by the time the wait ends', () => {
-    const { root } = buildExtCaptcha();
-
-    type();
-    CaptchaT.checkCompletion();
-    root.querySelector<HTMLInputElement>('[name="t-challenge"]')!.value = '';
-    vi.advanceTimersByTime(5000);
-
-    expect(QRState.submit).not.toHaveBeenCalled();
-  });
-
-  it('drops a pending post when the captcha is consumed', () => {
-    buildExtCaptcha();
-
-    type();
-    CaptchaT.checkCompletion();
-    CaptchaT.setUsed();
-    vi.advanceTimersByTime(5000);
-
-    expect(QRState.submit).not.toHaveBeenCalled();
   });
 });
 
@@ -968,7 +793,6 @@ describe('CaptchaT challenge navigation', () => {
     delete CaptchaT.autoSubmittedFor;
     CaptchaT.isNavigating = true;
     CaptchaT.checkCompletion();
-    CaptchaT.autoSubmitWhenIdle({ 't-challenge': 'navigation', 't-response': '012' });
     expect(QRState.submit).not.toHaveBeenCalled();
     CaptchaT.isNavigating = false;
     CaptchaT.checkCompletion();
@@ -1448,7 +1272,6 @@ describe('CaptchaT queue auto-posting and completion readiness', () => {
     delete CaptchaT.autoReloadsSincePost;
     delete CaptchaT.autoSubmittedFor;
     delete CaptchaT.notifiedChallenge;
-    CaptchaT.clearAutoSubmitTimer();
     CaptchaT.shouldLoad = false;
   });
 
@@ -1630,17 +1453,17 @@ describe('CaptchaT queue auto-posting and completion readiness', () => {
     expect(QRState.submit).not.toHaveBeenCalled();
   });
 
-  it('preserves typing delay in queue auto mode', () => {
+  it('cancels noop auto-submit on recent edit in queue auto mode', () => {
     buildExtCaptcha();
     Conf['Auto-post typing delay'] = 3;
-    const textarea = document.createElement('textarea');
-    CaptchaT.noteTyping({ target: textarea });
+    QRState.posts[0].lastEditedAt = Date.now();
 
     CaptchaT.checkCompletion();
     expect(QRState.submit).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(3000);
-    expect(QRState.submit).toHaveBeenCalledTimes(1);
+    CaptchaT.checkCompletion();
+    expect(QRState.submit).not.toHaveBeenCalled();
   });
 });
 
@@ -1929,6 +1752,50 @@ describe('QR queue auto behavior and status display', () => {
     expect(submitSpy).not.toHaveBeenCalled();
     expect(QR.cooldown.auto).toBe(false);
     submitSpy.mockRestore();
+  });
+
+  it('cancels QR.cooldown.auto and updates status when editing first post within Auto-post typing delay', () => {
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 8;
+    const updateSpy = vi.spyOn(QR.cooldown, 'update').mockImplementation(() => {});
+    const post = Object.assign(Object.create(QR.post.prototype), { thread: 123 });
+    QRState.posts = [post];
+    QR.cooldown.seconds = 7;
+    QR.cooldown.auto = true;
+    QR.status();
+    expect(QR.nodes.status.value).toBe('Auto 7');
+
+    post.preventAutoPost();
+
+    expect(post.lastEditedAt).toBeTypeOf('number');
+    expect(QR.cooldown.auto).toBe(false);
+    expect(QR.nodes.status.value).toBe('7');
+    updateSpy.mockRestore();
+  });
+
+  it('keeps QR.cooldown.auto when outside typing window, delay is 0, or editing a queued post', () => {
+    Conf['Post on Captcha Completion'] = true;
+    Conf['Auto-post typing delay'] = 5;
+    const updateSpy = vi.spyOn(QR.cooldown, 'update').mockImplementation(() => {});
+    const first = Object.assign(Object.create(QR.post.prototype), { thread: 123 });
+    const second = Object.assign(Object.create(QR.post.prototype), { thread: 123 });
+    QRState.posts = [first, second];
+    QR.cooldown.seconds = 8;
+    QR.cooldown.auto = true;
+
+    first.preventAutoPost();
+    expect(QR.cooldown.auto).toBe(true);
+    expect(first.lastEditedAt).toBeTypeOf('number');
+
+    QR.cooldown.seconds = 3;
+    second.preventAutoPost();
+    expect(QR.cooldown.auto).toBe(true);
+    expect(second.lastEditedAt).toBeUndefined();
+
+    Conf['Auto-post typing delay'] = 0;
+    first.preventAutoPost();
+    expect(QR.cooldown.auto).toBe(true);
+    updateSpy.mockRestore();
   });
 });
 

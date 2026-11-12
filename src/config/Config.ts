@@ -593,14 +593,14 @@ const Config = {
       'Post on Captcha Completion': [
         false,
         'Automatically submit the post when you select the final captcha answer (3/3, 4/4, 5/5, etc.), ' +
-          'even with <em>Next challenge on captcha selection</em> off. Posting cooldown and typing delay still apply.',
+          'even with <em>Next challenge on captcha selection</em> off. Posting cooldown and typing protection still apply.',
         1
       ],
       'Auto-post typing delay': [
         5,
-        'Seconds to wait after you stop typing before <em>Post on Captcha Completion</em> submits, ' +
-          'so a captcha that completes on its own cannot post a comment you are still writing. ' +
-          'Set to 0 to submit as soon as the captcha is done.',
+        'Seconds before cooldown ends or after editing the first post during which auto-posting is cancelled, ' +
+          'so editing near submit or an auto-completing captcha cannot send an unfinished comment. ' +
+          'Set to 0 to disable.',
         2
       ],
       'Next challenge on captcha selection': [
