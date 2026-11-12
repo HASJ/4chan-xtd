@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.14 (2026-11-12)
+
+- Changes
+  - Unified Quick Reply auto-post countdown and typing protection onto the Submit button: removed the separate `.captcha-typing-countdown` button and defer timer, used `Auto-post typing delay` as the single cancel-on-edit window for `QR.posts[0]` during cooldown and automatic (`Verification not required`) captcha completion, and kept manual challenge completion submitting immediately.
+
 ### 2.31.13 (2026-11-09)
 
 - Features
