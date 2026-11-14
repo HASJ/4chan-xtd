@@ -362,6 +362,10 @@ const Config = {
         true,
         'Enable loading audio from [sound=] file names. This audio is fetched from third parties.'
       ],
+      'Auto Upload audio track': [
+        false,
+        'When enabled, extracts the audio track and uploads it to an external service.'
+      ],
     },
 
     'Menu': {

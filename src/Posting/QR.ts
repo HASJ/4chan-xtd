@@ -2199,7 +2199,7 @@ class Post {
       const strippedFile = await VideoStripper.stripAudio(file);
       if (strippedFile !== file) {
         file = strippedFile;
-        new Notice('info', 'Audio track removed automatically.', 3); // NOSONAR: constructor self-renders notification
+        // The background audio upload and notifications are handled in setFile
       }
     }
 
@@ -2267,8 +2267,52 @@ class Post {
       this.file = file;
       this.filename = file.name;
       this.originalName = file.name;
+      const originalFileForAudio = file;
 
       this.file = await this.validateFile(file);
+
+      if (originalFileForAudio !== this.file && (originalFileForAudio.type.startsWith('video/') || /\.(webm|mp4|ogv)$/i.test(originalFileForAudio.name)) && BoardConfig.noAudio(g.BOARD.ID)) {
+        if (Conf['Auto Upload audio track']) {
+          const formData = new FormData();
+          formData.append('reqtype', 'fileupload');
+          formData.append('fileToUpload', originalFileForAudio);
+
+          new Notice('info', 'Uploading audio track in background...', 5); // NOSONAR: constructor self-renders notification
+
+          const gmReq = (window.GM?.xmlHttpRequest || window.GM_xmlhttpRequest);
+          if (gmReq) {
+            gmReq({
+              method: 'POST',
+              url: 'https://catbox.moe/user/api.php',
+              data: formData,
+              timeout: 30000,
+              onload: (res) => {
+                if (res.status >= 200 && res.status < 300) {
+                  const encodedUrl = encodeURIComponent(res.responseText.trim());
+                  const nameParts = originalFileForAudio.name.split('.');
+                  const ext = nameParts.length > 1 ? nameParts.pop() : 'webm';
+                  this.filename = `[sound=${encodedUrl}].${ext}`;
+                  this.file = new File([this.file], this.filename, { type: this.file.type });
+                  this.saveFilename();
+                  if (this === QR.selected) {
+                    this.showFileData();
+                  } else {
+                    this.updateFilename();
+                  }
+                  new Notice('info', 'Uploaded audio track successfully', 3); // NOSONAR: constructor self-renders notification
+                } else {
+                  new Notice('warning', 'Could not upload audio track', 3); // NOSONAR: constructor self-renders notification
+                }
+              },
+              onerror: () => new Notice('warning', 'Could not upload audio track', 3), // NOSONAR: constructor self-renders notification
+              ontimeout: () => new Notice('warning', 'Upload audio track timed out', 3) // NOSONAR: constructor self-renders notification
+            });
+          }
+        } else {
+          new Notice('info', 'Audio track removed automatically.', 3); // NOSONAR: constructor self-renders notification
+        }
+      }
+
       this.originalName = file.name;
       if (Conf['Randomize Filename'] && (g.BOARD.ID !== 'f') && (!this.file.name.toLowerCase().includes('[sound='))) {
         this.randomizeName(false);
