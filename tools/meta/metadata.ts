@@ -51,6 +51,7 @@ export default async function generateMetadata(packageJson: any, fileName: any) 
 // @connect      api.dailymotion.com
 // @connect      api.github.com
 // @connect      soundcloud.com
+// @connect      store.steampowered.com
 // @connect      api.streamable.com
 // @connect      vimeo.com
 // @connect      www.youtube.com

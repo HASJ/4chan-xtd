@@ -16,6 +16,7 @@ import linkifyLiveleak from './linkify.liveleak.png';
 import linkifyPastebin from './linkify.pastebin.png';
 import linkifyPeertube from './linkify.peertube.png';
 import linkifySoundcloud from './linkify.soundcloud.png';
+import linkifySteam from './linkify.steam.png';
 import linkifyStreamable from './linkify.streamable.png';
 import linkifyTwitchtv from './linkify.twitchtv.png';
 import linkifyX from './linkify.x.png';
@@ -40,8 +41,9 @@ import { g } from '../globals/globals';
 import iconCss from '../Icons/icons.css';
 
 import fxTwitterCss from '../Linkification/Embedding/FxTwitter.css';
+import steamCss from '../Linkification/Embedding/Steam.css';
 
-const mainCSS = style + variableBase + yotsuba +yotsubaB+futaba+burichan+tomorrow + photon + spooky + iconCss + fxTwitterCss;
+const mainCSS = style + variableBase + yotsuba +yotsubaB+futaba+burichan+tomorrow + photon + spooky + iconCss + fxTwitterCss + steamCss;
 const faIcons: { name: string, data: string }[] = [
   { name: "audio", data: linkifyAudio },
   { name: "bitchute", data: linkifyBitchute },
@@ -55,6 +57,7 @@ const faIcons: { name: string, data: string }[] = [
   { name: "pastebin", data: linkifyPastebin },
   { name: "peertube", data: linkifyPeertube },
   { name: "soundcloud", data: linkifySoundcloud },
+  { name: "steam", data: linkifySteam },
   { name: "streamable", data: linkifyStreamable },
   { name: "twitchtv", data: linkifyTwitchtv },
   { name: "twitter", data: linkifyX },

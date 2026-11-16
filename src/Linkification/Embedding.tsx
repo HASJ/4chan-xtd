@@ -16,6 +16,7 @@ import CrossOrigin from '../platform/CrossOrigin';
 import { dict } from '../platform/helpers';
 import EmbeddingPage from './Embedding/Embed.html';
 import EmbedFxTwitter from './Embedding/FxTwitter';
+import EmbedSteam from './Embedding/Steam';
 import Icon from '../Icons/icon';
 
 const Embedding = {
@@ -536,6 +537,22 @@ const Embedding = {
       title: {
         api(uid) { return `${location.protocol}//soundcloud.com/oembed?format=json&url=https%3A%2F%2Fsoundcloud.com%2F${encodeURIComponent(uid)}`; },
         text(_) { return _.title; }
+      }
+    }
+    , {
+      key: 'Steam',
+      regExp: /^\w+:\/\/store\.steampowered\.com\/app\/(\d+)(?:\/([^?#]*))?/,
+      style: '',
+      el(a) {
+        return EmbedSteam(a);
+      },
+      title: {
+        api(uid) { return `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(uid)}&filters=basic`; },
+        text(_, uid) { return _?.[uid]?.data?.name; }
+      },
+      preview: {
+        url(uid) { return `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${uid}/header.jpg`; },
+        height: 215
       }
     }
     , {

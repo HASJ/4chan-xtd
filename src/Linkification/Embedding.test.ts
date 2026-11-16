@@ -151,4 +151,33 @@ describe('Embedding & Linkify for YouTube', () => {
       div.remove();
     });
   });
+
+  describe('Steam URLs', () => {
+    it('matches store.steampowered.com/app/<id> URLs with and without slug', () => {
+      const urls = [
+        'https://store.steampowered.com/app/413150',
+        'https://store.steampowered.com/app/413150/Stardew_Valley/',
+        'http://store.steampowered.com/app/413150/?snr=1_7_15__13',
+      ];
+      for (const url of urls) {
+        const a = document.createElement('a');
+        a.href = url;
+        const data = Embedding.services(a);
+        expect(data?.key).toBe('Steam');
+        expect(data?.uid).toBe('413150');
+      }
+    });
+
+    it('linkifies Steam store URLs in post text', () => {
+      const div = document.createElement('div');
+      div.textContent = 'Check out https://store.steampowered.com/app/413150/Stardew_Valley/ right now';
+      document.body.appendChild(div);
+      const links = Linkify.process(div);
+      expect(links).toHaveLength(1);
+      const data = Embedding.services(links[0]);
+      expect(data?.key).toBe('Steam');
+      expect(data?.uid).toBe('413150');
+      div.remove();
+    });
+  });
 });
