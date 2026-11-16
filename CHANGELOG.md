@@ -3,6 +3,11 @@
 4chan XTd uses a different user script namespace than 4chan X, so to migrate you need to export settings from 4chan X,
 and import them in XTd.
 
+### 2.31.15 (2026-11-16)
+
+- Features
+  - Added Steam Store URL (`store.steampowered.com/app/<id>`) embed with game short description, release date, developer(s), publisher(s), link title, cover preview, and an interactive media gallery for all videos and screenshots (with click-to-play video previews and MSE HLS support).
+
 ### 2.31.14 (2026-11-12)
 
 - Changes
